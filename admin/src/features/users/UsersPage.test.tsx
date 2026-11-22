@@ -113,6 +113,95 @@ describe('UsersPage', () => {
     expect(last?.query.get('page')).toBe('0');
   });
 
+  describe('role filter', () => {
+    const SUPPORT_TIER_2 = { code: 'SUPPORT_TIER_2', name: 'Support Tier 2', system: false };
+
+    it('offers a custom role nobody on the page holds and filters the list by it', async () => {
+      const calls = stubApi({
+        [ME_PATH]: { status: 200, body: ADMIN_ME },
+        [STATS_PATH]: STATS,
+        [LIST_PATH]: pageOf([ALICE], { total: 60 }),
+        'GET /api/v1/admin/roles': { status: 200, body: [SUPPORT_TIER_2] },
+      });
+      renderRoute('/users', '/users', <UsersPage />);
+      await screen.findByText(ALICE.email);
+
+      const role = screen.getByLabelText('Role', { selector: '#users-role' });
+      await screen.findByRole('option', { name: 'Support Tier 2' });
+      await userEvent.selectOptions(role, 'SUPPORT_TIER_2');
+
+      await waitFor(() =>
+        expect(
+          calls.filter((call) => call.path === '/api/v1/users').at(-1)?.query.get('role'),
+        ).toBe('SUPPORT_TIER_2'),
+      );
+    });
+
+    it('keeps the built-in roles and the role in the address without the role list', async () => {
+      stubApi({
+        [ME_PATH]: {
+          status: 200,
+          body: staffMe('OPERATION_MANAGER', ['user.account.view']),
+        },
+        [STATS_PATH]: STATS,
+        [LIST_PATH]: pageOf([ALICE]),
+      });
+      renderRoute('/users', '/users?role=SUPPORT_TIER_2', <UsersPage />);
+      await screen.findByText(ALICE.email);
+
+      const role = screen.getByLabelText('Role', { selector: '#users-role' });
+      expect(within(role).getByRole('option', { name: 'Creator' })).toBeInTheDocument();
+      expect(role).toHaveValue('SUPPORT_TIER_2');
+    });
+  });
+
+  describe('statistics', () => {
+    it('says the statistics failed, keeps the table and recovers on Retry', async () => {
+      let statsReply: { status: number; body: unknown } = {
+        status: 500,
+        body: { status: 500, detail: 'boom' },
+      };
+      stubApi({
+        [ME_PATH]: { status: 200, body: ADMIN_ME },
+        [STATS_PATH]: () => statsReply,
+        [LIST_PATH]: pageOf([ALICE]),
+      });
+      renderRoute('/users', '/users', <UsersPage />);
+      await screen.findByText(ALICE.email);
+
+      const message = await screen.findByText('Could not load user statistics.');
+      expect(screen.queryByRole('region', { name: 'User statistics' })).not.toBeInTheDocument();
+      expect(screen.getByText(ALICE.email)).toBeInTheDocument();
+
+      statsReply = STATS;
+      await userEvent.click(
+        within(message.closest('[role="alert"]') as HTMLElement).getByRole('button', {
+          name: 'Retry',
+        }),
+      );
+
+      expect(await screen.findByRole('region', { name: 'User statistics' })).toBeInTheDocument();
+      expect(screen.queryByText('Could not load user statistics.')).not.toBeInTheDocument();
+    });
+
+    it('keeps the cards already shown when a refresh of the statistics fails', async () => {
+      let statsReply: { status: number; body: unknown } = STATS;
+      stubApi({
+        [ME_PATH]: { status: 200, body: ADMIN_ME },
+        [STATS_PATH]: () => statsReply,
+        [LIST_PATH]: pageOf([ALICE]),
+      });
+      renderRoute('/users', '/users', <UsersPage />);
+      await screen.findByRole('region', { name: 'User statistics' });
+
+      statsReply = { status: 500, body: { status: 500, detail: 'boom' } };
+      await userEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+      await screen.findByText('Could not load user statistics.');
+      expect(screen.getByRole('region', { name: 'User statistics' })).toBeInTheDocument();
+    });
+  });
+
   describe('account control', () => {
     it('hides edit for a staff row without the admin-account key and says why', async () => {
       const support = {
