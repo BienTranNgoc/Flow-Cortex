@@ -13,5 +13,15 @@
       "critical": "số dư rất thấp",
       "exhausted": "đã hết Credit"
     }
+  },
+  "banner": {
+    "title": "Credit",
+    "balance": "{{amount}} Credit",
+    "used": "Đã dùng {{used}} / {{granted}} Credit",
+    "warning": {
+      "low": "Số dư đang thấp. Hãy nạp thêm trước lần chạy tiếp theo.",
+      "critical": "Số dư rất thấp. Các lượt chạy có thể sớm bị từ chối.",
+      "exhausted": "Bạn đã hết Credit. Các lượt chạy bị từ chối cho đến khi có thêm."
+    }
   }
 }

@@ -24,6 +24,11 @@ RUN npm run build -w admin
 
 # --- runtime stage: serve the bundle behind an unprivileged nginx (port 8080) --
 FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
-COPY admin/nginx.conf /etc/nginx/conf.d/default.conf
+# The image's start script renders the template into conf.d with envsubst. Only MEDIA_ORIGIN is
+# substituted, so nginx's own $variables stay; an empty default keeps the CSP at 'self' alone
+# when the deployment does not set it.
+ENV MEDIA_ORIGIN="" \
+    NGINX_ENVSUBST_FILTER="^MEDIA_ORIGIN$"
+COPY admin/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/admin/dist /usr/share/nginx/html
 EXPOSE 8080

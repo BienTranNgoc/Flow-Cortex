@@ -4,6 +4,7 @@ import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.UserEmail;
+import com.flowcortex.user.infrastructure.UserName;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -48,5 +49,14 @@ class UserDirectoryImpl implements UserDirectory {
             return Map.of();
         }
         return userRepository.findEmailsByIdIn(ids).stream().collect(Collectors.toMap(UserEmail::id, UserEmail::email));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, String> findNamesByIds(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findNamesByIdIn(ids).stream().collect(Collectors.toMap(UserName::id, UserName::name));
     }
 }

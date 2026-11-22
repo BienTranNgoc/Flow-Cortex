@@ -1,6 +1,7 @@
 name: compose-smoke
 
-# Checks egress isolation, builds every image, starts the whole compose stack and runs
+# Checks egress isolation, builds every image, checks the admin console's CSP names the store
+# origin (scripts/check-admin-csp.sh), starts the whole compose stack and runs
 # scripts/smoke-probe.sh: upload a clip, check it on the worker, download the
 # report, see the run in the admin list, fail a text file with probe_failed, and
 # carry a Product Video run through the fixture provider worker, a script
@@ -34,6 +35,7 @@ jobs:
                      GF_SECURITY_ADMIN_PASSWORD POSTGRES_EXPORTER_PASSWORD; do
             sed -i "s|^$key=.*|$key=$(openssl rand -hex 24)|" .env
           done
+          sed -i "s|^FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1=.*|FLOWCORTEX_CONNECTORS_ENCRYPTION_KEYS_K1=$(openssl rand -base64 32)|" .env
           if grep -nE '^[A-Z0-9_]+=change-me' .env; then
             echo "::error::.env still holds a change-me placeholder"
             exit 1
@@ -41,6 +43,15 @@ jobs:
 
       - name: Egress isolation
         run: scripts/check-egress-isolation.sh
+
+      - name: Check alert rules
+        # Same promtool image as the observability overlay's Prometheus.
+        run: |
+          promtool_image=prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+          docker run --rm -v "$PWD:/work:ro" -w /work --entrypoint promtool "$promtool_image" \
+            check rules observability/rules/worker-queues.yml
+          docker run --rm -v "$PWD:/work:ro" -w /work --entrypoint promtool "$promtool_image" \
+            test rules observability/rules-tests/worker-queues.test.yaml
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -61,8 +72,16 @@ jobs:
             admin.cache-from=type=gha,scope=admin
             admin.cache-to=type=gha,scope=admin,mode=max
 
+      - name: Admin content security policy
+        run: scripts/check-admin-csp.sh
+
       - name: Start the stack
         run: SPRING_PROFILES_ACTIVE=dev docker compose up -d --no-build --wait --wait-timeout 300
+
+      - name: Admin CSP names the store origin the backend signs for
+        run: |
+          origin="$(docker compose exec -T backend sh -c 'printf %s "$S3_PUBLIC_ENDPOINT"')"
+          ADMIN_URL=http://localhost:5174 EXPECTED_MEDIA_ORIGIN="$origin" scripts/check-admin-csp.sh
 
       - name: Readiness
         run: curl -fsS localhost:8080/readyz

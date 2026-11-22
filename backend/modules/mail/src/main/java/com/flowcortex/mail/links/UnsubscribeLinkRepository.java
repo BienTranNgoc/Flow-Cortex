@@ -71,13 +71,31 @@ class UnsubscribeLinkRepository {
      * @return whether this call changed anything
      */
     boolean apply(UUID linkId, UUID memberId, LinkList list, LinkSource source, String mailKey) {
+        return flip(linkId, memberId, list, source, mailKey, "now()", "IS NULL", "unsubscribe");
+    }
+
+    /**
+     * Rejoins the list with the same one-statement guard as {@link #apply}: only the call that clears a set
+     * column writes the history row.
+     *
+     * @return whether this call changed anything
+     */
+    boolean clear(UUID linkId, UUID memberId, LinkList list, LinkSource source) {
+        return flip(linkId, memberId, list, source, null, "NULL", "IS NOT NULL", "resubscribe");
+    }
+
+    /** {@code newValue}, {@code guard} and {@code action} are constants of the two callers, never user input. */
+    private boolean flip(UUID linkId, UUID memberId, LinkList list, LinkSource source, String mailKey,
+            String newValue, String guard, String action) {
         List<UUID> recorded = jdbc.query("WITH flipped AS (UPDATE mail_unsubscribe_link SET " + list.column()
-                        + " = now() WHERE id = :id AND " + list.column() + " IS NULL RETURNING id) "
-                        + "INSERT INTO mail_unsubscribe_history (id, user_id, list, source, mail_key, created_at) "
-                        + "SELECT :historyId, :userId, :list, :source, :mailKey, now() FROM flipped RETURNING id",
+                        + " = " + newValue + " WHERE id = :id AND " + list.column() + " " + guard + " RETURNING id) "
+                        + "INSERT INTO mail_unsubscribe_history (id, user_id, list, source, mail_key, action, "
+                        + "created_at) SELECT :historyId, :userId, :list, :source, :mailKey, :action, now() "
+                        + "FROM flipped RETURNING id",
                 new MapSqlParameterSource("id", linkId).addValue("historyId", UUID.randomUUID())
                         .addValue("userId", memberId).addValue("list", list.wire())
-                        .addValue("source", source.wire()).addValue("mailKey", mailKey, Types.VARCHAR),
+                        .addValue("source", source.wire()).addValue("mailKey", mailKey, Types.VARCHAR)
+                        .addValue("action", action),
                 (rs, row) -> rs.getObject("id", UUID.class));
         return !recorded.isEmpty();
     }

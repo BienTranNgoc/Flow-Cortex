@@ -5,6 +5,8 @@ plugins {
 dependencies {
     // UploadRejectedException, part of the api package, carries a LocalizedMessage.
     api(project(":shared:web"))
+    implementation(project(":modules:space"))
+    implementation(project(":modules:jobs"))
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     // Modulith externalizes @Externalized events to the broker through the event
     // publication registry (the outbox the workflow module already persists).
@@ -38,4 +40,10 @@ tasks.withType<Test> {
     inputs.dir(rootProject.projectDir.parentFile.resolve("contracts"))
         .withPropertyName("contracts")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // The backend's object-store policy, applied to a real store by the policy IT.
+    val backendPolicy = rootProject.projectDir.parentFile.resolve("infra/minio/backend-policy.json")
+    systemProperty("flowcortex.backend-policy", backendPolicy.absolutePath)
+    inputs.file(backendPolicy)
+        .withPropertyName("backendPolicy")
+        .withPathSensitivity(PathSensitivity.NONE)
 }

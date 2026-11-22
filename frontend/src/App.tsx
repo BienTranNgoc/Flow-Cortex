@@ -12,9 +12,9 @@ import { HomePage } from './app/HomePage';
 import { IntegrationsPage } from './app/IntegrationsPage';
 import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
-import { RunsPage } from './app/RunsPage';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
+import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
@@ -29,6 +29,9 @@ import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
 import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
+import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
+import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
+import { NotificationsPage } from './features/notifications/NotificationsPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -64,6 +67,22 @@ function SupportWidgetWhenOn() {
         <SupportWidget />
       </Suspense>
     </ErrorBoundary>
+  ) : null;
+}
+
+// A failed chunk renders nothing: the route element sits outside ContainedOutlet's ErrorBoundary.
+const OnboardingFlow = lazy(() =>
+  import('./features/onboarding/OnboardingFlow')
+    .then((module) => ({ default: module.OnboardingFlow }))
+    .catch(() => ({ default: () => null })),
+);
+
+function OnboardingFlowWhenOn() {
+  const { onboarding } = useFeatures();
+  return onboarding ? (
+    <Suspense fallback={null}>
+      <OnboardingFlow />
+    </Suspense>
   ) : null;
 }
 
@@ -106,6 +125,7 @@ export function App() {
                 <PasswordSetupGate>
                   <PhoneGate>
                     <Layout />
+                    <OnboardingFlowWhenOn />
                   </PhoneGate>
                 </PasswordSetupGate>
               </RequireAuth>
@@ -114,10 +134,13 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />
-              {demoPagesEnabled() && <Route path="runs" element={<RunsPage />} />}
+              <Route path="runs" element={<RunHistoryPage />} />
               <Route path="runs/:runId" element={<RunProgressPage />} />
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
               <Route path="chat" element={chatPage} />

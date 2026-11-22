@@ -35,7 +35,12 @@ services:
 
   minio:
     environment:
-      MINIO_API_CORS_ALLOW_ORIGIN: https://app.${DOMAIN:?Set DOMAIN (see .env.example)}
+      MINIO_API_CORS_ALLOW_ORIGIN: https://app.${DOMAIN:?Set DOMAIN (see .env.example)},https://admin.${DOMAIN:?Set DOMAIN (see .env.example)}
+
+  # The console's CSP names the store's public origin, the one its uploads and media go to.
+  admin:
+    environment:
+      MEDIA_ORIGIN: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
 
   # The allowlist lives outside the checkout on the host: it needs the SMTP relay
   # host, which differs per deployment. Replaces the base file's mount list.
@@ -70,6 +75,9 @@ services:
       # No dev fallback: with the assistant on, a blank secret stops startup instead of keying
       # guest hashes with the key published in docker-compose.yml.
       FLOWCORTEX_SUPPORT_HASH_SECRET: ${FLOWCORTEX_SUPPORT_HASH_SECRET:-}
+      # Same rule for the share access-log hashes: a blank value stops startup instead of
+      # falling back to the dev key published in docker-compose.yml.
+      FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:-}
 
   # Seedance and Wan read the product photo through a presigned URL on this host.
   provider-video-worker:

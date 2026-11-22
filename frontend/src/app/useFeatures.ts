@@ -11,6 +11,7 @@ const ALL_OFF: FeaturesResponse = {
   supportWidget: false,
   supportAssistant: false,
   personalAccessTokens: false,
+  onboarding: false,
   chat: false,
 };
 
