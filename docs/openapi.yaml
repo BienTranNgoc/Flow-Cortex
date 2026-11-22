@@ -2414,8 +2414,8 @@ paths:
               $ref: "#/components/schemas/DriveUploadRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           content:
             application/json:
               schema:
@@ -2433,8 +2433,8 @@ paths:
           type: string
           format: uuid
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
     delete:
       tags:
       - memory-controller
@@ -2447,8 +2447,8 @@ paths:
           type: string
           format: uuid
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
   /api/v1/drive/memory/{id}/hide:
     post:
       tags:
@@ -2462,8 +2462,8 @@ paths:
           type: string
           format: uuid
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
   /api/v1/drive/items:
     get:
       tags:
@@ -2516,8 +2516,8 @@ paths:
               $ref: "#/components/schemas/CreateDriveItemRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           content:
             application/json:
               schema:
@@ -4152,8 +4152,8 @@ paths:
           type: string
           format: uuid
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
     patch:
       tags:
       - drive-items-controller

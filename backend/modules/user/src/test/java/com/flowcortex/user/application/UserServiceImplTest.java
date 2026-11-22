@@ -149,6 +149,38 @@ class UserServiceImplTest {
     }
 
     @Test
+    void demotingAnAdminRevokesItsTokensButKeepsItsSessions() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser admin = ownedUser(ownerId, Role.ADMIN);
+
+        service.updateUser(ownerId, admin.getId(), null, null, "MEMBER", null);
+
+        verify(accountCredentials).revokePersonalAccessTokensOnDemotion(admin.getId());
+        verify(accountCredentials, never()).revokeAllFor(any());
+    }
+
+    @Test
+    void demotingAndSuspendingTogetherRevokesEverythingOnce() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser admin = ownedUser(ownerId, Role.ADMIN);
+
+        service.updateUser(ownerId, admin.getId(), null, null, "MEMBER", "SUSPENDED");
+
+        verify(accountCredentials).revokeAllFor(admin.getId());
+        verify(accountCredentials, never()).revokePersonalAccessTokensOnDemotion(any());
+    }
+
+    @Test
+    void changingAMembersRoleLeavesTheTokensAlone() {
+        UUID ownerId = UUID.randomUUID();
+        AppUser member = ownedUser(ownerId, Role.MEMBER);
+
+        service.updateUser(ownerId, member.getId(), null, null, "CREATOR", null);
+
+        verify(accountCredentials, never()).revokePersonalAccessTokensOnDemotion(any());
+    }
+
+    @Test
     void anEmailChangeRetiresTheAccountsOpenEmailedLinks() {
         UUID ownerId = UUID.randomUUID();
         AppUser member = ownedMember(ownerId, UserStatus.ACTIVE);
@@ -196,8 +228,16 @@ class UserServiceImplTest {
     }
 
     private AppUser ownedMember(UUID ownerId, UserStatus status) {
+        return ownedUser(ownerId, Role.MEMBER, status);
+    }
+
+    private AppUser ownedUser(UUID ownerId, Role role) {
+        return ownedUser(ownerId, role, UserStatus.ACTIVE);
+    }
+
+    private AppUser ownedUser(UUID ownerId, Role role, UserStatus status) {
         AppUser member = new AppUser(UUID.randomUUID(), ownerId, "person@example.com", "$2a$hash", "Person",
-                Role.MEMBER, status);
+                role, status);
         when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
         when(repository.findByOwnerIdAndId(ownerId, member.getId())).thenReturn(Optional.of(member));
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));

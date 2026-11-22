@@ -1,9 +1,12 @@
 package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.user.api.StepUpProofs;
 import com.flowcortex.user.api.StepUpPurpose;
+import com.flowcortex.user.api.StepUpRequiredException;
+import com.flowcortex.user.application.AccountCredentials;
 import com.flowcortex.user.application.AuthRetentionJob;
 import com.flowcortex.user.application.OpaqueTokens;
 import java.sql.Timestamp;
@@ -51,6 +54,9 @@ class PersonalAccessTokenIT extends AbstractUserModuleIT {
 
     @Autowired
     private StepUpProofs stepUpProofs;
+
+    @Autowired
+    private AccountCredentials accountCredentials;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -271,6 +277,34 @@ class PersonalAccessTokenIT extends AbstractUserModuleIT {
         assertThat(jdbc.queryForObject("SELECT locked_until > now() FROM app_user WHERE id = ?", Boolean.class,
                 locked.id())).isTrue();
         assertThat(status("/api/v1/workflows", HttpMethod.GET, lockedToken)).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void aDemotedAdminsTokenStaysRefusedAfterThePromotionIsReversed() {
+        Account owner = admin("promoter");
+        String email = uniqueEmail("flip");
+        UUID id = userService.createUser(owner.id(), email, PASSWORD, "Flip Admin", "ADMIN").id();
+        Account flipped = new Account(id, email, login(email, PASSWORD));
+        String token = createToken(flipped, "flip");
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, token)).isEqualTo(HttpStatus.OK);
+
+        userService.updateUser(owner.id(), id, null, null, "MEMBER", null);
+        userService.updateUser(owner.id(), id, null, null, "ADMIN", null);
+
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, token)).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_event WHERE user_id = ? AND type = 'PAT_REVOKED'"
+                + " AND metadata->>'reason' = 'role_demoted'", Integer.class, id)).isEqualTo(1);
+    }
+
+    @Test
+    void aStepUpProofMintedBeforeACredentialResetCannotBeSpentAfterIt() {
+        Account a = admin("proofreset");
+        String proof = proof(a);
+
+        accountCredentials.revokeAllFor(a.id());
+
+        assertThatThrownBy(() -> stepUpProofs.consume(a.id(), StepUpPurpose.PAT_CREATE, proof))
+                .isInstanceOf(StepUpRequiredException.class);
     }
 
     @Test

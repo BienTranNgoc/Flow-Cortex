@@ -959,6 +959,25 @@ describe('RunProgressPage', () => {
       );
     });
 
+    it('refreshes the run after a revision save without refetching the uploaded files', async () => {
+      const user = userEvent.setup();
+      const calls = renderScript([REVISION], {
+        [`POST ${REVISIONS}`]: {
+          status: 200,
+          body: { ...REVISION, id: 'rev2', revisionNumber: 2, content: 'Edited', reviewTaskVersion: 4 },
+        },
+      });
+      const reads = (path: string) => calls.filter((call) => call.path === path).length;
+
+      await user.clear(await screen.findByLabelText('Script to approve'));
+      await waitFor(() => expect(reads('/api/v1/runs/r1/inputs')).toBe(1));
+      await user.type(screen.getByLabelText('Script to approve'), 'Edited');
+      await user.click(screen.getByRole('button', { name: 'Save revision' }));
+
+      await waitFor(() => expect(reads('/api/v1/runs/r1')).toBeGreaterThan(1));
+      expect(reads('/api/v1/runs/r1/inputs')).toBe(1);
+    });
+
     it('approves the revision it is showing, not the text in the box', async () => {
       const user = userEvent.setup();
       const calls = renderScript([REVISION], {
