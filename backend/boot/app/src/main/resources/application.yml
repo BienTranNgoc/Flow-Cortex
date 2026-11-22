@@ -380,7 +380,8 @@ flowcortex:
   credits:
     enabled: ${FLOWCORTEX_CREDITS_ENABLED:false}
   # Payments region gate: off places nobody, shadow only counts callers outside Vietnam,
-  # enforce refuses them on payment-opening handlers. The refresh pace is for the registry download.
+  # enforce refuses them on payment-opening handlers. The mode is the configured layer of the console
+  # setting payment.region_gate.mode: a value stored there wins. The refresh pace is for the registry download.
   billing:
     region-gate:
       mode: ${FLOWCORTEX_BILLING_REGION_GATE_MODE:shadow}

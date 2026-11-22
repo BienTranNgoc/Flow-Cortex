@@ -16,6 +16,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { ProvidersPage } from './features/providers/ProvidersPage';
 import { RunDetailPage } from './features/runs/RunDetailPage';
+import { PaymentSettingsPage } from './features/paymentSettings/PaymentSettingsPage';
 import { RunsPage } from './features/runs/RunsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { SmsOutboxPage } from './features/smsOutbox/SmsOutboxPage';
@@ -40,6 +41,7 @@ const PAGES: Record<string, ReactElement> = {
   '/settings': <SettingsPage />,
   '/media-jobs': <MediaJobsPage />,
   '/admin-accounts': <AdminAccountsPage />,
+  '/payment-settings': <PaymentSettingsPage />,
   '/support/articles': <ArticlesPage />,
   '/support/groups': <TopicGroupsPage />,
   '/support/requests': <RequestsInboxPage />,

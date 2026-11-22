@@ -13,18 +13,18 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * Places the caller of a {@link PaymentsRegionGated} handler by the address the container resolved
  * ({@code getRemoteAddr()}, which honours the forwarded-header strategy) and refuses it under enforce.
- * The mode binds at startup.
+ * The mode is read once per gated request, so a console change applies to the next one.
  */
 class PaymentsRegionInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     private final PaymentsRegionService service;
-    private final PaymentsRegionGateMode mode;
+    private final PaymentsRegionModeSource modeSource;
     private final RegionTelemetry telemetry;
 
-    PaymentsRegionInterceptor(PaymentsRegionService service, PaymentsRegionProperties properties,
+    PaymentsRegionInterceptor(PaymentsRegionService service, PaymentsRegionModeSource modeSource,
             RegionTelemetry telemetry) {
         this.service = service;
-        this.mode = PaymentsRegionGateMode.parse(properties.mode());
+        this.modeSource = modeSource;
         this.telemetry = telemetry;
     }
 
@@ -35,7 +35,11 @@ class PaymentsRegionInterceptor implements HandlerInterceptor, WebMvcConfigurer 
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (mode == PaymentsRegionGateMode.OFF || !gated(handler)) {
+        if (!gated(handler)) {
+            return true;
+        }
+        PaymentsRegionGateMode mode = modeSource.current();
+        if (mode == PaymentsRegionGateMode.OFF) {
             return true;
         }
         RegionVerdict verdict = service.verdictFor(request.getRemoteAddr());

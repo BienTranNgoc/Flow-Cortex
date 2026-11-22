@@ -3,7 +3,10 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":modules:settings"))
+    implementation(project(":modules:user"))
     implementation(project(":shared:web"))
+    implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
