@@ -8,9 +8,11 @@ import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.CurrentUser;
+import com.flowcortex.user.api.OwnProfiles;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.user.authz.CallerFacts;
 import com.flowcortex.user.authz.CallerFactsLoader;
+import com.flowcortex.user.phone.PhoneGate;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -45,8 +47,8 @@ import org.springframework.web.bind.annotation.RestController;
  * confirmation ({@code confirm-email}, {@code resend-confirmation}), password reset by emailed
  * link ({@code forgot-password}, {@code reset-password}), Google OAuth callback
  * (authorize lives in {@link OAuthController}), refresh, logout, the caller's own profile
- * ({@code me}), and self-service name update
- * ({@code profile}). Email/role/status are admin-mediated only.
+ * ({@code me}), and self-service names update
+ * ({@code profile}: display, first and last name). Email/role/status are admin-mediated only.
  *
  * <p>Responses carry the access token only; the refresh token lives in an HttpOnly cookie that
  * refresh and logout read back (never a request body).
@@ -57,15 +59,19 @@ class AuthController {
 
     private final AuthService authService;
     private final UserDirectory userDirectory;
+    private final OwnProfiles ownProfiles;
     private final RefreshCookieSupport cookieSupport;
     private final CallerFactsLoader callerFacts;
+    private final PhoneGate phoneGate;
 
-    AuthController(AuthService authService, UserDirectory userDirectory, RefreshCookieSupport cookieSupport,
-            CallerFactsLoader callerFacts) {
+    AuthController(AuthService authService, UserDirectory userDirectory, OwnProfiles ownProfiles,
+            RefreshCookieSupport cookieSupport, CallerFactsLoader callerFacts, PhoneGate phoneGate) {
         this.authService = authService;
         this.userDirectory = userDirectory;
+        this.ownProfiles = ownProfiles;
         this.cookieSupport = cookieSupport;
         this.callerFacts = callerFacts;
+        this.phoneGate = phoneGate;
     }
 
     @SecurityRequirements
@@ -213,7 +219,7 @@ class AuthController {
         UUID id = subjectId(jwt);
         CurrentUser user = userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
-        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id)));
+        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id), phoneGate.holds(id)));
     }
 
     @PutMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -221,8 +227,10 @@ class AuthController {
     ResponseEntity<MeResponse> updateProfile(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ProfileUpdateRequest request) {
         UUID id = subjectId(jwt);
-        CurrentUser user = authService.updateOwnProfile(id, request.name());
-        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id)));
+        ownProfiles.updateNames(id, request.name(), request.firstName(), request.lastName());
+        CurrentUser user = userDirectory.findById(id)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
+        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id), phoneGate.holds(id)));
     }
 
     private static UUID subjectId(Jwt jwt) {
@@ -286,24 +294,29 @@ class AuthController {
         static final String RESET = "password_reset";
     }
 
-    record ProfileUpdateRequest(@NotBlank String name) {
+    /** The service stores the names trimmed; a blank first or last name clears it. */
+    record ProfileUpdateRequest(@NotBlank @Size(max = 255) String name, @Size(max = 100) String firstName,
+            @Size(max = 100) String lastName) {
     }
 
     /**
      * {@code passwordSetupRequired}: the account has no password and no Google sign-in, so once this
      * session ends nothing gets it back in; the app sends the member to set a password first.
      * {@code permissions}: the caller's effective admin keys sorted by key (empty for an end user and
-     * once deactivated); {@code adminDisabled}: the admin console access is deactivated.
+     * once deactivated); {@code adminDisabled}: the admin console access is deactivated;
+     * {@code phoneVerificationRequired}: the phone gate holds this caller until a number is verified.
      */
     record MeResponse(UUID id, String email, String name, String role, String status, boolean hasPassword,
             boolean passwordSetupRequired,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Permission> permissions,
-            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean adminDisabled) {
-        static MeResponse from(CurrentUser user, CallerFacts facts) {
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean adminDisabled,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean phoneVerificationRequired) {
+        static MeResponse from(CurrentUser user, CallerFacts facts, boolean phoneVerificationRequired) {
             List<Permission> keys = facts.effectiveKeys().stream()
                     .sorted(Comparator.comparing(Permission::key)).toList();
             return new MeResponse(user.id(), user.email(), user.name(), user.role(), user.status(),
-                    user.hasPassword(), user.passwordSetupRequired(), keys, facts.adminDisabled());
+                    user.hasPassword(), user.passwordSetupRequired(), keys, facts.adminDisabled(),
+                    phoneVerificationRequired);
         }
     }
 }

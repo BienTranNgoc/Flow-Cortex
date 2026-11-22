@@ -7,6 +7,9 @@ dependencies {
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:jobs"))
+    implementation(project(":modules:llm"))
+    implementation(project(":modules:connector"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
 
@@ -17,6 +20,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     // InputResolver parses a referenced step's JSON output directly.
     implementation("com.fasterxml.jackson.core:jackson-databind")
+    // The HTTP converter is Jackson 3, so request and response bodies are typed with its JsonNode.
+    implementation("tools.jackson.core:jackson-databind")
     // Persistent Event Publication Registry: an after-commit listener crash mid-run
     // redelivers instead of losing the run (schema: V2026.09.22.003__event_publication.sql).
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")
@@ -28,6 +33,9 @@ dependencies {
     // brings springdoc (and these annotations) at runtime, so compile-only here.
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
 
+    // Proves the artifact writer's output matches contracts/workflow-artifact.schema.json; the runtime parser is
+    // hand-written, so the validator stays off the runtime classpath.
+    testImplementation("com.networknt:json-schema-validator:${providers.gradleProperty("jsonSchemaValidatorVersion").get()}")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
     // The atomic step-claim IT needs a real Postgres (no H2), scoped to this module's

@@ -1,0 +1,27 @@
+{
+  "title": "Xác minh số điện thoại",
+  "eyebrow": "Quản trị",
+  "description": "Cách luồng xác minh số điện thoại được bật và kết nối trong backend đang chạy.",
+  "loading": "Đang tải trạng thái xác minh số điện thoại…",
+  "loadError": "Không tải được trạng thái xác minh số điện thoại.",
+  "retry": "Thử lại",
+  "on": "Bật",
+  "off": "Tắt",
+  "fields": {
+    "verification": "Xác minh số điện thoại",
+    "sender": "Bên gửi SMS",
+    "hashSecret": "Khóa băm",
+    "gate": "Cổng số điện thoại",
+    "dailyBudget": "Hạn mức mã mỗi ngày",
+    "sentLast24h": "Mã đã gửi trong 24 giờ qua"
+  },
+  "sender": {
+    "none": "Không có",
+    "outbox": "Hộp thư đi phát triển",
+    "custom": "Bên gửi tùy chỉnh"
+  },
+  "hashSecret": {
+    "configured": "Đã cấu hình",
+    "missing": "Chưa cấu hình"
+  }
+}

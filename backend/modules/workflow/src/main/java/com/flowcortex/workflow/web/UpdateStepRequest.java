@@ -1,8 +1,8 @@
 package com.flowcortex.workflow.web;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
+import tools.jackson.databind.JsonNode;
 
 /** A partial change: an absent or null field stays, an empty {@code name} or {@code inputRef} clears it. */
 record UpdateStepRequest(

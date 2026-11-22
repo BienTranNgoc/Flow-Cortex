@@ -338,7 +338,7 @@ class AdminRolesEndpointsIT extends AbstractUserModuleIT {
 
         ResponseEntity<RoleView> saved = put(ROLES + "/MATRIX_ROLE/permissions", token,
                 new ReplaceBody(List.of("support.ticket.view", "support.ticket.close", "workflow.workflow.manage",
-                        "support.ticket.view"), 0), RoleView.class);
+                        "workflow.workflow.view", "support.ticket.view"), 0), RoleView.class);
         ResponseEntity<String> stale = put(ROLES + "/MATRIX_ROLE/permissions", token,
                 new ReplaceBody(TICKET_VIEW, 0), String.class);
         ResponseEntity<String> missing = put(ROLES + "/NO_SUCH_ROLE/permissions", token,
@@ -351,13 +351,13 @@ class AdminRolesEndpointsIT extends AbstractUserModuleIT {
         assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(saved.getBody().permissionsVersion()).isOne();
         assertThat(saved.getBody().permissions()).containsExactly("support.ticket.close", "support.ticket.view",
-                "workflow.workflow.manage");
+                "workflow.workflow.manage", "workflow.workflow.view");
         assertThat(stale.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(unknownKey.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(negativeVersion.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(storedKeys("MATRIX_ROLE")).containsExactly("support.ticket.close", "support.ticket.view",
-                "workflow.workflow.manage");
+                "workflow.workflow.manage", "workflow.workflow.view");
     }
 
     @Test

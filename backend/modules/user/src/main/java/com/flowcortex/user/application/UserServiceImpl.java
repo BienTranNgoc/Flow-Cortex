@@ -37,7 +37,7 @@ class UserServiceImpl implements UserService {
 
     private final AppUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final RefreshTokenService refreshTokenService;
+    private final AccountCredentials accountCredentials;
     private final ApplicationEventPublisher events;
     private final EmailConfirmationService emailLinks;
     private final AdminPermissions adminPermissions;
@@ -46,14 +46,14 @@ class UserServiceImpl implements UserService {
     private final RoleCatalog roleCatalog;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
-            RefreshTokenService refreshTokenService, ApplicationEventPublisher events,
+            AccountCredentials accountCredentials, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
             SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard,
             RoleCatalog roleCatalog) {
         this.roleCatalog = roleCatalog;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.refreshTokenService = refreshTokenService;
+        this.accountCredentials = accountCredentials;
         this.events = events;
         this.emailLinks = emailLinks;
         this.adminPermissions = adminPermissions;
@@ -143,7 +143,7 @@ class UserServiceImpl implements UserService {
             if (newStatus == UserStatus.SUSPENDED) {
                 // Refresh tokens would otherwise keep minting access tokens for a suspended account,
                 // and its emailed links would work again once it is reactivated.
-                refreshTokenService.revokeAllFor(id);
+                accountCredentials.revokeAllFor(id);
                 emailLinks.retireOpenLinks(id);
             }
             // An account confirmed while suspended was never activated; listeners tolerate a repeat.

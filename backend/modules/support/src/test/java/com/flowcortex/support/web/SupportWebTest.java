@@ -3,7 +3,6 @@ package com.flowcortex.support.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,7 +11,11 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingSource;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.support.config.AssistantSwitch;
+import com.flowcortex.support.config.SupportSettingKeys;
 import com.flowcortex.support.config.SupportProperties;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.UserDirectory;
@@ -28,7 +31,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -108,23 +110,29 @@ class SupportWebTest {
 
     @Test
     void theSettingsNeedBothAssistantSwitchesAndHideAnEmptyContact() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(), eq(Boolean.class))).thenReturn(List.of(true), List.of(false), List.of());
+        Settings registry = mock(Settings.class);
+        when(registry.get(SupportSettingKeys.ASSISTANT_ENABLED)).thenReturn(
+                new SettingRead<>(true, true, SettingSource.STORED),
+                new SettingRead<>(false, false, SettingSource.STORED),
+                new SettingRead<>(true, true, SettingSource.DEFAULT),
+                new SettingRead<>(false, true, SettingSource.VETOED));
 
-        SupportSettingsController.SettingsResponse on = settings(properties(true, true, " "), jdbc);
-        SupportSettingsController.SettingsResponse consoleOff = settings(properties(true, true, "hotro@nodi.vn"), jdbc);
-        SupportSettingsController.SettingsResponse rowMissing = settings(properties(true, true, null), jdbc);
+        SupportSettingsController.SettingsResponse on = settings(properties(true, true, " "), registry);
+        SupportSettingsController.SettingsResponse consoleOff = settings(properties(true, true, "hotro@nodi.vn"),
+                registry);
+        SupportSettingsController.SettingsResponse nothingStored = settings(properties(true, true, null), registry);
 
         assertThat(on.contactEmail()).isNull();
         assertThat(on.assistantAvailable()).isTrue();
         assertThat(consoleOff.contactEmail()).isEqualTo("hotro@nodi.vn");
         assertThat(consoleOff.assistantAvailable()).isFalse();
-        assertThat(rowMissing.assistantAvailable()).isFalse();
-        assertThat(settings(properties(true, false, null), jdbc).assistantAvailable()).isFalse();
+        assertThat(nothingStored.assistantAvailable()).isTrue();
+        assertThat(settings(properties(true, false, null), registry).assistantAvailable()).isFalse();
     }
 
-    private static SupportSettingsController.SettingsResponse settings(SupportProperties properties, JdbcTemplate jdbc) {
-        return new SupportSettingsController(properties, new AssistantSwitch(properties, jdbc)).settings();
+    private static SupportSettingsController.SettingsResponse settings(SupportProperties properties,
+            Settings registry) {
+        return new SupportSettingsController(properties, new AssistantSwitch(properties, registry)).settings();
     }
 
     private SupportSwitchFilter filter(boolean enabled, boolean assistantEnabled) {
@@ -168,7 +176,7 @@ class SupportWebTest {
     private static SupportProperties properties(boolean enabled, boolean assistantEnabled, String contact) {
         return new SupportProperties(enabled, contact,
                 new SupportProperties.Assistant(assistantEnabled, "gemini-3.5-flash-lite", 2000, 50, 10, 100),
-                new SupportProperties.Mail("no-reply@flow-cortex.dev"));
+                new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
     }
 
     private static CurrentUser user(UUID id, String role) {

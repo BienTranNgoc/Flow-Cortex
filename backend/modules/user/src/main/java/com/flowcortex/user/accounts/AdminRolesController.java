@@ -2,6 +2,7 @@ package com.flowcortex.user.accounts;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.user.roles.RolePermissionService;
 import com.flowcortex.user.roles.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -71,6 +72,7 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "createAdminRole")
+    @AdminAudit(value = "role.create", resourceParam = "code", capture = {"name", "permissionKeys"})
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PostMapping(value = "/roles", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -80,6 +82,7 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "updateAdminRole")
+    @AdminAudit(value = "role.update", resourceParam = "code", capture = "name")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PatchMapping(value = "/roles/{code}", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -90,6 +93,7 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "deleteAdminRole")
+    @AdminAudit(value = "role.delete", resourceParam = "code")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @DeleteMapping("/roles/{code}")
     ResponseEntity<Void> delete(@PathVariable @Size(max = CODE_MAX) String code) {
@@ -98,6 +102,7 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "replaceAdminRolePermissions")
+    @AdminAudit(value = "role.replace_permissions", resourceParam = "code", capture = "keys")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PutMapping(value = "/roles/{code}/permissions", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)

@@ -84,6 +84,15 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Page<AppUser> searchByRoles(@Param("roles") Collection<Role> roles, @Param("pattern") String pattern,
             Pageable pageable);
 
+    boolean existsByUsernameAndIdNot(String username, UUID id);
+
+    /**
+     * Serialises every write of one username until the caller's transaction ends. The lock is taken
+     * after the caller's own row lock, always in that order.
+     */
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext('username:' || :name))", nativeQuery = true)
+    void lockUsername(@Param("name") String name);
+
     Optional<AppUser> findByGoogleSubject(String googleSubject);
 
     Optional<AppUser> findByOwnerIdAndEmail(UUID ownerId, String email);
@@ -95,4 +104,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     /** Ids and emails only, whatever the status: the rest of the row, the password hash included, stays unread. */
     @Query("SELECT new com.flowcortex.user.infrastructure.UserEmail(u.id, u.email) FROM AppUser u WHERE u.id IN :ids")
     List<UserEmail> findEmailsByIdIn(@Param("ids") Collection<UUID> ids);
+
+    /** Ids and display names only, whatever the status: the email and the password hash stay unread. */
+    @Query("SELECT new com.flowcortex.user.infrastructure.UserName(u.id, u.name) FROM AppUser u WHERE u.id IN :ids")
+    List<UserName> findNamesByIdIn(@Param("ids") Collection<UUID> ids);
 }

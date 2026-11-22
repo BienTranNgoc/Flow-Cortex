@@ -86,13 +86,16 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             return valid;
         }
 
-        /** What is wrong with the {@code outputInputs} step {@code order} declares in its config, or {@code null}. */
+        /**
+         * What is wrong with the config of step {@code order}: its {@code outputInputs} declaration,
+         * then its type's rule; or {@code null}.
+         */
         private static String configFault(NewWorkflowStep step, int order, boolean runsInline) {
             String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
-            return fault;
+            return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

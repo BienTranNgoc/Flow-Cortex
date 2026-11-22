@@ -1,9 +1,9 @@
 package com.flowcortex.workflow.web;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.flowcortex.workflow.api.NewStep;
 import com.flowcortex.workflow.api.StepEdit;
 import com.flowcortex.workflow.api.UpdateWorkflow;
+import tools.jackson.databind.JsonNode;
 
 /** Request-record to service-input mapping shared by the member and admin authoring controllers. */
 final class AuthoringRequests {
@@ -15,13 +15,9 @@ final class AuthoringRequests {
         return request.name().trim();
     }
 
-    static boolean shared(CreateWorkflowRequest request) {
-        return Boolean.TRUE.equals(request.shared());
-    }
-
     static UpdateWorkflow update(UpdateWorkflowRequest request) {
-        return new UpdateWorkflow(request.name() == null ? null : request.name().trim(), request.shared(),
-                request.status());
+        return new UpdateWorkflow(request.name() == null ? null : request.name().trim(), request.status(),
+                request.allowFork());
     }
 
     static NewStep newStep(CreateStepRequest request) {

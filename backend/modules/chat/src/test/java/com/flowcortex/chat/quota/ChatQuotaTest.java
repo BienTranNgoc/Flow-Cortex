@@ -5,6 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.chat.config.ChatProperties;
 import com.flowcortex.chat.web.ChatProblemException;
+import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
+import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
+import com.flowcortex.shared.ratelimit.RateLimiters;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,7 +33,13 @@ class ChatQuotaTest {
     private ChatQuota quota(int perMinute) {
         ChatProperties properties = new ChatProperties(true, "model", new ChatProperties.Quota(100, 5000, perMinute),
                 Duration.ofSeconds(90), Duration.ofSeconds(30), 4, 8, 32, 8192, 1024);
-        return new ChatQuota(ledger, new ChatMinuteLimiter(properties, clock), properties, clock);
+        return new ChatQuota(ledger, minuteLimiter(properties), properties, clock);
+    }
+
+    private ChatMinuteLimiter minuteLimiter(ChatProperties properties) {
+        RateLimiters limiters = new RateLimiters(List.of(ChatRateLimits.definition(properties)),
+                new InMemoryRateLimitStore(clock), new RateLimitTelemetry(new SimpleMeterRegistry(), clock));
+        return new ChatMinuteLimiter(limiters, clock);
     }
 
     @Test

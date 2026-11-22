@@ -22,15 +22,32 @@ dependencies {
     implementation(project(":modules:workflow"))
     implementation(project(":modules:media"))
     implementation(project(":modules:credit"))
+    implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
+    implementation(project(":modules:content"))
+    implementation(project(":modules:settings"))
     implementation(project(":modules:space"))
+    implementation(project(":modules:drive"))
+    implementation(project(":modules:profile"))
+    implementation(project(":modules:asset"))
     implementation(project(":modules:realtime"))
+    implementation(project(":modules:onboarding"))
+    implementation(project(":modules:notification"))
+    implementation(project(":modules:mail"))
+    implementation(project(":modules:connector"))
+    implementation(project(":modules:billing"))
     implementation(project(":modules:chat"))
+    implementation(project(":modules:notification"))
+    implementation(project(":modules:mail"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
+    implementation(project(":shared:ratelimit"))
+    // The limiter store builds its own Hikari pool from Boot's JdbcConnectionDetails.
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation(testFixtures(project(":shared:ratelimit")))
     // Boot 4 moved the MVC test slice out of spring-boot-starter-test.
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation(platform("org.testcontainers:testcontainers-bom:${providers.gradleProperty("testcontainersVersion").get()}"))
@@ -55,6 +72,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-resttestclient")
     testImplementation("org.springframework.boot:spring-boot-restclient")
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    // The publication ITs declare their own @ApplicationModuleListener probes.
+    testImplementation("org.springframework.modulith:spring-modulith-events-api")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.flywaydb:flyway-database-postgresql")
@@ -63,9 +82,9 @@ dependencies {
 
 tasks.withType<Test> {
     // Every distinct @SpringBootTest property set is its own cached context, each a full application.
-    // Evicting the least recently used keeps at most 8 alive. 1 GB was enough for this suite alone
-    // but ran out in CI once a branch added more contexts, so the heap is 2 GB (one test JVM, 16 GB runners).
-    maxHeapSize = "2g"
+    // Evicting the least recently used keeps at most 8 alive. Each context grows with every module, and
+    // 2 GB ran out in CI once eight full contexts were alive, so the heap is 3 GB (one test JVM, 16 GB runners).
+    maxHeapSize = "3g"
     systemProperty("spring.test.context.cache.maxSize", "8")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")
