@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   ApiError,
   authHeaders,
@@ -23,9 +24,14 @@ export function useAccountDeletionStatus() {
 
 /**
  * The conditions that stop the member from requesting deletion right now. Read only while `open`
- * and never kept: every opening of the dialog asks the server again.
+ * and never kept: the answer is dropped on close, so every opening waits for a fresh one instead
+ * of showing the previous opening's.
  */
 export function useDeletionEligibility(open: boolean) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!open) queryClient.removeQueries({ queryKey: ELIGIBILITY_KEY });
+  }, [open, queryClient]);
   return useQuery({
     queryKey: ELIGIBILITY_KEY,
     queryFn: () => unwrap(eligibilityRequest(authHeaders())),

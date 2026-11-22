@@ -1,10 +1,10 @@
 import { setToken } from '@flow-cortex/api-client';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import viAuth from '../../locales/vi/auth.json';
-import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
+import { renderRoute, settled, stubApi, type FakeReply } from '../../test/fakeApi';
 import { stubModalDialog } from '../../test/modalDialog';
 import { ProfilePage } from './ProfilePage';
 
@@ -252,6 +252,150 @@ describe('ProfilePage', () => {
       const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
       expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
       expect(screen.queryByText('Pending screen')).not.toBeInTheDocument();
+    });
+
+    function held() {
+      let release: (reply: FakeReply) => void = () => undefined;
+      const promise = new Promise<FakeReply>((resolve) => {
+        release = resolve;
+      });
+      return { promise, release };
+    }
+
+    it('keeps the dialog open on Escape while the request is being sent', async () => {
+      const request = held();
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: ELIGIBLE,
+        [STEP_UP]: PROOF,
+        [REQUEST]: () => request.promise,
+      });
+      const user = userEvent.setup();
+      renderWithPendingScreen();
+
+      await confirmAndEnterPassword(user);
+      const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+      await within(dialog).findByRole('button', { name: 'Submitting…' });
+      await user.keyboard('{Escape}');
+
+      expect(dialog).toHaveAttribute('open');
+      request.release(ACCEPTED);
+      expect(await screen.findByText('Pending screen')).toBeInTheDocument();
+    });
+
+    it('brings the dialog back when the browser closes it mid-request, and it can be closed and reopened afterwards', async () => {
+      const request = held();
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: ELIGIBLE,
+        [STEP_UP]: PROOF,
+        [REQUEST]: () => request.promise,
+      });
+      const user = userEvent.setup();
+      renderWithPendingScreen();
+
+      await confirmAndEnterPassword(user);
+      const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+      await within(dialog).findByRole('button', { name: 'Submitting…' });
+      act(() => (dialog as HTMLDialogElement).close());
+
+      expect(dialog).toHaveAttribute('open');
+      request.release(problem(500, 'internal'));
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+        'We could not send the request. Try again.',
+      );
+      await user.click(within(dialog).getByRole('button', { name: 'Keep my account' }));
+      await waitFor(() => expect(dialog).not.toHaveAttribute('open'));
+      await user.click(screen.getByRole('button', { name: 'Request deletion' }));
+      expect(await screen.findByRole('dialog', { name: 'Delete your account' })).toHaveAttribute('open');
+    });
+
+    it('waits for the new answer at every opening instead of showing the previous one', async () => {
+      let next: Promise<FakeReply> | null = null;
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: () =>
+          next ?? { status: 200, body: { eligible: false, reasons: [{ key: 'k', message: 'Busy.' }] } },
+      });
+      const user = userEvent.setup();
+      renderProfile();
+
+      await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+      await user.click(await screen.findByRole('button', { name: 'Close' }));
+      const answer = held();
+      next = answer.promise;
+      await user.click(screen.getByRole('button', { name: 'Request deletion' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent('Checking your account…');
+      expect(screen.queryByText('Busy.')).not.toBeInTheDocument();
+      answer.release(ELIGIBLE);
+      expect(await screen.findByRole('button', { name: 'Continue' })).toBeInTheDocument();
+    });
+
+    describe('background refetch of the eligibility check', () => {
+      const ELIGIBILITY_KEY = ['accountDeletion', 'eligibility'];
+
+      it('keeps the confirm view and the typed password', async () => {
+        let next: Promise<FakeReply> | null = null;
+        stubApi({
+          ...OWN_ROUTES,
+          [STATUS]: ON,
+          [ELIGIBILITY]: () => next ?? ELIGIBLE,
+          [STEP_UP]: PROOF,
+        });
+        const user = userEvent.setup();
+        const { queryClient } = renderProfile();
+
+        await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+        const keep = await within(dialog).findByRole('button', { name: 'Keep my account' });
+        const proceed = within(dialog).getByRole('button', { name: 'Continue' });
+        await user.click(proceed);
+        await user.type(await screen.findByLabelText('Password'), 'half typed');
+
+        const answer = held();
+        next = answer.promise;
+        void queryClient.refetchQueries({ queryKey: ELIGIBILITY_KEY });
+        await waitFor(() => expect(queryClient.isFetching({ queryKey: ELIGIBILITY_KEY })).toBe(1));
+
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(keep).toBeInTheDocument();
+        expect(proceed).toBeInTheDocument();
+        expect(screen.getByLabelText('Password')).toHaveValue('half typed');
+        answer.release(ELIGIBLE);
+        await settled(queryClient);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(keep).toBeInTheDocument();
+        expect(screen.getByLabelText('Password')).toHaveValue('half typed');
+      });
+
+      it('moves to the reasons, with focus kept inside the dialog, when a refetch says the member is blocked', async () => {
+        let next: Promise<FakeReply> | null = null;
+        stubApi({ ...OWN_ROUTES, [STATUS]: ON, [ELIGIBILITY]: () => next ?? ELIGIBLE });
+        const user = userEvent.setup();
+        const { queryClient } = renderProfile();
+
+        await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+        (await within(dialog).findByRole('button', { name: 'Continue' })).focus();
+
+        const answer = held();
+        next = answer.promise;
+        void queryClient.refetchQueries({ queryKey: ELIGIBILITY_KEY });
+        await waitFor(() => expect(queryClient.isFetching({ queryKey: ELIGIBILITY_KEY })).toBe(1));
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        answer.release({
+          status: 200,
+          body: { eligible: false, reasons: [{ key: 'k', message: 'A run is still in progress.' }] },
+        });
+
+        expect(await within(dialog).findByText('A run is still in progress.')).toBeInTheDocument();
+        expect(within(dialog).queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+        expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus();
+      });
     });
   });
 

@@ -31,6 +31,12 @@ function failureKey(failure: DeletionFailure): string {
   }
 }
 
+function viewOf(checking: boolean, checkFailed: boolean, blocked: boolean) {
+  if (checking) return 'checking';
+  if (checkFailed) return 'checkFailed';
+  return blocked ? 'blocked' : 'confirm';
+}
+
 /**
  * Steps of a deletion request as a native modal dialog: eligibility is read each time it opens;
  * a blocked account sees the reasons and can only close; an eligible one confirms, proves its
@@ -92,8 +98,23 @@ export function AccountDeletionDialog({
   let reasons: BlockReason[] | null = null;
   if (failure?.kind === 'blocked') reasons = failure.reasons;
   else if (eligibility.data && !eligibility.data.eligible) reasons = eligibility.data.reasons;
-  const checking = failure?.kind !== 'blocked' && (eligibility.isPending || eligibility.isFetching);
-  const checkFailed = failure?.kind !== 'blocked' && !checking && eligibility.isError;
+  // Only the first answer of an opening is awaited; a background refetch keeps the current view.
+  const checking =
+    failure?.kind !== 'blocked' &&
+    !eligibility.data &&
+    (eligibility.isPending || eligibility.isFetching);
+  const checkFailed =
+    failure?.kind !== 'blocked' && !checking && !eligibility.data && eligibility.isError;
+  const view = viewOf(checking, checkFailed, reasons !== null);
+
+  // A view swap unmounts the focused button; hand focus to the new view instead of the page.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!open || !dialog?.open || askingPassword) return;
+    if (!dialog.contains(document.activeElement)) {
+      dialog.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
+    }
+  }, [view, open, askingPassword]);
 
   let body;
   if (checking) {
@@ -188,9 +209,13 @@ export function AccountDeletionDialog({
           event.preventDefault();
           close();
         }}
-        // A browser may close the dialog on a repeated Escape despite `preventDefault`.
-        onClose={() => {
-          if (open) close();
+        // A browser may close the dialog on a repeated Escape despite `preventDefault`. A sent
+        // request cannot be dismissed, so the dialog is shown again to keep the DOM and `open` in
+        // step and to let the outcome be seen.
+        onClose={(event) => {
+          if (!open) return;
+          if (!submitting) onClose();
+          else if (!event.currentTarget.open) event.currentTarget.showModal();
         }}
       >
         <h2 id={titleId}>{t('auth.accountDeletion.dialog.title')}</h2>
