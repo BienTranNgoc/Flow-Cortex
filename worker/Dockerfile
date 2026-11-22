@@ -112,7 +112,7 @@ RUN mkdir -p /models/beat_this && cd /models/beat_this \
 # --- audio-runtime stage: ffmpeg, the venv with the engines, the models, the licences -----------
 FROM python:3.12-slim AS audio-runtime
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg libsndfile1 libgomp1 \
+ && apt-get install -y --no-install-recommends ffmpeg libgomp1 libsndfile1 \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --no-create-home worker \
  && install -d -m 0700 -o worker -g worker /run/flowcortex
