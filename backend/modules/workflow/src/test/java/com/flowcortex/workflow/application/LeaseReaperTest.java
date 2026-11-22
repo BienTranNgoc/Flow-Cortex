@@ -252,7 +252,7 @@ class LeaseReaperTest {
     void whenParallelClipsEnabledUsesTheParallelStalledQueryToRecoverPendingClip() {
         LeaseReaper parallelReaper = new LeaseReaper(runStepRepository, workflowRunRepository,
                 new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
-                        mock(RunUpdates.class)),
+                        mock(RunUpdates.class), mock(ApplicationEventPublisher.class), mock(ChildRuns.class)),
                 new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), advancer, meters,
                 Clock.fixed(NOW, ZoneOffset.UTC), true);
         givenReapable(List.of(), 1);

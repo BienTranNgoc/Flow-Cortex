@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.TaskScheduler;
 
 class ProductVideoParallelDispatchTest {
@@ -64,6 +65,7 @@ class ProductVideoParallelDispatchTest {
     private final RunStepRepository stepRepo = mock(RunStepRepository.class);
     private final CreditAccounts creditAccounts = mock(CreditAccounts.class);
     private final RunUpdates runUpdates = mock(RunUpdates.class);
+    private final ChildRuns childRuns = mock(ChildRuns.class);
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final TaskScheduler scheduler = mock(TaskScheduler.class);
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
@@ -134,14 +136,14 @@ class ProductVideoParallelDispatchTest {
         }).when(mediaJobs).enqueue(any());
 
         when(creditAccounts.enabled()).thenReturn(true);
-        when(creditAccounts.debitForStep(any(), any(), any(), any())).thenAnswer(inv -> {
+        when(creditAccounts.debitForStep(any(), any(), any(), anyShort(), any())).thenAnswer(inv -> {
             creditEvents.add("debit:" + inv.getArgument(2));
             return true;
         });
         doAnswer(inv -> {
-            creditEvents.add("refund:" + inv.getArgument(1) + ":" + inv.getArgument(2));
+            creditEvents.add("refund:" + inv.getArgument(1) + ":" + inv.getArgument(3));
             return null;
-        }).when(creditAccounts).refundStep(any(), any(), any());
+        }).when(creditAccounts).refundStep(any(), any(), anyShort(), any());
 
         wireStatefulRepos();
 
@@ -156,14 +158,15 @@ class ProductVideoParallelDispatchTest {
                         Clock.fixed(NOW, ZoneOffset.UTC)),
                 new RemoteStepExecutor(MediaCapability.RENDER_VIDEO.value(), mediaJobs,
                         Clock.fixed(NOW, ZoneOffset.UTC))));
-        transactions = new RunStepTransactions(stepRepo, runRepo, creditAccounts, runUpdates);
+        transactions = new RunStepTransactions(stepRepo, runRepo, creditAccounts, runUpdates,
+                mock(ApplicationEventPublisher.class), childRuns);
         advancer = new RunAdvancer(runRepo, stepRepo, transactions, new InputResolver(), registry,
                 Runnable::run, Runnable::run, scheduler, Tracer.NOOP, ObservationRegistry.NOOP,
                 new SimpleMeterRegistry(), LEASE, Clock.fixed(NOW, ZoneOffset.UTC),
                 mock(ReviewCheckpointTransactions.class), mediaJobs, validator, null, true);
         jobControl = new WorkflowJobControl(runRepo, stepRepo);
         cancellation = new RunCancellation(runRepo, stepRepo, registry, mediaJobs,
-                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, true);
+                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, true);
     }
 
     private void wireStatefulRepos() {
@@ -429,7 +432,7 @@ class ProductVideoParallelDispatchTest {
 
     @Test
     void insufficientCreditsOnFirstClipBlocksSecondClip() {
-        when(creditAccounts.debitForStep(any(), any(), any(), any())).thenReturn(false);
+        when(creditAccounts.debitForStep(any(), any(), any(), anyShort(), any())).thenReturn(false);
 
         advancer.advance(runId);
 
@@ -441,7 +444,7 @@ class ProductVideoParallelDispatchTest {
 
     @Test
     void insufficientCreditsOnSecondClipTriggersCancelForFirst() {
-        when(creditAccounts.debitForStep(any(), any(), any(), any()))
+        when(creditAccounts.debitForStep(any(), any(), any(), anyShort(), any()))
                 .thenReturn(true)
                 .thenReturn(false);
 

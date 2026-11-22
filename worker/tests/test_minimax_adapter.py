@@ -65,6 +65,7 @@ def test_minimax_submit_uploads_multiple_reference_images(monkeypatch: pytest.Mo
     def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResponse:
         nonlocal file_counter
         content_type = req.get_header("Content-type") or ""
+        assert req.data is None or isinstance(req.data, bytes)
         calls.append((req.get_method(), req.full_url, content_type, req.data))
         if req.full_url.endswith("/files"):
             file_counter += 1
