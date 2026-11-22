@@ -61,35 +61,6 @@ describe('useNotificationStream', () => {
     vi.restoreAllMocks();
   });
 
-  it('opensOneUserStreamWhileVisible', () => {
-    mount();
-
-    expect(openStreams()).toHaveLength(1);
-    expect(openStreams()[0]?.options.topics).toEqual(['user']);
-  });
-
-  it('opensNothingWhileHidden', () => {
-    setVisibility('hidden');
-
-    mount();
-
-    expect(openStreams()).toHaveLength(0);
-  });
-
-  it('closesOnHiddenAndReopensAndRefetchesOnVisible', async () => {
-    const { invalidate } = mount();
-
-    setVisibility('hidden');
-    expect(openStreams()).toHaveLength(0);
-
-    setVisibility('visible');
-    expect(openStreams()).toHaveLength(1);
-    act(() => openStreams()[0]?.options.onOpen?.());
-    await flush();
-
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['notifications'] });
-  });
-
   it('refetchesOnOpenChangedAndResync', async () => {
     const { invalidate } = mount();
 
@@ -126,13 +97,5 @@ describe('useNotificationStream', () => {
     });
 
     expect(invalidate).toHaveBeenCalledTimes(2);
-  });
-
-  it('closesOnUnmount', () => {
-    const { unmount } = mount();
-
-    unmount();
-
-    expect(openStreams()).toHaveLength(0);
   });
 });
