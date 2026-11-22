@@ -8,7 +8,7 @@ import { UploadFailedError } from '../../workflow/uploadFile';
 import { rolesOf, type ContentType } from '../model/driveRoles';
 import { nameFromFileName } from '../model/keepSuggestion';
 import { fieldMessage, nameRoleSchema, showFieldRefusals, type NameRoleValues } from './formFields';
-import { FieldError, FormDialog, FormMessages } from './formParts';
+import { FieldError, FormActions, FormDialog, FormMessages, NameRoleFields } from './formParts';
 import { refusalOf } from './refusal';
 import { useUploadDriveItem } from './useDriveItems';
 
@@ -172,8 +172,6 @@ function UploadFields({
     })(event);
   };
 
-  const nameError = fieldMessage(errors.name, t);
-  const roleError = fieldMessage(errors.semanticRole, t);
   const fileError =
     fileMessage?.kind === 'server'
       ? fileMessage.message
@@ -207,36 +205,15 @@ function UploadFields({
         />
         <FieldError id={`${ids}-file-error`} message={fileError} />
       </div>
-      <div className="drive-field">
-        <label htmlFor={`${ids}-name`}>{t('driveItems.form.name')}</label>
-        <input
-          id={`${ids}-name`}
-          type="text"
-          autoComplete="off"
-          disabled={phase !== null}
-          aria-invalid={nameError ? true : undefined}
-          aria-describedby={nameError ? `${ids}-name-error` : undefined}
-          {...register('name')}
-        />
-        <FieldError id={`${ids}-name-error`} message={nameError} />
-      </div>
-      <div className="drive-field">
-        <label htmlFor={`${ids}-role`}>{t('driveItems.form.role')}</label>
-        <select
-          id={`${ids}-role`}
-          disabled={phase !== null}
-          aria-invalid={roleError ? true : undefined}
-          aria-describedby={roleError ? `${ids}-role-error` : undefined}
-          {...register('semanticRole')}
-        >
-          {roles.map((role) => (
-            <option key={role} value={role}>
-              {t(`drive.roles.${role}`, { defaultValue: role })}
-            </option>
-          ))}
-        </select>
-        <FieldError id={`${ids}-role-error`} message={roleError} />
-      </div>
+      <NameRoleFields
+        ids={ids}
+        name={register('name')}
+        role={register('semanticRole')}
+        nameError={fieldMessage(errors.name, t)}
+        roleError={fieldMessage(errors.semanticRole, t)}
+        roles={roles}
+        disabled={phase !== null}
+      />
       {phase && (
         <div className="drive-upload__phase">
           <p className="drive-upload__label">
@@ -258,28 +235,15 @@ function UploadFields({
       )}
       <output className="visually-hidden">{announced}</output>
       <FormMessages messages={messages} />
-      <div className="drive-dialog__actions">
-        <button
-          type="button"
-          className="drive-button"
-          aria-disabled={phase?.kind === 'saving' || undefined}
-          onClick={() => {
-            if (phase?.kind === 'saving') return;
-            if (phase) controllerRef.current?.abort();
-            else onClose();
-          }}
-        >
-          {t('drive.confirm.cancel')}
-        </button>
-        <button
-          type="submit"
-          className="drive-button drive-button--primary"
-          aria-disabled={phase !== null || undefined}
-          aria-busy={phase !== null || undefined}
-        >
-          {phase ? t('driveItems.form.saving') : t('driveItems.upload.submit')}
-        </button>
-      </div>
+      <FormActions
+        cancelBlocked={phase?.kind === 'saving'}
+        onCancel={() => {
+          if (phase) controllerRef.current?.abort();
+          else onClose();
+        }}
+        pending={phase !== null}
+        submitLabel={t('driveItems.upload.submit')}
+      />
     </form>
   );
 }

@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { keepDefaults, keepRequest } from '../model/keepSuggestion';
 import { fieldMessage, nameRoleSchema, showFieldRefusals, type NameRoleValues } from './formFields';
-import { FieldError, FormDialog, FormMessages } from './formParts';
+import { FormActions, FormDialog, FormMessages, NameRoleFields } from './formParts';
 import { refusalOf } from './refusal';
 import { useCreateDriveItem } from './useDriveItems';
 
@@ -76,60 +76,23 @@ function KeepFields({
     });
   });
 
-  const nameError = fieldMessage(errors.name, t);
-  const roleError = fieldMessage(errors.semanticRole, t);
-
   return (
     <form className="drive-form" noValidate onSubmit={onSubmit} aria-label={t('driveItems.keep.title')}>
-      <div className="drive-field">
-        <label htmlFor={`${ids}-name`}>{t('driveItems.form.name')}</label>
-        <input
-          id={`${ids}-name`}
-          type="text"
-          autoComplete="off"
-          aria-invalid={nameError ? true : undefined}
-          aria-describedby={nameError ? `${ids}-name-error` : undefined}
-          {...register('name')}
-        />
-        <FieldError id={`${ids}-name-error`} message={nameError} />
-      </div>
-      <div className="drive-field">
-        <label htmlFor={`${ids}-role`}>{t('driveItems.form.role')}</label>
-        <select
-          id={`${ids}-role`}
-          aria-invalid={roleError ? true : undefined}
-          aria-describedby={roleError ? `${ids}-role-error` : undefined}
-          {...register('semanticRole')}
-        >
-          {defaults.roles.map((role) => (
-            <option key={role} value={role}>
-              {t(`drive.roles.${role}`, { defaultValue: role })}
-            </option>
-          ))}
-        </select>
-        <FieldError id={`${ids}-role-error`} message={roleError} />
-      </div>
+      <NameRoleFields
+        ids={ids}
+        name={register('name')}
+        role={register('semanticRole')}
+        nameError={fieldMessage(errors.name, t)}
+        roleError={fieldMessage(errors.semanticRole, t)}
+        roles={defaults.roles}
+      />
       <FormMessages messages={messages} />
-      <div className="drive-dialog__actions">
-        <button
-          type="button"
-          className="drive-button"
-          aria-disabled={create.isPending || undefined}
-          onClick={() => {
-            if (!create.isPending) onClose();
-          }}
-        >
-          {t('drive.confirm.cancel')}
-        </button>
-        <button
-          type="submit"
-          className="drive-button drive-button--primary"
-          aria-disabled={create.isPending || undefined}
-          aria-busy={create.isPending || undefined}
-        >
-          {create.isPending ? t('driveItems.form.saving') : t('driveItems.keep.submit')}
-        </button>
-      </div>
+      <FormActions
+        cancelBlocked={create.isPending}
+        onCancel={onClose}
+        pending={create.isPending}
+        submitLabel={t('driveItems.keep.submit')}
+      />
     </form>
   );
 }
