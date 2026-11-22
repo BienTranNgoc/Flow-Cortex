@@ -3,6 +3,7 @@ package com.flowcortex.workflow.web;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.workflow.application.WorkflowTransferService;
 import com.flowcortex.workflow.application.WorkflowTransferService.Exported;
 import com.flowcortex.workflow.application.WorkflowTransferService.ImportResult;
@@ -94,6 +95,7 @@ class AdminWorkflowTransferController {
     @ApiResponse(responseCode = "429", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "reviewAdminWorkflowImport")
+    @AdminAudit(value = "workflow.review_import", resourceParam = "")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(
             mediaType = MediaType.APPLICATION_JSON_VALUE,
             schema = @Schema(implementation = WorkflowArtifactDocument.class)))
@@ -118,6 +120,7 @@ class AdminWorkflowTransferController {
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "importAdminWorkflow")
+    @AdminAudit("workflow.import")
     @RequirePermission(Permission.WORKFLOW_WORKFLOW_MANAGE)
     @PostMapping(value = "/import", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
