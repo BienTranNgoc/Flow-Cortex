@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.shared.ratelimit.InMemoryRateLimitStore;
 import com.flowcortex.shared.ratelimit.RateLimitDefinition;
+import com.flowcortex.shared.ratelimit.RateLimitStore;
 import com.flowcortex.shared.ratelimit.RateLimitTelemetry;
 import com.flowcortex.shared.ratelimit.RateLimiters;
 import com.flowcortex.user.api.StepUpPurpose;
@@ -20,6 +21,7 @@ import com.flowcortex.user.api.StepUpRequiredException;
 import com.flowcortex.user.application.AuditEventWriter;
 import com.flowcortex.user.application.AuthEventType;
 import com.flowcortex.user.application.OpaqueTokens;
+import com.flowcortex.user.application.RateLimit;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
@@ -55,10 +57,14 @@ class StepUpServiceTest {
     private final UUID userId = UUID.randomUUID();
 
     private StepUpService service(int capacity) {
-        RateLimitDefinition definition = new RateLimitDefinition(StepUpRateLimits.STEP_UP_USER, capacity,
-                Duration.ofMinutes(1));
-        RateLimiters limiters = new RateLimiters(java.util.List.of(definition),
-                new InMemoryRateLimitStore(CLOCK), new RateLimitTelemetry(new SimpleMeterRegistry(), CLOCK));
+        return service(capacity, new InMemoryRateLimitStore(CLOCK));
+    }
+
+    private StepUpService service(int capacity, RateLimitStore store) {
+        RateLimitDefinition definition = new StepUpRateLimits().stepUpUser(
+                new StepUpProperties(new RateLimit(capacity, Duration.ofMinutes(1))));
+        RateLimiters limiters = new RateLimiters(java.util.List.of(definition), store,
+                new RateLimitTelemetry(new SimpleMeterRegistry(), CLOCK));
         return new StepUpService(proofs, users, encoder, audit, limiters, CLOCK);
     }
 
@@ -142,6 +148,23 @@ class StepUpServiceTest {
 
         verify(encoder).matches(any(), any());
         verify(proofs).save(any());
+        verify(audit).write(eq(AuthEventType.STEP_UP_RATE_LIMITED), eq(userId), eq(IP), eq(AGENT), any());
+    }
+
+    @Test
+    void aFailingRateLimitStoreRefusesWith429InsteadOfAdmittingTheAttempt() {
+        RateLimitStore down = mock(RateLimitStore.class);
+        when(down.tryConsume(any(), org.mockito.ArgumentMatchers.anyLong(), any()))
+                .thenThrow(new IllegalStateException("store down"));
+
+        assertThatThrownBy(() -> service(5, down).mint(userId, PASSWORD, StepUpPurpose.PAT_CREATE, IP, AGENT))
+                .isInstanceOfSatisfying(StepUpRateLimitedException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(ex.getRetryAfterSeconds()).isPositive();
+                });
+
+        verifyNoInteractions(encoder);
+        verify(proofs, never()).save(any());
         verify(audit).write(eq(AuthEventType.STEP_UP_RATE_LIMITED), eq(userId), eq(IP), eq(AGENT), any());
     }
 

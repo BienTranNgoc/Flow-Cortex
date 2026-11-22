@@ -159,6 +159,11 @@ class UserServiceImpl implements UserService {
         if (newRole != null) {
             user.changeRole(newRole, newRoleRow.isAdminAccount());
         }
+        if (leavesAdminRole && !suspends) {
+            // Suspension revokes every credential below; a plain demotion must still drop the tokens,
+            // or promoting the account again would revive ones its owner could not see or revoke.
+            accountCredentials.revokePersonalAccessTokensOnDemotion(id);
+        }
         if (newStatus != null) {
             boolean reactivated = user.getStatus() != UserStatus.ACTIVE && newStatus == UserStatus.ACTIVE;
             user.changeStatus(newStatus);
