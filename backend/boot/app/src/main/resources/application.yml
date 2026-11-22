@@ -402,6 +402,12 @@ flowcortex:
         enabled: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_ENABLED:true}
         failure-threshold: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_FAILURE_THRESHOLD:5}
         open-duration: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_OPEN_DURATION:PT30S}
+    # Applies accepted provider callbacks to payments; switched off, callbacks wait unapplied.
+    ledger:
+      apply:
+        enabled: ${FLOWCORTEX_BILLING_LEDGER_APPLY_ENABLED:true}
+        interval: ${FLOWCORTEX_BILLING_LEDGER_APPLY_INTERVAL:PT5S}
+        batch-size: ${FLOWCORTEX_BILLING_LEDGER_APPLY_BATCH_SIZE:100}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
