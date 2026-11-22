@@ -22,10 +22,14 @@ export function useApiTokensQuery(enabled: boolean) {
   });
 }
 
-/** Creates a token; the answer carries the raw token once and is never cached. */
+/**
+ * Creates a token; the answer carries the raw token once. `gcTime: 0` drops the finished mutation
+ * from the cache as soon as the caller resets it, instead of holding the token for the default gc time.
+ */
 export function useCreateApiTokenMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    gcTime: 0,
     mutationFn: async (request: CreateApiTokenRequest) =>
       (await unwrap(create1(request, authHeaders()))) as CreatedApiToken,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: API_TOKENS_KEY }),
