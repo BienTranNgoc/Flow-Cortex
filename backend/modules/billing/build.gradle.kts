@@ -9,6 +9,8 @@ dependencies {
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web types this module compiles against are declared here.
     implementation("org.springframework.boot:spring-boot-starter-web")
+    // The module's own chain for the provider callback routes, as modules/support.
+    implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("com.fasterxml.jackson.core:jackson-annotations")
     implementation("tools.jackson.core:jackson-databind")
     // The region gate counts each verdict.

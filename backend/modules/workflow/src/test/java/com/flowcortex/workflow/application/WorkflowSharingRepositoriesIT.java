@@ -15,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -50,6 +51,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = {
         "spring.flyway.locations=filesystem:${flowcortex.migrations.dir}",
+        "spring.flyway.postgresql.transactional-lock=false",
         "spring.jpa.hibernate.ddl-auto=validate"
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -65,6 +67,9 @@ class WorkflowSharingRepositoriesIT {
 
     private static final String MIGRATION_DIR = System.getProperty("flowcortex.migrations.dir");
     private static final String SHARING_MIGRATION = "2026.11.10.170";
+    /** A transaction-scoped migration lock makes CREATE INDEX CONCURRENTLY wait on Flyway itself. */
+    private static final Map<String, String> NO_TRANSACTIONAL_LOCK =
+            Map.of("flyway.postgresql.transactional.lock", "false");
 
     @Autowired
     private WorkflowRepository workflowRepository;
@@ -132,7 +137,8 @@ class WorkflowSharingRepositoriesIT {
     void theMigrationMakesSharedRowsPublicAndOthersPrivate() {
         String schema = "migration_" + UUID.randomUUID().toString().replace("-", "");
         MigrationVersion before = lastVersionBefore(SHARING_MIGRATION);
-        Flyway.configure().dataSource(dataSource).schemas(schema).locations("filesystem:" + MIGRATION_DIR)
+        Flyway.configure().configuration(NO_TRANSACTIONAL_LOCK).dataSource(dataSource).schemas(schema)
+                .locations("filesystem:" + MIGRATION_DIR)
                 .target(before).load().migrate();
         UUID shared = UUID.randomUUID();
         UUID unshared = UUID.randomUUID();
@@ -142,7 +148,8 @@ class WorkflowSharingRepositoriesIT {
                     id, UUID.randomUUID(), "pre-" + id, id.equals(shared));
         }
 
-        Flyway.configure().dataSource(dataSource).schemas(schema).locations("filesystem:" + MIGRATION_DIR)
+        Flyway.configure().configuration(NO_TRANSACTIONAL_LOCK).dataSource(dataSource).schemas(schema)
+                .locations("filesystem:" + MIGRATION_DIR)
                 .load().migrate();
 
         assertThat(jdbc().queryForObject("SELECT visibility FROM " + schema + ".workflow WHERE id = ?",

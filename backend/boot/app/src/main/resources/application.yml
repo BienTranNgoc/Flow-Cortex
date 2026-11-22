@@ -10,12 +10,14 @@ spring:
     url: jdbc:postgresql://localhost:5432/flowcortex
     username: flowcortex
     driver-class-name: org.postgresql.Driver
-    # Each async task can hold two connections at once (a listener's REQUIRES_NEW plus the
-    # step transition it opens), so the pool is at least 2 x task.execution.pool.max-size (16)
-    # plus headroom for HTTP requests, the reaper and heartbeats. Idle connections stay few:
-    # Hikari otherwise holds all 40 open per instance even when nothing runs.
+    # An async task can hold up to 4 connections at once (listener + advance + claim + workflow.call
+    # fact reads), so the pool is at least 4 x task.execution.pool.max-size (16) = 64 plus headroom
+    # for HTTP requests, the reaper and heartbeats; the workflow module refuses to start below the
+    # 4 x product. Each backend instance opens up to this many, so instances x this must fit in
+    # Postgres max_connections (100 by default; compose runs one backend). Idle connections stay few:
+    # Hikari otherwise holds all 80 open per instance even when nothing runs.
     hikari:
-      maximum-pool-size: 40
+      maximum-pool-size: 80
       minimum-idle: 5
 
   jpa:
@@ -29,6 +31,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    postgresql:
+      # The default transaction-scoped migration lock keeps a snapshot open for the whole run, which
+      # makes CREATE INDEX CONCURRENTLY wait on Flyway itself forever; a session lock does not.
+      transactional-lock: false
 
   # Bounds Boot's own applicationTaskExecutor, which runs every @Async and
   # @ApplicationModuleListener and the engine's inline steps. Declaring an
@@ -241,12 +247,40 @@ flowcortex:
       submit-per-ip:
         capacity: ${FLOWCORTEX_AUTH_PASSWORD_RESET_SUBMIT_PER_IP_CAPACITY:10}
         period: ${FLOWCORTEX_AUTH_PASSWORD_RESET_SUBMIT_PER_IP_PERIOD:1h}
+    # Step-up: each signed-in user gets `capacity` password attempts per `period` at
+    # POST /api/v1/me/step-up, every attempt counted; over it answers 429 with Retry-After before the
+    # password is compared. Shared by every backend instance through the rate-limit registry.
+    step-up:
+      per-user:
+        capacity: ${FLOWCORTEX_AUTH_STEP_UP_PER_USER_CAPACITY:5}
+        period: ${FLOWCORTEX_AUTH_STEP_UP_PER_USER_PERIOD:1m}
+    # Personal access tokens (fc_pat_...) for scripted API calls by admin accounts. Off answers 503 on
+    # the /api/v1/me/api-tokens routes and 401 to any fc_pat_ bearer; rows are kept. Each token value
+    # gets `per-minute` and `per-day` requests, counted before authentication; over either answers 429
+    # with Retry-After. A user holds at most `max-live-per-user` live tokens. Limits are registry
+    # limiters, shared by every backend instance. Env var + restart.
+    personal-access-tokens:
+      enabled: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_ENABLED:false}
+      max-live-per-user: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_MAX_LIVE_PER_USER:10}
+      default-lifetime: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_DEFAULT_LIFETIME:90d}
+      per-minute:
+        capacity: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_MINUTE_CAPACITY:60}
+        period: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_MINUTE_PERIOD:1m}
+      per-day:
+        capacity: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_CAPACITY:1000}
+        period: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_PERIOD:1d}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
-    # `audit-events`, refresh-token rows that expired or were revoked, and reset-link rows that
-    # were used or expired, every `interval`.
+    # `audit-events`, refresh-token rows that expired or were revoked, reset-link rows that were
+    # used or expired, spent step-up proofs, and revoked access tokens or ones expired longer ago
+    # than `audit-events`, every `interval`.
     retention:
       interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
       audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}
+  # Admin audit rows are kept; only their client address and user agent are cleared after
+  # `origin-retention`, checked every `retention-interval`.
+  admin-audit:
+    origin-retention: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:365d}
+    retention-interval: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:1h}
   # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
   # gradually; over it answers 429 with Retry-After before the password is checked. Budgets are
   # shared by every backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
@@ -331,6 +365,10 @@ flowcortex:
   # Personal spaces: off means the session space answers 503; spaces are still provisioned at activation.
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}
+  # Uploaded Drive files never expire, so each personal space is capped (run-output items add no storage).
+  drive:
+    max-bytes-per-space: ${FLOWCORTEX_DRIVE_MAX_BYTES_PER_SPACE:5368709120}
+    max-items-per-space: ${FLOWCORTEX_DRIVE_MAX_ITEMS_PER_SPACE:1000}
   # Member onboarding journey: off means no entry is offered and progress writes answer 409; the quiz routes keep working.
   onboarding:
     enabled: ${FLOWCORTEX_ONBOARDING_ENABLED:false}
@@ -348,6 +386,22 @@ flowcortex:
       mode: ${FLOWCORTEX_BILLING_REGION_GATE_MODE:shadow}
       refresh-interval: ${FLOWCORTEX_BILLING_REGION_GATE_REFRESH_INTERVAL:PT24H}
       refresh-initial-delay: ${FLOWCORTEX_BILLING_REGION_GATE_REFRESH_INITIAL_DELAY:PT10M}
+    # MoMo: off until the merchant contract is signed. Enabling it fails startup on a missing credential or URL,
+    # a callback URL off the receiver route, or an empty or unreadable source allowlist.
+    momo:
+      enabled: ${FLOWCORTEX_BILLING_MOMO_ENABLED:false}
+      base-url: ${FLOWCORTEX_BILLING_MOMO_BASE_URL:https://test-payment.momo.vn}
+      partner-code: ${FLOWCORTEX_BILLING_MOMO_PARTNER_CODE:}
+      access-key: ${FLOWCORTEX_BILLING_MOMO_ACCESS_KEY:}
+      secret-key: ${FLOWCORTEX_BILLING_MOMO_SECRET_KEY:}
+      redirect-url: ${FLOWCORTEX_BILLING_MOMO_REDIRECT_URL:}
+      ipn-url: ${FLOWCORTEX_BILLING_MOMO_IPN_URL:}
+      offered-instruments: ${FLOWCORTEX_BILLING_MOMO_OFFERED_INSTRUMENTS:wallet}
+      callback-source-allowlist: ${FLOWCORTEX_BILLING_MOMO_CALLBACK_SOURCE_ALLOWLIST:}
+      circuit:
+        enabled: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_ENABLED:true}
+        failure-threshold: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_FAILURE_THRESHOLD:5}
+        open-duration: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_OPEN_DURATION:PT30S}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
@@ -362,6 +416,9 @@ flowcortex:
     hub-threads: 2
     publish:
       queue-capacity: 1000
+  # In-app notifications: a member keeps their newest max-per-member; older ones are deleted on insert.
+  notifications:
+    max-per-member: 500
   # Kill switch gating POST
   # /api/v1/workflows/{id}/runs — off means new runs are refused (503), but
   # already-started/finished runs stay readable. Flip via the
@@ -380,6 +437,10 @@ flowcortex:
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
+    call:
+      # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
+      # child is stopped. Covers a child of four media steps at their queue and run bounds.
+      max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
@@ -440,7 +501,9 @@ flowcortex:
           retry-waits: 10s,30s
           call-timeout: 60s
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
-  # up). The assistant needs its own switch on as well as the admin console's. Restart to apply.
+  # up). The assistant switch and the four daily limits below are configured here and changed at
+  # runtime in the console Settings page; FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED=false keeps the
+  # assistant off whatever is stored. The Help Center switch itself needs a restart.
   support:
     enabled: ${FLOWCORTEX_SUPPORT_ENABLED:false}
     # Shown to guests and suspended members; empty shows no contact line.

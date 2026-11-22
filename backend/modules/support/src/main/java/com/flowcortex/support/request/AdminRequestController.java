@@ -2,6 +2,7 @@ package com.flowcortex.support.request;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.Count;
@@ -121,6 +122,7 @@ class AdminRequestController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SUPPORT_TICKET_REPLY)
+    @AdminAudit(value = "support_request.reply", resourceParam = "number", capture = "status")
     @PostMapping(value = "/{number}/messages", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<AdminDetail> reply(@AuthenticationPrincipal Jwt jwt, @PathVariable long number,
@@ -148,6 +150,7 @@ class AdminRequestController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SUPPORT_TICKET_CLOSE)
+    @AdminAudit(value = "support_request.change_status", resourceParam = "number", capture = "status")
     @PutMapping(value = "/{number}/status", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     AdminDetail status(@PathVariable long number, @RequestBody StatusRequest body) {
