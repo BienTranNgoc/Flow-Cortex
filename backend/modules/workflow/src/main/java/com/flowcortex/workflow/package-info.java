@@ -23,7 +23,8 @@
                 "llm :: api",
                 "connector :: api",
                 "shared :: web",
-                "shared :: security"
+                "shared :: security",
+                "shared :: ratelimit"
         }
 )
 package com.flowcortex.workflow;
