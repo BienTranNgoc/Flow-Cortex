@@ -201,6 +201,10 @@ export const MeResponsePermissionsItem = {
   contenthelp_topicmanage: 'content.help_topic.manage',
   contenthelp_articleview: 'content.help_article.view',
   contenthelp_articlemanage: 'content.help_article.manage',
+  contentdocumentview: 'content.document.view',
+  contentdocumentmanage: 'content.document.manage',
+  contentmediaview: 'content.media.view',
+  contentmediamanage: 'content.media.manage',
   platformsettingview: 'platform.setting.view',
   platformsettingupdate: 'platform.setting.update',
   platformsms_outboxview: 'platform.sms_outbox.view',
@@ -561,6 +565,50 @@ export interface PaymentSettingView {
   min?: number | null;
   /** @nullable */
   max?: number | null;
+}
+
+/**
+ * The fields of the section type; text fields are {vi, en}
+ */
+export type ContentSectionData = { [key: string]: unknown };
+
+export interface ContentSection {
+  /** The section type, e.g. richText or media */
+  type: string;
+  schemaVersion: number;
+  /** The fields of the section type; text fields are {vi, en} */
+  data: ContentSectionData;
+}
+
+export interface LocalizedText {
+  vi?: string;
+  en?: string;
+}
+
+export interface ContentSeoMeta {
+  title: LocalizedText;
+  description: LocalizedText;
+}
+
+export interface SaveContentDocumentDraftRequest {
+  /**
+   * The draft version the editor loaded; 0 when none
+   * @minimum 0
+   */
+  version: number;
+  sections: ContentSection[];
+  seoMeta: ContentSeoMeta;
+}
+
+export interface ContentDocumentDraft {
+  slug: string;
+  version: number;
+  sections: ContentSection[];
+  seoMeta: ContentSeoMeta;
+  /** @nullable */
+  updatedAt?: string | null;
+  /** @nullable */
+  updatedByEmail?: string | null;
 }
 
 export interface AdminChatSettingsUpdate {
@@ -1927,6 +1975,75 @@ export interface AdminRunDetailResponse {
   steps: Step[];
 }
 
+export interface RegisterContentMediaRequest {
+  /** The upload id of a granted, uploaded file */
+  uploadId: string;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   * @pattern [^\p{Cntrl}/\\]+
+   */
+  fileName: string;
+}
+
+export type ContentMediaItemKind = (typeof ContentMediaItemKind)[keyof typeof ContentMediaItemKind];
+
+export const ContentMediaItemKind = {
+  image: 'image',
+  video: 'video',
+} as const;
+
+export interface ContentMediaItem {
+  id: string;
+  kind: ContentMediaItemKind;
+  contentType: string;
+  sizeBytes: number;
+  fileName: string;
+  /**
+   * Null when the uploader's account no longer exists
+   * @nullable
+   */
+  uploaderEmail?: string | null;
+  createdAt: string;
+  url: string;
+}
+
+export interface ContentMediaUploadRequest {
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  fileName: string;
+  size: number;
+}
+
+export type UploadGrantHeaders = { [key: string]: string };
+
+export interface UploadGrant {
+  uploadId?: string;
+  url?: string;
+  method?: string;
+  headers?: UploadGrantHeaders;
+  expiresAt?: string;
+  maxBytes?: number;
+}
+
+export interface PublishContentDocumentRequest {
+  /**
+   * The draft version the editor reviewed
+   * @minimum 0
+   */
+  version: number;
+}
+
+export interface ContentDocumentPublication {
+  slug: string;
+  version: number;
+  publishedAt: string;
+  sections: ContentSection[];
+  seoMeta: ContentSeoMeta;
+}
+
 export interface ProbeResult {
   ok?: boolean;
   tested?: boolean;
@@ -2973,6 +3090,26 @@ export interface BalanceResponse {
   granted?: number;
 }
 
+export interface ContentDocumentHistoryEntry {
+  revisionId: string;
+  publishedAt: string;
+}
+
+export interface PageViewContentDocumentHistoryEntry {
+  items: ContentDocumentHistoryEntry[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface ContentDocumentHistoryPublication {
+  revisionId: string;
+  publishedAt: string;
+  slug: string;
+  sections: ContentSection[];
+  seoMeta: ContentSeoMeta;
+}
+
 export interface TelegramHealth {
   valid?: boolean;
   provider?: string;
@@ -3227,6 +3364,10 @@ export const RoleResponsePermissionsItem = {
   contenthelp_topicmanage: 'content.help_topic.manage',
   contenthelp_articleview: 'content.help_article.view',
   contenthelp_articlemanage: 'content.help_article.manage',
+  contentdocumentview: 'content.document.view',
+  contentdocumentmanage: 'content.document.manage',
+  contentmediaview: 'content.media.view',
+  contentmediamanage: 'content.media.manage',
   platformsettingview: 'platform.setting.view',
   platformsettingupdate: 'platform.setting.update',
   platformsms_outboxview: 'platform.sms_outbox.view',
@@ -3297,6 +3438,69 @@ export interface PageViewMediaJobResponse {
   page: number;
   size: number;
   total: number;
+}
+
+export interface PageViewContentMediaItem {
+  items: ContentMediaItem[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface ContentDocumentSummary {
+  slug: string;
+  title: LocalizedText;
+  sectionTypes: string[];
+  publicHistory: boolean;
+  draftVersion: number;
+  /** @nullable */
+  draftUpdatedAt?: string | null;
+  publishedVersion: number;
+  /** @nullable */
+  publishedAt?: string | null;
+}
+
+export type ContentDocumentRevisionSummaryKind =
+  (typeof ContentDocumentRevisionSummaryKind)[keyof typeof ContentDocumentRevisionSummaryKind];
+
+export const ContentDocumentRevisionSummaryKind = {
+  draft: 'draft',
+  publication: 'publication',
+} as const;
+
+export interface ContentDocumentRevisionSummary {
+  id: string;
+  kind: ContentDocumentRevisionSummaryKind;
+  version: number;
+  /** @nullable */
+  authorEmail?: string | null;
+  createdAt: string;
+}
+
+export interface PageViewContentDocumentRevisionSummary {
+  items: ContentDocumentRevisionSummary[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export type ContentDocumentRevisionKind =
+  (typeof ContentDocumentRevisionKind)[keyof typeof ContentDocumentRevisionKind];
+
+export const ContentDocumentRevisionKind = {
+  draft: 'draft',
+  publication: 'publication',
+} as const;
+
+export interface ContentDocumentRevision {
+  id: string;
+  kind: ContentDocumentRevisionKind;
+  version: number;
+  sections: ContentSection[];
+  seoMeta: ContentSeoMeta;
+  /** @nullable */
+  authorEmail?: string | null;
+  createdAt: string;
 }
 
 export interface AdminAssignee {
@@ -3430,6 +3634,23 @@ export const ListAdminWorkflowsStatus = {
   draft: 'draft',
   published: 'published',
 } as const;
+
+export type ListContentMediaParams = {
+  /**
+   * @pattern image|video
+   */
+  kind?: string;
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
 
 export type ListAdminAiModelsParams = {
   /**
@@ -3632,6 +3853,19 @@ export type ListDriveMemoryParams = {
    */
   page?: number;
   pageSize?: number;
+};
+
+export type ListContentDocumentHistoryParams = {
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
 };
 
 export type GetBuilderRunsChartParams = {
@@ -3902,6 +4136,19 @@ export const ListAdminMediaJobsStatus = {
   completed: 'completed',
   error: 'error',
 } as const;
+
+export type ListContentDocumentRevisionsParams = {
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
 
 export type ListAdminAssigneesParams = {
   /**
@@ -5566,6 +5813,110 @@ export const updatePaymentSetting = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(paymentSettingUpdate),
+  });
+};
+
+export type getContentDocumentDraftResponse200 = {
+  data: ContentDocumentDraft;
+  status: 200;
+};
+
+export type getContentDocumentDraftResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getContentDocumentDraftResponseSuccess = getContentDocumentDraftResponse200 & {
+  headers: Headers;
+};
+export type getContentDocumentDraftResponseError = getContentDocumentDraftResponse404 & {
+  headers: Headers;
+};
+
+export type getContentDocumentDraftResponse =
+  getContentDocumentDraftResponseSuccess | getContentDocumentDraftResponseError;
+
+export const getGetContentDocumentDraftUrl = (slug: string) => {
+  return `/api/v1/admin/content/documents/${slug}`;
+};
+
+export const getContentDocumentDraft = async (
+  slug: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getContentDocumentDraftResponse> => {
+  return customFetch<getContentDocumentDraftResponse>(getGetContentDocumentDraftUrl(slug), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type saveContentDocumentDraftResponse200 = {
+  data: ContentDocumentDraft;
+  status: 200;
+};
+
+export type saveContentDocumentDraftResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type saveContentDocumentDraftResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type saveContentDocumentDraftResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type saveContentDocumentDraftResponseSuccess = saveContentDocumentDraftResponse200 & {
+  headers: Headers;
+};
+export type saveContentDocumentDraftResponseError = (
+  | saveContentDocumentDraftResponse400
+  | saveContentDocumentDraftResponse404
+  | saveContentDocumentDraftResponse409
+) & {
+  headers: Headers;
+};
+
+export type saveContentDocumentDraftResponse =
+  saveContentDocumentDraftResponseSuccess | saveContentDocumentDraftResponseError;
+
+export const getSaveContentDocumentDraftUrl = (slug: string) => {
+  return `/api/v1/admin/content/documents/${slug}`;
+};
+
+export const saveContentDocumentDraft = async (
+  slug: string,
+  saveContentDocumentDraftRequest: SaveContentDocumentDraftRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<saveContentDocumentDraftResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<saveContentDocumentDraftResponse>(getSaveContentDocumentDraftUrl(slug), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(saveContentDocumentDraftRequest),
   });
 };
 
@@ -10667,6 +11018,246 @@ export const cancelAdminRun = async (
   });
 };
 
+export type listContentMediaResponse200 = {
+  data: PageViewContentMediaItem;
+  status: 200;
+};
+
+export type listContentMediaResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listContentMediaResponseSuccess = listContentMediaResponse200 & {
+  headers: Headers;
+};
+export type listContentMediaResponseError = listContentMediaResponse400 & {
+  headers: Headers;
+};
+
+export type listContentMediaResponse =
+  listContentMediaResponseSuccess | listContentMediaResponseError;
+
+export const getListContentMediaUrl = (params?: ListContentMediaParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/content/media?${stringifiedParams}`
+    : `/api/v1/admin/content/media`;
+};
+
+export const listContentMedia = async (
+  params?: ListContentMediaParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listContentMediaResponse> => {
+  return customFetch<listContentMediaResponse>(getListContentMediaUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type registerContentMediaResponse201 = {
+  data: ContentMediaItem;
+  status: 201;
+};
+
+export type registerContentMediaResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type registerContentMediaResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type registerContentMediaResponseSuccess = registerContentMediaResponse201 & {
+  headers: Headers;
+};
+export type registerContentMediaResponseError = (
+  registerContentMediaResponse400 | registerContentMediaResponse503
+) & {
+  headers: Headers;
+};
+
+export type registerContentMediaResponse =
+  registerContentMediaResponseSuccess | registerContentMediaResponseError;
+
+export const getRegisterContentMediaUrl = () => {
+  return `/api/v1/admin/content/media`;
+};
+
+export const registerContentMedia = async (
+  registerContentMediaRequest: RegisterContentMediaRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<registerContentMediaResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<registerContentMediaResponse>(getRegisterContentMediaUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerContentMediaRequest),
+  });
+};
+
+export type requestContentMediaUploadResponse201 = {
+  data: UploadGrant;
+  status: 201;
+};
+
+export type requestContentMediaUploadResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type requestContentMediaUploadResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type requestContentMediaUploadResponseSuccess = requestContentMediaUploadResponse201 & {
+  headers: Headers;
+};
+export type requestContentMediaUploadResponseError = (
+  requestContentMediaUploadResponse400 | requestContentMediaUploadResponse503
+) & {
+  headers: Headers;
+};
+
+export type requestContentMediaUploadResponse =
+  requestContentMediaUploadResponseSuccess | requestContentMediaUploadResponseError;
+
+export const getRequestContentMediaUploadUrl = () => {
+  return `/api/v1/admin/content/media/uploads`;
+};
+
+export const requestContentMediaUpload = async (
+  contentMediaUploadRequest: ContentMediaUploadRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestContentMediaUploadResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestContentMediaUploadResponse>(getRequestContentMediaUploadUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(contentMediaUploadRequest),
+  });
+};
+
+export type publishContentDocumentResponse200 = {
+  data: ContentDocumentPublication;
+  status: 200;
+};
+
+export type publishContentDocumentResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type publishContentDocumentResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type publishContentDocumentResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type publishContentDocumentResponseSuccess = publishContentDocumentResponse200 & {
+  headers: Headers;
+};
+export type publishContentDocumentResponseError = (
+  | publishContentDocumentResponse404
+  | publishContentDocumentResponse409
+  | publishContentDocumentResponse422
+) & {
+  headers: Headers;
+};
+
+export type publishContentDocumentResponse =
+  publishContentDocumentResponseSuccess | publishContentDocumentResponseError;
+
+export const getPublishContentDocumentUrl = (slug: string) => {
+  return `/api/v1/admin/content/documents/${slug}/publish`;
+};
+
+export const publishContentDocument = async (
+  slug: string,
+  publishContentDocumentRequest: PublishContentDocumentRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<publishContentDocumentResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<publishContentDocumentResponse>(getPublishContentDocumentUrl(slug), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publishContentDocumentRequest),
+  });
+};
+
 export type testAdminAiProviderResponse200 = {
   data: ProbeResult;
   status: 200;
@@ -13984,6 +14575,155 @@ export const balance = async (
   });
 };
 
+export type getContentMediaResponse302 = {
+  data: void;
+  status: 302;
+};
+
+export type getContentMediaResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getContentMediaResponseError = (
+  getContentMediaResponse302 | getContentMediaResponse404
+) & {
+  headers: Headers;
+};
+
+export type getContentMediaResponse = getContentMediaResponseError;
+
+export const getGetContentMediaUrl = (id: string) => {
+  return `/api/v1/content/media/${id}`;
+};
+
+export const getContentMedia = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getContentMediaResponse> => {
+  return customFetch<getContentMediaResponse>(getGetContentMediaUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getPublishedContentDocumentResponse200 = {
+  data: ContentDocumentPublication;
+  status: 200;
+};
+
+export type getPublishedContentDocumentResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getPublishedContentDocumentResponseSuccess = getPublishedContentDocumentResponse200 & {
+  headers: Headers;
+};
+export type getPublishedContentDocumentResponseError = getPublishedContentDocumentResponse404 & {
+  headers: Headers;
+};
+
+export type getPublishedContentDocumentResponse =
+  getPublishedContentDocumentResponseSuccess | getPublishedContentDocumentResponseError;
+
+export const getGetPublishedContentDocumentUrl = (slug: string) => {
+  return `/api/v1/content/documents/${slug}`;
+};
+
+export const getPublishedContentDocument = async (
+  slug: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getPublishedContentDocumentResponse> => {
+  return customFetch<getPublishedContentDocumentResponse>(getGetPublishedContentDocumentUrl(slug), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listContentDocumentHistoryResponse200 = {
+  data: PageViewContentDocumentHistoryEntry;
+  status: 200;
+};
+
+export type listContentDocumentHistoryResponseSuccess = listContentDocumentHistoryResponse200 & {
+  headers: Headers;
+};
+export type listContentDocumentHistoryResponse = listContentDocumentHistoryResponseSuccess;
+
+export const getListContentDocumentHistoryUrl = (
+  slug: string,
+  params?: ListContentDocumentHistoryParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/content/documents/${slug}/history?${stringifiedParams}`
+    : `/api/v1/content/documents/${slug}/history`;
+};
+
+export const listContentDocumentHistory = async (
+  slug: string,
+  params?: ListContentDocumentHistoryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listContentDocumentHistoryResponse> => {
+  return customFetch<listContentDocumentHistoryResponse>(
+    getListContentDocumentHistoryUrl(slug, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type getContentDocumentPublicationResponse200 = {
+  data: ContentDocumentHistoryPublication;
+  status: 200;
+};
+
+export type getContentDocumentPublicationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getContentDocumentPublicationResponseSuccess =
+  getContentDocumentPublicationResponse200 & {
+    headers: Headers;
+  };
+export type getContentDocumentPublicationResponseError =
+  getContentDocumentPublicationResponse404 & {
+    headers: Headers;
+  };
+
+export type getContentDocumentPublicationResponse =
+  getContentDocumentPublicationResponseSuccess | getContentDocumentPublicationResponseError;
+
+export const getGetContentDocumentPublicationUrl = (slug: string, id: string) => {
+  return `/api/v1/content/documents/${slug}/history/${id}`;
+};
+
+export const getContentDocumentPublication = async (
+  slug: string,
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getContentDocumentPublicationResponse> => {
+  return customFetch<getContentDocumentPublicationResponse>(
+    getGetContentDocumentPublicationUrl(slug, id),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
 export type readResponse200 = {
   data: TelegramConnection;
   status: 200;
@@ -14862,6 +15602,121 @@ export const listAdminMediaJobs = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listContentDocumentsResponse200 = {
+  data: ContentDocumentSummary[];
+  status: 200;
+};
+
+export type listContentDocumentsResponseSuccess = listContentDocumentsResponse200 & {
+  headers: Headers;
+};
+export type listContentDocumentsResponse = listContentDocumentsResponseSuccess;
+
+export const getListContentDocumentsUrl = () => {
+  return `/api/v1/admin/content/documents`;
+};
+
+export const listContentDocuments = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listContentDocumentsResponse> => {
+  return customFetch<listContentDocumentsResponse>(getListContentDocumentsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listContentDocumentRevisionsResponse200 = {
+  data: PageViewContentDocumentRevisionSummary;
+  status: 200;
+};
+
+export type listContentDocumentRevisionsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listContentDocumentRevisionsResponseSuccess =
+  listContentDocumentRevisionsResponse200 & {
+    headers: Headers;
+  };
+export type listContentDocumentRevisionsResponseError = listContentDocumentRevisionsResponse404 & {
+  headers: Headers;
+};
+
+export type listContentDocumentRevisionsResponse =
+  listContentDocumentRevisionsResponseSuccess | listContentDocumentRevisionsResponseError;
+
+export const getListContentDocumentRevisionsUrl = (
+  slug: string,
+  params?: ListContentDocumentRevisionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/content/documents/${slug}/revisions?${stringifiedParams}`
+    : `/api/v1/admin/content/documents/${slug}/revisions`;
+};
+
+export const listContentDocumentRevisions = async (
+  slug: string,
+  params?: ListContentDocumentRevisionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listContentDocumentRevisionsResponse> => {
+  return customFetch<listContentDocumentRevisionsResponse>(
+    getListContentDocumentRevisionsUrl(slug, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type getContentDocumentRevisionResponse200 = {
+  data: ContentDocumentRevision;
+  status: 200;
+};
+
+export type getContentDocumentRevisionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getContentDocumentRevisionResponseSuccess = getContentDocumentRevisionResponse200 & {
+  headers: Headers;
+};
+export type getContentDocumentRevisionResponseError = getContentDocumentRevisionResponse404 & {
+  headers: Headers;
+};
+
+export type getContentDocumentRevisionResponse =
+  getContentDocumentRevisionResponseSuccess | getContentDocumentRevisionResponseError;
+
+export const getGetContentDocumentRevisionUrl = (slug: string, id: string) => {
+  return `/api/v1/admin/content/documents/${slug}/revisions/${id}`;
+};
+
+export const getContentDocumentRevision = async (
+  slug: string,
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getContentDocumentRevisionResponse> => {
+  return customFetch<getContentDocumentRevisionResponse>(
+    getGetContentDocumentRevisionUrl(slug, id),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type listAdminAssigneesResponse200 = {
