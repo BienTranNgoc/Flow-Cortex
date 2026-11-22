@@ -14,7 +14,6 @@ import { describePath, errorAt, firstLocale, isStillBlank, seoPath } from './fie
 import { DocumentPreview } from './DocumentPreview';
 import {
   LOCALES,
-  MAX_SECTIONS,
   MAX_SEO_DESCRIPTION_CHARS,
   MAX_SEO_TITLE_CHARS,
   fromWire,
@@ -148,7 +147,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
     }
   };
 
-  const editSection = (index: number, section: Section, path: string) =>
+  const editSection = (index: number, section: Section, path?: string) =>
     edit(
       (content) => ({
         ...content,
@@ -317,7 +316,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
   const remainingIncomplete = incomplete.filter((path) => isStillBlank(state.content, path));
   const errorEntries = Object.entries(errors);
   const sectionCount = state.content.sections.length;
-  const atLimit = sectionCount >= MAX_SECTIONS;
+  const atLimit = sectionCount >= summary.maxSections;
 
   return (
     <div className="content-editor">
@@ -436,7 +435,9 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
             <p>{t('content.editor.incompleteSummary')}</p>
             <ul>
               {remainingIncomplete.map((path) => (
-                <li key={path}>{pathLabel(t, path)}</li>
+                <li key={path}>
+                  {path === 'sections' ? t('content.editor.requiredSection') : pathLabel(t, path)}
+                </li>
               ))}
             </ul>
           </div>
@@ -588,7 +589,13 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
             </ol>
             {!readOnly && (
               <div className="content-add">
-                {allowedTypes.length > 0 ? (
+                {allowedTypes.length === 0 ? (
+                  <p className="content-hint">{t('content.editor.noAddableTypes')}</p>
+                ) : atLimit ? (
+                  <small className="content-hint">
+                    {t('content.editor.sectionLimit', { count: summary.maxSections })}
+                  </small>
+                ) : (
                   <>
                     <div className="cortex-admin-field">
                       <label htmlFor={`${ids}-add`}>{t('content.editor.addType')}</label>
@@ -607,9 +614,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
                     <button
                       type="button"
                       className="cortex-admin-btn"
-                      aria-disabled={atLimit}
                       onClick={() =>
-                        !atLimit &&
                         edit((content) => ({
                           ...content,
                           sections: [...content.sections, newSection(addType)],
@@ -618,14 +623,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
                     >
                       {t('content.editor.addSection')}
                     </button>
-                    {atLimit && (
-                      <small className="content-hint">
-                        {t('content.editor.sectionLimit', { max: MAX_SECTIONS })}
-                      </small>
-                    )}
                   </>
-                ) : (
-                  <p className="content-hint">{t('content.editor.noAddableTypes')}</p>
                 )}
               </div>
             )}

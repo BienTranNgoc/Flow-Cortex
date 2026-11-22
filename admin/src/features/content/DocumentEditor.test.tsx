@@ -11,6 +11,8 @@ const SUMMARY = {
   title: { vi: 'Điều khoản', en: 'Terms' },
   sectionTypes: ['richText'],
   publicHistory: false,
+  minSections: 0,
+  maxSections: 100,
   draftVersion: 3,
   publishedVersion: 0,
 };
@@ -22,11 +24,11 @@ const draft = (version: number): ContentDocumentDraft => ({
   seoMeta: { title: text('Terms'), description: text('Our terms') },
 });
 
-function renderEditor(version: number) {
+function renderEditor(version: number, summary = SUMMARY, content = draft(version)) {
   renderRoute(
     '/',
     '/',
-    <DocumentEditor slug="terms" summary={SUMMARY} draft={draft(version)} me={EDITOR} />,
+    <DocumentEditor slug="terms" summary={summary} draft={content} me={EDITOR} />,
   );
 }
 
@@ -73,5 +75,25 @@ describe('DocumentEditor Save', () => {
 
     expect(await screen.findByText(/Saved as version 1/)).toBeInTheDocument();
     expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
+  });
+});
+
+describe('DocumentEditor section limit', () => {
+  it('hidesAddSectionAtTheDefinitionMaximum', () => {
+    const full = {
+      ...draft(3),
+      sections: [{ type: 'richText', schemaVersion: 1, data: { body: text('Body') } }],
+    };
+    renderEditor(3, { ...SUMMARY, maxSections: 1 }, full);
+
+    expect(screen.queryByRole('button', { name: 'Add section' })).not.toBeInTheDocument();
+    expect(screen.getByText('A document holds at most 1 section.')).toBeInTheDocument();
+  });
+
+  it('offers Add section below the maximum', () => {
+    renderEditor(3, { ...SUMMARY, maxSections: 1 });
+
+    expect(screen.getByRole('button', { name: 'Add section' })).toBeInTheDocument();
+    expect(screen.queryByText(/A document holds at most/)).not.toBeInTheDocument();
   });
 });

@@ -10,11 +10,26 @@
     "caption": "Caption",
     "mediaId": "Library item",
     "seoTitle": "SEO title",
-    "seoDescription": "SEO description"
+    "seoDescription": "SEO description",
+    "title": "Title",
+    "docVersion": "Version label",
+    "effectiveDate": "Effective date",
+    "slug": "Document",
+    "label": "Label",
+    "shown": "Shown"
   },
   "sectionTypes": {
     "richText": "Rich text",
-    "media": "Image or video"
+    "media": "Image or video",
+    "legalDoc": "Legal document",
+    "legalIndex": "Legal index"
+  },
+  "legalIndex": {
+    "addDocument": "Add document",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "remove": "Remove {{name}}",
+    "empty": "No documents are listed yet."
   },
   "dialog": {
     "cancel": "Cancel",
@@ -82,7 +97,10 @@
     "removeShort": "Remove",
     "addType": "Section type",
     "addSection": "Add section",
-    "sectionLimit": "A document holds at most {{max}} sections.",
+    "sectionLimit_one": "A document holds at most {{count}} section.",
+    "sectionLimit_other": "A document holds at most {{count}} sections.",
+    "requiredSection": "Add the required section",
+    "sharedField": "Shared by both languages",
     "noAddableTypes": "This console has no editor for the section types this document allows.",
     "count": "{{current}} / {{max}} characters",
     "tooLong": "This text is over the {{max}} character limit and cannot be saved.",
