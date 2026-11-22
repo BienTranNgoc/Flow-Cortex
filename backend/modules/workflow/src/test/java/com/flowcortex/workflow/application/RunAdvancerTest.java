@@ -1507,7 +1507,7 @@ class RunAdvancerTest {
     }
 
     @Test
-    void decideLoopIsBoundedByTheConcurrency() {
+    void aPassWhoseClaimsAreAllLostEndsTheDecisionLoop() {
         RunStep step = runningIterateStep("{\"child\":{\"type\":\"echo\"},\"concurrency\":2}", "[1,2,3,4,5]");
         givenIterateRun("x", List.of(step));
         List<RunStep> items = itemsOf(step, "echo", "1", "2", "3", "4", "5");
@@ -1516,9 +1516,101 @@ class RunAdvancerTest {
 
         advancer.advance(runId);
 
-        verify(runStepRepository, org.mockito.Mockito.times(3)).findChildStates(step.getId(), (short) 1);
-        verify(runStepRepository, org.mockito.Mockito.times(6)).claimPendingChild(any(), eq(step.getId()),
+        verify(runStepRepository, org.mockito.Mockito.times(1)).findChildStates(step.getId(), (short) 1);
+        verify(runStepRepository, org.mockito.Mockito.times(2)).claimPendingChild(any(), eq(step.getId()),
                 eq((short) 1), eq(2), eq(NOW), eq(NOW.plus(LEASE)), any());
+    }
+
+    @Test
+    void aPassThatOnlyStartsItemsEndsTheDecisionLoop() {
+        RunStep step = runningIterateStep("{\"child\":{\"type\":\"echo\"},\"concurrency\":2}", "[1,2,3,4,5]");
+        givenIterateRun("x", List.of(step));
+        List<RunStep> items = itemsOf(step, "echo", "1", "2", "3", "4", "5");
+        when(runStepRepository.findChildStates(step.getId(), (short) 1))
+                .thenReturn(rows(items, RunStepStatus.PENDING));
+        when(runStepRepository.claimPendingChild(any(), any(), anyShort(), anyInt(), any(), any(), any()))
+                .thenReturn(1);
+
+        advancer(task -> { }, task -> { }).advance(runId);
+
+        verify(runStepRepository, org.mockito.Mockito.times(1)).findChildStates(step.getId(), (short) 1);
+        verify(runStepRepository, org.mockito.Mockito.times(2)).claimPendingChild(any(), eq(step.getId()),
+                eq((short) 1), eq(2), eq(NOW), eq(NOW.plus(LEASE)), any());
+    }
+
+    @Test
+    void itemsThatAllFailInTheirClaimCompleteTheStepInOneAdvance() {
+        String config = "{\"child\":{\"type\":\"capture\",\"config\":{\"t\":\"{item.title}\"}},\"concurrency\":1}";
+        String list = "[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\"]";
+        RunStep step = runningIterateStep(config, list);
+        givenIterateRun("x", List.of(step), List.of(completed(1, step.getId(), "{}")));
+        List<RunStep> items = itemsOf(step, "capture", "a", "b", "c", "d", "e", "f");
+        Map<UUID, RunStepStatus> statuses = new java.util.HashMap<>();
+        items.forEach(item -> statuses.put(item.getId(), RunStepStatus.PENDING));
+        when(runStepRepository.findChildStates(step.getId(), (short) 1)).thenAnswer(invocation -> items.stream()
+                .map(item -> row(item, statuses.get(item.getId()), null,
+                        statuses.get(item.getId()) == RunStepStatus.ERROR ? "iterate_item_field_missing" : null))
+                .toList());
+        when(runStepRepository.claimPendingChild(any(), any(), anyShort(), anyInt(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    statuses.put(invocation.getArgument(0), RunStepStatus.RUNNING);
+                    return 1;
+                });
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    statuses.put(invocation.getArgument(0), RunStepStatus.ERROR);
+                    return 1;
+                });
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1, 0);
+        RunStepRepository.Lineage itemLineage = lineageOf("capture", step.getId());
+        items.forEach(item -> when(runStepRepository.findLineageById(item.getId()))
+                .thenReturn(Optional.of(itemLineage)));
+
+        advancer.advance(runId);
+
+        verify(runStepRepository, org.mockito.Mockito.times(6)).claimPendingChild(any(), eq(step.getId()),
+                eq((short) 1), eq(1), any(), any(), any());
+        verify(runStepRepository).completeIfRunning(step.getId(), runId, (short) 1,
+                "{\"results\":[null,null,null,null,null,null],\"texts\":[],\"succeeded\":0,\"failed\":6,"
+                        + "\"total\":6,\"dropped\":0}", null, NOW);
+        assertThat(capture.contexts).isEmpty();
+    }
+
+    @Test
+    void aStringItemThatReadsAsANumberRendersAsTextInTheFirstDispatch() {
+        RunStep step = iterateStep("{\"child\":{\"type\":\"capture\",\"config\":{\"n\":\"{item}\"}},"
+                + "\"concurrency\":1}");
+        givenIterateRun("[\"42\",\"7\"]", List.of(step), List.of(completed(1, step.getId(), "{}")));
+        List<RunStep> items = itemsOf(step, "capture", "42", "7");
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        when(runStepRepository.findChildStates(step.getId(), (short) 1))
+                .thenReturn(rows(items, RunStepStatus.PENDING));
+        when(runStepRepository.claimPendingChild(any(), any(), anyShort(), anyInt(), any(), any(), any()))
+                .thenReturn(1);
+
+        advancer.on(new WorkflowRunStartedEvent(runId));
+
+        assertThat(step.getInput()).isNull();
+        assertThat(capture.contexts).extracting(StepContext::config).containsExactly("{\"n\":\"42\"}");
+    }
+
+    @Test
+    void aStringItemThatReadsAsANumberRendersAsTextInALaterAdvanceToo() {
+        RunStep step = runningIterateStep("{\"child\":{\"type\":\"capture\",\"config\":{\"n\":\"{item}\"}},"
+                + "\"concurrency\":1}", "[\"42\",\"7\"]");
+        givenIterateRun("[\"42\",\"7\"]", List.of(step), List.of(completed(1, step.getId(), "{}")));
+        List<RunStep> items = itemsOf(step, "capture", "42", "7");
+        when(runStepRepository.recordPickup(any(), anyShort(), any(), any(), any(), anyShort())).thenReturn(1);
+        when(runStepRepository.findChildStates(step.getId(), (short) 1))
+                .thenReturn(rows(items, RunStepStatus.PENDING));
+        when(runStepRepository.claimPendingChild(any(), any(), anyShort(), anyInt(), any(), any(), any()))
+                .thenReturn(1);
+
+        advancer.advance(runId);
+
+        assertThat(capture.contexts).extracting(StepContext::config).containsExactly("{\"n\":\"42\"}");
     }
 
     @Test
@@ -1531,7 +1623,7 @@ class RunAdvancerTest {
 
         advancer.advance(runId);
 
-        verify(runStepRepository, org.mockito.Mockito.times(2)).claimPendingChild(any(), eq(step.getId()),
+        verify(runStepRepository, org.mockito.Mockito.times(1)).claimPendingChild(any(), eq(step.getId()),
                 eq((short) 1), eq(1), any(), eq(NOW.plus(Duration.ofMinutes(20))), any());
         verify(runStepRepository, never()).claimPendingChild(any(), any(), anyShort(), eq(10), any(), any(), any());
     }
@@ -1561,7 +1653,7 @@ class RunAdvancerTest {
 
         providerAdvancer(3, 4).advance(runId);
 
-        verify(runStepRepository, org.mockito.Mockito.times(12)).claimPendingChild(any(), eq(step.getId()),
+        verify(runStepRepository, org.mockito.Mockito.times(3)).claimPendingChild(any(), eq(step.getId()),
                 eq((short) 1), eq(3), any(), any(), any());
     }
 

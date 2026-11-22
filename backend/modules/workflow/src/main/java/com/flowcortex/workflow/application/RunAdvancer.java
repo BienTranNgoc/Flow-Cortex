@@ -445,16 +445,21 @@ class RunAdvancer {
 
     /**
      * Decides what the running iterate step does next from its items as the database holds them, and does
-     * it; at most {@code concurrency + 1} decisions, since a dispatch that loses its claim or fails at once
-     * is seen again by the next one and a later item end advances the run anyway.
+     * it. It decides again only after a pass in which an item failed in its claim: no thread runs for such
+     * an item, so nothing else would advance the run, and each one turns a pending item terminal, which
+     * bounds the passes by the item count. A pass whose claims were all lost, or that only started items,
+     * stops here: a running item's end advances the run.
      *
+     * @param listInput the resolved list of the step, as the engine holds it now rather than as the entity read
+     *                  earlier in the advance does
      * @return whether the step completed, so the run's next step is to be read again
      */
     private boolean progressIterate(WorkflowRun run, RunStep step, IterateStepConfig config, String listInput) {
         int concurrency = effectiveConcurrency(config);
         int dropped = IterateItems.classify(listInput, config.maxItems()) instanceof IterateItems.Items items
                 ? items.dropped() : 0;
-        for (int pass = 0; pass <= concurrency; pass++) {
+        int failedAtClaim;
+        do {
             List<IterateProgress.ChildState> children = runStepRepository
                     .findChildStates(step.getId(), step.getAttempt()).stream()
                     .map(IterateProgress.ChildState::of)
@@ -470,9 +475,10 @@ class RunAdvancer {
                     failIterate(run, step, fail);
                     return false;
                 }
-                case IterateProgress.Dispatch dispatch -> dispatchItems(run, step, config, dispatch, concurrency);
+                case IterateProgress.Dispatch dispatch ->
+                        failedAtClaim = dispatchItems(run, step, config, listInput, dispatch, concurrency);
             }
-        }
+        } while (failedAtClaim > 0);
         return false;
     }
 
@@ -498,24 +504,31 @@ class RunAdvancer {
         }
     }
 
-    private void dispatchItems(WorkflowRun run, RunStep step, IterateStepConfig config,
+    /** @return how many of the items failed in their claim and so left nothing running to advance the run */
+    private int dispatchItems(WorkflowRun run, RunStep step, IterateStepConfig config, String listInput,
             IterateProgress.Dispatch dispatch, int concurrency) {
         Map<UUID, RunStep> items = runStepRepository.findChildren(step.getId(), step.getAttempt()).stream()
                 .collect(Collectors.toMap(RunStep::getId, item -> item));
+        int failed = 0;
         for (UUID id : dispatch.childIds()) {
             RunStep item = items.get(id);
-            if (item != null) {
-                dispatchItem(run, step, config, item, concurrency, false);
+            if (item != null
+                    && dispatchItem(run, step, config, listInput, item, concurrency, false)
+                            == RunStepTransactions.ClaimOutcome.FAILED) {
+                failed++;
             }
         }
+        return failed;
     }
 
     /**
      * Claims one item under the concurrency cap and hands it to its thread pool. Its config is rendered for
      * its item first; a render that fails fails the item inside the claim, so its charge is refunded.
+     * {@code listInput} is the parent's resolved list: it alone tells a string element that reads like JSON
+     * from the JSON value, so the caller passes the one it holds instead of this method reading the entity.
      */
-    private void dispatchItem(WorkflowRun run, RunStep parent, IterateStepConfig config, RunStep item, int limit,
-            boolean regenerated) {
+    private RunStepTransactions.ClaimOutcome dispatchItem(WorkflowRun run, RunStep parent, IterateStepConfig config,
+            String listInput, RunStep item, int limit, boolean regenerated) {
         Optional<StepExecutor> executor = registry.find(item.getType());
         try (StepLogContext ignored = StepLogContext.step(run.getId(), item.getId(), false, item.getAttempt(),
                 null)) {
@@ -527,7 +540,7 @@ class RunAdvancer {
                 };
             } else {
                 try {
-                    boolean textItem = IterateItems.isTextItem(parent.getInput(), item.getItemIndex(), item.getInput());
+                    boolean textItem = IterateItems.isTextItem(listInput, item.getItemIndex(), item.getInput());
                     context = new StepContext(run.getId(), item.getId(), item.getStepOrder(), item.getType(),
                             item.getAttempt(), item.getInput(),
                             IterateItems.render(config.childConfig(), item.getInput(), textItem, item.getItemIndex()),
@@ -551,6 +564,7 @@ class RunAdvancer {
                 case DISPATCHED -> submitInline(run.getId(), item, executor.orElseThrow(), context);
                 default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
             }
+            return outcome;
         }
     }
 
@@ -574,7 +588,7 @@ class RunAdvancer {
                 LOG.error("Iterate step {} of run {} holds a config it cannot read", parent.getId(), run.getId(), e);
                 return;
             }
-            dispatchItem(run, parent, config, item, effectiveConcurrency(config), true);
+            dispatchItem(run, parent, config, parent.getInput(), item, effectiveConcurrency(config), true);
         });
     }
 
