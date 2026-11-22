@@ -238,14 +238,20 @@ final class VietguysTokenStore implements SmartInitializingSingleton {
             case RENEWED -> {
                 String access = body.path("data").path("access_token").stringValue();
                 String refresh = body.path("data").path("refresh_token").stringValue();
-                Instant expiresAt = VietguysTokenPolicy.expiryFrom(body, now);
+                Optional<Instant> readable = VietguysTokenPolicy.readableExpiry(body, now);
+                Instant expiresAt = readable.orElseGet(() -> VietguysTokenPolicy.expiryFrom(body, now));
                 jdbc.update("UPDATE sms_provider_credential SET refresh_token_enc = ?, access_token_enc = ?, "
                         + "access_expires_at = ?, state = '" + ACTIVE + "', last_renewed_at = ?, updated_at = ? "
                         + "WHERE account = ?",
                         sealer.seal(ACCOUNT, refresh), sealer.seal(ACCOUNT, access), Timestamp.from(expiresAt),
                         Timestamp.from(now), Timestamp.from(now), ACCOUNT);
-                telemetry.renewal("renewed");
-                LOG.info("VietGuys token renewal account={} outcome=renewed", ACCOUNT);
+                if (readable.isPresent()) {
+                    telemetry.renewal("renewed");
+                    LOG.info("VietGuys token renewal account={} outcome=renewed", ACCOUNT);
+                } else {
+                    telemetry.renewal("renewed_fallback");
+                    LOG.warn("VietGuys token renewal account={} expiry=unreadable", ACCOUNT);
+                }
                 return Renewed.of(access, expiresAt);
             }
             case REVOKED -> {

@@ -75,20 +75,67 @@ class VietguysTokenPolicyTest {
     }
 
     @Test
-    void anAbsentExpiryGivesOneHourFromNow() {
-        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"error\":0,\"data\":{}}"), NOW))
-                .isEqualTo(NOW.plus(Duration.ofHours(1)));
-        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"error\":0}"), NOW)).isEqualTo(NOW.plus(Duration.ofHours(1)));
+    void anAbsentExpiryGivesAFallbackThatIsStillReusable() {
+        Instant fallback = NOW.plus(VietguysTokenPolicy.RENEW_WITHIN).plus(Duration.ofHours(1));
+
+        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"error\":0,\"data\":{}}"), NOW)).isEqualTo(fallback);
+        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"error\":0}"), NOW)).isEqualTo(fallback);
+        assertThat(VietguysTokenPolicy.renewalDue(VietguysTokenPolicy.expiryFrom(json("{\"error\":0}"), NOW), NOW))
+                .isFalse();
     }
 
     @Test
-    void aNonNumericExpiryGivesOneHourFromNow() {
-        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"data\":{\"expired_at\":\"soon\"}}"), NOW))
-                .isEqualTo(NOW.plus(Duration.ofHours(1)));
-        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"data\":{\"expired_at\":null}}"), NOW))
-                .isEqualTo(NOW.plus(Duration.ofHours(1)));
-        assertThat(VietguysTokenPolicy.expiryFrom(json("{\"data\":{\"expired_at\":0}}"), NOW))
-                .isEqualTo(NOW.plus(Duration.ofHours(1)));
+    void everyUnreadableExpiryGivesAFallbackThatIsNotDue() {
+        for (String expiredAt : new String[] {"\"soon\"", "null", "0", "-5", "\"-5\"", "\"\"", "1.5", "true", "[]",
+                "99999999999999999999"}) {
+            JsonNode answer = json("{\"data\":{\"expired_at\":" + expiredAt + "}}");
+
+            assertThat(VietguysTokenPolicy.readableExpiry(answer, NOW)).as(expiredAt).isEmpty();
+            assertThat(VietguysTokenPolicy.renewalDue(VietguysTokenPolicy.expiryFrom(answer, NOW), NOW))
+                    .as(expiredAt).isFalse();
+        }
+    }
+
+    @Test
+    void aNumericStringExpiryIsReadInMilliseconds() {
+        Instant expiry = NOW.plus(Duration.ofHours(24));
+
+        assertThat(VietguysTokenPolicy.expiryFrom(
+                json("{\"data\":{\"expired_at\":\" " + expiry.toEpochMilli() + " \"}}"), NOW)).isEqualTo(expiry);
+    }
+
+    @Test
+    void anExpiryInEpochSecondsIsScaledToMilliseconds() {
+        Instant expiry = NOW.plus(Duration.ofHours(24));
+
+        assertThat(VietguysTokenPolicy.expiryFrom(
+                json("{\"data\":{\"expired_at\":" + expiry.getEpochSecond() + "}}"), NOW)).isEqualTo(expiry);
+        assertThat(VietguysTokenPolicy.expiryFrom(
+                json("{\"data\":{\"expired_at\":\"" + expiry.getEpochSecond() + "\"}}"), NOW)).isEqualTo(expiry);
+    }
+
+    @Test
+    void aPastExpiryIsUnreadable() {
+        JsonNode answer = json("{\"data\":{\"expired_at\":" + NOW.minusSeconds(60).toEpochMilli() + "}}");
+
+        assertThat(VietguysTokenPolicy.readableExpiry(answer, NOW)).isEmpty();
+        assertThat(VietguysTokenPolicy.expiryFrom(answer, NOW))
+                .isEqualTo(NOW.plus(VietguysTokenPolicy.RENEW_WITHIN).plus(Duration.ofHours(1)));
+    }
+
+    @Test
+    void anExpiryMoreThanThirtyDaysAheadIsUnreadable() {
+        Instant limit = NOW.plus(Duration.ofDays(30));
+
+        assertThat(VietguysTokenPolicy.readableExpiry(
+                json("{\"data\":{\"expired_at\":" + limit.toEpochMilli() + "}}"), NOW)).contains(limit);
+        assertThat(VietguysTokenPolicy.readableExpiry(
+                json("{\"data\":{\"expired_at\":" + limit.plusMillis(1).toEpochMilli() + "}}"), NOW)).isEmpty();
+    }
+
+    @Test
+    void theFallbackAlwaysOutlastsTheRenewalWindow() {
+        assertThat(VietguysTokenPolicy.FALLBACK_LIFETIME).isGreaterThan(VietguysTokenPolicy.RENEW_WITHIN);
     }
 
     @Test

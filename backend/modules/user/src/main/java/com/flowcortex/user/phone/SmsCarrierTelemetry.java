@@ -20,7 +20,7 @@ final class SmsCarrierTelemetry {
         meters.counter(SEND, "sender", sender, "result", result).increment();
     }
 
-    /** {@code outcome}: renewed, rejected or failed. */
+    /** {@code outcome}: renewed, renewed_fallback (the answer's expiry was unreadable), rejected or failed. */
     void renewal(String outcome) {
         meters.counter(RENEWAL, "outcome", outcome).increment();
     }

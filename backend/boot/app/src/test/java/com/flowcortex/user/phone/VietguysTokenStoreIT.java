@@ -155,6 +155,25 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void aRenewalWithoutAnExpiryIsReusedAndCountedAsFallback() {
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        VietguysTokenStore store = new VietguysTokenStore(jdbc, transactions,
+                new VietguysHttp(Duration.ofSeconds(5), Duration.ofSeconds(5)), sealer(ring("k1", KEY_1), "k1"),
+                carrierUrl("/token"), "demo-user", SEED, CLOCK, new SmsCarrierTelemetry(meters));
+        store.seed();
+        tokenAnswer.set("{\"error\":0,\"data\":{\"access_token\":\"access-2\",\"refresh_token\":\"refresh-2\"}}");
+
+        assertThat(store.accessToken()).isEqualTo("access-2");
+        assertThat(store.accessToken()).isEqualTo("access-2");
+        assertThat(store(ring("k1", KEY_1), "k1", SEED, Duration.ofSeconds(5)).accessToken()).isEqualTo("access-2");
+
+        assertThat(tokenRequests.get()).isEqualTo(1);
+        assertThat(meters.get(SmsCarrierTelemetry.RENEWAL).tag("outcome", "renewed_fallback").counter().count())
+                .isEqualTo(1.0);
+        assertThat(meters.find(SmsCarrierTelemetry.RENEWAL).tag("outcome", "renewed").counter()).isNull();
+    }
+
+    @Test
     void theSameSeedAfterARestartKeepsTheRotatedChain() {
         CredentialSealer sealer = sealer(ring("k1", KEY_1), "k1");
         store(ring("k1", KEY_1), "k1", SEED, Duration.ofSeconds(5)).seed();
