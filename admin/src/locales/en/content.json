@@ -80,6 +80,8 @@
     "up": "Up",
     "down": "Down",
     "removeShort": "Remove",
+    "sectionMoved": "Section moved to position {{n}} of {{total}}.",
+    "sectionRemoved": "Section {{n}} removed.",
     "addType": "Section type",
     "addSection": "Add section",
     "sectionLimit": "A document holds at most {{max}} sections.",

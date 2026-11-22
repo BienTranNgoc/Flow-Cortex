@@ -214,12 +214,14 @@ export function OnboardingFlow() {
       if (outcome !== 'failed') void actions.refreshStatus();
     }
     tryingRef.current = false;
+    if (!mountedRef.current) return;
+    // The component outlives the journey, so the busy flag clears whether or not we navigate.
+    setTrying(false);
     // A 409 already closed the journey through `write`, which bumps the generation once.
     const ours =
       generationRef.current === generation ||
       (outcome === 'closed' && generationRef.current === generation + 1);
-    if (!mountedRef.current || !ours) return;
-    setTrying(false);
+    if (!ours) return;
     if (flowRef.current.screen !== 'closed') leave();
     navigate(`/workflows/${sample.id}`, { state: { sampleInput: sample.input } });
   };
