@@ -1,9 +1,11 @@
 import { setToken } from '@flow-cortex/api-client';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route } from 'react-router-dom';
 import i18n from '../../lib/i18n';
 import viAuth from '../../locales/vi/auth.json';
-import { renderRoute, stubApi } from '../../test/fakeApi';
+import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
+import { stubModalDialog } from '../../test/modalDialog';
 import { ProfilePage } from './ProfilePage';
 
 const ME = {
@@ -74,14 +76,183 @@ describe('ProfilePage', () => {
     expect(await screen.findByText('—')).toBeInTheDocument();
   });
 
-  it('shows the stats and delete block when VITE_ACCOUNT_STATS_ENABLED is true', async () => {
+  it('shows the stats when VITE_ACCOUNT_STATS_ENABLED is true', async () => {
     vi.stubEnv('VITE_ACCOUNT_STATS_ENABLED', 'true');
     stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ME } });
 
     renderProfile();
 
     expect(await screen.findByRole('list', { name: 'Account statistics' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Request deletion' })).toBeInTheDocument();
+  });
+
+  describe('delete-account zone', () => {
+    const STATUS = 'GET /api/v1/me/account-deletion';
+    const ELIGIBILITY = 'GET /api/v1/me/account-deletion/eligibility';
+    const REQUEST = 'POST /api/v1/me/account-deletion';
+    const STEP_UP = 'POST /api/v1/me/step-up';
+    const ON: FakeReply = { status: 200, body: { enabled: true, gracePeriodDays: 30, state: 'NONE' } };
+    const ELIGIBLE: FakeReply = { status: 200, body: { eligible: true, reasons: [] } };
+    const PROOF: FakeReply = {
+      status: 200,
+      body: { stepUpProof: 'proof-1', expiresAt: '2026-11-11T10:05:00Z' },
+    };
+    const ACCEPTED: FakeReply = {
+      status: 202,
+      body: {
+        requestId: 'r-1',
+        state: 'PENDING',
+        requestedAt: '2026-11-11T10:00:00Z',
+        scheduledAt: '2026-12-11T10:00:00Z',
+      },
+    };
+    let restoreDialog: () => void;
+
+    beforeEach(() => {
+      restoreDialog = stubModalDialog();
+    });
+    afterEach(() => restoreDialog());
+
+    function problem(status: number, code: string, extra: object = {}): FakeReply {
+      return { status, body: { status, code, detail: 'server wording', ...extra } };
+    }
+
+    function renderWithPendingScreen() {
+      return renderRoute(
+        '/profile',
+        '/profile',
+        <ProfilePage />,
+        <Route path="/account-deletion" element={<p>Pending screen</p>} />,
+      );
+    }
+
+    async function confirmAndEnterPassword(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+      await user.click(await screen.findByRole('button', { name: 'Continue' }));
+      await user.type(await screen.findByLabelText('Password'), 'correct horse');
+      await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    }
+
+    it('lists the reasons of a blocked member and offers only Close', async () => {
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: {
+          status: 200,
+          body: {
+            eligible: false,
+            reasons: [{ key: 'workflow.active_run', message: 'A run is still in progress.' }],
+          },
+        },
+      });
+      const user = userEvent.setup();
+      renderProfile();
+
+      await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+
+      const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+      expect(await within(dialog).findByText('A run is still in progress.')).toBeInTheDocument();
+      expect(within(dialog).getAllByRole('button').map((button) => button.textContent)).toEqual(['Close']);
+      await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('asks again at every opening', async () => {
+      let blocked = true;
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: () =>
+          blocked
+            ? { status: 200, body: { eligible: false, reasons: [{ key: 'k', message: 'Busy.' }] } }
+            : ELIGIBLE,
+      });
+      const user = userEvent.setup();
+      renderProfile();
+
+      await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+      await user.click(await screen.findByRole('button', { name: 'Close' }));
+      blocked = false;
+      await user.click(screen.getByRole('button', { name: 'Request deletion' }));
+
+      expect(await screen.findByRole('button', { name: 'Continue' })).toBeInTheDocument();
+      expect(screen.queryByText('Busy.')).not.toBeInTheDocument();
+    });
+
+    it('sends an eligible member through the password step to the pending screen', async () => {
+      const calls = stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: ELIGIBLE,
+        [STEP_UP]: PROOF,
+        [REQUEST]: ACCEPTED,
+      });
+      const user = userEvent.setup();
+      renderWithPendingScreen();
+
+      await user.click(await screen.findByRole('button', { name: 'Request deletion' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+      expect(await within(dialog).findByText(/You can cancel for 30 days/)).toBeInTheDocument();
+      expect(within(dialog).getByText(/Every device, including this one, is signed out/)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: 'Continue' }));
+      await user.type(await screen.findByLabelText('Password'), 'correct horse');
+      await user.click(screen.getByRole('button', { name: 'Confirm' }));
+
+      expect(await screen.findByText('Pending screen')).toBeInTheDocument();
+      expect(calls.find((call) => call.path === '/api/v1/me/step-up')?.body).toEqual({
+        password: 'correct horse',
+        purpose: 'ACCOUNT_DELETION',
+      });
+      expect(calls.find((call) => call.method === 'POST' && call.path === '/api/v1/me/account-deletion')?.body).toEqual({
+        stepUpProof: 'proof-1',
+      });
+    });
+
+    it('stays on the profile page and lists the reasons when the submit is blocked', async () => {
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: ELIGIBLE,
+        [STEP_UP]: PROOF,
+        [REQUEST]: problem(409, 'account.deletion.blocked', {
+          reasons: [{ key: 'support.open_request', message: 'A support request is still open.' }],
+        }),
+      });
+      const user = userEvent.setup();
+      renderWithPendingScreen();
+
+      await confirmAndEnterPassword(user);
+
+      expect(await screen.findByText('A support request is still open.')).toBeInTheDocument();
+      expect(screen.queryByText('Pending screen')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+    });
+
+    it.each([
+      [409, 'account.deletion.staffAccount', 'Staff and administrator accounts are removed by an administrator.'],
+      [
+        403,
+        'STEP_UP_REQUIRED',
+        'Your password confirmation expired or was already used. Continue to confirm it again.',
+      ],
+      [503, 'account.deletion.eligibilityUnavailable', 'We could not check your account right now. Try again shortly.'],
+      [500, 'internal', 'We could not send the request. Try again.'],
+    ])('shows a message for a %i %s refusal and stays on the profile page', async (status, code, message) => {
+      stubApi({
+        ...OWN_ROUTES,
+        [STATUS]: ON,
+        [ELIGIBILITY]: ELIGIBLE,
+        [STEP_UP]: PROOF,
+        [REQUEST]: problem(status, code),
+      });
+      const user = userEvent.setup();
+      renderWithPendingScreen();
+
+      await confirmAndEnterPassword(user);
+
+      const dialog = await screen.findByRole('dialog', { name: 'Delete your account' });
+      expect(await within(dialog).findByRole('alert')).toHaveTextContent(message);
+      expect(screen.queryByText('Pending screen')).not.toBeInTheDocument();
+    });
   });
 
   it('saves the display name through PUT /auth/profile', async () => {

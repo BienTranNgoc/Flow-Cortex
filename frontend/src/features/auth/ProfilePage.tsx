@@ -9,6 +9,7 @@ import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { BillingBanner } from '../credits/BillingBanner';
 import { useBalance } from '../credits/useBalance';
+import { AccountDeletionZone } from './AccountDeletionZone';
 import { ApiTokensSection } from './ApiTokensSection';
 import { AvatarPickerDialog } from '../profile/AvatarPickerDialog';
 import { CoverPickerDialog } from '../profile/CoverPickerDialog';
@@ -316,21 +317,7 @@ export function ProfilePage() {
             </>
           )}
 
-          {showAccountStats && (
-            <>
-              <hr className="profile-card__divider" />
-
-              <div className="profile-danger">
-                <div>
-                  <h3>{t('auth.profile.deleteTitle')}</h3>
-                  <p>{t('auth.profile.deleteHint')}</p>
-                </div>
-                <button type="button" className="cortex-btn cortex-btn--danger" disabled>
-                  {t('auth.profile.deleteRequest')}
-                </button>
-              </div>
-            </>
-          )}
+          <AccountDeletionZone />
         </section>
       </div>
 
