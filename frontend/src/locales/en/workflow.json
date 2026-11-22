@@ -56,6 +56,22 @@
     "retried": "Retried {{n}}×",
     "notConfigured": "Not configured"
   },
+  "canvas": {
+    "region": "Run diagram",
+    "input": "Input",
+    "runInput": "Run input",
+    "live": "Live",
+    "progress": "Step {{current}} of {{total}}",
+    "elapsed": "Running for {{time}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomLevel": "{{percent}}%",
+    "fit": "Fit diagram",
+    "expand": "Expand diagram",
+    "close": "Close",
+    "minimap": "Diagram overview",
+    "splitHandle": "Resize diagram and details"
+  },
   "run": {
     "heading": {
       "pending": "Run pending",

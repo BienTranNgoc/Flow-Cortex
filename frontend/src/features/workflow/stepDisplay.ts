@@ -165,6 +165,21 @@ function shortSeconds(s: number, t: TFunction, locale: Locale): string {
   });
 }
 
+/** A length of time in the given language: seconds below a minute ("42s"), else "1m 20s" or "2m". */
+export function formatSeconds(seconds: number, t: TFunction, locale: Locale): string {
+  if (seconds < 60) {
+    return shortSeconds(seconds, t, locale);
+  }
+  const mins = Math.floor(seconds / 60);
+  const remSecs = Math.round(seconds % 60);
+  return remSecs > 0
+    ? t('common.units.minutesSeconds', {
+        minutes: plain(mins, locale),
+        seconds: plain(remSecs, locale),
+      })
+    : t('common.units.minutes', { value: plain(mins, locale) });
+}
+
 /**
  * Execution duration of a step in the given language (e.g. "11.3s", "1m 20s"), from its timestamps,
  * else from the duration its output report carries.
@@ -179,17 +194,7 @@ export function stepDuration(step: RunStepResponse, t: TFunction, locale: Locale
       if (s < 0.1) {
         return t('common.units.milliseconds', { value: plain(ms, locale) });
       }
-      if (s < 60) {
-        return shortSeconds(s, t, locale);
-      }
-      const mins = Math.floor(s / 60);
-      const remSecs = Math.round(s % 60);
-      return remSecs > 0
-        ? t('common.units.minutesSeconds', {
-            minutes: plain(mins, locale),
-            seconds: plain(remSecs, locale),
-          })
-        : t('common.units.minutes', { value: plain(mins, locale) });
+      return formatSeconds(s, t, locale);
     }
   }
 

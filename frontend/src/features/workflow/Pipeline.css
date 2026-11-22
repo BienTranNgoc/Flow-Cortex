@@ -548,6 +548,72 @@ button.pipeline-node:hover {
   }
 }
 
+/* Run canvas beside the step details; the handle between them sets the canvas share of the row. */
+@media (min-width: 1024px) {
+  .run-layout--canvas {
+    grid-template-columns: var(--run-split, 40%) 0.5rem minmax(0, 1fr);
+    column-gap: 0;
+  }
+
+  .run-layout--canvas .run-layout-canvas,
+  .run-layout--canvas .run-split-handle {
+    position: sticky;
+    top: 1.5rem;
+    height: min(70dvh, 40rem);
+    min-height: 20rem;
+  }
+
+  .run-layout--canvas .run-layout-canvas {
+    min-width: 0;
+  }
+
+  .run-layout--canvas .run-layout-detail {
+    position: static;
+    min-width: 0;
+    padding-inline-start: 1rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+.run-split-handle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+}
+
+/* A wider pointer target than the visible handle, so it is easy to grab without widening the row. */
+.run-split-handle::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: calc((var(--hit-min) - 100%) / -2);
+}
+
+.run-split-handle__grip {
+  width: 0.25rem;
+  height: 2.5rem;
+  border-radius: var(--radius-full);
+  background: var(--line-2);
+}
+
+.run-split-handle:hover {
+  background: var(--chrome-hover);
+}
+
+.run-split-handle:hover .run-split-handle__grip,
+.run-split-handle:active .run-split-handle__grip {
+  background: var(--primary);
+}
+
+.run-split-handle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Inside the two-column run layout, keep the pipeline list stacked vertically */
 .run-layout .pipeline .pipeline-list {
   flex-direction: column !important;

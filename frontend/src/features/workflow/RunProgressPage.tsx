@@ -1,16 +1,19 @@
 import { ApiError, type RunResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
 import './WorkflowPages.css';
 import { Pipeline } from './Pipeline';
+import { RunCanvas, useRunCanvasWide } from './RunCanvas';
 import { RunInputs } from './RunInputs';
 import { RunLogPanel } from './RunLogPanel';
+import { RunSplitHandle } from './RunSplitHandle';
 import { StepDetail } from './StepDetail';
 import { StopRunDialog } from './StopRunDialog';
+import { looksLikeJson } from './runCanvasModel';
 import {
   choiceTakenBack,
   needsYouStep,
@@ -22,6 +25,7 @@ import {
   type StepChoice,
 } from './stepDisplay';
 import { NO_MESSAGE } from './stepErrorMessages';
+import { useRunSplit } from './useRunSplit';
 import { useCancelRunMutation, useRunQuery } from './useWorkflows';
 
 const RUN_HEADING_KEYS: Record<string, string> = {
@@ -109,19 +113,6 @@ function StopControl({ runId, chargedCredits, onStopped }: Readonly<StopControlP
   );
 }
 
-/**
- * Runs written before uploads existed may hold a JSON reference as their input; that is never a
- * file name, so it is not shown.
- */
-function looksLikeJson(value: string): boolean {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return typeof parsed === 'object' && parsed !== null;
-  } catch {
-    return false;
-  }
-}
-
 /** The state `useTransitionNavigate` attaches when a member has just started this run. */
 function isFocusRequest(state: unknown): boolean {
   return (
@@ -142,6 +133,8 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const wide = useRunCanvasWide();
+  const split = useRunSplit();
   const [choice, setChoice] = useState<StepChoice>();
   const steps = run.steps ?? [];
   if (choice && choiceTakenBack(steps, run.status, choice)) {
@@ -200,6 +193,25 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     panelRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
   };
 
+  const pipelineSteps = steps.map((step) => ({
+    id: stepKey(step),
+    name: stepLabel(step, t),
+    run: step,
+  }));
+  const detail = selected && (
+    <div className="run-layout-detail">
+      <StepDetail
+        id={panelId}
+        panelRef={panelRef}
+        runId={runId}
+        step={selected}
+        awaitingApproval={needsYouStep(steps, run.status) !== undefined}
+        needsYou={selectedState === 'needs-you'}
+        fileName={fileName}
+      />
+    </div>
+  );
+
   return (
     <div>
       <PageHeading ref={headingRef} title={runHeading(run.status, t)} />
@@ -220,32 +232,37 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       )}
       {fileName && <p className="run-file">{t('workflow.file', { name: fileName })}</p>}
       <RunInputs runId={runId} />
-      {selected && (
+      {selected && wide && (
+        <div
+          ref={split.gridRef}
+          className="run-layout run-layout--canvas"
+          style={{ '--run-split': `${split.percent}%` } as CSSProperties}
+        >
+          <div className="run-layout-canvas">
+            <RunCanvas
+              run={run}
+              steps={pipelineSteps}
+              selectedId={stepKey(selected)}
+              onSelect={onSelect}
+              panelId={panelId}
+            />
+          </div>
+          <RunSplitHandle binding={split.handle} />
+          {detail}
+        </div>
+      )}
+      {selected && !wide && (
         <div className="run-layout">
           <div className="run-layout-pipeline">
             <Pipeline
-              steps={steps.map((step) => ({
-                id: stepKey(step),
-                name: stepLabel(step, t),
-                run: step,
-              }))}
+              steps={pipelineSteps}
               runStatus={run.status}
               selectedId={stepKey(selected)}
               onSelect={onSelect}
               panelId={panelId}
             />
           </div>
-          <div className="run-layout-detail">
-            <StepDetail
-              id={panelId}
-              panelRef={panelRef}
-              runId={runId}
-              step={selected}
-              awaitingApproval={needsYouStep(steps, run.status) !== undefined}
-              needsYou={selectedState === 'needs-you'}
-              fileName={fileName}
-            />
-          </div>
+          {detail}
         </div>
       )}
       <RunLogPanel runId={runId} />
