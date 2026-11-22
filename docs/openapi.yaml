@@ -3448,6 +3448,24 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/Saved"
+  /api/v1/connectors/google/authorize:
+    post:
+      tags:
+      - google-connector-controller
+      operationId: googleAuthorize
+      responses:
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/client-errors:
     post:
       tags:
@@ -7278,6 +7296,288 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/TelegramHealth"
+  /api/v1/connectors/google:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleRead
+      responses:
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/sheets:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: listGoogleSpreadsheets
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/sheets/{id}/tabs:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: listGoogleSpreadsheetTabs
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/sheets/{id}/preview:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: previewGoogleSpreadsheetTab
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: tab
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: range
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: hasHeader
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/health:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleHealth
+      responses:
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/callback:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleCallback
+      parameters:
+      - name: connector_google_flow
+        in: cookie
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to the return path with connector=google and result
+          headers:
+            Location:
+              description: The return path with the result
+              style: simple
+              schema:
+                type: string
+      security: []
   /api/v1/chat/conversations/{id}/messages:
     get:
       tags:
