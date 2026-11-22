@@ -3601,6 +3601,19 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
+/**
+ * none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned
+ */
+export type AdminPhoneVerificationStatusCarrierCredential =
+  (typeof AdminPhoneVerificationStatusCarrierCredential)[keyof typeof AdminPhoneVerificationStatusCarrierCredential];
+
+export const AdminPhoneVerificationStatusCarrierCredential = {
+  none: 'none',
+  active: 'active',
+  reseed_required: 'reseed_required',
+  unseeded: 'unseeded',
+} as const;
+
 export interface AdminPhoneVerificationStatus {
   verificationEnabled: boolean;
   /** none when no SMS sender is wired; the configured sender when it is a known one; else custom */
@@ -3612,6 +3625,8 @@ export interface AdminPhoneVerificationStatus {
   globalSendsPerDay: number;
   /** Codes sent in the last 24 hours */
   sentLast24h: number;
+  /** none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned */
+  carrierCredential: AdminPhoneVerificationStatusCarrierCredential;
 }
 
 export type PermissionCatalogEntryKey =
@@ -9260,10 +9275,19 @@ export type sendCodeResponse200 = {
   status: 200;
 };
 
+export type sendCodeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type sendCodeResponseSuccess = sendCodeResponse200 & {
   headers: Headers;
 };
-export type sendCodeResponse = sendCodeResponseSuccess;
+export type sendCodeResponseError = sendCodeResponse503 & {
+  headers: Headers;
+};
+
+export type sendCodeResponse = sendCodeResponseSuccess | sendCodeResponseError;
 
 export const getSendCodeUrl = () => {
   return `/api/v1/me/phone/send-code`;
@@ -9396,6 +9420,11 @@ export type changeStartResponse429 = {
   status: 429;
 };
 
+export type changeStartResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type changeStartResponseSuccess = changeStartResponse200 & {
   headers: Headers;
 };
@@ -9405,6 +9434,7 @@ export type changeStartResponseError = (
   | changeStartResponse409
   | changeStartResponse422
   | changeStartResponse429
+  | changeStartResponse503
 ) & {
   headers: Headers;
 };
