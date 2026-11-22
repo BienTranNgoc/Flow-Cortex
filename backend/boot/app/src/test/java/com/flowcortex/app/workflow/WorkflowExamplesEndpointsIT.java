@@ -91,7 +91,7 @@ class WorkflowExamplesEndpointsIT extends AbstractWorkflowHttpIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         JsonNode workflow = JSON.readTree(response.getBody());
-        assertThat(workflow.get("isShared").asBoolean()).isFalse();
+        assertThat(workflow.get("visibility").asText()).isEqualTo("private");
         assertThat(workflow.get("status").asText()).isEqualTo("draft");
         assertThat(workflow.get("name").asText()).isEqualTo("Fill a template, review, use a field");
         assertThat(workflow.get("steps")).extracting(step -> step.get("type").asText())
