@@ -1240,6 +1240,27 @@ export interface SupportAssistantQuestion {
   question: string;
 }
 
+/**
+ * @nullable
+ */
+export type SupportAssistantHandoffTopic =
+  (typeof SupportAssistantHandoffTopic)[keyof typeof SupportAssistantHandoffTopic] | null;
+
+export const SupportAssistantHandoffTopic = {
+  money: 'money',
+  security: 'security',
+  personal_data: 'personal_data',
+  legal: 'legal',
+  violation: 'violation',
+} as const;
+
+export interface SupportAssistantHandoff {
+  /** @nullable */
+  topic: SupportAssistantHandoffTopic;
+  subject?: string;
+  description?: string;
+}
+
 export interface SupportAssistantQuota {
   remaining: number;
   resetsAt: string;
@@ -1259,6 +1280,8 @@ export const SupportAssistantReplyMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportAssistantSource {
@@ -1271,6 +1294,7 @@ export interface SupportAssistantReplyMessage {
   text: string;
   outcome: SupportAssistantReplyMessageOutcome;
   sources: SupportAssistantSource[];
+  handoff?: SupportAssistantHandoff;
 }
 
 export interface SupportAssistantReply {
@@ -2850,6 +2874,8 @@ export const SupportAssistantHistoryMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportAssistantHistoryMessage {
@@ -2857,6 +2883,7 @@ export interface SupportAssistantHistoryMessage {
   text: string;
   outcome?: SupportAssistantHistoryMessageOutcome;
   sources: SupportAssistantSource[];
+  handoff?: SupportAssistantHandoff;
   createdAt: string;
 }
 
@@ -3482,6 +3509,16 @@ export const AdminSupportRequestSummaryStatus = {
   closed: 'closed',
 } as const;
 
+export type AdminSupportRequestSummarySlaLevel =
+  (typeof AdminSupportRequestSummarySlaLevel)[keyof typeof AdminSupportRequestSummarySlaLevel];
+
+export const AdminSupportRequestSummarySlaLevel = {
+  ok: 'ok',
+  due_soon: 'due_soon',
+  overdue: 'overdue',
+  paused: 'paused',
+} as const;
+
 export interface AdminSupportRequestSummary {
   number: number;
   type: AdminSupportRequestSummaryType;
@@ -3491,6 +3528,7 @@ export interface AdminSupportRequestSummary {
   assignee?: SupportAssignee;
   createdAt: string;
   lastActivityAt: string;
+  slaLevel: AdminSupportRequestSummarySlaLevel;
 }
 
 export interface AdminSupportRequestPage {
@@ -3498,6 +3536,11 @@ export interface AdminSupportRequestPage {
   page: number;
   size: number;
   total: number;
+}
+
+export interface AdminSupportSlaSummary {
+  overdue: number;
+  dueSoon: number;
 }
 
 export interface SupportAssigneeCount {
@@ -3852,6 +3895,18 @@ export type StartRunParams = {
   key?: string;
 };
 
+export type MarkAllNotificationsReadParams = {
+  audience?: MarkAllNotificationsReadAudience;
+};
+
+export type MarkAllNotificationsReadAudience =
+  (typeof MarkAllNotificationsReadAudience)[keyof typeof MarkAllNotificationsReadAudience];
+
+export const MarkAllNotificationsReadAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
 export type UnsubscribeEmailLinkParams = {
   src?: string;
 };
@@ -4098,10 +4153,31 @@ export type OpenRealtimeStreamParams = {
 };
 
 export type ListNotificationsParams = {
+  audience?: ListNotificationsAudience;
   filter?: string;
   page?: string;
   size?: string;
 };
+
+export type ListNotificationsAudience =
+  (typeof ListNotificationsAudience)[keyof typeof ListNotificationsAudience];
+
+export const ListNotificationsAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export type GetUnreadNotificationCountParams = {
+  audience?: GetUnreadNotificationCountAudience;
+};
+
+export type GetUnreadNotificationCountAudience =
+  (typeof GetUnreadNotificationCountAudience)[keyof typeof GetUnreadNotificationCountAudience];
+
+export const GetUnreadNotificationCountAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
 
 export type ListDriveSuggestionsParams = {
   /**
@@ -4200,6 +4276,10 @@ export type ListAdminSupportRequestsParams = {
    * @maxLength 100
    */
   q?: string;
+  /**
+   * Keeps only due-soon and overdue requests
+   */
+  sla?: ListAdminSupportRequestsSla;
   sort?: ListAdminSupportRequestsSort;
   /**
    * @minimum 0
@@ -4240,12 +4320,65 @@ export const ListAdminSupportRequestsCreated = {
   older: 'older',
 } as const;
 
+export type ListAdminSupportRequestsSla =
+  (typeof ListAdminSupportRequestsSla)[keyof typeof ListAdminSupportRequestsSla];
+
+export const ListAdminSupportRequestsSla = {
+  at_risk: 'at_risk',
+} as const;
+
 export type ListAdminSupportRequestsSort =
   (typeof ListAdminSupportRequestsSort)[keyof typeof ListAdminSupportRequestsSort];
 
 export const ListAdminSupportRequestsSort = {
   newest: 'newest',
   oldest: 'oldest',
+} as const;
+
+export type GetAdminSupportSlaSummaryParams = {
+  status?: GetAdminSupportSlaSummaryStatus;
+  type?: GetAdminSupportSlaSummaryType;
+  /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: GetAdminSupportSlaSummaryCreated;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type GetAdminSupportSlaSummaryStatus =
+  (typeof GetAdminSupportSlaSummaryStatus)[keyof typeof GetAdminSupportSlaSummaryStatus];
+
+export const GetAdminSupportSlaSummaryStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type GetAdminSupportSlaSummaryType =
+  (typeof GetAdminSupportSlaSummaryType)[keyof typeof GetAdminSupportSlaSummaryType];
+
+export const GetAdminSupportSlaSummaryType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type GetAdminSupportSlaSummaryCreated =
+  (typeof GetAdminSupportSlaSummaryCreated)[keyof typeof GetAdminSupportSlaSummaryCreated];
+
+export const GetAdminSupportSlaSummaryCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
 } as const;
 
 export type GetAdminSupportRequestFacetsParams = {
@@ -9116,19 +9249,42 @@ export type markAllNotificationsReadResponse200 = {
   status: 200;
 };
 
+export type markAllNotificationsReadResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type markAllNotificationsReadResponseSuccess = markAllNotificationsReadResponse200 & {
   headers: Headers;
 };
-export type markAllNotificationsReadResponse = markAllNotificationsReadResponseSuccess;
+export type markAllNotificationsReadResponseError = markAllNotificationsReadResponse400 & {
+  headers: Headers;
+};
 
-export const getMarkAllNotificationsReadUrl = () => {
-  return `/api/v1/notifications/read-all`;
+export type markAllNotificationsReadResponse =
+  markAllNotificationsReadResponseSuccess | markAllNotificationsReadResponseError;
+
+export const getMarkAllNotificationsReadUrl = (params?: MarkAllNotificationsReadParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications/read-all?${stringifiedParams}`
+    : `/api/v1/notifications/read-all`;
 };
 
 export const markAllNotificationsRead = async (
+  params?: MarkAllNotificationsReadParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<markAllNotificationsReadResponse> => {
-  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(), {
+  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(params), {
     ...options,
     method: 'POST',
   });
@@ -15225,19 +15381,42 @@ export type getUnreadNotificationCountResponse200 = {
   status: 200;
 };
 
+export type getUnreadNotificationCountResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type getUnreadNotificationCountResponseSuccess = getUnreadNotificationCountResponse200 & {
   headers: Headers;
 };
-export type getUnreadNotificationCountResponse = getUnreadNotificationCountResponseSuccess;
+export type getUnreadNotificationCountResponseError = getUnreadNotificationCountResponse400 & {
+  headers: Headers;
+};
 
-export const getGetUnreadNotificationCountUrl = () => {
-  return `/api/v1/notifications/unread-count`;
+export type getUnreadNotificationCountResponse =
+  getUnreadNotificationCountResponseSuccess | getUnreadNotificationCountResponseError;
+
+export const getGetUnreadNotificationCountUrl = (params?: GetUnreadNotificationCountParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications/unread-count?${stringifiedParams}`
+    : `/api/v1/notifications/unread-count`;
 };
 
 export const getUnreadNotificationCount = async (
+  params?: GetUnreadNotificationCountParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getUnreadNotificationCountResponse> => {
-  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(), {
+  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -16112,6 +16291,52 @@ export const getAdminSupportRequest = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getAdminSupportRequestResponse> => {
   return customFetch<getAdminSupportRequestResponse>(getGetAdminSupportRequestUrl(number), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAdminSupportSlaSummaryResponse200 = {
+  data: AdminSupportSlaSummary;
+  status: 200;
+};
+
+export type getAdminSupportSlaSummaryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getAdminSupportSlaSummaryResponseSuccess = getAdminSupportSlaSummaryResponse200 & {
+  headers: Headers;
+};
+export type getAdminSupportSlaSummaryResponseError = getAdminSupportSlaSummaryResponse400 & {
+  headers: Headers;
+};
+
+export type getAdminSupportSlaSummaryResponse =
+  getAdminSupportSlaSummaryResponseSuccess | getAdminSupportSlaSummaryResponseError;
+
+export const getGetAdminSupportSlaSummaryUrl = (params?: GetAdminSupportSlaSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/support/requests/sla-summary?${stringifiedParams}`
+    : `/api/v1/admin/support/requests/sla-summary`;
+};
+
+export const getAdminSupportSlaSummary = async (
+  params?: GetAdminSupportSlaSummaryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportSlaSummaryResponse> => {
+  return customFetch<getAdminSupportSlaSummaryResponse>(getGetAdminSupportSlaSummaryUrl(params), {
     ...options,
     method: 'GET',
   });
