@@ -23,6 +23,7 @@ import com.flowcortex.workflow.api.WorkflowVersionDetailView;
 import com.flowcortex.workflow.api.WorkflowVersionPageView;
 import com.flowcortex.workflow.api.WorkflowVersionView;
 import com.flowcortex.workflow.api.WorkflowView;
+import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowStep;
@@ -78,7 +79,7 @@ class WorkflowVersionServiceImplTest {
     }
 
     private Workflow draftWorkflow() {
-        Workflow workflow = Workflow.draft(UUID.randomUUID(), ANA, "Demo", false);
+        Workflow workflow = Workflow.draft(UUID.randomUUID(), ANA, "Demo");
         stub(workflow);
         return workflow;
     }
@@ -86,7 +87,8 @@ class WorkflowVersionServiceImplTest {
     private void stub(Workflow workflow) {
         when(workflowRepository.findByIdAndDeletedAtIsNull(workflow.getId())).thenReturn(Optional.of(workflow));
         when(workflowRepository.findVisibleTo(workflow.getId(), ANA)).thenReturn(Optional.of(workflow));
-        if (workflow.isShared() && workflow.getStatus() == WorkflowStatus.PUBLISHED) {
+        if (workflow.getVisibility() != WorkflowVisibility.PRIVATE
+                && workflow.getStatus() == WorkflowStatus.PUBLISHED) {
             when(workflowRepository.findVisibleTo(workflow.getId(), BEN)).thenReturn(Optional.of(workflow));
         }
     }

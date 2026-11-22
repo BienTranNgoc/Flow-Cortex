@@ -489,6 +489,11 @@
   color: var(--red);
 }
 
+.pv-run-badge[data-state='stopped'] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .pv-run-actions-group {
   display: inline-flex;
   flex-wrap: wrap;

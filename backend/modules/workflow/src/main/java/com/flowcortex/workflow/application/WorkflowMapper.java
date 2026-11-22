@@ -37,7 +37,7 @@ final class WorkflowMapper {
 
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
             Predicate<String> isAvailableType, UUID publishedVersionId, Integer servedVersion) {
-        return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.isShared(),
+        return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.getVisibility(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
@@ -46,7 +46,7 @@ final class WorkflowMapper {
 
     /** The same view with every step reduced to what a reader who does not own the workflow may see. */
     static WorkflowView withoutStepContent(WorkflowView view) {
-        return new WorkflowView(view.id(), view.ownerId(), view.name(), view.shared(), view.createdAt(),
+        return new WorkflowView(view.id(), view.ownerId(), view.name(), view.visibility(), view.createdAt(),
                 view.updatedAt(),
                 view.steps().stream()
                         .map(step -> new WorkflowStepView(step.id(), step.stepOrder(), step.name(), step.type(),

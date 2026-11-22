@@ -13,7 +13,7 @@ const PRODUCT_VIDEO_ID = '9aa35334-b672-4b6c-93e8-1a4c2cc14301';
 const PRODUCT_VIDEO: WorkflowResponse = {
   id: PRODUCT_VIDEO_ID,
   name: 'Product Video',
-  isShared: true,
+  visibility: 'public',
   available: true,
   steps: [
     { id: 's1', stepOrder: 1, name: 'Generate script', type: 'provider-script', mode: 'remote' },
@@ -116,6 +116,37 @@ describe('ProductVideoStartForm', () => {
     await user.click(screen.getByRole('button', { name: 'Remove extra.png' }));
     expect(screen.queryByText('At most 3 images per run.')).not.toBeInTheDocument();
     expect(screen.getByText('3 / 3 photos')).toBeInTheDocument();
+  });
+
+  it('keeps the hidden file input out of the tab order so only the visible picker takes focus', async () => {
+    renderForm();
+
+    expect(await screen.findByLabelText(/Product image/)).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('ties the image error to the visible picker button', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await screen.findByLabelText('Product name *');
+    await user.type(screen.getByLabelText('Product name *'), 'Bình giữ nhiệt');
+    await user.type(screen.getByLabelText('Description *'), 'Giữ nhiệt 12 tiếng');
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+    await screen.findByText('Add at least one product image');
+    const picker = screen.getByRole('button', { name: /Drag & drop 1–3 photos/ });
+    expect(picker).toHaveAccessibleDescription('Add at least one product image');
+  });
+
+  it('ties the image error to the Add photo button once a rejected file is chosen', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.upload(await screen.findByLabelText(/Product image/), [image('holiday.avi')]);
+
+    expect(await screen.findByRole('button', { name: 'Add photo' })).toHaveAccessibleDescription(
+      'Use .jpg, .jpeg, .png or .webp.',
+    );
   });
 
   it('asks for at least one product image when Start is pressed without one', async () => {

@@ -21,11 +21,12 @@ const ACTIVE_STATUSES = new Set(['pending', 'running', 'cancelling']);
 
 function runBadgeState(
   status: string | undefined,
-): 'running' | 'needs-you' | 'completed' | 'error' | 'pending' {
+): 'running' | 'needs-you' | 'completed' | 'error' | 'stopped' | 'pending' {
   if (status === 'running' || status === 'cancelling') return 'running';
   if (status === 'waiting_approval') return 'needs-you';
   if (status === 'completed') return 'completed';
-  if (status === 'error' || status === 'cancelled') return 'error';
+  if (status === 'error') return 'error';
+  if (status === 'cancelled') return 'stopped';
   return 'pending';
 }
 

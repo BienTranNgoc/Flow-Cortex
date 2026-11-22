@@ -367,6 +367,7 @@ export function ProductVideoStartForm({
 
   const uploadPercent = phase?.kind === 'uploading' ? phase.percent : null;
   const resend = failure?.kind === 'credits' ? failure.resend : null;
+  const imageProblemId = imageError ? 'product-images-problem' : undefined;
 
   return (
     <div className="pv-studio-grid">
@@ -447,15 +448,17 @@ export function ProductVideoStartForm({
                 multiple
                 accept="image/jpeg,image/png,image/webp"
                 required
+                tabIndex={-1}
                 onChange={onPick}
                 aria-invalid={imageError ? true : undefined}
-                aria-describedby={imageError ? 'product-images-problem' : undefined}
+                aria-describedby={imageProblemId}
               />
               {files.length === 0 ? (
                 <button
                   type="button"
                   className="pv-dropzone-empty"
                   disabled={phase !== null}
+                  aria-describedby={imageProblemId}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <span className="pv-dropzone-icon" aria-hidden="true">
@@ -511,6 +514,7 @@ export function ProductVideoStartForm({
                         type="button"
                         className="pv-secondary-btn"
                         disabled={phase !== null}
+                        aria-describedby={imageProblemId}
                         onClick={() => fileInputRef.current?.click()}
                       >
                         <Plus size={16} aria-hidden="true" />
