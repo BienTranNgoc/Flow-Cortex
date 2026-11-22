@@ -4893,7 +4893,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PreferencesView"
+                $ref: "#/components/schemas/NotificationPreferencesView"
     patch:
       tags:
       - preferences-controller
@@ -4909,7 +4909,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PreferencesView"
+                $ref: "#/components/schemas/NotificationPreferencesView"
         "400":
           description: "empty body, or a field that is not one of the three booleans"
           content:
@@ -11144,7 +11144,7 @@ components:
           type: boolean
         marketingEmail:
           type: boolean
-    PreferencesView:
+    NotificationPreferencesView:
       type: object
       properties:
         inApp:
@@ -12834,6 +12834,23 @@ components:
       - day
       - failed
       - runs
+    PreferencesView:
+      type: object
+      properties:
+        locale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+        ui:
+          $ref: "#/components/schemas/UiPreferences"
+        privacy:
+          $ref: "#/components/schemas/PrivacySettings"
+      required:
+      - privacy
+      - ui
     AdminWorkflowResponse:
       type: object
       properties:
