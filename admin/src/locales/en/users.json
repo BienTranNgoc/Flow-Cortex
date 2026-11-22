@@ -65,7 +65,9 @@
     "pendingConfirmation": "Pending confirmation",
     "locked": "Locked",
     "suspended": "Suspended",
-    "newThisWeek": "New in 7 days"
+    "newThisWeek": "New in 7 days",
+    "loadError": "Could not load user statistics.",
+    "retry": "Retry"
   },
   "create": {
     "form": "Add user",

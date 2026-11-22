@@ -65,7 +65,9 @@
     "pendingConfirmation": "Chờ xác nhận",
     "locked": "Đang bị khóa",
     "suspended": "Đã tạm ngưng",
-    "newThisWeek": "Mới trong 7 ngày"
+    "newThisWeek": "Mới trong 7 ngày",
+    "loadError": "Không tải được thống kê người dùng.",
+    "retry": "Thử lại"
   },
   "create": {
     "form": "Thêm người dùng",
