@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { stubApi, type FakeReply } from '../../test/fakeApi';
+import { stubModalDialog } from '../../test/modalDialog';
 import { StepUpDialog } from './StepUpDialog';
 
 const STEP_UP = 'POST /api/v1/me/step-up';
@@ -11,33 +12,6 @@ const GRANTED: FakeReply = {
   status: 200,
   body: { stepUpProof: 'proof-1', expiresAt: '2026-11-11T10:05:00Z' },
 };
-
-/**
- * jsdom has no `showModal`/`close`; these set and clear `open` and fire `close` like a browser.
- */
-function stubModalDialog() {
-  const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-  Object.defineProperties(proto, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        if (!this.hasAttribute('open')) return;
-        this.removeAttribute('open');
-        this.dispatchEvent(new Event('close'));
-      },
-    },
-  });
-  return () => {
-    delete proto.showModal;
-    delete proto.close;
-  };
-}
 
 interface HarnessProps {
   onProof: (proof: string) => void;

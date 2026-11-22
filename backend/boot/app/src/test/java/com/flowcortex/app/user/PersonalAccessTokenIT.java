@@ -282,37 +282,42 @@ class PersonalAccessTokenIT extends AbstractUserModuleIT {
     @Test
     void aDemotedAdminsTokenStaysRefusedAfterThePromotionIsReversed() {
         Account owner = admin("promoter");
-        String email = uniqueEmail("flip");
-        UUID id = userService.createUser(owner.id(), email, PASSWORD, "Flip Admin", "ADMIN").id();
-        Account flipped = new Account(id, email, login(email, PASSWORD));
-        String token = createToken(flipped, "flip");
-        assertThat(status("/api/v1/workflows", HttpMethod.GET, token)).isEqualTo(HttpStatus.OK);
+        TokenHolder flipped = secondAdminWithToken(owner, "flip");
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, flipped.token())).isEqualTo(HttpStatus.OK);
 
-        userService.updateUser(owner.id(), id, null, null, "MEMBER", null);
-        userService.updateUser(owner.id(), id, null, null, "ADMIN", null);
+        userService.updateUser(owner.id(), flipped.id(), null, null, "MEMBER", null);
+        userService.updateUser(owner.id(), flipped.id(), null, null, "ADMIN", null);
 
-        assertThat(status("/api/v1/workflows", HttpMethod.GET, token)).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_event WHERE user_id = ? AND type = 'PAT_REVOKED'"
-                + " AND metadata->>'reason' = 'role_demoted'", Integer.class, id)).isEqualTo(1);
+        assertRevokedByDemotion(flipped);
     }
 
     @Test
     void aTokenStaysRefusedWhenTheAdminAccountsRouteDemotesAndPromotesItsOwner() {
         Account owner = admin("console");
-        String email = uniqueEmail("console-flip");
-        UUID id = userService.createUser(owner.id(), email, PASSWORD, "Console Flip", "ADMIN").id();
-        Account flipped = new Account(id, email, login(email, PASSWORD));
-        String token = createToken(flipped, "console-flip");
-        String rolePath = "/api/v1/admin/accounts/" + id + "/role";
+        TokenHolder flipped = secondAdminWithToken(owner, "console-flip");
+        String rolePath = "/api/v1/admin/accounts/" + flipped.id() + "/role";
 
-        assertThat(exchange(rolePath, HttpMethod.PATCH, owner.session(), Map.of("role", "CONTENT_EDITOR"),
-                String.class).getStatusCode().value()).isEqualTo(200);
-        assertThat(exchange(rolePath, HttpMethod.PATCH, owner.session(), Map.of("role", "ADMIN"),
-                String.class).getStatusCode().value()).isEqualTo(200);
+        for (String role : List.of("CONTENT_EDITOR", "ADMIN")) {
+            assertThat(exchange(rolePath, HttpMethod.PATCH, owner.session(), Map.of("role", role), String.class)
+                    .getStatusCode().value()).isEqualTo(200);
+        }
 
-        assertThat(status("/api/v1/workflows", HttpMethod.GET, token)).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertRevokedByDemotion(flipped);
+    }
+
+    private record TokenHolder(UUID id, String token) {
+    }
+
+    private TokenHolder secondAdminWithToken(Account owner, String label) {
+        String email = uniqueEmail(label);
+        UUID id = userService.createUser(owner.id(), email, PASSWORD, label, "ADMIN").id();
+        return new TokenHolder(id, createToken(new Account(id, email, login(email, PASSWORD)), label));
+    }
+
+    private void assertRevokedByDemotion(TokenHolder holder) {
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, holder.token())).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_event WHERE user_id = ? AND type = 'PAT_REVOKED'"
-                + " AND metadata->>'reason' = 'role_demoted'", Integer.class, id)).isEqualTo(1);
+                + " AND metadata->>'reason' = 'role_demoted'", Integer.class, holder.id())).isEqualTo(1);
     }
 
     @Test

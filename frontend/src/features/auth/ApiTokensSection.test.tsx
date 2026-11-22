@@ -2,6 +2,7 @@ import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderRoute, stubApi, type FakeReply } from '../../test/fakeApi';
+import { stubModalDialog } from '../../test/modalDialog';
 import { ApiTokensSection } from './ApiTokensSection';
 
 const LIST = 'GET /api/v1/me/api-tokens';
@@ -17,31 +18,6 @@ const NIGHTLY = {
   expiresAt: '2026-12-01T08:00:00Z',
   expired: false,
 };
-
-/** jsdom has no `showModal`/`close`; these set and clear `open` and fire `close` like a browser. */
-function stubModalDialog() {
-  const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-  Object.defineProperties(proto, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        if (!this.hasAttribute('open')) return;
-        this.removeAttribute('open');
-        this.dispatchEvent(new Event('close'));
-      },
-    },
-  });
-  return () => {
-    delete proto.showModal;
-    delete proto.close;
-  };
-}
 
 function renderSection() {
   return renderRoute('/profile', '/profile', <ApiTokensSection />);
