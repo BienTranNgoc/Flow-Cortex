@@ -155,6 +155,7 @@ class ApiTokenCallFilter extends OncePerRequestFilter {
                         return new Admitted(null, new Held(userId, key, now), cached);
                     }
                 }
+                default -> throw new IllegalStateException("Unhandled idempotency decision");
             }
         }
         throw ApiTokenCallProblemException.inProgress();
