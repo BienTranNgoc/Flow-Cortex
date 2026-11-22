@@ -2,46 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import i18n from '../../lib/i18n';
+import { stubModalDialog } from '../../test/modalDialog';
 import { StopRunDialog } from './StopRunDialog';
 
 const TEXT =
   "The current step will finish, then the run stops. Remaining steps won't run and won't be charged. Results of finished steps are kept.";
-
-/**
- * jsdom has no `showModal`/`close`; these mirror the browser closely enough for the dialog's own
- * logic, and Escape fires `cancel` the way a browser does for an open modal dialog.
- */
-function stubModalDialog() {
-  const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-  Object.defineProperties(proto, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        if (!this.hasAttribute('open')) return;
-        this.removeAttribute('open');
-        this.dispatchEvent(new Event('close'));
-      },
-    },
-  });
-  const onEscape = (event: KeyboardEvent) => {
-    const open = document.querySelector('dialog[open]');
-    if (event.key === 'Escape' && open instanceof HTMLDialogElement) {
-      if (open.dispatchEvent(new Event('cancel', { cancelable: true }))) open.close();
-    }
-  };
-  document.addEventListener('keydown', onEscape);
-  return () => {
-    document.removeEventListener('keydown', onEscape);
-    delete proto.showModal;
-    delete proto.close;
-  };
-}
 
 interface HarnessProps {
   chargedCredits?: number | null | undefined;

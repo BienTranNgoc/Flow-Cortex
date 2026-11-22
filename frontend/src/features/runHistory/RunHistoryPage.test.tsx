@@ -2,6 +2,7 @@ import { setToken } from '@flow-cortex/api-client';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderRoute, settled, stubApi } from '../../test/fakeApi';
+import { stubModalDialog } from '../../test/modalDialog';
 import { RunHistoryPage } from './RunHistoryPage';
 
 const WORKFLOW_ID = '3f2b8c1e-5a4d-4e7b-9c10-0a1b2c3d4e5f';
@@ -44,31 +45,6 @@ function stubHistory(items: unknown[], extra: Parameters<typeof stubApi>[0] = {}
 
 function renderPage(url = '/runs') {
   return renderRoute('/runs', url, <RunHistoryPage />);
-}
-
-/** jsdom has no `showModal`/`close`; these set and clear `open` and fire `close` like a browser. */
-function stubModalDialog() {
-  const proto = HTMLDialogElement.prototype as unknown as Record<string, unknown>;
-  Object.defineProperties(proto, {
-    showModal: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        this.setAttribute('open', '');
-      },
-    },
-    close: {
-      configurable: true,
-      value(this: HTMLDialogElement) {
-        if (!this.hasAttribute('open')) return;
-        this.removeAttribute('open');
-        this.dispatchEvent(new Event('close'));
-      },
-    },
-  });
-  return () => {
-    delete proto.showModal;
-    delete proto.close;
-  };
 }
 
 describe('RunHistoryPage', () => {
