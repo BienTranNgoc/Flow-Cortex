@@ -1,0 +1,100 @@
+{
+  "empty": {
+    "title": "Chưa có mục nào được lưu ở đây"
+  },
+  "types": {
+    "label": "Loại nội dung",
+    "text": "Văn bản",
+    "image": "Hình ảnh",
+    "video": "Video",
+    "audio": "Âm thanh"
+  },
+  "add": {
+    "text": "Thêm văn bản",
+    "image": "Tải ảnh lên",
+    "video": "Tải video lên",
+    "audio": "Tải âm thanh lên"
+  },
+  "list": {
+    "total_one": "{{n}} mục",
+    "total_other": "{{n}} mục"
+  },
+  "card": {
+    "open": "Mở",
+    "edit": "Sửa",
+    "delete": "Xóa",
+    "openLabel": "Mở {{name}}",
+    "editLabel": "Sửa {{name}}",
+    "deleteLabel": "Xóa {{name}}"
+  },
+  "notice": {
+    "saved": "Đã lưu “{{name}}”."
+  },
+  "form": {
+    "name": "Tên",
+    "role": "Vai trò",
+    "text": "Nội dung",
+    "counter": "{{n}} / {{max}}",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "failed": "Không thể lưu mục này. Hãy thử lại."
+  },
+  "validation": {
+    "nameRequired": "Hãy nhập tên.",
+    "nameTooLong": "Tên tối đa 160 ký tự.",
+    "textRequired": "Hãy nhập nội dung.",
+    "textTooLong": "Nội dung tối đa 32.768 ký tự.",
+    "roleRequired": "Hãy chọn vai trò.",
+    "fileRequired": "Hãy chọn một tệp để tải lên.",
+    "fileType": "Loại tệp này không được chấp nhận ở đây. Định dạng được chấp nhận: {{formats}}."
+  },
+  "text": {
+    "title": "Thêm mục văn bản"
+  },
+  "edit": {
+    "title": "Sửa {{name}}",
+    "formLabel": "Sửa mục",
+    "contentType": "Loại nội dung",
+    "file": "Tệp"
+  },
+  "upload": {
+    "title": {
+      "image": "Tải ảnh lên",
+      "video": "Tải video lên",
+      "audio": "Tải tệp âm thanh lên"
+    },
+    "file": "Tệp",
+    "submit": "Tải lên",
+    "sending": "Đang gửi {{percent}}%",
+    "saving": "Đang lưu vào Drive…",
+    "progress": "Tiến độ tải lên",
+    "cancelled": "Đã hủy tải lên.",
+    "putFailed": "Quá trình tải lên chưa hoàn tất. Hãy kiểm tra kết nối và thử lại.",
+    "tryAgainLater": "Chưa có mục nào được thêm vào Drive của bạn. Vui lòng thử lại sau."
+  },
+  "delete": {
+    "title": "Xóa mục này?",
+    "message": "“{{name}}” sẽ bị xóa khỏi Drive của bạn. Không thể hoàn tác.",
+    "confirm": "Xóa",
+    "busy": "Đang xóa…",
+    "done": "Đã xóa “{{name}}”.",
+    "alreadyGone": "“{{name}}” đã được xóa từ trước.",
+    "failed": "Không thể xóa mục này. Hãy thử lại."
+  },
+  "keep": {
+    "title": "Giữ lại trong Drive",
+    "submit": "Giữ lại"
+  },
+  "suggestions": {
+    "title": "Gợi ý từ các lần chạy gần đây",
+    "hint": "Đầu ra và đầu vào của các lần chạy gần nhất mà bạn có thể giữ lại trong Drive.",
+    "empty": "Chưa có gợi ý nào. Hãy chạy một quy trình, kết quả sẽ hiện ở đây.",
+    "from": "Từ {{workflow}}",
+    "mediaLabel": "{{kind}} từ {{workflow}}",
+    "keep": "Giữ lại",
+    "keepLabel": "Giữ lại {{kind}} từ {{workflow}}",
+    "kept": "Đã giữ",
+    "keptAnnouncement": "Đã giữ “{{name}}” trong Drive.",
+    "tooLong": "Quá dài để giữ lại thành mục văn bản"
+  }
+}

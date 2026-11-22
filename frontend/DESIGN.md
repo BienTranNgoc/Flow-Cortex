@@ -196,6 +196,21 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Trợ lý: an `ink-3` intro, then a `role="log"` (`aria-live="polite"`, focusable) of messages. A member's question is a `btn-bg` bubble with a `line-2` edge and `md` radius; an answer is Markdown with its sources as fully rounded `btn-bg` chips, and under every member answer a `primary` link-style "Vẫn chưa giải quyết? Gửi yêu cầu hỗ trợ" that opens the request form prefilled with the question and linked to the conversation. "Trợ lý đang trả lời…" is a `role="status"` line; errors are `role="alert"` with "Thử lại". The question box is a field with an `ink-3` counter ("n/1000") that turns `red` over the limit.
 - Yêu cầu: the member's requests as list rows, newest activity first, each with a status chip (foreground on its `-soft` partner: Mới `accent`, Đang xử lý `primary`, Chờ bạn phản hồi `warning`, Đã giải quyết `green`, Đã đóng `ink-3` on `line`). A thread shows member messages on `input-bg` and team messages on `paper`. An unread admin reply puts an 8px `red` dot on the launcher, the Yêu cầu tab and the request row, with "Có phản hồi mới" in their accessible names.
 
+### Drive (shared parts)
+
+- Button: the `btn-bg` button on `md` radius; primary is `primary` fill, danger is `red` on `red-soft`. Disabled is flat `paper-3` with `ink-4`; pressed shrinks to 0.98 except when disabled or under reduced motion.
+- Dialogs (confirm, preview): native modal `dialog`, `paper-3` fill, `line` edge, `md` radius, `shadow`, up to `min(40rem, 100vw − 2rem)` wide (confirm `min(28rem, …)`) and `min(80svh, 45rem)` tall, scrolling inside. Focus starts on the safe choice (Cancel, Close), Escape cancels and focus returns to the opener; both buttons hold while the action runs. Below 480px the buttons stack.
+- Media: an image, video or audio player from a signed link; a link that cannot load shows a dashed `line-2` "not available" panel on `paper-3` in `ink-3`.
+- Pagination: previous, numbered and next buttons (current page `primary-soft` with a `primary` edge, `aria-current="page"`), the first, last and current pages with its neighbours, `…` for longer gaps, and an optional page-size select as a field.
+- Migration notice: a `primary-soft` bar with `card-edge`, `lg` radius, a title, one sentence and a "Got it" button; announced as a status.
+
+### Drive (items and suggestions)
+
+- Sub-tabs: Text, Image, Video, Audio as wrapping buttons (selected `primary-soft` with a `primary` edge, roving focus, arrow keys, Home and End), with the add button as a `primary` button at the end of the row.
+- Cards: `paper-2` fill, `card-edge` edge, `shadow-sm`, `lg` radius, in a grid of `repeat(auto-fill, minmax(min(100%, 15rem), 1fr))`; name in `ink`, text start in `ink-2` clamped to four lines, role, source, date and size in `ink-3`; Open, Edit and Delete (danger) buttons at the foot. A kept suggestion's button reads "Kept" and holds.
+- Forms and dialogs: native modal on `paper-3`; fields are `input-bg` with an `input-border` edge, `red` edge and message when refused; the text counter is `ink-3` and turns `red` over the limit; refusals with no field of their own show as one `red` on `red-soft` message above the buttons. An upload shows "Sending n%" with a determinate progress, then "Saving to Drive…" with an indeterminate one while Cancel holds.
+- Controls keep `control-h`, and `hit-min` on coarse pointers or below 1024px.
+
 ## Do's and Don'ts
 
 - Do take every colour from a token; no literal colour outside `tokens.css`.
