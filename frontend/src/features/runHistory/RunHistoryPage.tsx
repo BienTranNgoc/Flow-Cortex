@@ -13,6 +13,7 @@ import { formatCredits } from '../credits/formatCredits';
 import { DeleteRunDialog } from './DeleteRunDialog';
 import { downloadRunsCsv } from './downloadRunsCsv';
 import { RenameRunDialog } from './RenameRunDialog';
+import { RunResultSummary } from './RunResultSummary';
 import { formatSpan, formatStart, runName } from './runDisplay';
 import {
   canDeleteRun,
@@ -25,6 +26,7 @@ import {
   RUN_HISTORY_PAGE_SIZE,
   useDeleteRunMutation,
   useRunHistoryQuery,
+  useRunResultsQuery,
   useRunWorkflowsQuery,
   useUpdateRunMutation,
 } from './useRunHistory';
@@ -189,6 +191,12 @@ export function RunHistoryPage() {
   };
 
   const page = listQuery.data;
+  const runIds = useMemo(() => page?.items.map((run) => run.id) ?? [], [page]);
+  const resultsQuery = useRunResultsQuery(runIds);
+  const resultsByRun = useMemo(
+    () => new Map(resultsQuery.data?.map((result) => [result.runId, result])),
+    [resultsQuery.data],
+  );
   const lastPage = page ? Math.max(1, Math.ceil(page.total / RUN_HISTORY_PAGE_SIZE)) : 1;
 
   // A delete can empty the last page: land on the new last one rather than on "nothing".
@@ -385,16 +393,19 @@ export function RunHistoryPage() {
                   return (
                     <li key={run.id} className="run-row">
                       <div className="run-row__main">
-                        <Link
-                          to={`/runs/${run.id}`}
-                          className="run-row__name"
-                          aria-label={t('runHistory.row.open', { name })}
-                        >
-                          {name}
-                        </Link>
-                        {run.title?.trim() && (
-                          <span className="run-row__workflow">{run.workflowName}</span>
-                        )}
+                        <div className="run-row__titles">
+                          <Link
+                            to={`/runs/${run.id}`}
+                            className="run-row__name"
+                            aria-label={t('runHistory.row.open', { name })}
+                          >
+                            {name}
+                          </Link>
+                          {run.title?.trim() && (
+                            <span className="run-row__workflow">{run.workflowName}</span>
+                          )}
+                        </div>
+                        <RunResultSummary result={resultsByRun.get(run.id)} />
                       </div>
                       <span className={`run-pill run-pill--${STATUS_TONE[run.status]}`}>
                         {t(`runHistory.status.${run.status}`)}

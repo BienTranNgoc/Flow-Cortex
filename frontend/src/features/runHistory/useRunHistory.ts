@@ -4,6 +4,7 @@ import {
   deleteRun,
   getRunTray,
   getRunUsageSummary,
+  listRunResults,
   listRunWorkflows,
   listRuns,
   unwrap,
@@ -11,11 +12,19 @@ import {
   useAuthToken,
 } from '@flow-cortex/api-client';
 import type { UpdateRunRequest } from '@flow-cortex/api-client';
-import { trayRefetchInterval, toListParams, type RunHistoryFilters } from './runHistoryRules';
+import {
+  resultsRefetchInterval,
+  toListParams,
+  trayRefetchInterval,
+  type RunHistoryFilters,
+} from './runHistoryRules';
 
 export const RUN_HISTORY_PAGE_SIZE = 20;
 
 const ROOT_KEY = ['run-history'] as const;
+
+/** Below the 15-minute presign TTL, so a list refetch does not re-sign the thumbnails and miss the browser cache. */
+const RESULTS_STALE_MS = 5 * 60_000;
 
 export function useRunHistoryQuery(filters: RunHistoryFilters) {
   const params = toListParams(filters, RUN_HISTORY_PAGE_SIZE);
@@ -50,6 +59,22 @@ export function useRunTrayQuery() {
     enabled: signedIn,
     refetchInterval: (query) => trayRefetchInterval(query.state.data, signedIn),
     refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * What each run on the page produced. Kept outside {@link ROOT_KEY} so starring or renaming a run
+ * does not refetch it and re-sign every thumbnail; a failed request leaves `data` empty and the rows unchanged.
+ */
+export function useRunResultsQuery(runIds: readonly string[]) {
+  return useQuery({
+    queryKey: ['run-results', runIds],
+    queryFn: async () => (await unwrap(listRunResults({ runId: [...runIds] }, authHeaders()))).results,
+    enabled: runIds.length > 0,
+    retry: 1,
+    staleTime: RESULTS_STALE_MS,
+    refetchInterval: (query) =>
+      resultsRefetchInterval(query.state.data, query.state.dataUpdateCount),
   });
 }
 

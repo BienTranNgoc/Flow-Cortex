@@ -1,4 +1,9 @@
-import type { ListRunsParams, RunHistoryRowResponse, RunTrayResponse } from '@flow-cortex/api-client';
+import type {
+  ListRunsParams,
+  RunHistoryRowResponse,
+  RunResultResponse,
+  RunTrayResponse,
+} from '@flow-cortex/api-client';
 
 export type RunStatus = RunHistoryRowResponse['status'];
 
@@ -102,4 +107,35 @@ export function trayRefetchInterval(
 ): number | false {
   if (!signedIn) return false;
   return tray && tray.active.length > 0 ? TRAY_LIVE_INTERVAL_MS : TRAY_IDLE_INTERVAL_MS;
+}
+
+export const RESULTS_POLL_INTERVAL_MS = 5_000;
+export const RESULTS_MAX_POLLS = 24;
+export const RESULT_THUMBNAIL_LIMIT = 3;
+
+/** What a row shows of its run's result summary. */
+export type ResultSummaryView =
+  | { kind: 'files'; count: number; thumbnails: string[] }
+  | { kind: 'saving' }
+  | { kind: 'none' };
+
+/** A pending registration reads "saving" whatever the count; zero files or no summary shows nothing. */
+export function resultSummaryView(result: RunResultResponse | undefined): ResultSummaryView {
+  if (!result) return { kind: 'none' };
+  if (result.registration === 'pending') return { kind: 'saving' };
+  if (result.count <= 0) return { kind: 'none' };
+  return {
+    kind: 'files',
+    count: result.count,
+    thumbnails: result.thumbnails.slice(0, RESULT_THUMBNAIL_LIMIT).map((thumbnail) => thumbnail.url),
+  };
+}
+
+/** Asks again every 5 seconds while a registration is pending, for at most 24 fetches (about 2 minutes). */
+export function resultsRefetchInterval(
+  results: readonly RunResultResponse[] | undefined,
+  polls: number,
+): number | false {
+  const pending = results?.some((result) => result.registration === 'pending') ?? false;
+  return pending && polls < RESULTS_MAX_POLLS ? RESULTS_POLL_INTERVAL_MS : false;
 }

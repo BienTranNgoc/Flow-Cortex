@@ -1,4 +1,13 @@
-import { canDeleteRun, parse, serialize, toListParams, trayRefetchInterval } from './runHistoryRules';
+import type { RunResultResponse } from '@flow-cortex/api-client';
+import {
+  canDeleteRun,
+  parse,
+  resultSummaryView,
+  resultsRefetchInterval,
+  serialize,
+  toListParams,
+  trayRefetchInterval,
+} from './runHistoryRules';
 
 const WORKFLOW = '3f2b8c1e-5a4d-4e7b-9c10-0a1b2c3d4e5f';
 
@@ -83,5 +92,64 @@ describe('trayRefetchInterval', () => {
   });
   it('stops while signed out', () => {
     expect(trayRefetchInterval({ active: [run], recent: [] }, false)).toBe(false);
+  });
+});
+
+function result(patch: Partial<RunResultResponse> = {}): RunResultResponse {
+  return { runId: 'r1', count: 0, kinds: [], thumbnails: [], registration: 'none', ...patch };
+}
+
+describe('resultSummaryView', () => {
+  it('shows the count and thumbnails when files exist', () => {
+    const thumbnails = [{ url: 'https://s/a' }, { url: 'https://s/b' }];
+    expect(resultSummaryView(result({ count: 3, registration: 'done', thumbnails }))).toEqual({
+      kind: 'files',
+      count: 3,
+      thumbnails: ['https://s/a', 'https://s/b'],
+    });
+    expect(resultSummaryView(result({ count: 2, registration: 'none' }))).toMatchObject({
+      kind: 'files',
+      count: 2,
+    });
+  });
+
+  it('shows saving while the registration is pending, with no count', () => {
+    expect(resultSummaryView(result({ registration: 'pending' }))).toEqual({ kind: 'saving' });
+    expect(resultSummaryView(result({ count: 2, registration: 'pending' }))).toEqual({
+      kind: 'saving',
+    });
+  });
+
+  it('shows nothing for zero files, a missing summary or no registration', () => {
+    expect(resultSummaryView(result({ registration: 'none' }))).toEqual({ kind: 'none' });
+    expect(resultSummaryView(result({ registration: 'done' }))).toEqual({ kind: 'none' });
+    expect(resultSummaryView(undefined)).toEqual({ kind: 'none' });
+  });
+
+  it('keeps at most three thumbnails', () => {
+    const thumbnails = ['a', 'b', 'c', 'd', 'e'].map((url) => ({ url }));
+    expect(resultSummaryView(result({ count: 5, registration: 'done', thumbnails }))).toEqual({
+      kind: 'files',
+      count: 5,
+      thumbnails: ['a', 'b', 'c'],
+    });
+  });
+});
+
+describe('resultsRefetchInterval', () => {
+  const pending = result({ registration: 'pending' });
+  const done = result({ count: 1, registration: 'done' });
+
+  it('refetches every five seconds while any result is pending', () => {
+    expect(resultsRefetchInterval([done, pending], 1)).toBe(5_000);
+    expect(resultsRefetchInterval([done, pending], 23)).toBe(5_000);
+  });
+
+  it('stops when nothing is pending, nothing has loaded, or after 24 polls', () => {
+    expect(resultsRefetchInterval([done, result()], 1)).toBe(false);
+    expect(resultsRefetchInterval([], 1)).toBe(false);
+    expect(resultsRefetchInterval(undefined, 0)).toBe(false);
+    expect(resultsRefetchInterval([pending], 24)).toBe(false);
+    expect(resultsRefetchInterval([pending], 40)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { setToken } from '@flow-cortex/api-client';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderRoute, settled, stubApi } from '../../test/fakeApi';
 import { stubModalDialog } from '../../test/modalDialog';
@@ -122,5 +122,79 @@ describe('RunHistoryPage', () => {
     );
     expect(calls.filter((call) => call.path === '/api/v1/runs/usage-summary').length).toBeGreaterThan(1);
     expect(screen.getByRole('img', { name: 'Runs per day' })).toBeInTheDocument();
+  });
+
+  describe('result summary', () => {
+    const RESULTS = 'GET /api/v1/assets/run-results';
+    const summary = (patch: Record<string, unknown>) => ({
+      status: 200,
+      body: {
+        results: [
+          { runId: 'a1', count: 0, kinds: [], thumbnails: [], registration: 'none', ...patch },
+        ],
+      },
+    });
+
+    it('shows the count and the thumbnails of a run that produced files', async () => {
+      stubHistory([COMPLETED], {
+        [RESULTS]: summary({
+          count: 3,
+          registration: 'done',
+          thumbnails: [{ url: 'https://files/a.png' }, { url: 'https://files/b.png' }],
+        }),
+      });
+      const { container } = renderPage();
+      expect(await screen.findByText('3 files')).toBeInTheDocument();
+      const images = Array.from(container.querySelectorAll('.run-row img'));
+      expect(images.map((image) => image.getAttribute('src'))).toEqual([
+        'https://files/a.png',
+        'https://files/b.png',
+      ]);
+      expect(images.every((image) => image.getAttribute('alt') === '')).toBe(true);
+    });
+
+    it('shows "Saving files…" and no count while the registration is pending', async () => {
+      stubHistory([COMPLETED], { [RESULTS]: summary({ registration: 'pending' }) });
+      renderPage();
+      expect(await screen.findByText('Saving files…')).toBeInTheDocument();
+      expect(screen.queryByText(/\d+ files?$/)).not.toBeInTheDocument();
+    });
+
+    it('turns "Saving files…" into the count without a reload', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let registered = false;
+        const calls = stubHistory([COMPLETED], {
+          [RESULTS]: () =>
+            registered
+              ? summary({ count: 2, registration: 'done' })
+              : summary({ registration: 'pending' }),
+        });
+        renderPage();
+        await screen.findByText('Saving files…');
+
+        registered = true;
+        await act(() => vi.advanceTimersByTimeAsync(5_000));
+        expect(await screen.findByText('2 files')).toBeInTheDocument();
+        expect(screen.queryByText('Saving files…')).not.toBeInTheDocument();
+        expect(calls.filter((call) => call.path === '/api/v1/assets/run-results')).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('leaves every row as it was when the summary request fails', async () => {
+      stubHistory([COMPLETED], { [RESULTS]: { status: 503, body: { status: 503 } } });
+      const { queryClient, container } = renderPage();
+      await screen.findByRole('link', { name: 'Open run Launch cut' });
+      await waitFor(
+        () => expect(queryClient.getQueryState(['run-results', ['a1']])?.status).toBe('error'),
+        { timeout: 4_000 },
+      );
+
+      expect(container.querySelector('.run-result')).toBeNull();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(container.querySelector('.run-row__workflow')).toHaveTextContent('Dub');
+    });
   });
 });
