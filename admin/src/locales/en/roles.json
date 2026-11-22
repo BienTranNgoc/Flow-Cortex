@@ -150,7 +150,8 @@
           "update": "Edit accounts",
           "change_role": "Change roles",
           "suspend": "Suspend accounts",
-          "delete": "Delete accounts"
+          "delete": "Delete accounts",
+          "export": "Export accounts"
         }
       },
       "workflow": {
