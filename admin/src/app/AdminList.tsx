@@ -32,6 +32,8 @@ interface AdminListProps<T> {
    * the row as a search landmark; `className` lets the page size its fields.
    */
   toolbar?: { label: string; className?: string; lead: ReactNode };
+  /** Runs beside the list's own re-read on Refresh and Retry, for data the page loads separately. */
+  onRefresh?: () => void;
   children: (items: T[]) => ReactNode;
 }
 
@@ -50,10 +52,15 @@ export function AdminList<T>({
   onStatusChange,
   onPageChange,
   toolbar,
+  onRefresh,
   children,
 }: Readonly<AdminListProps<T>>) {
   const { t } = useTranslation();
   const { data, error } = query;
+  const refresh = () => {
+    void query.refetch();
+    onRefresh?.();
+  };
   const disabled = error instanceof ApiError && error.status === 503;
   const filterId = useId();
   const noun = t(nounKey, { count: 0 });
@@ -104,7 +111,7 @@ export function AdminList<T>({
             ))}
           </select>
         </div>
-        <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
+        <button type="button" className="cortex-admin-btn" onClick={refresh}>
           {t('common.shell.list.refresh')}
         </button>
       </div>
@@ -115,7 +122,7 @@ export function AdminList<T>({
       {error && !disabled && (
         <div className="cortex-admin-error">
           <p role="alert">{t('common.shell.list.loadError', { noun })}</p>
-          <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
+          <button type="button" className="cortex-admin-btn" onClick={refresh}>
             {t('common.shell.list.retry')}
           </button>
         </div>
