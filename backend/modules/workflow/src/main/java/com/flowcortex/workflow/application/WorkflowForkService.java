@@ -42,15 +42,19 @@ public class WorkflowForkService {
      * @throws UnprocessableEntityException the caller owns the workflow ({@code CANNOT_FORK_OWN})
      * @throws ConflictException the workflow is the fixed Product Video workflow
      * @throws LocalizedStatusException 403: the owner has not allowed forking
+     * @throws UnprocessableEntityException the served steps hold a connector call
+     *         ({@code CANNOT_FORK_CONNECTOR_STEP})
      */
     @Transactional
     public WorkflowView fork(UUID callerId, UUID sourceId) {
         Workflow source = workflowRepository.findVisibleTo(sourceId, callerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", sourceId)));
-        ForkEligibility.refusal(source.getId(), source.getOwnerId(), source.isAllowFork(), callerId)
-                .ifPresent(WorkflowForkService::refuse);
-
         List<StepDefinition> served = WorkflowCarry.of(servedDefinitions.stepsFor(source, callerId));
+        boolean holdsConnectorCall = served.stream()
+                .anyMatch(step -> ConnectorStepOwnerGuard.isConnectorCall(step.type()));
+        ForkEligibility.refusal(source.getId(), source.getOwnerId(), source.isAllowFork(), holdsConnectorCall,
+                callerId).ifPresent(WorkflowForkService::refuse);
+
         Workflow fork = workflowRepository.save(
                 Workflow.forkOf(UUID.randomUUID(), callerId, source.getName(), source.getId()));
         List<WorkflowStep> steps = workflowStepRepository.saveAll(WorkflowCarry.copySteps(served, fork.getId()));
@@ -66,6 +70,8 @@ public class WorkflowForkService {
             case FIXED -> new ConflictException(new LocalizedMessage("workflow.copy.fixedWorkflow"));
             case NOT_ALLOWED -> new LocalizedStatusException(HttpStatus.FORBIDDEN,
                     new LocalizedMessage("workflow.fork.notAllowed"));
+            case CONNECTOR_STEP -> new UnprocessableEntityException(
+                    new LocalizedMessage("workflow.fork.connectorStep"), "CANNOT_FORK_CONNECTOR_STEP");
         };
     }
 }
