@@ -74,7 +74,7 @@ class WorkflowTransferEndpointsIT extends AbstractWorkflowHttpIT {
         ResponseEntity<Map> forked = exchange(HttpMethod.POST, fork, binhToken, null);
         assertThat(forked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(forked.getBody()).containsEntry("forkedFromId", workflowId.toString())
-                .containsEntry("allowFork", false).containsEntry("isShared", false)
+                .containsEntry("allowFork", false).containsEntry("visibility", "private")
                 .containsEntry("status", "draft");
         assertThat(jdbc.queryForObject("SELECT fork_count FROM workflow WHERE id = ?", Integer.class, workflowId))
                 .isEqualTo(1);
@@ -169,6 +169,9 @@ class WorkflowTransferEndpointsIT extends AbstractWorkflowHttpIT {
         if (token != null) {
             headers.setBearerAuth(token);
         }
+        if (body != null) {
+            headers.setContentType(MediaType.APPLICATION_JSON);
+        }
         return restTemplate.exchange(path, method, new HttpEntity<>(body, headers), type);
     }
 
@@ -182,8 +185,8 @@ class WorkflowTransferEndpointsIT extends AbstractWorkflowHttpIT {
     private UUID insertWorkflow(UUID ownerId, boolean shared, boolean published, String name) {
         UUID id = UUID.randomUUID();
         Timestamp now = Timestamp.from(Instant.now());
-        jdbc.update("INSERT INTO workflow (id, owner_id, name, is_shared, created_at, updated_at, status) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?)", id, ownerId, name, shared, now, now,
+        jdbc.update("INSERT INTO workflow (id, owner_id, name, is_shared, visibility, created_at, updated_at, status) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", id, ownerId, name, shared, shared ? "public" : "private", now, now,
                 published ? "published" : "draft");
         jdbc.update("INSERT INTO workflow_step (id, workflow_id, step_order, name, type) "
                 + "VALUES (?, ?, 1, 'First', 'echo')", UUID.randomUUID(), id);
