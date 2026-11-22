@@ -65,7 +65,9 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
         operationManager.remove(Permission.PAYMENT_SETTING_UPDATE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key())
+        assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key(),
+                        Permission.CONTENT_DOCUMENT_VIEW.key(), Permission.CONTENT_DOCUMENT_MANAGE.key(),
+                        Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key())
                 .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
@@ -73,7 +75,9 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 Permission.WORKFLOW_WORKFLOW_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
-                Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE));
+                Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE,
+                Permission.CONTENT_DOCUMENT_VIEW, Permission.CONTENT_DOCUMENT_MANAGE,
+                Permission.CONTENT_MEDIA_VIEW, Permission.CONTENT_MEDIA_MANAGE));
         assertThat(keysOf("PLATFORM_OPERATOR")).isEqualTo(keys(
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,

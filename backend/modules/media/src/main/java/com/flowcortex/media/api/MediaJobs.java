@@ -133,6 +133,27 @@ public interface MediaJobs {
     void releaseAttachments(List<StoredAttachment> attachments);
 
     /**
+     * Keeps {@code ownerId}'s upload {@code uploadId}, granted for {@link UploadPurpose#CONTENT_MEDIA}, at
+     * {@code content/<mediaId>} of the media bucket and registers it as an asset. An image is read, checked
+     * (format, pixel cap) and written without its metadata; a video is copied server-side. The copy is tagged
+     * pending, its first bytes are checked against its kind (when the content check is on), and only then is it
+     * re-tagged kept; a refused copy expires by the media bucket's lifecycle rule. An upload granted for another
+     * purpose or owner is not found. Call it outside any transaction.
+     * @return the kept copy, with the size of the stored bytes
+     * @throws UploadRejectedException on field {@code uploadId} if the upload is missing, of a type or size the
+     *         purpose does not accept, not the type it was declared as, or an image of more than 25 million pixels
+     * @throws org.springframework.transaction.IllegalTransactionStateException if a transaction is active
+     */
+    StoredContentMedia keepContentMedia(UUID ownerId, UUID uploadId, UUID mediaId);
+
+    /**
+     * Re-tags a kept content copy pending again, so the media bucket's lifecycle rule expires it: for a copy
+     * whose library row was never saved.
+     * @throws IllegalArgumentException if {@code media} is not under {@code content/} of the media bucket
+     */
+    void releaseContentMedia(StoredContentMedia media);
+
+    /**
      * Keeps the owner's {@link UploadPurpose#DRIVE_ITEM} upload {@code uploadId} at
      * {@code drive/<spaceId>/<itemId>} of the media bucket, tagged pending: an image is read, checked (format,
      * pixel cap) and written without its metadata, any other kind is copied server-side, and with the content

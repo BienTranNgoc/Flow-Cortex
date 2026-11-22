@@ -12,6 +12,9 @@ import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
 import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
+import { DocumentEditorPage } from './features/content/DocumentEditorPage';
+import { DocumentsPage } from './features/content/DocumentsPage';
+import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { ProvidersPage } from './features/providers/ProvidersPage';
@@ -47,6 +50,8 @@ const PAGES: Record<string, ReactElement> = {
   '/support/requests': <RequestsInboxPage />,
   '/support/settings': <SupportSettingsPage />,
   '/chat/settings': <ChatSettingsPage />,
+  '/content/documents': <DocumentsPage />,
+  '/content/media': <MediaLibraryPage />,
 };
 
 /** Pages under a sidebar entry, routable only where that entry is. */
@@ -56,6 +61,7 @@ const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
   { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },
   { parent: '/support/requests', path: '/support/requests/:number', element: <RequestDetailPage /> },
+  { parent: '/content/documents', path: '/content/documents/:slug', element: <DocumentEditorPage /> },
 ];
 
 /** Routes exist only for the entries the role may open; anything else lands on the first of them. */
