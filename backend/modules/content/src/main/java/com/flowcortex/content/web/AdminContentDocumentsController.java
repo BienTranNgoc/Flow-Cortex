@@ -12,6 +12,7 @@ import com.flowcortex.content.web.ContentDocumentResponses.RevisionSummaryRespon
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -101,6 +102,7 @@ class AdminContentDocumentsController {
     @ApiResponse(responseCode = "409", description = "version-conflict (currentVersion)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "content_document.save_draft", resourceParam = "slug", capture = "version")
     @RequirePermission(Permission.CONTENT_DOCUMENT_MANAGE)
     @PutMapping(value = "/{slug}", produces = MediaType.APPLICATION_JSON_VALUE)
     DraftResponse save(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,
@@ -120,6 +122,7 @@ class AdminContentDocumentsController {
     @ApiResponse(responseCode = "422", description = "document-incomplete (fields)",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "content_document.publish", resourceParam = "slug", capture = "version")
     @RequirePermission(Permission.CONTENT_DOCUMENT_MANAGE)
     @PostMapping(value = "/{slug}/publish", produces = MediaType.APPLICATION_JSON_VALUE)
     PublishedResponse publish(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug,

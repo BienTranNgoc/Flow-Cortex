@@ -5,6 +5,7 @@ import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -72,6 +73,7 @@ class AdminContentMediaController {
     @ApiResponse(responseCode = "503", description = "content-media-unavailable",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "content_media.request_upload", resourceParam = "uploadId", capture = "size")
     @RequirePermission(Permission.CONTENT_MEDIA_MANAGE)
     @PostMapping(value = "/uploads", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
@@ -88,6 +90,7 @@ class AdminContentMediaController {
     @ApiResponse(responseCode = "503", description = "content-media-unavailable",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "content_media.register", capture = "fileName")
     @RequirePermission(Permission.CONTENT_MEDIA_MANAGE)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ContentMediaResponse> register(@AuthenticationPrincipal Jwt jwt,
