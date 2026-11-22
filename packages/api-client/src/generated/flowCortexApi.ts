@@ -11212,11 +11212,18 @@ export type getWorkflowByShareKeyResponse410 = {
   status: 410;
 };
 
+export type getWorkflowByShareKeyResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
 export type getWorkflowByShareKeyResponseSuccess = getWorkflowByShareKeyResponse200 & {
   headers: Headers;
 };
 export type getWorkflowByShareKeyResponseError = (
-  getWorkflowByShareKeyResponse404 | getWorkflowByShareKeyResponse410
+  | getWorkflowByShareKeyResponse404
+  | getWorkflowByShareKeyResponse410
+  | getWorkflowByShareKeyResponse429
 ) & {
   headers: Headers;
 };
