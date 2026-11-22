@@ -37,6 +37,8 @@ dependencies {
     implementation(project(":modules:connector"))
     implementation(project(":modules:billing"))
     implementation(project(":modules:chat"))
+    implementation(project(":modules:notification"))
+    implementation(project(":modules:mail"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))

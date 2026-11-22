@@ -69,7 +69,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
-                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW, Permission.WORKFLOW_WORKFLOW_VIEW));
+                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
+                Permission.WORKFLOW_WORKFLOW_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE));
