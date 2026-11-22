@@ -29,6 +29,9 @@ HANDLER_MODULES: dict[str, str] = {
     "contact_sheet": "flowcortex_worker.handlers.contact_sheet",
     "detect_shots": "flowcortex_worker.handlers.detect_shots",
     "scene_frames": "flowcortex_worker.handlers.scene_frames",
+    "separate_audio": "flowcortex_worker.handlers.separate_audio",
+    "speakers": "flowcortex_worker.handlers.speakers",
+    "beats": "flowcortex_worker.handlers.beats",
 }
 
 
