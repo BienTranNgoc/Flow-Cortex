@@ -10,6 +10,7 @@ import com.flowcortex.llm.registry.RegisteredProvider.VendorModels;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.security.authz.RequirePermission;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.audit.AdminAudit;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -65,6 +66,7 @@ class AdminAiProvidersController {
     @ApiResponse(responseCode = "404", description = "ai-provider-not-found",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
+    @AdminAudit(value = "ai_provider.test", resourceParam = "providerKey")
     @RequirePermission(Permission.AI_PROVIDER_UPDATE)
     @PostMapping(value = "/{providerKey}/test", produces = MediaType.APPLICATION_JSON_VALUE)
     ProbeResult test(@PathVariable String providerKey) {
