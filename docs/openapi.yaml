@@ -937,6 +937,32 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/roles/{code}/permissions:
+    put:
+      tags:
+      - admin-roles-controller
+      operationId: replaceAdminRolePermissions
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplacePermissionsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
   /api/v1/admin/payment-settings/{key}:
     put:
       tags:
@@ -4222,6 +4248,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminRunDetailResponse"
+  /api/v1/admin/roles:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleResponse"
+    post:
+      tags:
+      - admin-roles-controller
+      operationId: createAdminRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
   /api/v1/admin/content/media:
     get:
       tags:
@@ -5367,6 +5424,66 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/roles/{code}:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: getAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+    delete:
+      tags:
+      - admin-roles-controller
+      operationId: deleteAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags:
+      - admin-roles-controller
+      operationId: updateAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
   /api/v1/admin/accounts/{id}/role:
     patch:
       tags:
@@ -7539,20 +7656,6 @@ paths:
             text/csv:
               schema:
                 type: string
-  /api/v1/admin/roles:
-    get:
-      tags:
-      - admin-roles-controller
-      operationId: listAdminRoles
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RoleResponse"
   /api/v1/admin/phone-verification/status:
     get:
       tags:
@@ -7565,6 +7668,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminPhoneVerificationStatus"
+  /api/v1/admin/permission-catalog:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminPermissionCatalog
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PermissionCatalogEntry"
   /api/v1/admin/payment-settings:
     get:
       tags:
@@ -7835,7 +7952,8 @@ paths:
         required: false
         schema:
           type: string
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+          maxLength: 20
+          minLength: 0
       - name: q
         in: query
         required: false
@@ -8129,7 +8247,8 @@ components:
           type: string
         role:
           type: string
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+          maxLength: 20
+          minLength: 0
         status:
           type: string
           pattern: ACTIVE|SUSPENDED
@@ -8145,6 +8264,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         createdAt:
@@ -8153,6 +8274,8 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+      - roleName
     UploadedImageRequest:
       type: object
       properties:
@@ -8297,6 +8420,7 @@ components:
             - platform.setting.update
             - platform.sms_outbox.view
             - system.role.view
+            - system.role.manage
             - system.admin_account.view
             - system.admin_account.manage
             - ai.provider.view
@@ -8776,6 +8900,96 @@ components:
       - source
       - type
       - value
+    ReplacePermissionsRequest:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+            minLength: 0
+          maxItems: 200
+          minItems: 0
+        expectedVersion:
+          type: integer
+          format: int32
+          minimum: 0
+      required:
+      - expectedVersion
+      - keys
+    RoleResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        system:
+          type: boolean
+        staff:
+          type: boolean
+        superAdmin:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - support.ticket.assign
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - content.document.view
+            - content.document.manage
+            - content.media.view
+            - content.media.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.role.manage
+            - system.admin_account.view
+            - system.admin_account.manage
+            - ai.provider.view
+            - ai.provider.update
+            - workflow.run.export
+            - workflow.run.cancel
+            - workflow.workflow.view
+            - workflow.workflow.export
+            - payment.setting.view
+            - payment.setting.update
+        permissionsVersion:
+          type: integer
+          format: int32
+        accountCount:
+          type: integer
+          format: int32
+      required:
+      - accountCount
+      - code
+      - name
+      - permissions
+      - permissionsVersion
+      - staff
+      - superAdmin
+      - system
     PaymentSettingUpdate:
       type: object
       properties:
@@ -9487,8 +9701,8 @@ components:
           minLength: 1
         role:
           type: string
+          maxLength: 20
           minLength: 1
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - email
       - name
@@ -10993,6 +11207,27 @@ components:
       - status
       - stepOrder
       - type
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        permissionKeys:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+            minLength: 0
+          maxItems: 200
+          minItems: 0
+      required:
+      - name
     RegisterContentMediaRequest:
       type: object
       properties:
@@ -11141,6 +11376,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         adminDisabled:
@@ -11158,6 +11395,7 @@ components:
       - id
       - name
       - role
+      - roleName
       - status
     UpdateWorkflowRequest:
       type: object
@@ -11355,13 +11593,25 @@ components:
           enum:
           - show
           - hide
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+          pattern: (?s).*\S.*
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
     ChangeRoleRequest:
       type: object
       properties:
         role:
           type: string
+          maxLength: 20
           minLength: 1
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - role
     Entry:
@@ -13393,59 +13643,6 @@ components:
       - page
       - size
       - total
-    RoleResponse:
-      type: object
-      properties:
-        code:
-          type: string
-        staff:
-          type: boolean
-        superAdmin:
-          type: boolean
-        permissions:
-          type: array
-          items:
-            type: string
-            enum:
-            - user.account.view
-            - user.account.create
-            - user.account.update
-            - user.account.change_role
-            - user.account.suspend
-            - user.account.delete
-            - workflow.run.view
-            - workflow.workflow.manage
-            - support.ticket.view
-            - support.ticket.reply
-            - support.ticket.close
-            - support.ticket.assign
-            - content.help_topic.view
-            - content.help_topic.manage
-            - content.help_article.view
-            - content.help_article.manage
-            - content.document.view
-            - content.document.manage
-            - content.media.view
-            - content.media.manage
-            - platform.setting.view
-            - platform.setting.update
-            - platform.sms_outbox.view
-            - system.role.view
-            - system.admin_account.view
-            - system.admin_account.manage
-            - ai.provider.view
-            - ai.provider.update
-            - workflow.run.export
-            - workflow.run.cancel
-            - workflow.workflow.view
-            - workflow.workflow.export
-            - payment.setting.view
-            - payment.setting.update
-      required:
-      - code
-      - permissions
-      - staff
-      - superAdmin
     AdminPhoneVerificationStatus:
       type: object
       properties:
@@ -13476,6 +13673,61 @@ components:
       - sentLast24h
       - smsSender
       - verificationEnabled
+    PermissionCatalogEntry:
+      type: object
+      properties:
+        key:
+          type: string
+          enum:
+          - user.account.view
+          - user.account.create
+          - user.account.update
+          - user.account.change_role
+          - user.account.suspend
+          - user.account.delete
+          - workflow.run.view
+          - workflow.workflow.manage
+          - support.ticket.view
+          - support.ticket.reply
+          - support.ticket.close
+          - support.ticket.assign
+          - content.help_topic.view
+          - content.help_topic.manage
+          - content.help_article.view
+          - content.help_article.manage
+          - content.document.view
+          - content.document.manage
+          - content.media.view
+          - content.media.manage
+          - platform.setting.view
+          - platform.setting.update
+          - platform.sms_outbox.view
+          - system.role.view
+          - system.role.manage
+          - system.admin_account.view
+          - system.admin_account.manage
+          - ai.provider.view
+          - ai.provider.update
+          - workflow.run.export
+          - workflow.run.cancel
+          - workflow.workflow.view
+          - workflow.workflow.export
+          - payment.setting.view
+          - payment.setting.update
+        module:
+          type: string
+        feature:
+          type: string
+        action:
+          type: string
+        superAdminOnly:
+          type: boolean
+      required:
+      - action
+      - feature
+      - key
+      - module
+      - superAdminOnly
     PageViewPaymentSettingChangeView:
       type: object
       properties:
