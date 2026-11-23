@@ -35,6 +35,7 @@ HANDLER_MODULES: dict[str, str] = {
     "separate_audio": "flowcortex_worker.handlers.separate_audio",
     "speakers": "flowcortex_worker.handlers.speakers",
     "beats": "flowcortex_worker.handlers.beats",
+    "role_suggest": "flowcortex_worker.handlers.role_suggest",
 }
 
 
