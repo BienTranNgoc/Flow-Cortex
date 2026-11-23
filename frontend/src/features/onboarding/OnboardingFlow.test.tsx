@@ -367,4 +367,57 @@ describe('OnboardingFlow', () => {
     expect(await screen.findByRole('dialog', { name: "You're all set" })).toBeVisible();
     expect(progressWrites(calls)).toEqual([]);
   });
+
+  it('keeps the next Done screen usable after the journey was closed while the sample write was pending', async () => {
+    const user = userEvent.setup();
+    let finished = false;
+    let release: () => void = () => {};
+    const pendingWrite = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = renderFlow({
+      'GET /api/v1/onboarding/status': () => ({
+        status: 200,
+        body: status({
+          ...ANSWERED,
+          entry: finished ? null : 'first',
+          open: !finished,
+          progress: { v: 2, step: 'done' },
+          sampleWorkflow: { id: 'wf-1', name: 'Release notes', input: 'Summarise the changelog' },
+        }),
+      }),
+      'POST /api/v1/onboarding/progress': async () => {
+        await pendingWrite;
+        finished = true;
+        return { status: 200, body: { progress: {} } };
+      },
+    });
+    await screen.findByRole('dialog', { name: "You're all set" });
+    await user.click(screen.getByRole('button', { name: 'Try this sample: Release notes' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    release();
+    const statusReads = () => calls.filter((call) => call.path.endsWith('/status')).length;
+    await waitFor(() => expect(statusReads()).toBeGreaterThan(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    act(() => requestReplay());
+    await screen.findByRole('dialog', { name: 'Welcome to FlowCortex' });
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await screen.findByRole('dialog', { name: 'Find your way around' });
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('dialog', { name: "You're all set" });
+
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: 'Start using FlowCortex' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+    const sample = screen.getByRole('button', { name: 'Try this sample: Release notes' });
+    expect(sample).toHaveAttribute('aria-disabled', 'false');
+    expect(sample).toHaveTextContent('Try this sample');
+  });
 });
