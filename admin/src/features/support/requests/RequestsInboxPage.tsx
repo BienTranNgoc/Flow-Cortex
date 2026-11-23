@@ -102,7 +102,8 @@ export function RequestsInboxPage() {
   const filter = useMemo(() => readFilter(params), [params]);
   const canAssign = can(useMeQuery().data, 'support.ticket.assign');
   const query = useRequestsQuery(filter);
-  const facets = useRequestFacets(filter).data;
+  const facetsQuery = useRequestFacets(filter);
+  const facets = facetsQuery.data;
   const [picked, setPicked] = useState<{ scope: string; numbers: number[] }>({
     scope,
     numbers: [],
@@ -179,6 +180,7 @@ export function RequestsInboxPage() {
             ),
           }}
           query={query}
+          onRefresh={() => void facetsQuery.refetch()}
           nounKey="support.requests.noun"
           tableLabelKey="support.requests.tableLabel"
           statuses={STATUSES}
