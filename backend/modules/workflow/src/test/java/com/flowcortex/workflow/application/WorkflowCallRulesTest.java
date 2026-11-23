@@ -31,7 +31,7 @@ class WorkflowCallRulesTest {
         int depth;
         boolean visible = true;
         List<String> types = List.of("echo", "echo");
-        boolean firstRemote;
+        boolean firstNeedsUpload;
         boolean anyRemote;
         boolean typeUnavailable;
         boolean workflowsEnabled = true;
@@ -62,8 +62,8 @@ class WorkflowCallRulesTest {
             return this;
         }
 
-        Facts withFirstRemote(boolean v) {
-            firstRemote = v;
+        Facts withFirstNeedsUpload(boolean v) {
+            firstNeedsUpload = v;
             return this;
         }
 
@@ -89,7 +89,7 @@ class WorkflowCallRulesTest {
 
         WorkflowCallRules.CallFacts build() {
             return new WorkflowCallRules.CallFacts(named, PARENT, ancestors, depth, visible, PRODUCT_VIDEO, types,
-                    firstRemote, anyRemote, typeUnavailable, workflowsEnabled, mediaEnabled);
+                    firstNeedsUpload, anyRemote, typeUnavailable, workflowsEnabled, mediaEnabled);
         }
     }
 
@@ -140,8 +140,8 @@ class WorkflowCallRulesTest {
     }
 
     @Test
-    void aChildStartingWithARemoteStepNeedsAnUpload() {
-        assertThat(code(valid().withFirstRemote(true))).isEqualTo("workflow_call_needs_upload");
+    void aChildWhoseFirstStepNeedsAnUploadIsRefused() {
+        assertThat(code(valid().withFirstNeedsUpload(true))).isEqualTo("workflow_call_needs_upload");
     }
 
     @Test

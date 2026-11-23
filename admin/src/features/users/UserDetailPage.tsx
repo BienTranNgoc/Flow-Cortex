@@ -9,17 +9,26 @@ import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useMeQuery } from '../auth/useAuth';
-import { assignableRoles, ROLE_CODES, roleLabel, statusLabel } from './enumLabels';
+import {
+  roleLabel,
+  signInMethodLabel,
+  stateLabel,
+  stateTone,
+  statusLabel,
+} from './enumLabels';
 import { RoleOptions } from './RoleOptions';
+import { canManageAccount } from './userAccess';
+import { roleCodeSchema } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation, useUserQuery } from './useUsers';
 
 const userIdSchema = z.string().uuid();
-const userRoleSchema = z.enum(ROLE_CODES);
 
 export function UserDetailPage() {
   const { t } = useTranslation();
   usePageTitle(t('users.detail.title'));
-  const assignable = assignableRoles(useMeQuery().data);
+  const me = useMeQuery().data;
+  const { assignable, names } = useAssignableRoles();
   const { userId = '' } = useParams();
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
@@ -68,12 +77,13 @@ export function UserDetailPage() {
   }
 
   const user = userQuery.data;
+  const manageable = canManageAccount(me, user);
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
   const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
   const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
   const saveRole = () => {
-    const parsedRole = userRoleSchema.safeParse(role || user.role || 'MEMBER');
+    const parsedRole = roleCodeSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
       setRoleErrorKey('users.detail.invalidRole');
       return;
@@ -92,15 +102,9 @@ export function UserDetailPage() {
         title={user.name || user.email || t('users.detail.userFallback')}
         description={user.email}
         actions={
-          <span
-            className={
-              user.status === 'ACTIVE'
-                ? 'cortex-admin-pill cortex-admin-pill--success'
-                : 'cortex-admin-pill cortex-admin-pill--warning'
-            }
-          >
-            {statusLabel(t, user.status)}
-          </span>
+          user.state ? (
+            <StatusPill tone={stateTone(user.state)} label={stateLabel(t, user.state)} />
+          ) : undefined
         }
       />
 
@@ -136,9 +140,15 @@ export function UserDetailPage() {
               <dt>{t('users.detail.email')}</dt>
               <dd>{user.email}</dd>
             </div>
+            {user.username && (
+              <div>
+                <dt>{t('users.detail.username')}</dt>
+                <dd>{user.username}</dd>
+              </div>
+            )}
             <div>
               <dt>{t('users.detail.role')}</dt>
-              <dd>{roleLabel(t, user.role)}</dd>
+              <dd>{roleLabel(t, user.role, user.roleName)}</dd>
             </div>
             <div>
               <dt>{t('users.detail.status')}</dt>
@@ -149,6 +159,34 @@ export function UserDetailPage() {
                 />
               </dd>
             </div>
+            <div>
+              <dt>{t('users.detail.emailConfirmed')}</dt>
+              <dd>
+                <Timestamp value={user.emailConfirmedAt} />
+              </dd>
+            </div>
+            <div>
+              <dt>{t('users.detail.signInMethods')}</dt>
+              <dd>
+                {user.signInMethods?.length
+                  ? user.signInMethods.map((method) => signInMethodLabel(t, method)).join(', ')
+                  : '—'}
+              </dd>
+            </div>
+            {user.lockedUntil && (
+              <div>
+                <dt>{t('users.detail.lockedUntil')}</dt>
+                <dd>
+                  <Timestamp value={user.lockedUntil} />
+                </dd>
+              </div>
+            )}
+            {user.adminDisabled && (
+              <div>
+                <dt>{t('users.detail.adminDisabled')}</dt>
+                <dd>{t('users.detail.yes')}</dd>
+              </div>
+            )}
             <div>
               <dt>{t('users.detail.registered')}</dt>
               <dd>
@@ -171,55 +209,67 @@ export function UserDetailPage() {
               <p>{t('users.detail.accessHint')}</p>
             </div>
           </header>
-          <div className="cortex-admin-field">
-            <label htmlFor="user-role">{t('users.detail.role')}</label>
-            <select
-              id="user-role"
-              value={role || user.role || 'MEMBER'}
-              disabled={assignable.length === 0}
-              onChange={(event) => {
-                setRole(event.target.value);
-                setRoleErrorKey('');
-              }}
-            >
-              <RoleOptions roles={assignable} current={user.role} />
-            </select>
-          </div>
-          <button
-            type="button"
-            className="cortex-admin-btn cortex-admin-btn--primary"
-            onClick={saveRole}
-            disabled={updateMutation.isPending || (role || user.role) === user.role}
-          >
-            {updateMutation.isPending ? t('users.detail.saving') : t('users.detail.saveRole')}
-          </button>
-          {roleErrorKey && (
-            <p className="cortex-admin-form-error" role="alert">
-              {t(roleErrorKey)}
-            </p>
-          )}
-          <hr className="cortex-admin-divider" />
-          <button
-            type="button"
-            className={
-              nextStatus === 'SUSPENDED'
-                ? 'cortex-admin-btn cortex-admin-btn--danger'
-                : 'cortex-admin-btn'
-            }
-            onClick={() =>
-              updateMutation.mutate({ id: parsedId.data, changes: { status: nextStatus } })
-            }
-            disabled={updateMutation.isPending}
-          >
-            {nextStatus === 'SUSPENDED' ? t('users.detail.suspend') : t('users.detail.reactivate')}
-          </button>
-          {updateError && (
-            <p className="cortex-admin-form-error" role="alert">
-              {updateError.detail}
-            </p>
-          )}
-          {updateMutation.isSuccess && (
-            <p className="cortex-admin-form-success">{t('users.detail.updated')}</p>
+          {manageable ? (
+            <>
+              <div className="cortex-admin-field">
+                <label htmlFor="user-role">{t('users.detail.role')}</label>
+                <select
+                  id="user-role"
+                  value={role || user.role || 'MEMBER'}
+                  disabled={assignable.length === 0}
+                  onChange={(event) => {
+                    setRole(event.target.value);
+                    setRoleErrorKey('');
+                  }}
+                >
+                  <RoleOptions
+                    roles={assignable}
+                    current={user.role}
+                    names={{ ...(user.role ? { [user.role]: user.roleName } : {}), ...names }}
+                  />
+                </select>
+              </div>
+              <button
+                type="button"
+                className="cortex-admin-btn cortex-admin-btn--primary"
+                onClick={saveRole}
+                disabled={updateMutation.isPending || (role || user.role) === user.role}
+              >
+                {updateMutation.isPending ? t('users.detail.saving') : t('users.detail.saveRole')}
+              </button>
+              {roleErrorKey && (
+                <p className="cortex-admin-form-error" role="alert">
+                  {t(roleErrorKey)}
+                </p>
+              )}
+              <hr className="cortex-admin-divider" />
+              <button
+                type="button"
+                className={
+                  nextStatus === 'SUSPENDED'
+                    ? 'cortex-admin-btn cortex-admin-btn--danger'
+                    : 'cortex-admin-btn'
+                }
+                onClick={() =>
+                  updateMutation.mutate({ id: parsedId.data, changes: { status: nextStatus } })
+                }
+                disabled={updateMutation.isPending}
+              >
+                {nextStatus === 'SUSPENDED'
+                  ? t('users.detail.suspend')
+                  : t('users.detail.reactivate')}
+              </button>
+              {updateError && (
+                <p className="cortex-admin-form-error" role="alert">
+                  {updateError.detail}
+                </p>
+              )}
+              {updateMutation.isSuccess && (
+                <p className="cortex-admin-form-success">{t('users.detail.updated')}</p>
+              )}
+            </>
+          ) : (
+            <p className="cortex-admin-stale">{t('users.readOnlyAdminAccount')}</p>
           )}
         </section>
       </div>

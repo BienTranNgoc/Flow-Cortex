@@ -16,7 +16,7 @@ class KnownStepTypesTest {
 
     private List<String> violationsOf(NewWorkflowStep... steps) {
         Set<ConstraintViolation<KnownStepTypes.Definition>> violations = validator.validate(
-                new KnownStepTypes.Definition(List.of(steps), Set.of("echo"), Set.of(), Set.of()));
+                new KnownStepTypes.Definition(List.of(steps), Set.of("echo"), Set.of(), Set.of(), Set.of()));
         return violations.stream()
                 .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                 .sorted()

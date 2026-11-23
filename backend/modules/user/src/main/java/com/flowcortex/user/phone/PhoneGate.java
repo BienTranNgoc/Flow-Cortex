@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class PhoneGate {
 
-    private static final String FACTS = "SELECT u.role, p.verified_at FROM app_user u "
+    private static final String FACTS = "SELECT r.staff, r.super_admin, p.verified_at FROM app_user u "
+            + "LEFT JOIN role r ON r.code = u.role "
             + "LEFT JOIN user_phone p ON p.user_id = u.id WHERE u.id = ?";
 
     private final boolean enabled;
@@ -33,7 +34,8 @@ public class PhoneGate {
     /** {@code query}, not {@code queryForObject}: a deleted account is no row, not an exception. */
     private Optional<GateFacts> facts(UUID userId) {
         return jdbc.query(FACTS,
-                (rs, row) -> new GateFacts(rs.getTimestamp("verified_at") != null, rs.getString("role")),
+                (rs, row) -> new GateFacts(rs.getTimestamp("verified_at") != null, rs.getBoolean("staff"),
+                        rs.getBoolean("super_admin")),
                 userId).stream().findFirst();
     }
 }

@@ -13,6 +13,7 @@ import {
   Headset,
   Images,
   ListChecks,
+  LockKey,
   Play,
   Pulse,
   ShieldCheck,
@@ -140,6 +141,12 @@ export const NAV: NavGroup[] = [
         key: 'platform.setting.view',
       },
       {
+        label: 'common.shell.nav.items.onboardingSample',
+        path: '/onboarding-sample',
+        icon: Sparkle,
+        key: 'platform.setting.view',
+      },
+      {
         label: 'common.shell.nav.items.features',
         path: '/features',
         icon: GearSix,
@@ -170,6 +177,12 @@ export const NAV: NavGroup[] = [
         path: '/admin-accounts',
         icon: UserGear,
         key: 'system.admin_account.view',
+      },
+      {
+        label: 'common.shell.nav.items.roles',
+        path: '/roles',
+        icon: LockKey,
+        key: 'system.role.view',
       },
       {
         label: 'common.shell.nav.items.voiceQuota',
