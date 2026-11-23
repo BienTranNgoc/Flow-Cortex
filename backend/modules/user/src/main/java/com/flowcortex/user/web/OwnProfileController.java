@@ -2,6 +2,7 @@ package com.flowcortex.user.web;
 
 import com.flowcortex.user.api.OwnProfile;
 import com.flowcortex.user.api.OwnProfiles;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -31,6 +32,7 @@ class OwnProfileController {
         this.profiles = profiles;
     }
 
+    @Operation(operationId = "getOwnProfile")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     OwnProfileResponse get(@AuthenticationPrincipal Jwt jwt) {
         return OwnProfileResponse.from(profiles.get(subjectId(jwt)));
