@@ -323,7 +323,7 @@ paths:
     get:
       tags:
       - users-controller
-      operationId: get
+      operationId: getUser
       parameters:
       - name: id
         in: path
@@ -491,7 +491,7 @@ paths:
     get:
       tags:
       - own-profile-controller
-      operationId: get_1
+      operationId: getOwnProfile
       responses:
         "200":
           description: OK
@@ -2007,7 +2007,7 @@ paths:
     post:
       tags:
       - users-controller
-      operationId: create
+      operationId: createUser
       requestBody:
         content:
           application/json:
@@ -2717,7 +2717,7 @@ paths:
     post:
       tags:
       - profile-images-controller
-      operationId: requestUpload_1
+      operationId: requestProfileImageUpload
       requestBody:
         content:
           application/json:
@@ -3179,7 +3179,7 @@ paths:
     get:
       tags:
       - personal-access-token-controller
-      operationId: list
+      operationId: listApiTokens
       responses:
         "200":
           description: OK
@@ -3204,7 +3204,7 @@ paths:
     post:
       tags:
       - personal-access-token-controller
-      operationId: create_1
+      operationId: createApiToken
       requestBody:
         content:
           application/json:
@@ -3473,7 +3473,7 @@ paths:
     get:
       tags:
       - http-connector-controller
-      operationId: list_1
+      operationId: listHttpConnectors
       responses:
         "200":
           description: OK
@@ -6963,7 +6963,7 @@ paths:
     get:
       tags:
       - profile-images-controller
-      operationId: current
+      operationId: getCurrentProfileImages
       responses:
         "200":
           description: OK
@@ -7057,7 +7057,7 @@ paths:
     get:
       tags:
       - phone-controller
-      operationId: current_1
+      operationId: getMyPhone
       responses:
         "200":
           description: OK
@@ -7387,7 +7387,7 @@ paths:
     get:
       tags:
       - telegram-connector-controller
-      operationId: health_1
+      operationId: getTelegramConnectorHealth
       responses:
         "200":
           description: OK
@@ -7474,7 +7474,7 @@ paths:
     get:
       tags:
       - account-preferences-controller
-      operationId: get_2
+      operationId: getAccountPreferences
       responses:
         "200":
           description: OK

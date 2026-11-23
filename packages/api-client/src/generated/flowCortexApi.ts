@@ -5296,25 +5296,25 @@ export const setWorkflowBookmark = async (
   });
 };
 
-export type getResponse200 = {
+export type getUserResponse200 = {
   data: UserResponse;
   status: 200;
 };
 
-export type getResponseSuccess = getResponse200 & {
+export type getUserResponseSuccess = getUserResponse200 & {
   headers: Headers;
 };
-export type getResponse = getResponseSuccess;
+export type getUserResponse = getUserResponseSuccess;
 
-export const getGetUrl = (id: string) => {
+export const getGetUserUrl = (id: string) => {
   return `/api/v1/users/${id}`;
 };
 
-export const get = async (
+export const getUser = async (
   id: string,
   options?: Parameters<typeof customFetch>[1],
-): Promise<getResponse> => {
-  return customFetch<getResponse>(getGetUrl(id), {
+): Promise<getUserResponse> => {
+  return customFetch<getUserResponse>(getGetUserUrl(id), {
     ...options,
     method: 'GET',
   });
@@ -5592,22 +5592,24 @@ export const deleteChatConversation = async (
   });
 };
 
-export type get1Response200 = {
+export type getOwnProfileResponse200 = {
   data: OwnProfileResponse;
   status: 200;
 };
 
-export type get1ResponseSuccess = get1Response200 & {
+export type getOwnProfileResponseSuccess = getOwnProfileResponse200 & {
   headers: Headers;
 };
-export type get1Response = get1ResponseSuccess;
+export type getOwnProfileResponse = getOwnProfileResponseSuccess;
 
-export const getGet1Url = () => {
+export const getGetOwnProfileUrl = () => {
   return `/api/v1/auth/profile`;
 };
 
-export const get1 = async (options?: Parameters<typeof customFetch>[1]): Promise<get1Response> => {
-  return customFetch<get1Response>(getGet1Url(), {
+export const getOwnProfile = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getOwnProfileResponse> => {
+  return customFetch<getOwnProfileResponse>(getGetOwnProfileUrl(), {
     ...options,
     method: 'GET',
   });
@@ -8008,24 +8010,24 @@ export const listUsers = async (
   });
 };
 
-export type createResponse201 = {
+export type createUserResponse201 = {
   data: UserResponse;
   status: 201;
 };
 
-export type createResponseSuccess = createResponse201 & {
+export type createUserResponseSuccess = createUserResponse201 & {
   headers: Headers;
 };
-export type createResponse = createResponseSuccess;
+export type createUserResponse = createUserResponseSuccess;
 
-export const getCreateUrl = () => {
+export const getCreateUserUrl = () => {
   return `/api/v1/users`;
 };
 
-export const create = async (
+export const createUser = async (
   createUserRequest: CreateUserRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<createResponse> => {
+): Promise<createUserResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -8045,7 +8047,7 @@ export const create = async (
     }
     return headers;
   };
-  return customFetch<createResponse>(getCreateUrl(), {
+  return customFetch<createUserResponse>(getCreateUserUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -9065,24 +9067,24 @@ export const addOriginal = async (
   });
 };
 
-export type requestUpload1Response201 = {
+export type requestProfileImageUploadResponse201 = {
   data: UploadResponse;
   status: 201;
 };
 
-export type requestUpload1ResponseSuccess = requestUpload1Response201 & {
+export type requestProfileImageUploadResponseSuccess = requestProfileImageUploadResponse201 & {
   headers: Headers;
 };
-export type requestUpload1Response = requestUpload1ResponseSuccess;
+export type requestProfileImageUploadResponse = requestProfileImageUploadResponseSuccess;
 
-export const getRequestUpload1Url = () => {
+export const getRequestProfileImageUploadUrl = () => {
   return `/api/v1/profile/images/uploads`;
 };
 
-export const requestUpload1 = async (
+export const requestProfileImageUpload = async (
   uploadRequest: UploadRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<requestUpload1Response> => {
+): Promise<requestProfileImageUploadResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -9102,7 +9104,7 @@ export const requestUpload1 = async (
     }
     return headers;
   };
-  return customFetch<requestUpload1Response>(getRequestUpload1Url(), {
+  return customFetch<requestProfileImageUploadResponse>(getRequestProfileImageUploadUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -9958,85 +9960,90 @@ export const claimFirstResult = async (
   });
 };
 
-export type listResponse200 = {
+export type listApiTokensResponse200 = {
   data: ApiTokenView[];
   status: 200;
 };
 
-export type listResponse403 = {
+export type listApiTokensResponse403 = {
   data: ProblemDetail;
   status: 403;
 };
 
-export type listResponse503 = {
+export type listApiTokensResponse503 = {
   data: ProblemDetail;
   status: 503;
 };
 
-export type listResponseSuccess = listResponse200 & {
+export type listApiTokensResponseSuccess = listApiTokensResponse200 & {
   headers: Headers;
 };
-export type listResponseError = (listResponse403 | listResponse503) & {
+export type listApiTokensResponseError = (listApiTokensResponse403 | listApiTokensResponse503) & {
   headers: Headers;
 };
 
-export type listResponse = listResponseSuccess | listResponseError;
+export type listApiTokensResponse = listApiTokensResponseSuccess | listApiTokensResponseError;
 
-export const getListUrl = () => {
+export const getListApiTokensUrl = () => {
   return `/api/v1/me/api-tokens`;
 };
 
-export const list = async (options?: Parameters<typeof customFetch>[1]): Promise<listResponse> => {
-  return customFetch<listResponse>(getListUrl(), {
+export const listApiTokens = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listApiTokensResponse> => {
+  return customFetch<listApiTokensResponse>(getListApiTokensUrl(), {
     ...options,
     method: 'GET',
   });
 };
 
-export type create1Response201 = {
+export type createApiTokenResponse201 = {
   data: CreatedApiToken;
   status: 201;
 };
 
-export type create1Response400 = {
+export type createApiTokenResponse400 = {
   data: ProblemDetail;
   status: 400;
 };
 
-export type create1Response403 = {
+export type createApiTokenResponse403 = {
   data: ProblemDetail;
   status: 403;
 };
 
-export type create1Response409 = {
+export type createApiTokenResponse409 = {
   data: ProblemDetail;
   status: 409;
 };
 
-export type create1Response503 = {
+export type createApiTokenResponse503 = {
   data: ProblemDetail;
   status: 503;
 };
 
-export type create1ResponseSuccess = create1Response201 & {
+export type createApiTokenResponseSuccess = createApiTokenResponse201 & {
   headers: Headers;
 };
-export type create1ResponseError = (
-  create1Response400 | create1Response403 | create1Response409 | create1Response503
+export type createApiTokenResponseError = (
+  | createApiTokenResponse400
+  | createApiTokenResponse403
+  | createApiTokenResponse409
+  | createApiTokenResponse503
 ) & {
   headers: Headers;
 };
 
-export type create1Response = create1ResponseSuccess | create1ResponseError;
+export type createApiTokenResponse = createApiTokenResponseSuccess | createApiTokenResponseError;
 
-export const getCreate1Url = () => {
+export const getCreateApiTokenUrl = () => {
   return `/api/v1/me/api-tokens`;
 };
 
-export const create1 = async (
+export const createApiToken = async (
   createApiTokenRequest: CreateApiTokenRequest,
   options?: Parameters<typeof customFetch>[1],
-): Promise<create1Response> => {
+): Promise<createApiTokenResponse> => {
   const getHeaders = (
     h?: NonNullable<RequestInit['headers']>,
   ): Record<string, string | readonly string[]> => {
@@ -10056,7 +10063,7 @@ export const create1 = async (
     }
     return headers;
   };
-  return customFetch<create1Response>(getCreate1Url(), {
+  return customFetch<createApiTokenResponse>(getCreateApiTokenUrl(), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
@@ -10467,24 +10474,24 @@ export const connect = async (
   });
 };
 
-export type list1Response200 = {
+export type listHttpConnectorsResponse200 = {
   data: Summary[];
   status: 200;
 };
 
-export type list1ResponseSuccess = list1Response200 & {
+export type listHttpConnectorsResponseSuccess = listHttpConnectorsResponse200 & {
   headers: Headers;
 };
-export type list1Response = list1ResponseSuccess;
+export type listHttpConnectorsResponse = listHttpConnectorsResponseSuccess;
 
-export const getList1Url = () => {
+export const getListHttpConnectorsUrl = () => {
   return `/api/v1/connectors/http`;
 };
 
-export const list1 = async (
+export const listHttpConnectors = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<list1Response> => {
-  return customFetch<list1Response>(getList1Url(), {
+): Promise<listHttpConnectorsResponse> => {
+  return customFetch<listHttpConnectorsResponse>(getListHttpConnectorsUrl(), {
     ...options,
     method: 'GET',
   });
@@ -15644,24 +15651,24 @@ export const openRealtimeStream = async (
   });
 };
 
-export type currentResponse200 = {
+export type getCurrentProfileImagesResponse200 = {
   data: CurrentImages;
   status: 200;
 };
 
-export type currentResponseSuccess = currentResponse200 & {
+export type getCurrentProfileImagesResponseSuccess = getCurrentProfileImagesResponse200 & {
   headers: Headers;
 };
-export type currentResponse = currentResponseSuccess;
+export type getCurrentProfileImagesResponse = getCurrentProfileImagesResponseSuccess;
 
-export const getCurrentUrl = () => {
+export const getGetCurrentProfileImagesUrl = () => {
   return `/api/v1/profile/images`;
 };
 
-export const current = async (
+export const getCurrentProfileImages = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<currentResponse> => {
-  return customFetch<currentResponse>(getCurrentUrl(), {
+): Promise<getCurrentProfileImagesResponse> => {
+  return customFetch<getCurrentProfileImagesResponse>(getGetCurrentProfileImagesUrl(), {
     ...options,
     method: 'GET',
   });
@@ -15802,24 +15809,24 @@ export const getUnreadNotificationCount = async (
   });
 };
 
-export type current1Response200 = {
+export type getMyPhoneResponse200 = {
   data: PhoneResponse;
   status: 200;
 };
 
-export type current1ResponseSuccess = current1Response200 & {
+export type getMyPhoneResponseSuccess = getMyPhoneResponse200 & {
   headers: Headers;
 };
-export type current1Response = current1ResponseSuccess;
+export type getMyPhoneResponse = getMyPhoneResponseSuccess;
 
-export const getCurrent1Url = () => {
+export const getGetMyPhoneUrl = () => {
   return `/api/v1/me/phone`;
 };
 
-export const current1 = async (
+export const getMyPhone = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<current1Response> => {
-  return customFetch<current1Response>(getCurrent1Url(), {
+): Promise<getMyPhoneResponse> => {
+  return customFetch<getMyPhoneResponse>(getGetMyPhoneUrl(), {
     ...options,
     method: 'GET',
   });
@@ -16230,24 +16237,24 @@ export const read = async (options?: Parameters<typeof customFetch>[1]): Promise
   });
 };
 
-export type health1Response200 = {
+export type getTelegramConnectorHealthResponse200 = {
   data: TelegramHealth;
   status: 200;
 };
 
-export type health1ResponseSuccess = health1Response200 & {
+export type getTelegramConnectorHealthResponseSuccess = getTelegramConnectorHealthResponse200 & {
   headers: Headers;
 };
-export type health1Response = health1ResponseSuccess;
+export type getTelegramConnectorHealthResponse = getTelegramConnectorHealthResponseSuccess;
 
-export const getHealth1Url = () => {
+export const getGetTelegramConnectorHealthUrl = () => {
   return `/api/v1/connectors/telegram/health`;
 };
 
-export const health1 = async (
+export const getTelegramConnectorHealth = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<health1Response> => {
-  return customFetch<health1Response>(getHealth1Url(), {
+): Promise<getTelegramConnectorHealthResponse> => {
+  return customFetch<getTelegramConnectorHealthResponse>(getGetTelegramConnectorHealthUrl(), {
     ...options,
     method: 'GET',
   });
@@ -16369,22 +16376,24 @@ export const getBuilderRunsChart = async (
   });
 };
 
-export type get2Response200 = {
+export type getAccountPreferencesResponse200 = {
   data: PreferencesView;
   status: 200;
 };
 
-export type get2ResponseSuccess = get2Response200 & {
+export type getAccountPreferencesResponseSuccess = getAccountPreferencesResponse200 & {
   headers: Headers;
 };
-export type get2Response = get2ResponseSuccess;
+export type getAccountPreferencesResponse = getAccountPreferencesResponseSuccess;
 
-export const getGet2Url = () => {
+export const getGetAccountPreferencesUrl = () => {
   return `/api/v1/auth/profile/preferences`;
 };
 
-export const get2 = async (options?: Parameters<typeof customFetch>[1]): Promise<get2Response> => {
-  return customFetch<get2Response>(getGet2Url(), {
+export const getAccountPreferences = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountPreferencesResponse> => {
+  return customFetch<getAccountPreferencesResponse>(getGetAccountPreferencesUrl(), {
     ...options,
     method: 'GET',
   });
