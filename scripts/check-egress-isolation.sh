@@ -6,8 +6,13 @@
 #   2. a service other than egress-proxy or egress-fetch is on the egress network;
 #   3. egress-proxy or egress-fetch publishes a port;
 #   4. the internal network (or the fetch network, when defined) is not internal: true;
-#   5. a service other than egress-fetch is on the fetch network;
-#   6. a proxy is on a network outside its set, or a service names egress-fetch.
+#   5. a service other than egress-fetch or fetch-worker is on the fetch network;
+#   6. a proxy or fetch-worker is on a network outside its set, or a service other than
+#      those two names egress-fetch;
+#   7. fetch-worker's object-store key equals another service's (it holds untrusted
+#      downloads, so it must not carry a key that reads uploads or run objects);
+#   8. fetch-worker's broker user equals another service's (the backend's administrator
+#      account, or the login another worker uses, reads queues that carry members' data).
 # A new service lands on the default network, so it fails rule 1 until it is made
 # internal-only or consciously added to NON_INTERNAL_OK below.
 #
@@ -56,6 +61,7 @@ done
 python3 - "$tmp" "$n" <<'PY'
 import json
 import sys
+from urllib.parse import urlsplit
 
 tmp, count = sys.argv[1], int(sys.argv[2])
 
@@ -66,7 +72,12 @@ NON_INTERNAL_OK = {
     "postgres-exporter", "pg-monitor-init",
 }
 PROXIES = {"egress-proxy", "egress-fetch"}
-PROXY_NETWORKS = {"egress-proxy": {"internal", "egress"}, "egress-fetch": {"fetch", "egress"}}
+FETCH_MEMBERS = {"egress-fetch", "fetch-worker"}
+NETWORK_SETS = {
+    "egress-proxy": {"internal", "egress"},
+    "egress-fetch": {"fetch", "egress"},
+    "fetch-worker": {"internal", "fetch"},
+}
 
 violations = []
 for i in range(1, count + 1):
@@ -90,13 +101,33 @@ for i in range(1, count + 1):
             violations.append(f"[{label}] {name}: on the egress network")
         if name in PROXIES and svc.get("ports"):
             violations.append(f"[{label}] {name}: publishes ports")
-        if "fetch" in on and name != "egress-fetch":
+        if "fetch" in on and name not in FETCH_MEMBERS:
             violations.append(f"[{label}] {name}: on the fetch network")
-        if name in PROXY_NETWORKS and not set(on) <= PROXY_NETWORKS[name]:
-            extra = sorted(set(on) - PROXY_NETWORKS[name])
+        if name in NETWORK_SETS and not set(on) <= NETWORK_SETS[name]:
+            extra = sorted(set(on) - NETWORK_SETS[name])
             violations.append(f"[{label}] {name}: on network(s) outside its set {extra}")
-        if name != "egress-fetch" and "egress-fetch" in json.dumps(svc.get("environment") or {}):
+        if name not in FETCH_MEMBERS and "egress-fetch" in json.dumps(svc.get("environment") or {}):
             violations.append(f"[{label}] {name}: environment names egress-fetch")
+
+    fetch_key = (services.get("fetch-worker", {}).get("environment") or {}).get("S3_ACCESS_KEY")
+    if fetch_key:
+        for name, svc in sorted(services.items()):
+            if name != "fetch-worker" and (svc.get("environment") or {}).get("S3_ACCESS_KEY") == fetch_key:
+                violations.append(f"[{label}] fetch-worker: object-store key equals the one of {name}")
+
+    def broker_user(svc):
+        env = svc.get("environment") or {}
+        if env.get("AMQP_URL"):
+            return urlsplit(env["AMQP_URL"]).username
+        return env.get("SPRING_RABBITMQ_USERNAME")
+
+    fetch_broker_user = broker_user(services.get("fetch-worker", {}))
+    if "fetch-worker" in services and not fetch_broker_user:
+        violations.append(f"[{label}] fetch-worker: no broker user in AMQP_URL")
+    if fetch_broker_user:
+        for name, svc in sorted(services.items()):
+            if name != "fetch-worker" and broker_user(svc) == fetch_broker_user:
+                violations.append(f"[{label}] fetch-worker: broker user equals the one of {name}")
 
     if not networks.get("internal", {}).get("internal", False):
         violations.append(f"[{label}] network internal is not internal: true")
