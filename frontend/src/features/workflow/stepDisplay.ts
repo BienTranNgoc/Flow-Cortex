@@ -35,12 +35,17 @@ export function stateWord(state: StepState, t: TFunction): string {
 }
 
 const CHECKPOINT = 'APPROVAL_CHECKPOINT';
+const QA_REVIEW = 'qa.review';
+
+/** The step types that pause a run for a member's decision. */
+export const HUMAN_STEP_TYPES: ReadonlySet<string> = new Set([CHECKPOINT, QA_REVIEW]);
 
 const LABEL_KEYS: Record<string, string> = {
   probe: 'workflow.step.label.probe',
   extract_audio: 'workflow.step.label.extract_audio',
   load_template: 'workflow.step.label.load_template',
   [CHECKPOINT]: 'workflow.step.label.review',
+  [QA_REVIEW]: 'workflow.step.label.qaReview',
   generate_script: 'workflow.step.label.generate_script',
   generate_storyboard: 'workflow.step.label.generate_storyboard',
   generate_speech: 'workflow.step.label.generate_speech',
@@ -102,7 +107,7 @@ export function computeElapsedSeconds(
   return Math.max(0, Math.floor((end - start) / 1000));
 }
 
-/** The step a waiting run is paused on: its first pending approval checkpoint. */
+/** The step a waiting run is paused on: its first pending human step (checkpoint or QA review). */
 export function needsYouStep(
   steps: readonly RunStepResponse[],
   runStatus: string | undefined,
@@ -110,7 +115,9 @@ export function needsYouStep(
   if (runStatus !== 'waiting_approval') {
     return undefined;
   }
-  return steps.find((step) => step.type === CHECKPOINT && (step.status ?? 'pending') === 'pending');
+  return steps.find(
+    (step) => HUMAN_STEP_TYPES.has(step.type ?? '') && (step.status ?? 'pending') === 'pending',
+  );
 }
 
 export function stepState(

@@ -4,5 +4,7 @@ package com.flowcortex.workflow.domain;
 public enum ReviewTaskStatus {
     PENDING,
     APPROVED,
-    REJECTED
+    REJECTED,
+    /** Nobody decided before the task's time limit; set only by the expiry sweep. */
+    EXPIRED
 }

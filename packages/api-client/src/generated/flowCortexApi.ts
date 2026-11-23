@@ -1325,6 +1325,17 @@ export interface ScriptRevisionResponse {
   reviewTaskVersion?: number;
 }
 
+export interface ReviewQuestion {
+  id: string;
+  type: string;
+  question: string;
+  options: string[];
+}
+
+export type ReviewTaskResponsePickOptionsItem = { [key: string]: unknown };
+
+export type ReviewTaskResponseAnswers = { [key: string]: unknown };
+
 export interface ReviewTaskResponse {
   id?: string;
   runId?: string;
@@ -1339,12 +1350,24 @@ export interface ReviewTaskResponse {
   version?: number;
   currentRevisionId?: string;
   approvedRevisionId?: string;
+  expiresAt: string;
+  pickOptions?: ReviewTaskResponsePickOptionsItem[];
+  questions?: ReviewQuestion[];
+  questionsState?: string;
+  answers?: ReviewTaskResponseAnswers;
 }
 
 export interface ApproveReviewTaskRequest {
   reviewedPayload?: string;
   revisionId?: string;
   expectedVersion?: number;
+  pickedOption?: number;
+}
+
+export type AnswerReviewTaskRequestAnswers = { [key: string]: unknown };
+
+export interface AnswerReviewTaskRequest {
+  answers: AnswerReviewTaskRequestAnswers;
 }
 
 export interface VideoConfig {
@@ -8665,10 +8688,31 @@ export type rejectTaskResponse200 = {
   status: 200;
 };
 
+export type rejectTaskResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type rejectTaskResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type rejectTaskResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
 export type rejectTaskResponseSuccess = rejectTaskResponse200 & {
   headers: Headers;
 };
-export type rejectTaskResponse = rejectTaskResponseSuccess;
+export type rejectTaskResponseError = (
+  rejectTaskResponse400 | rejectTaskResponse404 | rejectTaskResponse409
+) & {
+  headers: Headers;
+};
+
+export type rejectTaskResponse = rejectTaskResponseSuccess | rejectTaskResponseError;
 
 export const getRejectTaskUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/reject`;
@@ -8689,10 +8733,36 @@ export type approveTaskResponse200 = {
   status: 200;
 };
 
+export type approveTaskResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type approveTaskResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type approveTaskResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type approveTaskResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type approveTaskResponseSuccess = approveTaskResponse200 & {
   headers: Headers;
 };
-export type approveTaskResponse = approveTaskResponseSuccess;
+export type approveTaskResponseError = (
+  approveTaskResponse400 | approveTaskResponse404 | approveTaskResponse409 | approveTaskResponse422
+) & {
+  headers: Headers;
+};
+
+export type approveTaskResponse = approveTaskResponseSuccess | approveTaskResponseError;
 
 export const getApproveTaskUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/approve`;
@@ -8727,6 +8797,78 @@ export const approveTask = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(approveReviewTaskRequest),
+  });
+};
+
+export type answerTaskResponse200 = {
+  data: ReviewTaskResponse;
+  status: 200;
+};
+
+export type answerTaskResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type answerTaskResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type answerTaskResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type answerTaskResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type answerTaskResponseSuccess = answerTaskResponse200 & {
+  headers: Headers;
+};
+export type answerTaskResponseError = (
+  answerTaskResponse400 | answerTaskResponse404 | answerTaskResponse409 | answerTaskResponse422
+) & {
+  headers: Headers;
+};
+
+export type answerTaskResponse = answerTaskResponseSuccess | answerTaskResponseError;
+
+export const getAnswerTaskUrl = (taskId: string) => {
+  return `/api/v1/review-tasks/${taskId}/answers`;
+};
+
+export const answerTask = async (
+  taskId: string,
+  answerReviewTaskRequest: AnswerReviewTaskRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<answerTaskResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<answerTaskResponse>(getAnswerTaskUrl(taskId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(answerReviewTaskRequest),
   });
 };
 

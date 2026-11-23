@@ -98,6 +98,12 @@ const TYPE_PATHS: Record<string, ReactNode> = {
       <path d="M6.5 5.8l4 2.2-4 2.2V5.8z" fill="currentColor" stroke="none" />
     </>
   ),
+  'qa.review': (
+    <>
+      <path d="M5.5 6a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.8" />
+      <path d="M8 13h.01" />
+    </>
+  ),
 };
 
 /** The step-type icon; a type without a drawing gets a plain dot. */

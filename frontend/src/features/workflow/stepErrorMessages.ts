@@ -29,6 +29,7 @@ const SENTENCE_KEYS: Record<string, string> = {
   dub_disabled: 'workflow.stepError.dub_disabled',
   store_unavailable: 'workflow.stepError.store_unavailable',
   translation_invalid: 'workflow.stepError.translation_invalid',
+  REVIEW_EXPIRED: 'workflow.stepError.REVIEW_EXPIRED',
   load_template_invalid_input: 'workflow.stepError.load_template_invalid_input',
   load_template_not_found: 'workflow.stepError.load_template_not_found',
   load_template_invalid_template: 'workflow.stepError.load_template_invalid_template',

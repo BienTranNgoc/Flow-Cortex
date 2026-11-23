@@ -110,7 +110,7 @@ final class ReadyStepSelector {
             if (step.getStatus() != RunStepStatus.PENDING) {
                 return new Decision.Wait();
             }
-            if ("APPROVAL_CHECKPOINT".equals(step.getType())) {
+            if (HumanSteps.TYPES.contains(step.getType())) {
                 return new Decision.PauseForApproval(step);
             }
             return new Decision.Dispatch(List.of(step));
