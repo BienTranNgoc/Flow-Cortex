@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.flowcortex.user.pat.PersonalAccessTokenService.CreatedToken;
 import com.flowcortex.user.pat.PersonalAccessTokenService.TokenSummary;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,6 +48,7 @@ class PersonalAccessTokenController {
         this.service = service;
     }
 
+    @Operation(operationId = "listApiTokens")
     @ApiResponse(responseCode = "200")
     @ApiResponse(responseCode = "403", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
@@ -57,6 +59,7 @@ class PersonalAccessTokenController {
         return service.list(UUID.fromString(jwt.getSubject())).stream().map(ApiTokenView::from).toList();
     }
 
+    @Operation(operationId = "createApiToken")
     @ApiResponse(responseCode = "201")
     @ApiResponse(responseCode = "400", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))

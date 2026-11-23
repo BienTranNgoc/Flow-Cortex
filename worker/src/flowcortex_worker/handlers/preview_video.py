@@ -41,23 +41,24 @@ def handle(
     doc = _read_document(source)
     try:
         card = build_card(doc, shot_id, aspect)
-        send_version = send_card(card) if send else None
-    except (ArithmeticError, KeyError, TypeError, ValueError) as refused:
+        card_text = dumps(card)
+        send_text = dumps(send_card(card)) if send else None
+    except (ArithmeticError, KeyError, RecursionError, TypeError, ValueError) as refused:
         raise PermanentError("contract_violation", f"preview_video: {refused}") from refused
     blender = _blender()
 
     scratch = source.parent
     card_path = scratch / CARD_NAME
-    card_path.write_text(dumps(card), encoding="utf-8")
+    card_path.write_text(card_text, encoding="utf-8")
     report = _render(blender, card_path, scratch / PREVIEW_NAME, processes)
     files = [
         OutputFile(PREVIEW_NAME, VIDEO_MIME, scratch / PREVIEW_NAME),
         OutputFile(CARD_NAME, "application/json", card_path),
     ]
     render_seconds = _seconds(report)
-    if send_version is not None:
+    if send_text is not None:
         send_path = scratch / SEND_CARD_NAME
-        send_path.write_text(dumps(send_version), encoding="utf-8")
+        send_path.write_text(send_text, encoding="utf-8")
         send_report = _render(blender, send_path, scratch / SEND_NAME, processes)
         render_seconds += _seconds(send_report)
         files.append(OutputFile(SEND_NAME, VIDEO_MIME, scratch / SEND_NAME))
@@ -113,7 +114,7 @@ def _source(inputs: Mapping[str, Path]) -> Path:
 def _read_document(source: Path) -> Any:
     try:
         return json.loads(source.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as unreadable:
+    except (OSError, RecursionError, ValueError) as unreadable:
         raise PermanentError(
             "contract_violation", "preview_video input 'doc' is not readable JSON"
         ) from unreadable
@@ -122,7 +123,9 @@ def _read_document(source: Path) -> Any:
 def _blender() -> str:
     path = os.environ.get("BLENDER_BIN", DEFAULT_BLENDER_BIN)
     if not (os.path.isfile(path) and os.access(path, os.X_OK)):
-        raise PermanentError("contract_violation", f"Blender is not available at '{path}'")
+        raise PermanentError(
+            "provider_capability_unavailable", f"Blender is not available at '{path}'"
+        )
     return path
 
 

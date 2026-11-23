@@ -42,6 +42,7 @@ class AccountPreferencesController {
         this.preferences = preferences;
     }
 
+    @Operation(operationId = "getAccountPreferences")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     PreferencesView get(@AuthenticationPrincipal Jwt jwt) {
         return preferences.get(subjectId(jwt));
