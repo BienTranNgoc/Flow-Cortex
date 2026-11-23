@@ -4,6 +4,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.RequestLocale;
 import com.flowcortex.shared.web.UnprocessableEntityException;
+import com.flowcortex.user.phone.PhoneChallenge.Purpose;
 import com.flowcortex.user.phone.PhoneSendPolicies.Refusal;
 import com.flowcortex.user.phone.PhoneSendPolicies.Verdict;
 import java.security.SecureRandom;
@@ -41,10 +42,11 @@ class PhoneVerificationService {
 
     static final Duration CODE_TTL = Duration.ofMinutes(5);
     static final LocalizedMessage NUMBER_TAKEN = new LocalizedMessage("phone.numberTaken");
+    static final String LOCK = "SELECT pg_advisory_xact_lock(hashtext(?))";
 
     private static final Logger LOG = LoggerFactory.getLogger(PhoneVerificationService.class);
-    private static final String LOCK = "SELECT pg_advisory_xact_lock(hashtext(?))";
     private static final String VERIFIED_NUMBER_UNIQUE_INDEX = "uq_user_phone_verified_number";
+    private static final String ALREADY_VERIFIED = "already_verified";
 
     private final PhoneChallengeRepository challenges;
     private final UserPhoneRepository phones;
@@ -59,6 +61,7 @@ class PhoneVerificationService {
     private final Clock clock;
     private final MessageSource messages;
     private final RequestLocale requestLocale;
+    private final PhoneTelemetry telemetry;
     private final SecureRandom random = new SecureRandom();
 
     /** Fails startup when the feature is on and no {@link SmsSender} is configured. */
@@ -68,8 +71,9 @@ class PhoneVerificationService {
             PhoneSendAttemptStore attempts, PhoneNumberHasher phoneHasher, PhoneSendIpLimiter ipLimiter,
             PhoneSendLimits limits, PasswordEncoder passwordEncoder, JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager, Clock clock, MessageSource messages,
-            RequestLocale requestLocale) {
+            RequestLocale requestLocale, PhoneTelemetry telemetry) {
         this.messages = messages;
+        this.telemetry = telemetry;
         this.requestLocale = requestLocale;
         this.smsSender = smsSenders.getIfAvailable();
         if (enabled && smsSender == null) {
@@ -89,7 +93,8 @@ class PhoneVerificationService {
         this.clock = clock;
     }
 
-    record PhoneStatus(String phone, boolean verified, String maskedPhone) {
+    /** {@code cancelAvailableUntil}: when the newest undoable number change stops being undoable, else null. */
+    record PhoneStatus(String phone, boolean verified, String maskedPhone, Instant cancelAvailableUntil) {
     }
 
     /** {@code resendAfterSeconds}: how long the next request for this number would be refused. */
@@ -99,22 +104,43 @@ class PhoneVerificationService {
     PhoneStatus current(UUID userId) {
         return phones.findById(userId)
                 .filter(UserPhone::isVerified)
-                .map(row -> new PhoneStatus(row.getPhoneE164(), true, PhoneNumbers.mask(row.getPhoneE164())))
-                .orElse(new PhoneStatus(null, false, null));
+                .map(row -> new PhoneStatus(row.getPhoneE164(), true, PhoneNumbers.mask(row.getPhoneE164()),
+                        challenges.findLatestUndoable(userId, now()).map(PhoneChallenge::getUndoUntil).orElse(null)))
+                .orElse(new PhoneStatus(null, false, null, null));
+    }
+
+    /** The member's lock for a change of their number: sends, change verifies and cancels queue on it. */
+    static String memberLockKey(UUID userId) {
+        return "phone-send-user:" + userId;
+    }
+
+    /**
+     * First verification of a number. A member who already holds a verified number is refused 409
+     * before any quota is read or attempt recorded: the refusal concerns their own account, not the
+     * number asked for. Changing a verified number goes through the change flow.
+     */
+    SentCode sendCode(UUID userId, String rawPhone, String clientIp) {
+        String phone = PhoneNumbers.normalize(rawPhone)
+                .orElseThrow(() -> new IllegalArgumentException("Not a Vietnamese mobile number"));
+        if (holdsVerifiedNumber(userId)) {
+            telemetry.send(ALREADY_VERIFIED);
+            LOG.info("Phone code send refused: userId={} phone={} outcome={}", userId, PhoneNumbers.forLog(phone),
+                    ALREADY_VERIFIED);
+            throw alreadyVerified();
+        }
+        return sendChallenge(userId, phone, clientIp, Purpose.VERIFY);
     }
 
     /**
      * Runs {@link PhoneSendPolicies#ORDER} under the locks and records the attempt, refused or not.
      * A refusal is thrown only after that row commits; an allowed request invalidates the member's
-     * open code, then stores and sends the new one.
+     * open code, then stores and sends the new one. {@code phone} is already normalised.
      */
-    SentCode sendCode(UUID userId, String rawPhone, String clientIp) {
-        String phone = PhoneNumbers.normalize(rawPhone)
-                .orElseThrow(() -> new IllegalArgumentException("Not a Vietnamese mobile number"));
+    SentCode sendChallenge(UUID userId, String phone, String clientIp, Purpose purpose) {
         String phoneHash = phoneHasher.hash(phone);
         Instant now = now();
         SendResult result = transaction.execute(status -> {
-            jdbc.query(LOCK, (RowCallbackHandler) row -> { }, "phone-send-user:" + userId);
+            jdbc.query(LOCK, (RowCallbackHandler) row -> { }, memberLockKey(userId));
             jdbc.query(LOCK, (RowCallbackHandler) row -> { }, phone);
             Instant since = now.minus(PhoneSendPolicies.DAY);
             List<Instant> pairSends = new ArrayList<>(challenges.findSendTimesByUserSince(userId, phone, since));
@@ -134,15 +160,17 @@ class PhoneVerificationService {
             challenges.invalidateOpen(userId, now);
             String code = String.format("%06d", random.nextInt(1_000_000));
             challenges.save(new PhoneChallenge(UUID.randomUUID(), userId, phone, passwordEncoder.encode(code),
-                    now.plus(CODE_TTL), now));
+                    now.plus(CODE_TTL), now, purpose));
             sender().send(phone, messages.getMessage(new LocalizedMessage("sms.otp.body", code),
                     requestLocale.current()));
             pairSends.add(now);
             return new SendResult(null, OtpSendPolicy.decide(pairSends, now).retryAfterSeconds());
         });
         if (result.refusal() != null) {
+            telemetry.send(outcomeOf(result.refusal().refusal()));
             throw refusal(userId, phone, result.refusal());
         }
+        telemetry.send(PhoneSendAttemptStore.SENT);
         LOG.info("Phone code sent: userId={} phone={} outcome=sent", userId, PhoneNumbers.forLog(phone));
         return new SentCode(PhoneNumbers.mask(phone), result.resendAfterSeconds(), now.plus(CODE_TTL));
     }
@@ -154,12 +182,20 @@ class PhoneVerificationService {
         return smsSender;
     }
 
+    private boolean holdsVerifiedNumber(UUID userId) {
+        return phones.findById(userId).filter(UserPhone::isVerified).isPresent();
+    }
+
+    private static PhoneConflictException alreadyVerified() {
+        return new PhoneConflictException("PHONE_ALREADY_VERIFIED", new LocalizedMessage("phone.alreadyVerified"));
+    }
+
     private static String outcomeOf(Refusal refusal) {
         return refusal.name().toLowerCase(Locale.ROOT);
     }
 
     // Postgres keeps microseconds: a nanosecond "now" would sit just before a stored time it rounded up.
-    private Instant now() {
+    Instant now() {
         return Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
     }
 
@@ -179,45 +215,52 @@ class PhoneVerificationService {
             verification = new Verification(Result.NUMBER_TAKEN, null, 0);
         }
         String phone = verification.phone() == null ? "none" : PhoneNumbers.forLog(verification.phone());
-        LOG.info("Phone code checked: userId={} phone={} outcome={}", userId, phone,
-                verification.result().name().toLowerCase(Locale.ROOT));
-        switch (verification.result()) {
-            case VERIFIED -> {
-                return;
-            }
-            case WRONG -> throw new UnprocessableEntityException(
-                    new LocalizedMessage("phone.otp.wrong", verification.triesLeft()), "OTP_INVALID");
-            case LOCKED -> throw new UnprocessableEntityException(new LocalizedMessage("phone.otp.locked"),
-                    "OTP_LOCKED");
-            case EXPIRED -> throw new UnprocessableEntityException(new LocalizedMessage("phone.otp.expired"),
-                    "OTP_EXPIRED");
-            case STALE -> throw new UnprocessableEntityException(new LocalizedMessage("phone.otp.stale"),
-                    "OTP_INVALID");
-            case NUMBER_TAKEN -> throw new ConflictException(NUMBER_TAKEN);
-            default -> throw new IllegalStateException("Unhandled verification result " + verification.result());
+        String outcome = verification.result().name().toLowerCase(Locale.ROOT);
+        telemetry.verify(outcome);
+        LOG.info("Phone code checked: userId={} phone={} outcome={}", userId, phone, outcome);
+        if (verification.result() != Result.VERIFIED) {
+            throw refusalOf(verification);
         }
     }
 
+    /** The problem a refused check answers with; the plain and the change verify share it. */
+    static RuntimeException refusalOf(Verification verification) {
+        return switch (verification.result()) {
+            case WRONG -> new UnprocessableEntityException(
+                    new LocalizedMessage("phone.otp.wrong", verification.triesLeft()), "OTP_INVALID");
+            case LOCKED -> new UnprocessableEntityException(new LocalizedMessage("phone.otp.locked"), "OTP_LOCKED");
+            case EXPIRED -> new UnprocessableEntityException(new LocalizedMessage("phone.otp.expired"),
+                    "OTP_EXPIRED");
+            case STALE -> new UnprocessableEntityException(new LocalizedMessage("phone.otp.stale"), "OTP_INVALID");
+            case NUMBER_TAKEN -> new ConflictException(NUMBER_TAKEN);
+            case ALREADY_VERIFIED -> alreadyVerified();
+            case NO_PENDING_CHANGE -> new PhoneConflictException("PHONE_NO_PENDING_CHANGE",
+                    new LocalizedMessage("phone.change.noPending"));
+            case NOT_VERIFIED -> new PhoneConflictException("PHONE_NOT_VERIFIED",
+                    new LocalizedMessage("phone.change.notVerified"));
+            case SAME_NUMBER -> new UnprocessableEntityException(new LocalizedMessage("phone.change.sameNumber"),
+                    "PHONE_SAME_NUMBER");
+            case VERIFIED -> throw new IllegalStateException("A verified check has no refusal");
+        };
+    }
+
     private Verification verifyLatest(UUID userId, String code, Instant now) {
+        Optional<UserPhone> existing = phones.findById(userId);
+        if (existing.filter(UserPhone::isVerified).isPresent()) {
+            return new Verification(Result.ALREADY_VERIFIED, null, 0);
+        }
         Optional<PhoneChallenge> latest = challenges
-                .findFirstByUserIdAndConsumedAtIsNullAndInvalidatedAtIsNullOrderByCreatedAtDesc(userId)
-                .or(() -> challenges.findFirstByUserIdOrderByCreatedAtDesc(userId));
+                .findFirstByUserIdAndPurposeAndConsumedAtIsNullAndInvalidatedAtIsNullOrderByCreatedAtDesc(userId,
+                        Purpose.VERIFY)
+                .or(() -> challenges.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, Purpose.VERIFY));
         if (latest.isEmpty()) {
             return new Verification(Result.STALE, null, 0);
         }
         PhoneChallenge challenge = latest.get();
         String phone = challenge.getPhoneE164();
-        if (challenge.isLocked()) {
-            return new Verification(Result.LOCKED, phone, 0);
-        }
-        if (!challenge.isOpen()) {
-            return new Verification(Result.STALE, phone, 0);
-        }
-        if (challenge.isExpired(now)) {
-            return new Verification(Result.EXPIRED, phone, 0);
-        }
-        if (!passwordEncoder.matches(code, challenge.getCodeHash())) {
-            return wrongEntry(userId, challenge, code, now);
+        Optional<Verification> refused = refuseUnlessRight(userId, challenge, code, now);
+        if (refused.isPresent()) {
+            return refused.get();
         }
         if (phones.existsByPhoneE164AndVerifiedAtIsNotNullAndUserIdNot(phone, userId)) {
             return new Verification(Result.NUMBER_TAKEN, phone, 0);
@@ -225,15 +268,38 @@ class PhoneVerificationService {
         if (challenges.consume(challenge.getId(), now) == 0) {
             return new Verification(lockedOrStale(challenge.getId()), phone, 0);
         }
-        UserPhone row = phones.findById(userId).orElseGet(() -> new UserPhone(userId, phone, now));
+        UserPhone row = existing.orElseGet(() -> new UserPhone(userId, phone, now));
         row.verify(phone, now);
         phones.saveAndFlush(row);
         return new Verification(Result.VERIFIED, phone, 0);
     }
 
+    /**
+     * Empty when {@code challenge} is open, unexpired and {@code code} is its code; otherwise why
+     * not. A wrong entry is counted here. The caller holds the member's phone lock.
+     */
+    Optional<Verification> refuseUnlessRight(UUID userId, PhoneChallenge challenge, String code, Instant now) {
+        String phone = challenge.getPhoneE164();
+        if (challenge.isLocked()) {
+            return Optional.of(new Verification(Result.LOCKED, phone, 0));
+        }
+        if (!challenge.isOpen()) {
+            return Optional.of(new Verification(Result.STALE, phone, 0));
+        }
+        if (challenge.isExpired(now)) {
+            return Optional.of(new Verification(Result.EXPIRED, phone, 0));
+        }
+        if (!passwordEncoder.matches(code, challenge.getCodeHash())) {
+            return Optional.of(wrongEntry(userId, challenge, code, now));
+        }
+        return Optional.empty();
+    }
+
     private Verification wrongEntry(UUID userId, PhoneChallenge challenge, String code, Instant now) {
         String phone = challenge.getPhoneE164();
-        boolean earlierCode = challenges.findTop5ByUserIdAndIdNotOrderByCreatedAtDesc(userId, challenge.getId())
+        boolean earlierCode = challenges
+                .findTop5ByUserIdAndPurposeAndIdNotOrderByCreatedAtDesc(userId, challenge.getPurpose(),
+                        challenge.getId())
                 .stream()
                 .anyMatch(earlier -> passwordEncoder.matches(code, earlier.getCodeHash()));
         if (earlierCode) {
@@ -251,12 +317,12 @@ class PhoneVerificationService {
     }
 
     /** A conditional update changed nothing: a concurrent request locked or used the code first. */
-    private Result lockedOrStale(UUID challengeId) {
+    Result lockedOrStale(UUID challengeId) {
         return challenges.findAttempts(challengeId) >= PhoneChallenge.MAX_ATTEMPTS ? Result.LOCKED : Result.STALE;
     }
 
     /** Another account verified the number between our check and our write. */
-    private static boolean isVerifiedNumberTaken(DataIntegrityViolationException ex) {
+    static boolean isVerifiedNumberTaken(DataIntegrityViolationException ex) {
         String message = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
         return message != null && message.contains(VERIFIED_NUMBER_UNIQUE_INDEX);
     }
@@ -306,16 +372,21 @@ class PhoneVerificationService {
         return new LocalizedMessage("phone.wait.hours", (minutes + 59) / 60);
     }
 
-    private enum Result {
+    /** The last three are change-flow outcomes the plain verify never produces. */
+    enum Result {
         VERIFIED,
         WRONG,
         LOCKED,
         EXPIRED,
         STALE,
-        NUMBER_TAKEN
+        NUMBER_TAKEN,
+        ALREADY_VERIFIED,
+        NO_PENDING_CHANGE,
+        NOT_VERIFIED,
+        SAME_NUMBER
     }
 
-    private record Verification(Result result, String phone, int triesLeft) {
+    record Verification(Result result, String phone, int triesLeft) {
     }
 
     /** {@code refusal} is null when the code was sent. */

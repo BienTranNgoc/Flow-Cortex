@@ -63,6 +63,21 @@ class MediaTopologyConfigTest {
     }
 
     @Test
+    void declaresTheFetchLaneLikeTheDefaultJobQueue() {
+        Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
+
+        assertThat(argumentsOf(topology, "media.fetch.jobs")).isEqualTo(argumentsOf(topology, "media.jobs"));
+        assertThat(topology.getDeclarablesByType(Queue.class))
+                .extracting(Queue::getName)
+                .contains("media.fetch.jobs.dlq");
+        assertThat(topology.getDeclarablesByType(Binding.class))
+                .extracting(Binding::getDestination, Binding::getExchange, Binding::getRoutingKey)
+                .contains(
+                        tuple("media.fetch.jobs", "media", "fetch.job"),
+                        tuple("media.fetch.jobs.dlq", "media.dlx", "fetch.job"));
+    }
+
+    @Test
     void declaresTheAudioLaneLikeTheDefaultJobQueue() {
         Declarables topology = new MediaTopologyConfig().mediaTopology(properties());
 
@@ -78,11 +93,12 @@ class MediaTopologyConfigTest {
     }
 
     @Test
-    void onlySeparateAudioIsRoutedToTheAudioLane() {
+    void eachLaneCapabilityIsRoutedToItsOwnLaneAndEveryOtherOneToTheDefault() {
         for (MediaCapability capability : MediaCapability.values()) {
             String expected = switch (capability) {
                 case SEPARATE_AUDIO -> "audio.job";
                 case RENDER_VIDEO -> "render.job";
+                case FETCH_VIDEO -> "fetch.job";
                 default -> "job";
             };
             assertThat(MediaTopologyConfig.mediaJobKey(capability)).as(capability.value()).isEqualTo(expected);

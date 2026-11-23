@@ -153,7 +153,7 @@ describe('Sidebar', () => {
     stubApi({
       'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
       'GET /api/v1/admin/runs': { status: 200, body: { items: [], page: 0, size: 20, total: 0 } },
-      'GET /api/v1/users': { status: 200, body: [] },
+      'GET /api/v1/users/stats': { status: 200, body: {} },
       [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } },
     });
     setToken('admin-token-voice', true);
@@ -167,7 +167,9 @@ describe('Sidebar', () => {
   it('switches between expanded and icon-only mode', async () => {
     stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
     const { container } = renderSidebar(ADMIN_ME);
-    expect(container.querySelector('.cortex-admin-nav')).not.toHaveClass('cortex-admin-nav--collapsed');
+    expect(container.querySelector('.cortex-admin-nav')).not.toHaveClass(
+      'cortex-admin-nav--collapsed',
+    );
     expect(screen.getByText('Dashboard')).toBeVisible();
 
     renderSidebar(ADMIN_ME, true);
@@ -324,7 +326,13 @@ describe('Sidebar', () => {
         id: 'support',
         label: 'common.shell.nav.groups.overview',
         items: [
-          { label: 'Support', path: '/support', icon: Lifebuoy, key: 'workflow.run.view', badge: 3 },
+          {
+            label: 'Support',
+            path: '/support',
+            icon: Lifebuoy,
+            key: 'workflow.run.view',
+            badge: 3,
+          },
           { label: 'Empty', path: '/empty', icon: Lifebuoy, key: 'workflow.run.view', badge: 0 },
           { label: 'Plain', path: '/plain', icon: Lifebuoy, key: 'workflow.run.view' },
         ],
@@ -408,7 +416,13 @@ describe('Sidebar', () => {
       stubMatchMedia(false);
       render(
         <MemoryRouter>
-          <Sidebar me={ADMIN_ME} collapsed onToggle={() => {}} drawerOpen onDrawerClose={() => {}} />
+          <Sidebar
+            me={ADMIN_ME}
+            collapsed
+            onToggle={() => {}}
+            drawerOpen
+            onDrawerClose={() => {}}
+          />
         </MemoryRouter>,
       );
       const dialog = screen.getByRole('dialog', { name: 'Admin navigation' });

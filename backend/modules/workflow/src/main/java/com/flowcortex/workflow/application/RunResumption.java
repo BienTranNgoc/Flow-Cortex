@@ -145,7 +145,7 @@ public class RunResumption {
             requireInputsStored(runId, bound, steps);
         }
         // A claim overwrites a step's stored input with the resolved one, so it is rebuilt, never kept.
-        String restoredInput = registry.isRemote(step.getType()) ? RunInputShape.storedInput(bound) : null;
+        String restoredInput = snapshotsUpload(steps, step) ? RunInputShape.storedInput(bound) : null;
         short attempt = step.getAttempt();
         Optional<RunStep> companion = parallelClipCompanion(operation, run, steps, step);
 
@@ -280,7 +280,7 @@ public class RunResumption {
             }
             for (RunStep step : tail) {
                 carried.add(new RunStep(UUID.randomUUID(), newRunId, step.getStepOrder(), step.getType(),
-                        registry.isRemote(step.getType()) ? tailInput : null, step.getConfig(), step.getInputRef()));
+                        snapshotsUpload(steps, step) ? tailInput : null, step.getConfig(), step.getInputRef()));
             }
             List<RunStep> saved = runStepRepository.saveAll(carried);
             for (RunStep step : reusedSteps) {
@@ -296,6 +296,11 @@ public class RunResumption {
         });
         LOG.info("Run resume: op=retryRun outcome=created runId={} newRunId={} fromStepOrder={}", runId, newRunId, from);
         return view;
+    }
+
+    /** Whether {@code step} holds the run's upload, by the rule run start uses. */
+    private boolean snapshotsUpload(List<RunStep> steps, RunStep step) {
+        return registry.snapshotsUpload(steps.stream().map(RunStep::getType).toList(), steps.indexOf(step));
     }
 
     private List<MediaAssetInput> copyRunInputs(UUID newRunId, List<MediaAssetInput> inputs) {
@@ -363,11 +368,11 @@ public class RunResumption {
         }
     }
 
-    /** Run inputs expire; a remote step that would read an expired one fails after being charged, so refuse first. */
+    /** Run inputs expire; a step that would read an expired one fails after being charged, so refuse first. */
     private void requireInputsStored(UUID runId, List<MediaJobInput> bound, List<RunStep> steps) {
-        boolean remoteLeft = steps.stream()
-                .anyMatch(step -> step.getStatus() != RunStepStatus.COMPLETED && registry.isRemote(step.getType()));
-        if (!bound.isEmpty() && remoteLeft && !mediaJobs.runInputsStored(runId)) {
+        boolean readerLeft = steps.stream()
+                .anyMatch(step -> step.getStatus() != RunStepStatus.COMPLETED && snapshotsUpload(steps, step));
+        if (!bound.isEmpty() && readerLeft && !mediaJobs.runInputsStored(runId)) {
             throw new ConflictException(new LocalizedMessage("workflow.run.retry.objectGone", 0));
         }
     }

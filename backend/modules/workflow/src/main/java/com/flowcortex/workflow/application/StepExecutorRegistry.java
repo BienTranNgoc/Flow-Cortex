@@ -18,8 +18,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Every step type the engine can run, listed here rather than discovered: the inline demo
- * types, the dub steps, the template loader, and one remote executor per media capability. Workflow creation rejects
- * any other type.
+ * types, the dub steps, the template loader, the connector call, the two ingest steps, the link download step,
+ * and one remote executor per other media capability. Workflow creation rejects any other type.
  */
 @Component
 class StepExecutorRegistry {
@@ -29,9 +29,9 @@ class StepExecutorRegistry {
     @Autowired
     StepExecutorRegistry(MediaJobs mediaJobs, TranslateStepExecutor translate, TtsStepExecutor tts,
             VendorJobLedger vendorLedger, VendorJobsProperties vendorJobs, WorkflowCallStepExecutor workflowCall,
-            LoadTemplateStepExecutor loadTemplate) {
+            LoadTemplateStepExecutor loadTemplate, ConnectorCallStepExecutor connectorCall) {
         this(withNestedSteps(withDubSteps(executors(mediaJobs, Clock.systemUTC(), vendorLedger, vendorJobs), translate,
-                tts, loadTemplate), workflowCall));
+                tts, loadTemplate), workflowCall, connectorCall));
     }
 
     StepExecutorRegistry(MediaJobs mediaJobs, Clock clock) {
@@ -55,7 +55,11 @@ class StepExecutorRegistry {
         executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock,
                 vendorLedger, vendorJobs));
+        executors.add(new FetchVideoStepExecutor(mediaJobs, clock));
+        executors.add(new IngestStepExecutor("ingest_video", "video/", "video", mediaJobs));
+        executors.add(new IngestStepExecutor("ingest_image", "image/", "image", mediaJobs));
         Arrays.stream(MediaCapability.values())
+                .filter(capability -> capability != MediaCapability.FETCH_VIDEO)
                 .map(capability -> new RemoteStepExecutor(capability.value(), mediaJobs, clock))
                 .forEach(executors::add);
         return executors;
@@ -69,8 +73,10 @@ class StepExecutorRegistry {
         return executors;
     }
 
-    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall) {
+    private static List<StepExecutor> withNestedSteps(List<StepExecutor> executors, StepExecutor workflowCall,
+            StepExecutor connectorCall) {
         executors.add(workflowCall);
+        executors.add(connectorCall);
         return executors;
     }
 
@@ -102,12 +108,35 @@ class StepExecutorRegistry {
         return find(type).map(StepExecutor::bindsRunInputs).orElse(false);
     }
 
+    /**
+     * Whether step {@code index} of a run whose steps have {@code types} gets the upload stored at run
+     * start: only when step 1 takes it, and, after an ingest step 1, not for a stored-input step, which
+     * reads the file through {@code outputInputs} instead.
+     */
+    boolean snapshotsUpload(List<String> types, int index) {
+        String type = types.get(index);
+        if (!snapshotsRunInputs(type)) {
+            return false;
+        }
+        if (index == 0) {
+            return true;
+        }
+        String first = types.getFirst();
+        return snapshotsRunInputs(first) && !(ingestTypes().contains(first) && usesStoredInput(type));
+    }
+
     Set<String> knownTypes() {
         return byType.keySet();
     }
 
     Set<String> remoteTypes() {
         return byType.keySet().stream().filter(this::isRemote).collect(Collectors.toUnmodifiableSet());
+    }
+
+    /** The step types that copy an uploaded file into their own output. */
+    Set<String> ingestTypes() {
+        return byType.values().stream().filter(IngestStepExecutor.class::isInstance).map(StepExecutor::type)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     Set<String> storedInputTypes() {

@@ -18,6 +18,9 @@ const CHECK: WorkflowResponse = {
   name: 'Check a video file',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'upload',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' }],
 };
 
@@ -26,6 +29,9 @@ const ECHO: WorkflowResponse = {
   name: 'Echo Demo',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -43,6 +49,9 @@ const INCOMPLETE: WorkflowResponse = {
   name: 'Incomplete Demo (step 2 not configured)',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [
     { id: 'ws1', stepOrder: 1, name: 'Echo step 1', type: 'echo', mode: 'inline' },
     { id: 'ws2', stepOrder: 2, name: 'Echo step 2', type: 'echo', mode: 'inline' },
@@ -125,6 +134,9 @@ describe('WorkflowDetailPage', () => {
       name: 'Three steps',
       visibility: 'public',
       available: true,
+      allowFork: false,
+      forkCount: 0,
+      startInput: 'upload',
       steps: [
         { id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' },
         { id: 'ws2', stepOrder: 2, name: 'Pull the audio', type: 'extract_audio', mode: 'remote' },
@@ -288,6 +300,7 @@ describe('WorkflowDetailPage', () => {
       renderForm(
         {
           ...INCOMPLETE,
+          startInput: 'upload',
           steps: (INCOMPLETE.steps ?? []).map((step) => ({ ...step, mode: 'remote' as const })),
         },
         { 'POST /api/v1/workflows/w1/runs': INCOMPLETE_REPLY },

@@ -51,7 +51,7 @@ class FakeRunner(ProcessRunner):
         self.calls: list[list[str]] = []
         self._script = script
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         self.calls.append(argv)
         return self._script(argv)
 

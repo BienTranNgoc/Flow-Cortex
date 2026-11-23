@@ -26,9 +26,9 @@ class RecordingRunner(ProcessRunner):
         super().__init__()
         self.argvs: list[list[str]] = []
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         self.argvs.append(argv)
-        return super().run(argv)
+        return super().run(argv, cwd)
 
     def middle_frame_runs(self) -> list[list[str]]:
         return [argv for argv in self.argvs if any("eq(n" in part for part in argv)]
@@ -127,8 +127,8 @@ def test_a_container_that_understates_its_length_is_encoded_only_to_the_gate(
 
 
 class OvercountingRunner(ProcessRunner):
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
-        completed = super().run(argv)
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
+        completed = super().run(argv, cwd)
         if "stream=nb_read_frames" in argv:
             return subprocess.CompletedProcess(argv, 0, stdout=b"1441\n", stderr=b"")
         return completed

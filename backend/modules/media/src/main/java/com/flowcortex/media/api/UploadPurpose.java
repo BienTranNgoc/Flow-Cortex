@@ -11,7 +11,9 @@ public enum UploadPurpose {
     /** A member's avatar or cover picture; only the owner ever sees it. */
     PROFILE_IMAGE,
     /** An image attached to a workflow review. */
-    REVIEW_IMAGE;
+    REVIEW_IMAGE,
+    /** An image or video staff upload to the content media library (PNG, JPEG, WebP, MP4, WebM). */
+    CONTENT_MEDIA;
 
     /** Size cap of one support-attachment image; the purpose table and the support module both read it here. */
     public static final long SUPPORT_ATTACHMENT_MAX_BYTES = 5L * 1024 * 1024;

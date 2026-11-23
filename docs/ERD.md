@@ -28,6 +28,7 @@ erDiagram
   workflow_review ||--o{ workflow_review_image : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_helpful : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_report : "review_id, ON DELETE CASCADE"
+  media_asset ||--o| space_asset : "media_asset_id, UNIQUE (no FK)"
 
   app_user {
     uuid id PK
@@ -114,6 +115,40 @@ erDiagram
     uuid asset_id FK
     smallint position "UNIQUE (run_id, position), preserves request order"
     timestamptz created_at
+  }
+  space_asset {
+    uuid id PK
+    uuid space_id "owning space, no FK"
+    uuid owner_id "no FK"
+    uuid media_asset_id UK "the stored file; an upload asset points at the run's copy, no FK"
+    varchar source "run | upload"
+    varchar kind "video | image | audio"
+    text title "1-200 code points"
+    text title_base "run titles: the name before the (N) and index suffixes"
+    integer title_version "N of the (N) suffix, 1 = none"
+    varchar bucket "UNIQUE with object_key"
+    varchar object_key
+    varchar mime_type
+    bigint bytes
+    uuid run_id "producing run, or the run that bound the upload"
+    uuid run_step_id "NOT NULL exactly when source = run"
+    uuid workflow_id
+    text workflow_name "copied at registration"
+    timestamptz created_at
+  }
+  space_asset_registration {
+    uuid id PK
+    varchar source_type "run_outputs | run_inputs, UNIQUE with source_id"
+    uuid source_id "run id"
+    uuid owner_id
+    varchar status "pending | done | skipped | stuck"
+    integer attempts "stuck at 288"
+    varchar last_error_code
+    timestamptz next_attempt_at "partial index WHERE status = pending"
+    timestamptz lease_until "5 minutes from claim"
+    uuid lease_token "fences finish and retry"
+    timestamptz created_at
+    timestamptz updated_at "finished rows deleted after 30 days"
   }
   product_video_input {
     uuid run_id PK,FK
@@ -336,6 +371,30 @@ and slot, which also makes concurrent saves exactly-once), `idx_profile_image_hi
 cross-module tables: the module boundary is kept at the schema level, and a deleted account leaves its
 rows behind.
 
+## Runtime settings (`V2026.11.11.180`, `V2026.11.11.320`)
+
+```mermaid
+erDiagram
+  app_setting {
+    varchar key PK "declared in code; a row exists only while an admin value is stored"
+    text value "canonical text; the type lives in the key's declaration"
+    uuid updated_by "no FK — deleting an account keeps the history"
+    timestamptz updated_at
+  }
+  app_setting_change {
+    uuid id PK
+    varchar key "no FK; index idx_app_setting_change_key_at (key, changed_at DESC, id DESC)"
+    text previous_value "NULL = no stored value before"
+    text new_value "NULL = the stored value was reset"
+    uuid changed_by "no FK"
+    timestamptz changed_at
+    varchar reason "NULL; varchar(2000), trimmed, NULL when blank — written by the payment console only"
+  }
+```
+
+`app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
+the value, and a write of the value already stored records none.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
@@ -343,5 +402,4 @@ rows behind.
 | `provider` | provider catalogue + fallback order per capability | Providers page / first real capability |
 | `usage_event` | per-step provider units and cost | first paid provider |
 | `audit_log` | admin actions with before/after | first admin write beyond Users |
-| `app_setting`, `settings_audit` | DB-backed runtime settings (override > env > default) | Settings page |
 | `channel_account` | publish targets with encrypted tokens | Publish step |

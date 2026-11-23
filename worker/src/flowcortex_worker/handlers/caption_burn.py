@@ -41,7 +41,7 @@ def handle(
         spec = job.params.get("style")
         style = resolve_style(spec, height)
         script, line_count = build_ass(words, offset, style, width, height)
-    except ValueError as exc:
+    except (ArithmeticError, ValueError) as exc:
         raise PermanentError("contract_violation", str(exc)) from exc
 
     script_path = source.parent / ASS_NAME

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   authHeaders,
   create1,
-  list1,
+  list,
   revoke,
   unwrap,
   type ApiTokenView,
@@ -17,7 +17,7 @@ export function useApiTokensQuery(enabled: boolean) {
   return useQuery({
     queryKey: API_TOKENS_KEY,
     // `unwrap` throws for every status >= 400, so the generated error bodies never reach here.
-    queryFn: async () => (await unwrap(list1(authHeaders()))) as ApiTokenView[],
+    queryFn: async () => (await unwrap(list(authHeaders()))) as ApiTokenView[],
     enabled,
   });
 }

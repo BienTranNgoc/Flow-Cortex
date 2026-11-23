@@ -79,16 +79,20 @@ export const ADMIN_ME = {
   email: 'admin@flowcortex.dev',
   name: 'Admin',
   role: 'ADMIN',
+  roleName: 'Admin',
   permissions: ALL_PERMISSIONS,
   adminDisabled: false,
+  phoneVerificationRequired: false,
 };
 export const MEMBER_ME = {
   id: 'm1',
   email: 'member1@flowcortex.dev',
   name: 'Member One',
   role: 'MEMBER',
+  roleName: 'Member',
   permissions: [] as MeResponsePermissionsItem[],
   adminDisabled: false,
+  phoneVerificationRequired: false,
 };
 
 /** A staff caller holding only `keys`. */
@@ -98,7 +102,9 @@ export function staffMe(role: string, keys: MeResponsePermissionsItem[]) {
     email: `${role.toLowerCase()}@flowcortex.dev`,
     name: 'Staff',
     role,
+    roleName: role,
     permissions: keys,
     adminDisabled: false,
+    phoneVerificationRequired: false,
   };
 }

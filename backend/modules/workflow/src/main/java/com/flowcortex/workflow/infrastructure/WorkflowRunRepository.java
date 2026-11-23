@@ -118,6 +118,8 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     /** Whether the owner has a run of the workflow in {@code status}. */
     boolean existsByWorkflowIdAndOwnerIdAndStatus(UUID workflowId, UUID ownerId, RunStatus status);
 
+    Optional<WorkflowRun> findFirstByOwnerIdAndStatusOrderByStartedAtAscIdAsc(UUID ownerId, RunStatus status);
+
     Optional<WorkflowRun> findByOwnerIdAndRequestKey(UUID ownerId, String requestKey);
 
     /**

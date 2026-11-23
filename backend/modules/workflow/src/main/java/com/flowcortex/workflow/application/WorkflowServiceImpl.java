@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.ChatWorkflowView;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -115,7 +117,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
      */
     private WorkflowView servedView(Workflow workflow, ServedDefinitions.ServedSteps served, UUID viewerId) {
         WorkflowView view = WorkflowMapper.toWorkflowView(workflow, served.steps(), registry::isRemote,
-                registry::isAvailable, workflow.getPublishedVersionId(), served.version());
+                registry::isAvailable, registry::snapshotsRunInputs, workflow.getPublishedVersionId(),
+                served.version());
         boolean ownerOrBuiltIn = workflow.isSystemOwned() || workflow.getOwnerId().equals(viewerId);
         return ownerOrBuiltIn ? view : WorkflowMapper.withoutStepContent(view);
     }
@@ -147,14 +150,16 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         }
         stepEntities = workflowStepRepository.saveAll(stepEntities);
 
-        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     @Override
     @Transactional
     public WorkflowView createDraft(UUID ownerId, String name) {
         Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name));
-        return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     // Self-invocation skips the proxy, so each member entry point opens the transaction the row lock needs.
@@ -189,6 +194,9 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         if (update.name() != null && !update.name().equals(workflow.getName())) {
             workflow.rename(update.name());
         }
+        if (update.allowFork() != null && update.allowFork() != workflow.isAllowFork()) {
+            workflow.setAllowFork(update.allowFork());
+        }
         if (update.status() != null) {
             WorkflowStatus status = WorkflowStatus.valueOf(update.status().toUpperCase(Locale.ROOT));
             if (status != workflow.getStatus()) {
@@ -198,7 +206,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         workflowRepository.save(workflow);
         versionWriter.ensurePublishedPointer(workflow, caller.userId());
         return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote, registry::isAvailable,
-                workflow.getPublishedVersionId(), null);
+                registry::snapshotsRunInputs, workflow.getPublishedVersionId(), null);
     }
 
     @Override
@@ -213,6 +221,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     @Transactional
     public WorkflowStepView addStep(Caller caller, UUID workflowId, NewStep step) {
         Workflow workflow = writeAccess.lockForWrite(caller, workflowId);
+        requireMayAuthor(caller, workflow, step.type());
         int last = workflowStepRepository.findMaxStepOrder(workflow.getId());
         if (last >= Short.MAX_VALUE) {
             throw new UnprocessableEntityException(new LocalizedMessage("workflow.definitionStep.tooMany"), null,
@@ -241,6 +250,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                 .filter(found -> found.getWorkflowId().equals(workflow.getId()))
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.definitionStep.notFound",
                         stepId)));
+        requireMayAuthor(caller, workflow, step.getType());
         requireObjectConfig(edit.config());
         String name = edit.name() == null ? step.getName() : emptyToNull(edit.name());
         String inputRef = edit.inputRef() == null ? step.getInputRef() : emptyToNull(edit.inputRef());
@@ -312,7 +322,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         StepRenumbering.Outcome outcome = StepRenumbering.forOrder(rowsOf(steps), stepIds);
         switch (outcome) {
             case StepRenumbering.Unchanged unchanged -> {
-                return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable);
+                return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable,
+                        registry::snapshotsRunInputs);
             }
             case StepRenumbering.Stale stale ->
                 throw new ConflictException(new LocalizedMessage("workflow.definitionStep.orderStale"));
@@ -341,7 +352,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                     }
                 }
                 List<WorkflowStep> reloaded = applyReferenceRewrites(workflow, plan.rows());
-                return WorkflowMapper.toWorkflowView(workflow, reloaded, registry::isRemote, registry::isAvailable);
+                return WorkflowMapper.toWorkflowView(workflow, reloaded, registry::isRemote, registry::isAvailable,
+                        registry::snapshotsRunInputs);
             }
         }
     }
@@ -409,6 +421,17 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
             String readers = broken.stream().map(reader -> String.valueOf(reader.order()))
                     .collect(Collectors.joining(", "));
             throw new ConflictException(new LocalizedMessage("workflow.definitionStep.nameReferenced", name, readers));
+        }
+    }
+
+    /**
+     * A connector call step runs with the workflow owner's credential, so only the owner may add or edit one; an
+     * admin passes {@link WorkflowWriteAccess#lockForWrite} on any workflow but is refused here.
+     */
+    private static void requireMayAuthor(Caller caller, Workflow workflow, String stepType) {
+        if (ConnectorStepOwnerGuard.isConnectorCall(stepType)
+                && !ConnectorStepOwnerGuard.mayAuthor(caller.userId(), workflow.getOwnerId())) {
+            throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
         }
     }
 
