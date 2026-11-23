@@ -92,6 +92,15 @@ public class RunStep {
     @Column(name = "input_ref", updatable = false)
     private String inputRef;
 
+    @Column(name = "parent_step_id", updatable = false)
+    private UUID parentStepId;
+
+    @Column(name = "parent_attempt", updatable = false)
+    private Short parentAttempt;
+
+    @Column(name = "item_index", updatable = false)
+    private Short itemIndex;
+
     /** Required by JPA. */
     protected RunStep() {
     }
@@ -136,6 +145,35 @@ public class RunStep {
         return step;
     }
 
+    /**
+     * A pending item of the iterate step {@code parentStepId}, in that step's {@code parentAttempt}:
+     * it takes the parent's order, carries the item as its input and has no config of its own.
+     */
+    public static RunStep child(UUID runId, short stepOrder, String type, UUID parentStepId, short parentAttempt,
+            short itemIndex, String input) {
+        RunStep step = new RunStep(UUID.randomUUID(), runId, stepOrder, type, input);
+        step.parentStepId = parentStepId;
+        step.parentAttempt = parentAttempt;
+        step.itemIndex = itemIndex;
+        return step;
+    }
+
+    /**
+     * An item of a retried iterate step that an earlier attempt already finished: {@code completed} at
+     * attempt 1 in {@code parentAttempt} with {@code earlier}'s input, output, stored objects and timing,
+     * never claimed or charged.
+     */
+    public static RunStep completedCopy(RunStep earlier, short parentAttempt) {
+        RunStep step = child(earlier.runId, earlier.stepOrder, earlier.type, earlier.parentStepId, parentAttempt,
+                earlier.itemIndex, earlier.input);
+        step.status = RunStepStatus.COMPLETED;
+        step.output = earlier.output;
+        step.outputs = earlier.outputs;
+        step.startedAt = earlier.startedAt;
+        step.finishedAt = earlier.finishedAt;
+        return step;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -168,6 +206,21 @@ public class RunStep {
     /** The definition's {@code {step:K}} input reference, fixed when the run started; {@code null} = default. */
     public String getInputRef() {
         return inputRef;
+    }
+
+    /** The iterate step this row is an item of; {@code null} for a top-level step. */
+    public UUID getParentStepId() {
+        return parentStepId;
+    }
+
+    /** The attempt of the parent step this item belongs to; {@code null} for a top-level step. */
+    public Short getParentAttempt() {
+        return parentAttempt;
+    }
+
+    /** The item's 0-based position in the parent's list; {@code null} for a top-level step. */
+    public Short getItemIndex() {
+        return itemIndex;
     }
 
     public String getOutput() {

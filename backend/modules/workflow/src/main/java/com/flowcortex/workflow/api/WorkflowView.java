@@ -28,8 +28,13 @@ public record WorkflowView(
                 servedVersion, false, 0, null, "text");
     }
 
-    /** Sum of the steps' configured costs; {@code null} while credits are switched off. */
+    /**
+     * Sum of the steps' configured costs, an iterate step counted as its {@code maxItems} child steps;
+     * {@code null} while credits are switched off.
+     */
     public Long estimatedCredits(CreditAccounts credits) {
-        return credits.enabled() ? credits.estimate(steps.stream().map(WorkflowStepView::type).toList()) : null;
+        return credits.enabled() ? credits.estimate(steps.stream()
+                .flatMap(step -> IterateStepConfig.effectiveTypes(step.type(), step.config()).stream()).toList())
+                : null;
     }
 }

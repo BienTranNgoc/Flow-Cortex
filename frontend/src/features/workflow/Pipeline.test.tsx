@@ -17,6 +17,7 @@ function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
     attempt: 1,
     deliveryCount: 0,
     outputs: [],
+    children: [],
     ...overrides,
   };
 }
