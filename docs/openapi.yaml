@@ -14556,9 +14556,12 @@ components:
           type: boolean
         chat:
           type: boolean
+        drive:
+          type: boolean
       required:
       - chat
       - credits
+      - drive
       - emailConfirmation
       - onboarding
       - passwordReset
