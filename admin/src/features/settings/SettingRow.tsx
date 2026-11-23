@@ -1,8 +1,10 @@
 import { ApiError, type AdminSetting } from '@flow-cortex/api-client';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatVietnamTime } from '../support/vietnamTime';
+import { LowerValueDialog } from './LowerValueDialog';
 import { SettingHistory } from './SettingHistory';
+import { loweringToConfirm, type Lowering } from './settingConfirmation';
 import { parseSettingInput } from './settingInput';
 import { useResetSetting, useUpdateSetting } from './useSettings';
 
@@ -16,6 +18,13 @@ function refusal(error: unknown): string | undefined {
   return error instanceof ApiError && error.status === 422 ? error.problem?.errors?.value : undefined;
 }
 
+/** A lowering the admin has not confirmed yet: the change it releases and the button that asked. */
+interface HeldChange {
+  readonly lowering: Lowering;
+  readonly run: () => void;
+  readonly opener: HTMLButtonElement | null;
+}
+
 export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
   const { t } = useTranslation();
   const controlId = useId();
@@ -25,6 +34,10 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
   const decided = setting.decidedValue;
   const [draft, setDraft] = useState(String(decided));
   const [bounds, setBounds] = useState<string | null>(null);
+  const [held, setHeld] = useState<HeldChange | null>(null);
+  const saveButton = useRef<HTMLButtonElement>(null);
+  const resetButton = useRef<HTMLButtonElement>(null);
+  const focusAfterDialog = useRef<HTMLButtonElement | null>(null);
   const busy = update.isPending || reset.isPending;
   const isSwitch = setting.type === 'SWITCH';
 
@@ -32,6 +45,13 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
     setDraft(String(decided));
     setBounds(null);
   }, [decided]);
+
+  useEffect(() => {
+    if (held === null) {
+      focusAfterDialog.current?.focus();
+      focusAfterDialog.current = null;
+    }
+  }, [held]);
 
   const label = t(`settings.keys.${setting.key}.label`, { defaultValue: setting.key });
   const help = t(`settings.keys.${setting.key}.help`, { defaultValue: '' });
@@ -51,8 +71,31 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
       return;
     }
     setBounds(null);
-    reset.reset();
-    update.mutate(parsed.value);
+    const value = parsed.value;
+    const send = () => {
+      reset.reset();
+      update.mutate(value);
+    };
+    const lowering = loweringToConfirm(setting.key, setting.value, value);
+    if (lowering) setHeld({ lowering, run: send, opener: saveButton.current });
+    else send();
+  };
+
+  const resetToConfigured = () => {
+    if (busy) return;
+    const send = () => {
+      update.reset();
+      setBounds(null);
+      reset.mutate();
+    };
+    const lowering = loweringToConfirm(setting.key, setting.value, setting.configuredValue);
+    if (lowering) setHeld({ lowering, run: send, opener: resetButton.current });
+    else send();
+  };
+
+  const closeDialog = (change: HeldChange) => {
+    focusAfterDialog.current = change.opener;
+    setHeld(null);
   };
 
   const toggle = (value: boolean) => {
@@ -108,6 +151,7 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
             />
             {canUpdate && (
               <button
+                ref={saveButton}
                 type="submit"
                 className="cortex-admin-btn cortex-admin-btn--primary cortex-admin-btn--sm"
                 aria-disabled={busy || draft.trim() === String(decided)}
@@ -147,20 +191,27 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
       )}
       {canUpdate && setting.storedValue != null && (
         <button
+          ref={resetButton}
           type="button"
           className="cortex-admin-btn cortex-admin-btn--ghost cortex-admin-btn--sm"
           aria-disabled={busy}
-          onClick={() => {
-            if (busy) return;
-            update.reset();
-            setBounds(null);
-            reset.mutate();
-          }}
+          onClick={resetToConfigured}
         >
           {t('settings.reset')}
         </button>
       )}
       <SettingHistory setting={setting} />
+      {held && (
+        <LowerValueDialog
+          lowering={held.lowering}
+          pending={busy}
+          onConfirm={() => {
+            held.run();
+            closeDialog(held);
+          }}
+          onCancel={() => closeDialog(held)}
+        />
+      )}
     </li>
   );
 }
