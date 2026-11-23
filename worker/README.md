@@ -215,12 +215,19 @@ count. The scene ceiling is structural (288), not derived from these figures.
 
 | Clip | Scenes | Job P50 / P95 (s) | Per scene P50 / P95 (s) | Model load (s) | CPU | Threads |
 |---|---|---|---|---|---|---|
-| 1 scene × 24 frames | 1 | not yet measured | not yet measured | not yet measured | not yet measured | not yet measured |
-| 10 scenes × 24 frames | 10 | not yet measured | not yet measured | not yet measured | not yet measured | not yet measured |
-| 288 scenes × 5 frames | 288 | not yet measured | not yet measured | not yet measured | not yet measured | not yet measured |
+| 1 scene × 24 frames | 1 | 4.52 / 5.40 | 1.936 / 2.694 | 2.61 | AMD EPYC 7763 64-Core Processor | 4 |
+| 10 scenes × 24 frames | 10 | 15.66 / 15.82 | 1.300 / 1.310 | 2.66 | AMD EPYC 7763 64-Core Processor | 4 |
+| 288 scenes × 5 frames | 288 | 347.69 / 348.75 | 1.198 / 1.202 | 2.60 | AMD EPYC 7763 64-Core Processor | 4 |
 
-The figures come from the job log of the first `trend-engines` run on the pull request (step
-"Measure the role suggestion cost"). The enum owner sets
-`flowcortex.media.max-runtime.role_suggest` from the 288-scene P95 with headroom for runner speed;
-if the P95 exceeds what a job may take, ADR-0011 promotes the capability to an API provider or
-`worker-gpu-self-host`.
+Peak resident memory of the detector children over every run: 822 MiB. The figures come from the
+job log of the first `trend-engines` run on the pull request (job `worker / trend-engines`, step
+"Measure the role suggestion cost"): https://github.com/BienTranNgoc/Flow-Cortex/actions/runs/45215044603/job/137833947550
+(GitHub-hosted `ubuntu-latest` runner limited to 4 CPUs, 3 runs per clip, P95 is the slowest of the
+three).
+
+**348.75 s is the worst-case P95**: 288 scenes on a GitHub 4-vCPU runner. The enum owner sets
+`flowcortex.media.max-runtime.role_suggest` from it with headroom for runner speed (clean overlay
+P95 varied 2x between runners): **12 minutes (720 s)** leaves about 2.06x. A max-runtime below about
+350 s makes the watchdog kill every worst-case job; the kill reaches the job as `ProcessKilled`, so it
+fails every time. If a job may not take that long, ADR-0011 promotes the capability to an API
+provider or `worker-gpu-self-host`.
