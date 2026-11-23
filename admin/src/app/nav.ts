@@ -141,6 +141,12 @@ export const NAV: NavGroup[] = [
         key: 'platform.setting.view',
       },
       {
+        label: 'common.shell.nav.items.onboardingSample',
+        path: '/onboarding-sample',
+        icon: Sparkle,
+        key: 'platform.setting.view',
+      },
+      {
         label: 'common.shell.nav.items.features',
         path: '/features',
         icon: GearSix,

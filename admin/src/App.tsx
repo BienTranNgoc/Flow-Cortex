@@ -17,6 +17,7 @@ import { DocumentsPage } from './features/content/DocumentsPage';
 import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { OnboardingSamplePage } from './features/onboarding/OnboardingSamplePage';
 import { RoleDetailPage } from './features/roles/RoleDetailPage';
 import { RolesPage } from './features/roles/RolesPage';
 import { PhoneVerificationStatusPage } from './features/phoneVerification/PhoneVerificationStatusPage';
@@ -47,6 +48,7 @@ const PAGES: Record<string, ReactElement> = {
   '/phone-verification': <PhoneVerificationStatusPage />,
   '/settings': <SettingsPage />,
   '/media-jobs': <MediaJobsPage />,
+  '/onboarding-sample': <OnboardingSamplePage />,
   '/admin-accounts': <AdminAccountsPage />,
   '/roles': <RolesPage />,
   '/payment-settings': <PaymentSettingsPage />,

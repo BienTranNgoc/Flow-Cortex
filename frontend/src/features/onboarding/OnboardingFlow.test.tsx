@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { stubApi, type Handler, type RecordedCall } from '../../test/fakeApi';
 import { OnboardingFlow } from './OnboardingFlow';
 import { requestReplay, resetOnboardingSession } from './onboardingSession';
+import { resetFirstResultClaim } from './useFirstResultClaim';
 
 const FEATURES = {
   emailConfirmation: false,
@@ -113,6 +114,7 @@ describe('OnboardingFlow', () => {
     cleanup();
     setToken(null);
     act(() => resetOnboardingSession());
+    resetFirstResultClaim();
     vi.unstubAllGlobals();
   });
 
@@ -295,6 +297,41 @@ describe('OnboardingFlow', () => {
     );
   });
 
+  it('claims a pending first result once and refreshes the status on 200', async () => {
+    let reads = 0;
+    const calls = renderFlow({
+      'GET /api/v1/onboarding/status': () => ({
+        status: 200,
+        body: status({
+          entry: null,
+          open: false,
+          firstResult: ++reads === 1 ? 'pending' : 'reported',
+        }),
+      }),
+      'POST /api/v1/me/first-result/claim': { status: 200, body: { runId: 'r', workflowId: 'w' } },
+    });
+    await waitFor(() => expect(reads).toBe(2));
+    expect(calls.filter((call) => call.path === '/api/v1/me/first-result/claim')).toHaveLength(1);
+  });
+
+  it('drops a failed claim without a message or a retry', async () => {
+    const calls = renderFlow({
+      'GET /api/v1/onboarding/status': {
+        status: 200,
+        body: status({ entry: null, open: false, firstResult: 'pending' }),
+      },
+      'POST /api/v1/me/first-result/claim': { status: 500, body: { status: 500 } },
+    });
+    await waitFor(() =>
+      expect(calls.filter((call) => call.path === '/api/v1/me/first-result/claim')).toHaveLength(1),
+    );
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(calls.filter((call) => call.path === '/api/v1/me/first-result/claim')).toHaveLength(1);
+  });
+
   it('sends nothing while the feature is off', async () => {
     const calls = renderFlow({
       'GET /api/v1/features': { status: 200, body: { ...FEATURES, onboarding: false } },
@@ -329,5 +366,58 @@ describe('OnboardingFlow', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByRole('dialog', { name: "You're all set" })).toBeVisible();
     expect(progressWrites(calls)).toEqual([]);
+  });
+
+  it('keeps the next Done screen usable after the journey was closed while the sample write was pending', async () => {
+    const user = userEvent.setup();
+    let finished = false;
+    let release: () => void = () => {};
+    const pendingWrite = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const calls = renderFlow({
+      'GET /api/v1/onboarding/status': () => ({
+        status: 200,
+        body: status({
+          ...ANSWERED,
+          entry: finished ? null : 'first',
+          open: !finished,
+          progress: { v: 2, step: 'done' },
+          sampleWorkflow: { id: 'wf-1', name: 'Release notes', input: 'Summarise the changelog' },
+        }),
+      }),
+      'POST /api/v1/onboarding/progress': async () => {
+        await pendingWrite;
+        finished = true;
+        return { status: 200, body: { progress: {} } };
+      },
+    });
+    await screen.findByRole('dialog', { name: "You're all set" });
+    await user.click(screen.getByRole('button', { name: 'Try this sample: Release notes' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    release();
+    const statusReads = () => calls.filter((call) => call.path.endsWith('/status')).length;
+    await waitFor(() => expect(statusReads()).toBeGreaterThan(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    act(() => requestReplay());
+    await screen.findByRole('dialog', { name: 'Welcome to FlowCortex' });
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await screen.findByRole('dialog', { name: 'Find your way around' });
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('dialog', { name: "You're all set" });
+
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.getByRole('button', { name: 'Start using FlowCortex' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+    const sample = screen.getByRole('button', { name: 'Try this sample: Release notes' });
+    expect(sample).toHaveAttribute('aria-disabled', 'false');
+    expect(sample).toHaveTextContent('Try this sample');
   });
 });
