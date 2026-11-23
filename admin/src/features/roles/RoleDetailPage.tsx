@@ -98,11 +98,11 @@ export function RoleDetailPage() {
     );
   }
 
-  if (catalogQuery.isError || roleQuery.isError) {
+  const catalogFailed = catalogQuery.isError && catalogQuery.data === undefined;
+  const roleFailed = roleQuery.isError && roleQuery.data === undefined;
+  if (catalogFailed || roleFailed) {
     const missing =
-      !catalogQuery.isError &&
-      roleQuery.error instanceof ApiError &&
-      roleQuery.error.status === 404;
+      !catalogFailed && roleQuery.error instanceof ApiError && roleQuery.error.status === 404;
     return (
       <div className="roles-page">
         <h1>{missing ? t('roles.detail.notFound') : t('roles.title')}</h1>
@@ -116,7 +116,7 @@ export function RoleDetailPage() {
             <button
               type="button"
               className="cortex-admin-btn"
-              onClick={() => (catalogQuery.isError ? catalogQuery.refetch() : roleQuery.refetch())}
+              onClick={() => (catalogFailed ? catalogQuery.refetch() : roleQuery.refetch())}
             >
               {t('roles.detail.retry')}
             </button>
@@ -127,7 +127,8 @@ export function RoleDetailPage() {
     );
   }
 
-  if (catalogQuery.isPending || (!isNew && roleQuery.isPending)) {
+  const catalog = catalogQuery.data;
+  if (catalog === undefined || (!isNew && roleQuery.data === undefined)) {
     return (
       <div className="roles-page">
         <h1>{t('roles.title')}</h1>
@@ -140,8 +141,13 @@ export function RoleDetailPage() {
     <RoleEditor
       key={`${code ?? 'new'}:${reloadToken}`}
       role={roleQuery.data}
-      catalog={catalogQuery.data}
+      catalog={catalog}
       back={back}
+      refreshFailed={catalogQuery.isError || roleQuery.isError}
+      onRetryRefresh={() => {
+        if (catalogQuery.isError) void catalogQuery.refetch();
+        if (roleQuery.isError) void roleQuery.refetch();
+      }}
       onReload={async () => {
         const result = await roleQuery.refetch();
         if (result.data) setReloadToken((token) => token + 1);
@@ -154,10 +160,20 @@ interface RoleEditorProps {
   readonly role: RoleResponse | undefined;
   readonly catalog: readonly PermissionCatalogEntry[];
   readonly back: ReactNode;
+  /** A background refetch failed while the editor holds data: the draft stays and this offers a retry. */
+  readonly refreshFailed: boolean;
+  readonly onRetryRefresh: () => void;
   readonly onReload: () => Promise<void>;
 }
 
-function RoleEditor({ role, catalog, back, onReload }: Readonly<RoleEditorProps>) {
+function RoleEditor({
+  role,
+  catalog,
+  back,
+  refreshFailed,
+  onRetryRefresh,
+  onReload,
+}: Readonly<RoleEditorProps>) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -384,6 +400,14 @@ function RoleEditor({ role, catalog, back, onReload }: Readonly<RoleEditorProps>
         <p role="status" className="cortex-admin-form-success">
           {noticeText}
         </p>
+      )}
+      {refreshFailed && (
+        <div className="cortex-admin-error roles-detail__banner" role="alert">
+          <p>{t('roles.detail.refreshFailed')}</p>
+          <button type="button" className="cortex-admin-btn" onClick={onRetryRefresh}>
+            {t('roles.detail.retry')}
+          </button>
+        </div>
       )}
       {problem?.kind === 'stale' && (
         <div className="cortex-admin-error roles-detail__banner" role="alert">

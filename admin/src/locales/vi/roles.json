@@ -111,6 +111,7 @@
       "saved_other": "Đã lưu. {{name}} hiện có {{count}} quyền.",
       "renamed": "Đã lưu. Vai trò giờ có tên {{name}}."
     },
+    "refreshFailed": "Không làm mới được vai trò này. Bản nháp của bạn vẫn được giữ.",
     "stale": "Một quản trị viên khác vừa đổi vai trò này khi bạn đang sửa. Bản nháp của bạn vẫn được giữ bên dưới; Tải lại sẽ thay nó bằng các quyền đã lưu.",
     "partialSave": "Các quyền đã được lưu nhưng tên thì chưa. Hãy sửa tên rồi lưu lại.",
     "delete": {

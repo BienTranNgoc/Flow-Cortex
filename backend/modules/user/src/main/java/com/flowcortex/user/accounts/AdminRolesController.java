@@ -6,6 +6,9 @@ import com.flowcortex.shared.web.audit.AdminAudit;
 import com.flowcortex.user.roles.RolePermissionService;
 import com.flowcortex.user.roles.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -15,7 +18,9 @@ import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,6 +32,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -61,6 +67,10 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "getAdminRole")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "404", description = "no role has this code",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @RequirePermission(Permission.SYSTEM_ROLE_VIEW)
     @GetMapping(value = "/roles/{code}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<RoleResponse> get(@PathVariable @Size(max = CODE_MAX) String code) {
@@ -75,6 +85,17 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "createAdminRole")
+    @ApiResponse(responseCode = "201")
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "role.nameTaken",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422",
+            description = "PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY, PERMISSION_SET_INCONSISTENT",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @AdminAudit(value = "role.create", resourceParam = "code", capture = {"name", "permissionKeys"})
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PostMapping(value = "/roles", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -86,6 +107,16 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "updateAdminRole")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "validation-failed (errors)",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", description = "no role has this code",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "role.nameTaken, role.systemImmutable",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @AdminAudit(value = "role.update", resourceParam = "code", capture = "name")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PatchMapping(value = "/roles/{code}", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -97,15 +128,34 @@ class AdminRolesController {
     }
 
     @Operation(operationId = "deleteAdminRole")
+    @ApiResponse(responseCode = "204")
+    @ApiResponse(responseCode = "404", description = "no role has this code",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "role.systemImmutable, role.hasAccounts",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @AdminAudit(value = "role.delete", resourceParam = "code")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @DeleteMapping("/roles/{code}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable @Size(max = CODE_MAX) String code) {
         roles.delete(callerId(jwt), code);
         return ResponseEntity.noContent().build();
     }
 
     @Operation(operationId = "replaceAdminRolePermissions")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "404", description = "no role has this code",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "role.staleVersion",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "422",
+            description = "ROLE_NOT_EDITABLE, PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY, PERMISSION_SET_INCONSISTENT",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @AdminAudit(value = "role.replace_permissions", resourceParam = "code", capture = "keys")
     @RequirePermission(Permission.SYSTEM_ROLE_MANAGE)
     @PutMapping(value = "/roles/{code}/permissions", consumes = MediaType.APPLICATION_JSON_VALUE,

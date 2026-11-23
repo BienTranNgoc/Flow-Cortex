@@ -963,6 +963,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RoleResponse"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "Someone else changed the keys of role {0}. Reload it and try\
+            \ again."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "ROLE_NOT_EDITABLE, PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY,\
+            \ PERMISSION_SET_INCONSISTENT"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/rbac/runtime:
     get:
       tags:
@@ -4465,12 +4485,30 @@ paths:
               $ref: "#/components/schemas/CreateRoleRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "A role named ''{0}'' already exists"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY, PERMISSION_SET_INCONSISTENT"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/content/media:
     get:
       tags:
@@ -5636,6 +5674,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RoleResponse"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
     delete:
       tags:
       - admin-roles-controller
@@ -5649,8 +5693,20 @@ paths:
           maxLength: 20
           minLength: 0
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "role.systemImmutable, role.hasAccounts"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
     patch:
       tags:
       - admin-roles-controller
@@ -5676,6 +5732,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "role.nameTaken, role.systemImmutable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts/{id}/role:
     patch:
       tags:
@@ -8595,6 +8669,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         hasPassword:
@@ -8649,6 +8725,7 @@ components:
       - adminDisabled
       - permissions
       - phoneVerificationRequired
+      - roleName
     UsernameRequest:
       type: object
       properties:
