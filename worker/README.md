@@ -6,8 +6,11 @@ One Python codebase serves two isolated runtimes:
   `media.render.jobs` (`render_video`, compose service `render-worker`) or `media.audio.jobs`
   (`separate_audio`, compose service `audio-worker`) — reads assets, runs FFmpeg/FFprobe
   capabilities and publishes through exchange `media`. It runs the capabilities
-  `WORKER_CAPABILITIES` lists, comma-separated (empty = all). An unknown queue or capability
-  name, or a listed handler that fails to import, exits non-zero before it connects;
+  `WORKER_CAPABILITIES` lists, comma-separated (empty = every capability except the opt-in
+  `preview_video` and `clean_overlay`, which need a dedicated image and run only when named). An
+  unknown queue or capability name, or a listed handler that fails to import, exits non-zero
+  before it connects; a job for a capability the worker does not run is a permanent
+  `contract_violation`;
 - the provider worker consumes the queue `PROVIDER_QUEUE` names — `provider.jobs` (script,
   storyboard, speech; the default) or `provider.video.jobs` (video clips, compose service
   `provider-video-worker`) — runs provider capabilities and publishes through
@@ -57,7 +60,8 @@ the recognised text can be returned as layers.
 - It runs only on the `overlay-runtime` image (`docker build --target overlay-runtime worker/`);
   there is no compose service until the owner of the capability enum adds the lane. The default
   `media-runtime` and `provider-runtime` images are unchanged and never import numpy, OpenCV or
-  torch. The handler is registered under `clean_overlay` through `HANDLER_MODULES`.
+  torch. The handler is registered under `clean_overlay` through `HANDLER_MODULES` and is opt-in:
+  the image sets `WORKER_CAPABILITIES=clean_overlay`, and a worker without that name never loads it.
 - Models live in `/opt/flowcortex/models` (`FLOWCORTEX_OVERLAY_MODELS`), sha256-checked at build
   time and again in the final stage; nothing is downloaded at run time. Licences and source URLs:
   `models/MODEL-LICENSES.md`.
@@ -86,22 +90,26 @@ the recognised text can be returned as layers.
 
 Renders a white-block preview of one storyboard shot: dummies, stage, props, camera and
 dialogue timing from a reduced storyboard document, through headless Blender 4.5 (Workbench,
-software GL). The handler is registered but no job can reach it yet: `MediaJob.capability` has no
-`preview_video` value until the enum owner adds `video.preview` with its queue, routing and
-max-runtime (set from the cost figures below).
+software GL). `preview_video` is the worker capability, the name in `WORKER_CAPABILITIES` and
+`HANDLER_MODULES`. The handler is registered but no job can reach it yet: `MediaJob.capability`
+has no matching value until the enum owner adds the backend value `video.preview` with its queue,
+routing and max-runtime (set from the cost figures below). It is opt-in: only a worker whose
+`WORKER_CAPABILITIES` names `preview_video` (the `preview-runtime` image) serves it.
 
 - **Input** — `doc` only: a storyboard document (`story.shots`, `story.sets`, `characters`);
   `tests/fixtures/preview/` holds five.
 - **Params** — `shotId` (string), `aspect` (`9:16`, `16:9` or `1:1`), `send` (boolean, default
   false: also render the send version, which carries no labels, subtitles, extras or walls). Any
-  other param, input or a wrong-typed leaf of the document is refused before Blender starts.
+  other param, input, a wrong-typed leaf of the document, a document nested deeper than the JSON
+  parser allows, or a shot longer than 720 frames (30 s at 24 fps) is refused before Blender starts.
 - **Outputs** — `preview.mp4` (24 fps H.264 at 496×864, 854×480 or 640×640), `staging-card.json`,
   and `preview-send.mp4` when `send` is true. Data: `shotId`, `frames`, `width`, `height`,
   `durationSec`, `subjectInFrame` (false still succeeds), `blender`, `renderer`, `renderSec`
   (Blender's own build + render seconds, summed over both runs) and `warnings` (motions
   shortened or dropped, each with a closed `reason`).
-- **Failures** — a refused document or param, a missing Blender, a non-zero Blender exit, or an
-  exit without a readable video and report is `PermanentError` `contract_violation`; Blender
+- **Failures** — a refused document or param, a non-zero Blender exit, or an exit without a
+  readable video and report is `PermanentError` `contract_violation`; a missing Blender is
+  `provider_capability_unavailable` (the job is valid, the host lacks the tool); Blender
   ended by a signal (OOM kill) is a `TransientError` and is retried. The last 25 lines of Blender's
   output are logged with the exit code.
 - **Environment** — `BLENDER_BIN` (default `/opt/blender/blender`), `PREVIEW_SCENE_SCRIPT`,
@@ -139,6 +147,9 @@ renderer. Seconds are the handler call's wall time, as the job watchdog counts i
 Slowest single runs: 56.76 s (preview) and 115.96 s (job with `send: true`). CPU: AMD EPYC 9V45 96-Core Processor (a GitHub-hosted
 `ubuntu-latest` runner limited to 4 CPUs), renderer `llvmpipe (LLVM 19.1.7, 256 bits)`, Blender
 4.5.14 LTS. Run: https://github.com/BienTranNgoc/Flow-Cortex/actions/runs/43612114231 (job
-`worker / preview`, step "Measure the render cost"). The 22 shots are a sample: shot length is
-unbounded, so the enum owner sets the capability's max-runtime from the per-frame P95 and a cap
-on the frame count, not from the per-shot figure alone.
+`worker / preview`, step "Measure the render cost"). The 22 shots are a sample, so the handler caps
+a shot at **720 frames (30 s at 24 fps)**, `MAX_FRAME_COUNT` in `preview/vocabulary.py`. At the
+send-job per-frame P95 (0.439 s) a capped job takes about 316 s, and about 158 s without `send`
+(0.219 s per frame). The enum owner sets the capability's max-runtime above the send figure with
+headroom for runner speed (clean overlay P95 varied 2x between runners): 10 minutes leaves about
+1.9x. Raise the cap only together with that max-runtime.
