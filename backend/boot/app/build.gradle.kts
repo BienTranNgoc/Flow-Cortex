@@ -84,8 +84,9 @@ dependencies {
 tasks.withType<Test> {
     // Every distinct @SpringBootTest property set is its own cached context, each a full application.
     // Evicting the least recently used keeps at most 8 alive. Each context grows with every module, and
-    // 2 GB ran out in CI once eight full contexts were alive, so the heap is 3 GB (one test JVM, 16 GB runners).
-    maxHeapSize = "3g"
+    // 2 GB, then 3 GB, ran out in CI once eight full contexts were alive, so the heap is 4 GB (one test JVM,
+    // 16 GB runners).
+    maxHeapSize = "4g"
     systemProperty("spring.test.context.cache.maxSize", "8")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")
