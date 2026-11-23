@@ -111,6 +111,13 @@ export interface UserResponse {
   status?: string;
   createdAt?: string;
   updatedAt?: string;
+  username?: string;
+  state?: string;
+  emailConfirmedAt?: string;
+  lockedUntil?: string;
+  signInMethods?: string[];
+  adminDisabled?: boolean;
+  staffTarget?: boolean;
 }
 
 export interface UploadedImageRequest {
@@ -224,6 +231,7 @@ export const MeResponsePermissionsItem = {
   workflowworkflowexport: 'workflow.workflow.export',
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
+  useraccountexport: 'user.account.export',
 } as const;
 
 export interface MeResponse {
@@ -575,6 +583,7 @@ export const RoleResponsePermissionsItem = {
   workflowworkflowexport: 'workflow.workflow.export',
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
+  useraccountexport: 'user.account.export',
 } as const;
 
 export interface RoleResponse {
@@ -859,6 +868,16 @@ export const WorkflowResponseStatus = {
   published: 'published',
 } as const;
 
+export type WorkflowResponseStartInput =
+  (typeof WorkflowResponseStartInput)[keyof typeof WorkflowResponseStartInput];
+
+export const WorkflowResponseStartInput = {
+  link: 'link',
+  image: 'image',
+  upload: 'upload',
+  text: 'text',
+} as const;
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -897,6 +916,7 @@ export interface WorkflowResponse {
   forkCount: number;
   /** @nullable */
   forkedFromId?: string | null;
+  startInput: WorkflowResponseStartInput;
 }
 
 export interface SaveVersionRequest {
@@ -2761,6 +2781,22 @@ export interface WorkflowExampleResponse {
   estimatedCredits?: number;
 }
 
+export interface PageViewUserResponse {
+  items: UserResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface UserStats {
+  total?: number;
+  active?: number;
+  pendingConfirmation?: number;
+  locked?: number;
+  suspended?: number;
+  newLast7Days?: number;
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -3666,6 +3702,7 @@ export const PermissionCatalogEntryKey = {
   workflowworkflowexport: 'workflow.workflow.export',
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
+  useraccountexport: 'user.account.export',
 } as const;
 
 export interface PermissionCatalogEntry {
@@ -3867,6 +3904,54 @@ export type StartRunParams = {
   key?: string;
 };
 
+export type ListUsersParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  q?: string;
+  /**
+   * @pattern ^[A-Z][A-Z0-9_]{0,19}$
+   */
+  role?: string;
+  /**
+   * @pattern active|pending_confirmation|locked|suspended
+   */
+  state?: ListUsersState;
+  /**
+   * @pattern newest|oldest|email|name
+   */
+  sort?: ListUsersSort;
+};
+
+export type ListUsersState = (typeof ListUsersState)[keyof typeof ListUsersState];
+
+export const ListUsersState = {
+  active: 'active',
+  pending_confirmation: 'pending_confirmation',
+  locked: 'locked',
+  suspended: 'suspended',
+} as const;
+
+export type ListUsersSort = (typeof ListUsersSort)[keyof typeof ListUsersSort];
+
+export const ListUsersSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  email: 'email',
+  name: 'name',
+} as const;
+
 export type UnsubscribeEmailLinkParams = {
   src?: string;
 };
@@ -4020,6 +4105,44 @@ export type ListBookmarkedWorkflowsParams = {
    */
   size?: number;
 };
+
+export type ExportUsersParams = {
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  q?: string;
+  /**
+   * @pattern ^[A-Z][A-Z0-9_]{0,19}$
+   */
+  role?: string;
+  /**
+   * @pattern active|pending_confirmation|locked|suspended
+   */
+  state?: ExportUsersState;
+  /**
+   * @pattern newest|oldest|email|name
+   */
+  sort?: ExportUsersSort;
+};
+
+export type ExportUsersState = (typeof ExportUsersState)[keyof typeof ExportUsersState];
+
+export const ExportUsersState = {
+  active: 'active',
+  pending_confirmation: 'pending_confirmation',
+  locked: 'locked',
+  suspended: 'suspended',
+} as const;
+
+export type ExportUsersSort = (typeof ExportUsersSort)[keyof typeof ExportUsersSort];
+
+export const ExportUsersSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  email: 'email',
+  name: 'name',
+} as const;
 
 export type SearchSupportKbParams = {
   /**
@@ -7598,22 +7721,35 @@ export const useWorkflowExample = async (
   });
 };
 
-export type listResponse200 = {
-  data: UserResponse[];
+export type listUsersResponse200 = {
+  data: PageViewUserResponse;
   status: 200;
 };
 
-export type listResponseSuccess = listResponse200 & {
+export type listUsersResponseSuccess = listUsersResponse200 & {
   headers: Headers;
 };
-export type listResponse = listResponseSuccess;
+export type listUsersResponse = listUsersResponseSuccess;
 
-export const getListUrl = () => {
-  return `/api/v1/users`;
+export const getListUsersUrl = (params?: ListUsersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/users?${stringifiedParams}` : `/api/v1/users`;
 };
 
-export const list = async (options?: Parameters<typeof customFetch>[1]): Promise<listResponse> => {
-  return customFetch<listResponse>(getListUrl(), {
+export const listUsers = async (
+  params?: ListUsersParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listUsersResponse> => {
+  return customFetch<listUsersResponse>(getListUsersUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -9569,38 +9705,36 @@ export const claimFirstResult = async (
   });
 };
 
-export type list1Response200 = {
+export type listResponse200 = {
   data: ApiTokenView[];
   status: 200;
 };
 
-export type list1Response403 = {
+export type listResponse403 = {
   data: ProblemDetail;
   status: 403;
 };
 
-export type list1Response503 = {
+export type listResponse503 = {
   data: ProblemDetail;
   status: 503;
 };
 
-export type list1ResponseSuccess = list1Response200 & {
+export type listResponseSuccess = listResponse200 & {
   headers: Headers;
 };
-export type list1ResponseError = (list1Response403 | list1Response503) & {
+export type listResponseError = (listResponse403 | listResponse503) & {
   headers: Headers;
 };
 
-export type list1Response = list1ResponseSuccess | list1ResponseError;
+export type listResponse = listResponseSuccess | listResponseError;
 
-export const getList1Url = () => {
+export const getListUrl = () => {
   return `/api/v1/me/api-tokens`;
 };
 
-export const list1 = async (
-  options?: Parameters<typeof customFetch>[1],
-): Promise<list1Response> => {
-  return customFetch<list1Response>(getList1Url(), {
+export const list = async (options?: Parameters<typeof customFetch>[1]): Promise<listResponse> => {
+  return customFetch<listResponse>(getListUrl(), {
     ...options,
     method: 'GET',
   });
@@ -10080,24 +10214,24 @@ export const connect = async (
   });
 };
 
-export type list2Response200 = {
+export type list1Response200 = {
   data: Summary[];
   status: 200;
 };
 
-export type list2ResponseSuccess = list2Response200 & {
+export type list1ResponseSuccess = list1Response200 & {
   headers: Headers;
 };
-export type list2Response = list2ResponseSuccess;
+export type list1Response = list1ResponseSuccess;
 
-export const getList2Url = () => {
+export const getList1Url = () => {
   return `/api/v1/connectors/http`;
 };
 
-export const list2 = async (
+export const list1 = async (
   options?: Parameters<typeof customFetch>[1],
-): Promise<list2Response> => {
-  return customFetch<list2Response>(getList2Url(), {
+): Promise<list1Response> => {
+  return customFetch<list1Response>(getList1Url(), {
     ...options,
     method: 'GET',
   });
@@ -14470,6 +14604,72 @@ export const listWorkflowExamples = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listWorkflowExamplesResponse> => {
   return customFetch<listWorkflowExamplesResponse>(getListWorkflowExamplesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getUserStatsResponse200 = {
+  data: UserStats;
+  status: 200;
+};
+
+export type getUserStatsResponseSuccess = getUserStatsResponse200 & {
+  headers: Headers;
+};
+export type getUserStatsResponse = getUserStatsResponseSuccess;
+
+export const getGetUserStatsUrl = () => {
+  return `/api/v1/users/stats`;
+};
+
+export const getUserStats = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getUserStatsResponse> => {
+  return customFetch<getUserStatsResponse>(getGetUserStatsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportUsersResponse200TextCsv = {
+  data: string;
+  status: 200;
+};
+
+export type exportUsersResponse200ApplicationProblemJson = {
+  data: string;
+  status: 200;
+};
+
+export type exportUsersResponseSuccess = (
+  exportUsersResponse200TextCsv | exportUsersResponse200ApplicationProblemJson
+) & {
+  headers: Headers;
+};
+export type exportUsersResponse = exportUsersResponseSuccess;
+
+export const getExportUsersUrl = (params?: ExportUsersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/users/export?${stringifiedParams}`
+    : `/api/v1/users/export`;
+};
+
+export const exportUsers = async (
+  params?: ExportUsersParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportUsersResponse> => {
+  return customFetch<exportUsersResponse>(getExportUsersUrl(params), {
     ...options,
     method: 'GET',
   });

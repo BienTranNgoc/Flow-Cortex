@@ -26,6 +26,7 @@ final class StepConfigRules {
         Map<String, Function<String, String>> rules = new LinkedHashMap<>();
         rules.put("workflow.call", WorkflowCallConfig::fault);
         rules.put("connector.call", ConnectorCallConfig::fault);
+        rules.put(FetchVideoConfig.TYPE, FetchVideoConfig::fault);
         return Collections.unmodifiableMap(rules);
     }
 }
