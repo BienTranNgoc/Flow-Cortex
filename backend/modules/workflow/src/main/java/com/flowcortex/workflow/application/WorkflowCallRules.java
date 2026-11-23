@@ -18,9 +18,12 @@ final class WorkflowCallRules {
 
     private static final int MAX_CHILD_MESSAGE = 500;
 
-    /** Facts the executor gathers before deciding; {@code stepTypes} is empty when the child was not found. */
+    /**
+     * Facts the executor gathers before deciding; {@code stepTypes} is empty when the child was not found, and
+     * {@code firstStepNeedsUpload} is whether run start would ask for an upload to begin it.
+     */
     record CallFacts(UUID namedId, UUID parentWorkflowId, List<UUID> ancestorWorkflowIds, int parentDepth,
-            boolean childVisible, UUID productVideoId, List<String> stepTypes, boolean firstStepRemote,
+            boolean childVisible, UUID productVideoId, List<String> stepTypes, boolean firstStepNeedsUpload,
             boolean anyStepRemote, boolean anyTypeUnavailable, boolean workflowsEnabled, boolean mediaEnabled) {
     }
 
@@ -42,7 +45,7 @@ final class WorkflowCallRules {
                     new Refusal("workflow_call_unsupported", "The Product Video workflow cannot be called from a step")),
             new Row(f -> f.stepTypes().isEmpty(),
                     new Refusal("workflow_call_child_empty", "The called workflow has no steps")),
-            new Row(CallFacts::firstStepRemote,
+            new Row(CallFacts::firstStepNeedsUpload,
                     new Refusal("workflow_call_needs_upload",
                             "The called workflow starts with a step that needs an upload")),
             new Row(f -> f.stepTypes().contains(KnownStepTypes.APPROVAL_CHECKPOINT),

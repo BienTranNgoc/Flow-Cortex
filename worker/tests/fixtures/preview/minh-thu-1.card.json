@@ -1,0 +1,130 @@
+{
+ "loai": "xood.the-dan-canh/1",
+ "phan_canh": {
+  "id": "sh1",
+  "so": 1,
+  "ten": "Minh chào Thư khi gặp lại",
+  "kieu_canh": "single",
+  "co": "CU",
+  "may": "static",
+  "goc": "eye",
+  "nguoi_phu": null,
+  "goc_nhin_cua": null
+ },
+ "khung": {
+  "ti_le": "9:16",
+  "rong": 496,
+  "cao": 864,
+  "hinh_moi_giay": 24,
+  "cam_bien_mm": 36.0,
+  "so_khung": 120
+ },
+ "san_khau": {
+  "khong_gian": "room",
+  "kieu": "hop_phong",
+  "rong": 6.0,
+  "sau": 5.0,
+  "cao": 3.0,
+  "tam": [0.0, 0.5],
+  "ban": {
+   "tam": [0.0, 0.55, 0.375],
+   "co": [0.9, 0.6, 0.75]
+  }
+ },
+ "do_co_dinh": [
+  {
+   "nhan": "bàn gỗ tròn",
+   "tam": [-1.9053, 1.1, 0.45],
+   "co": [0.8, 0.6, 0.9]
+  },
+  {
+   "nhan": "cửa sổ rèm mỏng",
+   "tam": [1.9053, 1.1, 0.45],
+   "co": [0.8, 0.6, 0.9]
+  }
+ ],
+ "dao_cu": [
+  {
+   "id": "pr_coc",
+   "nhan": "cốc cà phê",
+   "so_luong": 2,
+   "tam": [0.0, 0.55, 0.825],
+   "co": [0.12, 0.12, 0.15],
+   "cam_luc_dau": null
+  }
+ ],
+ "truc": {
+  "trai": "ch_thu",
+  "phai": "ch_minh"
+ },
+ "nguoi": [
+  {
+   "id": "ch_minh",
+   "nhan": "Minh",
+   "mau": [200, 200, 200],
+   "chan": [0.6, 0.0],
+   "yaw_do": -90.0,
+   "z0": 0.0,
+   "cao": 1.7,
+   "dang": "dung",
+   "trong_khung": true,
+   "vai": "subject",
+   "di": null
+  },
+  {
+   "id": "ch_thu",
+   "nhan": "Thư",
+   "mau": [200, 200, 200],
+   "chan": [-0.6, 0.0],
+   "yaw_do": 90.0,
+   "z0": 0.0,
+   "cao": 1.7,
+   "dang": "dung",
+   "trong_khung": false,
+   "vai": null,
+   "di": null
+  }
+ ],
+ "nguoi_phu": {
+  "muc": null,
+  "mau": [120, 120, 120],
+  "cao": 1.7,
+  "nguoi": []
+ },
+ "may": {
+  "dat": {
+   "ham": "cu_mot_nguoi",
+   "tham": {
+    "nguoi": "ch_minh",
+    "co": "CU",
+    "goc": "ngang_mat",
+    "huong_do": 25.0,
+    "nhin": "trai_khung",
+    "x_man": 0.0,
+    "f": null
+   }
+  },
+  "chuyen": {
+   "ham": "dung_yen",
+   "tham": {}
+  },
+  "cach_nguoi_m": 0.6
+ },
+ "dong_tac": [],
+ "noi": [
+  {
+   "ai": "ch_minh",
+   "tu_giay": 0.0,
+   "den_giay": 5.0
+  }
+ ],
+ "phu_de": [
+  {
+   "chu": "Minh: Thư, chào em.",
+   "tu": 0,
+   "den": 120
+  }
+ ],
+ "nhan_goc": "1 · Minh chào Thư khi gặp lại · Cận (CU)",
+ "canh_bao": []
+}
