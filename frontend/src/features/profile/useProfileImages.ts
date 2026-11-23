@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   addOriginal,
   authHeaders,
-  current,
+  getCurrentProfileImages,
   originals,
-  requestUpload1,
+  requestProfileImageUpload,
   setCurrent,
   unwrap,
   useAuthToken,
@@ -28,7 +28,7 @@ export function useProfileImagesQuery() {
   const token = useAuthToken();
   return useQuery({
     queryKey: ['profile-images', token],
-    queryFn: () => unwrap(current(authHeaders())),
+    queryFn: () => unwrap(getCurrentProfileImages(authHeaders())),
     enabled: Boolean(token),
     staleTime: (query) =>
       staleUntilExpiry([query.state.data?.avatar, query.state.data?.cover]),
@@ -47,7 +47,7 @@ export function useOriginalsQuery(slot: ImageSlot, enabled = true) {
 
 /** Asks for a grant, then PUTs `file` to it; the signed URL is the credential, so no Authorization header. */
 export async function uploadProfileImage(file: Blob, fileName: string): Promise<string> {
-  const grant = await unwrap(requestUpload1({ fileName, size: file.size }, authHeaders()));
+  const grant = await unwrap(requestProfileImageUpload({ fileName, size: file.size }, authHeaders()));
   const response = await fetch(grant.url, {
     method: grant.method,
     headers: grant.headers,
