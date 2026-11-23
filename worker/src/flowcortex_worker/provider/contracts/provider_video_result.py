@@ -17,10 +17,10 @@ class ProviderVideoData(BaseModel):
     )
     profile: Literal["vertical_ad_clip_v1"]
     durationSeconds: Literal[5]
-    provider: Literal["seedance", "veo", "wan", "fixture"]
+    provider: Literal["seedance", "veo", "wan", "minimax", "fixture"]
     model: Annotated[StrictStr, Field(max_length=200, min_length=1)]
     aspectRatio: Literal["9:16"]
-    resolution: Literal["480p", "720p"]
+    resolution: Literal["480p", "720p", "768p"]
     sourceRevisionId: UUID
     idempotencyKey: Annotated[StrictStr, Field(pattern="^[0-9a-f]{64}$")]
     providerTaskId: Annotated[StrictStr, Field(max_length=200, min_length=1)]

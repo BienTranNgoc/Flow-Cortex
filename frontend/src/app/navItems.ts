@@ -2,6 +2,7 @@ import {
   BookOpen,
   ChatsCircle,
   FlowArrow,
+  HardDrives,
   House,
   PlugsConnected,
   Play,
@@ -39,6 +40,10 @@ const CHAT_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/chat', labelKey: 'common.nav.chat', icon: ChatsCircle },
 ];
 
+const DRIVE_NAV_ITEMS: readonly NavEntry[] = [
+  { to: '/drive', labelKey: 'common.nav.drive', icon: HardDrives },
+];
+
 const DEMO_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/integrations', labelKey: 'common.nav.integrations', icon: PlugsConnected },
 ];
@@ -49,11 +54,12 @@ const DEMO_NAV_ITEMS: readonly NavEntry[] = [
  */
 export function primaryNavItems(
   t: TFunction = i18n.t,
-  options: { chat?: boolean } = {},
+  options: { chat?: boolean; drive?: boolean } = {},
 ): readonly PrimaryNavItem[] {
   const entries = [
     ...CORE_NAV_ITEMS,
     ...(options.chat ? CHAT_NAV_ITEMS : []),
+    ...(options.drive ? DRIVE_NAV_ITEMS : []),
     ...(demoPagesEnabled() ? DEMO_NAV_ITEMS : []),
   ];
   return entries.map(({ labelKey, ...rest }) => ({ ...rest, label: t(labelKey) }));

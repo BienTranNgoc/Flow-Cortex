@@ -79,7 +79,8 @@ class OnboardingEndpointsIT extends AbstractPostgresBootTest {
                 .containsEntry("purposes", null).containsEntry("source", null).containsEntry("aiLevel", null)
                 .containsEntry("industries", null).containsEntry("contentTypes", null)
                 .containsEntry("usageType", null).containsEntry("progress", Map.of())
-                .containsEntry("firstRunDone", false).containsEntry("open", true).containsEntry("entry", "first");
+                .containsEntry("firstRunDone", false).containsEntry("open", true).containsEntry("entry", "first")
+                .containsEntry("sampleWorkflow", null).containsEntry("firstResult", "none");
         assertThat(rows(ana)).isZero();
     }
 

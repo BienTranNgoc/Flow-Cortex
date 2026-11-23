@@ -4,7 +4,8 @@ export * from './problemDetail';
 // The generated ProblemDetail models Spring's `properties` bag; the wire shape flattens extension
 // members (errors, lockedUntil) to the top level, which the hand-written one describes.
 export type { ProblemDetail } from './problemDetail';
-export { sessionFetch } from './customFetch';
+export { downloadFile, sessionFetch } from './customFetch';
+export type { DownloadResult } from './customFetch';
 export { setClientId } from './clientId';
 export { setLocaleProvider } from './locale';
 export { openEventStream } from './eventStream';

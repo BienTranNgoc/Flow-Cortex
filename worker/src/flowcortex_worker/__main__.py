@@ -34,7 +34,8 @@ def main() -> int:
         accepted = roles.accepted_capabilities(
             os.environ.get("WORKER_CAPABILITIES"), HANDLER_MODULES
         )
-        registry = Registry(load_handlers(accepted), accepted)
+        handlers = load_handlers(accepted)
+        registry = Registry(handlers, accepted)
     except RoleError as invalid:
         log.error("invalid worker role: %s", invalid)
         return 2
@@ -85,7 +86,7 @@ def main() -> int:
         extra={
             "workerId": settings.worker_id,
             "queue": queue,
-            "capabilities": sorted(accepted or HANDLER_MODULES),
+            "capabilities": sorted(handlers),
         },
     )
     remove_leftovers()

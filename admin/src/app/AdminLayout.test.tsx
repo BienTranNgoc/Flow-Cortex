@@ -126,6 +126,23 @@ describe('AdminLayout', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('shows a custom role by its name in the account menu and the account dialog', async () => {
+    const custom = { ...ADMIN_ME, role: 'HO_TRO_NANG_CAO', roleName: 'Advanced support' };
+    stubApi({ 'GET /api/v1/auth/me': { status: 200, body: custom } });
+    setToken('admin-token-custom-role', true);
+    renderAdminPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: /account menu/i }));
+    const menu = screen.getByRole('menu', { name: 'Account menu' });
+    expect(menu).toHaveTextContent('Advanced support');
+    expect(menu).not.toHaveTextContent(custom.role);
+
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Account details' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Account' });
+    expect(dialog).toHaveTextContent('Advanced support');
+    expect(dialog).not.toHaveTextContent(custom.role);
+  });
+
   it('supports menu arrow navigation and Escape returns focus to the trigger', async () => {
     stubApi({ 'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME } });
     setToken('admin-token-menu-keys', true);

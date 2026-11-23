@@ -35,7 +35,12 @@ services:
 
   minio:
     environment:
-      MINIO_API_CORS_ALLOW_ORIGIN: https://app.${DOMAIN:?Set DOMAIN (see .env.example)}
+      MINIO_API_CORS_ALLOW_ORIGIN: https://app.${DOMAIN:?Set DOMAIN (see .env.example)},https://admin.${DOMAIN:?Set DOMAIN (see .env.example)}
+
+  # The console's CSP names the store's public origin, the one its uploads and media go to.
+  admin:
+    environment:
+      MEDIA_ORIGIN: https://media.${DOMAIN:?Set DOMAIN (see .env.example)}
 
   # The allowlist lives outside the checkout on the host: it needs the SMTP relay
   # host, which differs per deployment. Replaces the base file's mount list.

@@ -1,0 +1,89 @@
+{
+  "empty": {
+    "title": "No results in your memory yet",
+    "noMatchTitle": "No result matches",
+    "noMatchHint": "Try other words or fewer filters.",
+    "clear": "Clear filters"
+  },
+  "toolbar": {
+    "label": "Search and filter Memory",
+    "search": "Search titles",
+    "filters": "Filters",
+    "filtersActive": "Filters ({{n}})",
+    "sort": "Sort by"
+  },
+  "sort": {
+    "newest": "Newest",
+    "oldest": "Oldest",
+    "size_desc": "Largest",
+    "size_asc": "Smallest"
+  },
+  "filters": {
+    "label": "Filter results",
+    "types": "Type",
+    "time": "Time",
+    "sizes": "Size",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply",
+    "reset": "Reset",
+    "close": "Close",
+    "rangeNeedsDate": "Pick at least one date for a custom range.",
+    "rangeReversed": "The start date must not be after the end date."
+  },
+  "types": {
+    "text": "Text",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio"
+  },
+  "times": {
+    "all": "Any time",
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "custom": "Custom dates"
+  },
+  "sizes": {
+    "lt1mb": "Under 1 MB",
+    "1to50mb": "1 to 50 MB",
+    "gt50mb": "Over 50 MB"
+  },
+  "results": {
+    "heading": "Results",
+    "total_one": "{{n}} result",
+    "total_other": "{{n}} results",
+    "label": "Memory results",
+    "updating": "Updating…"
+  },
+  "pinned": {
+    "heading": "Pinned",
+    "note": "Your most recent pinned results.",
+    "showMore": "Show more ({{n}})",
+    "showFewer": "Show fewer"
+  },
+  "card": {
+    "open": "Open",
+    "openLabel": "Open {{title}}",
+    "pin": "Pin",
+    "pinLabel": "Pin {{title}}",
+    "hide": "Hide",
+    "hideLabel": "Hide {{title}}"
+  },
+  "hide": {
+    "title": "Hide this result?",
+    "message": "“{{title}}” will leave your memory list and your pinned results. The run itself is not changed, and you cannot bring this result back here.",
+    "confirm": "Hide",
+    "busy": "Hiding…"
+  },
+  "announce": {
+    "pinned": "Pinned “{{title}}”.",
+    "unpinned": "Unpinned “{{title}}”.",
+    "hidden": "Hid “{{title}}”.",
+    "failed": "That did not work. Try again."
+  },
+  "fullText": {
+    "loading": "Loading the full text…",
+    "gone": "The full text is no longer available.",
+    "failed": "The full text could not be loaded."
+  }
+}

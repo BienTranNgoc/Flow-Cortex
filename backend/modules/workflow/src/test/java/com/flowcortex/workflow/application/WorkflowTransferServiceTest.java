@@ -391,6 +391,38 @@ class WorkflowTransferServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void anArtifactWithAConnectorCallStepIsReviewedOutboundAndNeedsTheAcknowledgment() {
+        ConnectorCallStepExecutor connectorCall = new ConnectorCallStepExecutor(
+                mock(com.flowcortex.connector.api.HttpConnector.class),
+                mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
+        StepExecutorRegistry withConnector = new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall));
+        WorkflowTransferService production = new WorkflowTransferService(workflowRepository, stepRepository,
+                reviewRepository,
+                new WorkflowWriteAccess(workflowRepository, withConnector,
+                        Validation.buildDefaultValidatorFactory().getValidator()),
+                new WorkflowReadinessGuard(), withConnector, jdbc, Clock.fixed(NOW, ZoneOffset.UTC));
+        byte[] body = artifactBytes("CRM export", step(1, "connector.call",
+                "{\"connector\":\"crm\",\"method\":\"POST\",\"url\":\"https://api.crm.example/v1/export\","
+                        + "\"bodyFromInput\":true}", null));
+
+        ReviewView view = production.review(ADMIN, body);
+
+        assertThat(view.blocked()).isFalse();
+        assertThat(view.outbound()).isTrue();
+        assertThat(view.outboundTargets()).singleElement().satisfies(target -> {
+            assertThat(target.stepOrder()).isEqualTo(1);
+            assertThat(target.field()).isEqualTo("url");
+            assertThat(target.value()).isEqualTo("https://api.crm.example/v1/export");
+        });
+        WorkflowImportReview row = openReview(ADMIN, body, true);
+        assertRefusedWith(() -> production.importReviewed(ADMIN, row.getToken().toString(), null),
+                "OUTBOUND_ACK_REQUIRED");
+        assertThat(production.importReviewed(ADMIN, row.getToken().toString(), true).created()).isTrue();
+    }
+
+    @Test
     void anOutboundReviewWithAcknowledgmentImports() {
         WorkflowImportReview row = openReview(ADMIN,
                 artifactBytes("A", step(1, "echo", "{\"url\":\"https://hooks.example.com/x\"}", null)), true);

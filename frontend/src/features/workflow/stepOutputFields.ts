@@ -44,14 +44,44 @@ const megabytes = (bytes: unknown, t: TFunction, locale: Locale) =>
 const FIELDS: readonly FieldDefinition[] = [
   {
     labelKey: 'workflow.output.field.duration',
-    keys: ['durationMs'],
-    format: (report, t, locale) => seconds(report.durationMs, t, locale),
+    keys: ['durationMs', 'durationSeconds'],
+    format: (report, t, locale) => {
+      if (report.durationMs !== undefined) return seconds(report.durationMs, t, locale);
+      return typeof report.durationSeconds === 'number'
+        ? seconds(report.durationSeconds * 1000, t, locale)
+        : null;
+    },
   },
   {
     labelKey: 'workflow.output.field.dimensions',
     keys: ['width', 'height'],
     format: ({ width, height }) =>
       typeof width === 'number' && typeof height === 'number' ? `${width} × ${height}` : null,
+  },
+  {
+    labelKey: 'workflow.output.field.aspectRatio',
+    keys: ['aspectRatio'],
+    format: text('aspectRatio'),
+  },
+  {
+    labelKey: 'workflow.output.field.resolution',
+    keys: ['resolution'],
+    format: text('resolution'),
+  },
+  {
+    labelKey: 'workflow.output.field.voice',
+    keys: ['voice'],
+    format: text('voice'),
+  },
+  {
+    labelKey: 'workflow.output.field.speechSpeed',
+    keys: ['speed'],
+    format: text('speed'),
+  },
+  {
+    labelKey: 'workflow.output.field.format',
+    keys: ['format'],
+    format: text('format'),
   },
   {
     labelKey: 'workflow.output.field.videoCodec',
@@ -65,8 +95,14 @@ const FIELDS: readonly FieldDefinition[] = [
   },
 ];
 
-/** Keys no member can read (a demuxer list); kept for "Show raw" and the technical details file. */
-const TECHNICAL_KEYS: ReadonlySet<string> = new Set(['container']);
+/** Keys omitted from summary view; non-product-video runs retain them under "Show raw". */
+const TECHNICAL_KEYS: ReadonlySet<string> = new Set([
+  'container',
+  'profile',
+  'provider',
+  'renderer',
+  'sourceRevisionId',
+]);
 
 const KNOWN_KEYS: ReadonlySet<string> = new Set(FIELDS.flatMap((field) => field.keys));
 

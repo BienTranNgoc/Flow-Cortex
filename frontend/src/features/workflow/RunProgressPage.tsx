@@ -1,16 +1,29 @@
 import { ApiError, type RunResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { PageHeading } from '../../app/PageHeading';
 import { useFeatures } from '../../app/useFeatures';
+import { useRefreshOnboardingOnCompletion } from '../onboarding/useFirstResultClaim';
 import './WorkflowPages.css';
+import './ProductVideoStudio.css';
 import { Pipeline } from './Pipeline';
+import { ProductBriefBanner } from './ProductBriefBanner';
+import { ProductVideoRunHeader } from './ProductVideoRunHeader';
+import { ProductVideoShowcaseCard } from './ProductVideoShowcaseCard';
+import {
+  findFinalVideoArtifact,
+  isProductVideoRun,
+  parseProductBrief,
+} from './productVideoSchemas';
+import { RunCanvas, useRunCanvasWide } from './RunCanvas';
 import { RunInputs } from './RunInputs';
 import { RunLogPanel } from './RunLogPanel';
+import { RunSplitHandle } from './RunSplitHandle';
 import { StepDetail } from './StepDetail';
 import { StopRunDialog } from './StopRunDialog';
+import { looksLikeJson } from './runCanvasModel';
 import {
   choiceTakenBack,
   needsYouStep,
@@ -22,6 +35,8 @@ import {
   type StepChoice,
 } from './stepDisplay';
 import { NO_MESSAGE } from './stepErrorMessages';
+import { useCapabilitiesQuery } from './useCapabilities';
+import { useRunSplit } from './useRunSplit';
 import { useCancelRunMutation, useRunQuery } from './useWorkflows';
 
 const RUN_HEADING_KEYS: Record<string, string> = {
@@ -32,6 +47,15 @@ const RUN_HEADING_KEYS: Record<string, string> = {
   error: 'workflow.run.heading.error',
   cancelling: 'workflow.run.heading.cancelling',
   cancelled: 'workflow.run.heading.cancelled',
+};
+
+const RUN_BADGE_KEYS: Record<string, string> = {
+  running: 'workflow.step.state.running',
+  cancelling: 'workflow.run.heading.cancelling',
+  waiting_approval: 'workflow.step.state.needsYou',
+  completed: 'workflow.step.state.completed',
+  error: 'workflow.step.state.error',
+  cancelled: 'workflow.step.state.stopped',
 };
 
 function runHeading(status: string | undefined, t: TFunction): string {
@@ -109,19 +133,6 @@ function StopControl({ runId, chargedCredits, onStopped }: Readonly<StopControlP
   );
 }
 
-/**
- * Runs written before uploads existed may hold a JSON reference as their input; that is never a
- * file name, so it is not shown.
- */
-function looksLikeJson(value: string): boolean {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return typeof parsed === 'object' && parsed !== null;
-  } catch {
-    return false;
-  }
-}
-
 /** The state `useTransitionNavigate` attaches when a member has just started this run. */
 function isFocusRequest(state: unknown): boolean {
   return (
@@ -142,6 +153,8 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const wide = useRunCanvasWide();
+  const split = useRunSplit();
   const [choice, setChoice] = useState<StepChoice>();
   const steps = run.steps ?? [];
   if (choice && choiceTakenBack(steps, run.status, choice)) {
@@ -166,9 +179,13 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     if (stopped) headingRef.current?.focus();
   }, [stopped]);
 
+  const capabilitiesQuery = useCapabilitiesQuery();
+  const isProductVideo = isProductVideoRun(run, capabilitiesQuery.data?.productVideoWorkflowId);
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
-    selected && selectedState ? `${stepLabel(selected, t)}, ${stateWord(selectedState, t)}` : '';
+    selected && selectedState
+      ? `${stepLabel(selected, t, steps, isProductVideo)}, ${stateWord(selectedState, t)}`
+      : '';
 
   const selectedKey = selected && stepKey(selected);
   const [announced, setAnnounced] = useState('');
@@ -186,6 +203,9 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const failedWithoutStep =
     run.status === 'error' && !steps.some((step) => step.status === 'error');
   const backTo = workflowId ?? run.workflowId;
+  const brief = parseProductBrief(run.input);
+  const finalVideo =
+    isProductVideo && run.status === 'completed' ? findFinalVideoArtifact(steps) : null;
 
   const onSelect = (stepId: string) => {
     const waitingOn = needsYouStep(steps, run.status);
@@ -200,15 +220,56 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     panelRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
   };
 
+  const pipelineSteps = steps.map((step) => ({
+    id: stepKey(step),
+    name: stepLabel(step, t, steps, isProductVideo),
+    run: step,
+  }));
+  const detail = selected && (
+    <div className="run-layout-detail">
+      <StepDetail
+        id={panelId}
+        panelRef={panelRef}
+        runId={runId}
+        step={selected}
+        awaitingApproval={needsYouStep(steps, run.status) !== undefined}
+        needsYou={selectedState === 'needs-you'}
+        fileName={fileName}
+        isProductVideo={isProductVideo}
+        stepTitle={stepLabel(selected, t, steps, isProductVideo)}
+        productName={brief?.productName}
+      />
+    </div>
+  );
+
+  const stopButton = STOPPABLE.has(run.status ?? '') ? (
+    <StopControl
+      runId={runId}
+      chargedCredits={run.chargedCredits}
+      onStopped={() => setStopped(true)}
+    />
+  ) : null;
+
+  const statusPillLabel = t(RUN_BADGE_KEYS[run.status ?? ''] ?? 'workflow.step.state.pending');
+
   return (
-    <div>
-      <PageHeading ref={headingRef} title={runHeading(run.status, t)} />
-      {STOPPABLE.has(run.status ?? '') && (
-        <StopControl
-          runId={runId}
-          chargedCredits={run.chargedCredits}
-          onStopped={() => setStopped(true)}
+    <div className={isProductVideo ? 'pv-run-shell' : undefined}>
+      {isProductVideo ? (
+        <ProductVideoRunHeader
+          title={runHeading(run.status, t)}
+          headingRef={headingRef}
+          status={run.status}
+          statusLabel={statusPillLabel}
+          startedAt={run.startedAt}
+          finishedAt={run.finishedAt}
+          steps={steps}
+          stopControl={stopButton}
         />
+      ) : (
+        <>
+          <PageHeading ref={headingRef} title={runHeading(run.status, t)} />
+          {stopButton}
+        </>
       )}
       <div role="status" className="visually-hidden">
         {announced}
@@ -219,33 +280,55 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
         </p>
       )}
       {fileName && <p className="run-file">{t('workflow.file', { name: fileName })}</p>}
-      <RunInputs runId={runId} />
-      {selected && (
+      {brief ? (
+        <ProductBriefBanner
+          runId={runId}
+          brief={brief}
+          workflowId={backTo}
+          showRetryAction={run.status === 'error' || run.status === 'cancelled'}
+        />
+      ) : (
+        <RunInputs runId={runId} />
+      )}
+      {finalVideo && (
+        <ProductVideoShowcaseCard
+          runId={runId}
+          workflowId={backTo}
+          renderStep={finalVideo.step}
+          artifact={finalVideo.artifact}
+        />
+      )}
+      {selected && wide && (
+        <div
+          ref={split.gridRef}
+          className="run-layout run-layout--canvas"
+          style={{ '--run-split': `${split.percent}%` } as CSSProperties}
+        >
+          <div className="run-layout-canvas">
+            <RunCanvas
+              run={run}
+              steps={pipelineSteps}
+              selectedId={stepKey(selected)}
+              onSelect={onSelect}
+              panelId={panelId}
+            />
+          </div>
+          <RunSplitHandle binding={split.handle} />
+          {detail}
+        </div>
+      )}
+      {selected && !wide && (
         <div className="run-layout">
           <div className="run-layout-pipeline">
             <Pipeline
-              steps={steps.map((step) => ({
-                id: stepKey(step),
-                name: stepLabel(step, t),
-                run: step,
-              }))}
+              steps={pipelineSteps}
               runStatus={run.status}
               selectedId={stepKey(selected)}
               onSelect={onSelect}
               panelId={panelId}
             />
           </div>
-          <div className="run-layout-detail">
-            <StepDetail
-              id={panelId}
-              panelRef={panelRef}
-              runId={runId}
-              step={selected}
-              awaitingApproval={needsYouStep(steps, run.status) !== undefined}
-              needsYou={selectedState === 'needs-you'}
-              fileName={fileName}
-            />
-          </div>
+          {detail}
         </div>
       )}
       <RunLogPanel runId={runId} />
@@ -267,6 +350,7 @@ export function RunProgressPage() {
   const { workflowId, runId } = useParams<{ workflowId: string; runId: string }>();
   const runQuery = useRunQuery(runId);
   const { t } = useTranslation();
+  useRefreshOnboardingOnCompletion(runQuery.data?.status);
 
   if (!runId) {
     return <p role="alert">{t('workflow.run.noRun')}</p>;

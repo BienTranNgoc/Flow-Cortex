@@ -7,6 +7,7 @@ import com.flowcortex.profile.application.ProfileImagesService.CurrentImages;
 import com.flowcortex.profile.domain.ProfileImage.Slot;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import jakarta.validation.Valid;
@@ -45,6 +46,7 @@ class ProfileImagesController {
         this.images = images;
     }
 
+    @Operation(operationId = "requestProfileImageUpload")
     @PostMapping(value = "/uploads", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -52,6 +54,7 @@ class ProfileImagesController {
         return UploadResponse.from(images.grant(subjectId(jwt), request.fileName(), request.size()));
     }
 
+    @Operation(operationId = "getCurrentProfileImages")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     CurrentImages current(@AuthenticationPrincipal Jwt jwt) {
         return images.current(subjectId(jwt));

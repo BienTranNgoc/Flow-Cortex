@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
+import tempfile
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -12,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 import pika.exceptions
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
+
+from .storage import TEMP_PREFIX
 
 if TYPE_CHECKING:
     from .consumer import Consumer
@@ -32,15 +36,25 @@ class ProcessRunner:
     """A job's kill switch: its subprocesses and transfers stop when the watchdog, a cancel
     or a shutdown kills it."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, deadline_monotonic: float | None = None) -> None:
         self._lock = threading.Lock()
         self._process: subprocess.Popen[bytes] | None = None
         self._killed: str | None = None
         self._on_kill: list[Callable[[], None]] = []
+        self._deadline_monotonic: float | None = deadline_monotonic
+        self._scratch: Path | None = None
 
     @property
     def killed(self) -> str | None:
         return self._killed
+
+    @property
+    def deadline_monotonic(self) -> float | None:
+        return self._deadline_monotonic
+
+    def set_deadline_monotonic(self, deadline_monotonic: float) -> None:
+        with self._lock:
+            self._deadline_monotonic = deadline_monotonic
 
     def check(self) -> None:
         if self._killed is not None:
@@ -53,7 +67,7 @@ class ProcessRunner:
                 return
         callback()
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         executable = Path(argv[0]).name
         # argv is not recorded: it holds local paths and, for later capabilities, parameters.
         with tracer.start_as_current_span(
@@ -62,7 +76,9 @@ class ProcessRunner:
             with self._lock:
                 if self._killed is not None:
                     raise ProcessKilled(self._killed)
-                process = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                process = subprocess.Popen(
+                    argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 self._process = process
             try:
                 stdout, stderr = process.communicate()
@@ -76,6 +92,19 @@ class ProcessRunner:
             if process.returncode != 0:
                 span.set_status(Status(StatusCode.ERROR, f"exit code {process.returncode}"))
             return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
+
+    def scratch_dir(self) -> Path:
+        """The job's private (0700) directory, created on first use and removed by `close`."""
+        with self._lock:
+            if self._scratch is None:
+                self._scratch = Path(tempfile.mkdtemp(prefix=TEMP_PREFIX))
+            return self._scratch
+
+    def close(self) -> None:
+        with self._lock:
+            scratch, self._scratch = self._scratch, None
+        if scratch is not None:
+            shutil.rmtree(scratch, ignore_errors=True)
 
     def kill(self, reason: str) -> None:
         with self._lock:

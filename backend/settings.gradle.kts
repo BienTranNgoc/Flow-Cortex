@@ -12,6 +12,7 @@ include(
     ":modules:jobs",
     ":modules:llm",
     ":modules:support",
+    ":modules:content",
     ":modules:settings",
     ":modules:space",
     ":modules:drive",

@@ -34,6 +34,12 @@ public enum AuthEventType {
     STEP_UP_RATE_LIMITED,
     PAT_CREATED,
     PAT_REVOKED,
+    OAUTH_CONSENT_GRANTED,
+    /** A redeemed authorization code was presented again; the token its first redemption produced is revoked. */
+    OAUTH_CODE_REPLAYED,
+
+    PHONE_CHANGED,
+    PHONE_CHANGE_REVERTED,
 
     LOGOUT;
 

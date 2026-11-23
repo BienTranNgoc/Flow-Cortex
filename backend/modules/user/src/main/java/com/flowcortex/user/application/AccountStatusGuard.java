@@ -22,7 +22,12 @@ public final class AccountStatusGuard {
     }
 
     public static void requireActive(AppUser user) {
-        if (user.getStatus() == UserStatus.SUSPENDED) {
+        requireActive(user.getStatus());
+    }
+
+    /** For callers that hold a row's status rather than the entity. */
+    public static void requireActive(UserStatus status) {
+        if (status == UserStatus.SUSPENDED) {
             throw new AccessDeniedException("Account is suspended");
         }
     }
