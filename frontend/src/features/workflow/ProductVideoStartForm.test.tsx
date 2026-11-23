@@ -16,6 +16,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   available: true,
   allowFork: false,
   forkCount: 0,
+  startInput: 'upload',
   steps: [
     { id: 's1', stepOrder: 1, name: 'Generate script', type: 'provider-script', mode: 'remote' },
   ],
