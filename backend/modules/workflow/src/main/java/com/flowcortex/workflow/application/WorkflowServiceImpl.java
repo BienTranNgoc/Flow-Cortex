@@ -117,7 +117,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
      */
     private WorkflowView servedView(Workflow workflow, ServedDefinitions.ServedSteps served, UUID viewerId) {
         WorkflowView view = WorkflowMapper.toWorkflowView(workflow, served.steps(), registry::isRemote,
-                registry::isAvailable, workflow.getPublishedVersionId(), served.version());
+                registry::isAvailable, registry::snapshotsRunInputs, workflow.getPublishedVersionId(),
+                served.version());
         boolean ownerOrBuiltIn = workflow.isSystemOwned() || workflow.getOwnerId().equals(viewerId);
         return ownerOrBuiltIn ? view : WorkflowMapper.withoutStepContent(view);
     }
@@ -149,14 +150,16 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         }
         stepEntities = workflowStepRepository.saveAll(stepEntities);
 
-        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, stepEntities, registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     @Override
     @Transactional
     public WorkflowView createDraft(UUID ownerId, String name) {
         Workflow workflow = workflowRepository.save(Workflow.draft(UUID.randomUUID(), ownerId, name));
-        return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, List.of(), registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     // Self-invocation skips the proxy, so each member entry point opens the transaction the row lock needs.
@@ -203,7 +206,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         workflowRepository.save(workflow);
         versionWriter.ensurePublishedPointer(workflow, caller.userId());
         return WorkflowMapper.toWorkflowView(workflow, stepsOf(workflow), registry::isRemote, registry::isAvailable,
-                workflow.getPublishedVersionId(), null);
+                registry::snapshotsRunInputs, workflow.getPublishedVersionId(), null);
     }
 
     @Override
@@ -319,7 +322,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
         StepRenumbering.Outcome outcome = StepRenumbering.forOrder(rowsOf(steps), stepIds);
         switch (outcome) {
             case StepRenumbering.Unchanged unchanged -> {
-                return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable);
+                return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable,
+                        registry::snapshotsRunInputs);
             }
             case StepRenumbering.Stale stale ->
                 throw new ConflictException(new LocalizedMessage("workflow.definitionStep.orderStale"));
@@ -348,7 +352,8 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
                     }
                 }
                 List<WorkflowStep> reloaded = applyReferenceRewrites(workflow, plan.rows());
-                return WorkflowMapper.toWorkflowView(workflow, reloaded, registry::isRemote, registry::isAvailable);
+                return WorkflowMapper.toWorkflowView(workflow, reloaded, registry::isRemote, registry::isAvailable,
+                        registry::snapshotsRunInputs);
             }
         }
     }

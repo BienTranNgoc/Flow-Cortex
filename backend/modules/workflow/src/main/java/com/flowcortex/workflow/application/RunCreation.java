@@ -81,8 +81,10 @@ class RunCreation {
                     .map(def -> new StepReferences.Step(def.getId(), def.getStepOrder(), def.getName(),
                             def.getInputRef()))
                     .toList();
-            for (WorkflowStep stepDef : newRun.steps()) {
-                String stepInput = steps.isRemote(stepDef.getType()) ? newRun.stepInputJson() : null;
+            List<String> types = newRun.steps().stream().map(WorkflowStep::getType).toList();
+            for (int index = 0; index < newRun.steps().size(); index++) {
+                WorkflowStep stepDef = newRun.steps().get(index);
+                String stepInput = steps.snapshotsUpload(types, index) ? newRun.stepInputJson() : null;
                 runSteps.add(new RunStep(
                         UUID.randomUUID(),
                         run.getId(),

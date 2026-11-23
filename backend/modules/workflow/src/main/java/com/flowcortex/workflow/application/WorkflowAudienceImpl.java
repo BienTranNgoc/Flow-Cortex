@@ -37,7 +37,7 @@ class WorkflowAudienceImpl implements WorkflowAudience {
         }
         WorkflowView view = WorkflowMapper.toWorkflowView(workflow,
                 workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflowId), registry::isRemote,
-                registry::isAvailable);
+                registry::isAvailable, registry::snapshotsRunInputs);
         return new AudienceView(audienceOf(workflow), view, startKindOf(view));
     }
 
@@ -51,9 +51,12 @@ class WorkflowAudienceImpl implements WorkflowAudience {
         return workflow.getVisibility() == WorkflowVisibility.PUBLIC ? Audience.ALL_MEMBERS : Audience.OWNER_ONLY;
     }
 
-    /** A first step that runs on the media engine reads an uploaded file; every other first step reads text. */
+    /** What the start form asks for, as run start decides it: a link, a file or image, or text. */
     private static StartKind startKindOf(WorkflowView view) {
-        boolean remoteFirst = !view.steps().isEmpty() && "remote".equals(view.steps().get(0).mode());
-        return remoteFirst ? StartKind.UPLOAD : StartKind.TEXT;
+        return switch (view.startInput()) {
+            case "link" -> StartKind.LINK;
+            case "upload", "image" -> StartKind.UPLOAD;
+            default -> StartKind.TEXT;
+        };
     }
 }

@@ -60,7 +60,8 @@ public class WorkflowForkService {
         List<WorkflowStep> steps = workflowStepRepository.saveAll(WorkflowCarry.copySteps(served, fork.getId()));
         workflowRepository.incrementForkCount(source.getId());
 
-        return WorkflowMapper.toWorkflowView(fork, steps, registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(fork, steps, registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     private static void refuse(ForkEligibility.Refusal refusal) {
