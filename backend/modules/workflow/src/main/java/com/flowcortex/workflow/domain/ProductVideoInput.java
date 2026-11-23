@@ -34,6 +34,24 @@ public class ProductVideoInput {
     @Column(name = "aspect_ratio", nullable = false, updatable = false)
     private String aspectRatio;
 
+    @Column(name = "template_id", nullable = false, updatable = false)
+    private String templateId = "showroom-v1";
+
+    @Column(name = "template_version", nullable = false, updatable = false)
+    private int templateVersion = 1;
+
+    @Column(name = "voice_gender", nullable = false, updatable = false)
+    private String voiceGender = "male";
+
+    @Column(name = "mc_preset_id", updatable = false)
+    private String mcPresetId;
+
+    @Column(name = "background_preset_id", updatable = false)
+    private String backgroundPresetId;
+
+    @Column(name = "scene_note", updatable = false)
+    private String sceneNote;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -42,6 +60,13 @@ public class ProductVideoInput {
 
     public ProductVideoInput(UUID runId, String productName, String description, String cta, String price,
             String promotion, String aspectRatio, Instant createdAt) {
+        this(runId, productName, description, cta, price, promotion, aspectRatio, "showroom-v1", 1, "male",
+                null, null, null, createdAt);
+    }
+
+    public ProductVideoInput(UUID runId, String productName, String description, String cta, String price,
+            String promotion, String aspectRatio, String templateId, int templateVersion, String voiceGender,
+            String mcPresetId, String backgroundPresetId, String sceneNote, Instant createdAt) {
         this.runId = runId;
         this.productName = productName;
         this.description = description;
@@ -49,6 +74,12 @@ public class ProductVideoInput {
         this.price = price;
         this.promotion = promotion;
         this.aspectRatio = aspectRatio;
+        this.templateId = templateId == null || templateId.isBlank() ? "showroom-v1" : templateId;
+        this.templateVersion = Math.max(1, templateVersion);
+        this.voiceGender = voiceGender == null || voiceGender.isBlank() ? "male" : voiceGender;
+        this.mcPresetId = mcPresetId;
+        this.backgroundPresetId = backgroundPresetId;
+        this.sceneNote = sceneNote;
         this.createdAt = createdAt;
     }
 

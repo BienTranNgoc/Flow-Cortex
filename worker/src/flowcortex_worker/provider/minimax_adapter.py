@@ -107,9 +107,9 @@ class MinimaxAdapter:
             raise PermanentError(
                 "contract_violation", "MiniMax resolution must be 480P or 768P"
             )
-        if self.config.duration != 5:
+        if not 4 <= self.config.duration <= 10:
             raise PermanentError(
-                "contract_violation", "MiniMax duration must be 5 seconds"
+                "contract_violation", "MiniMax duration must be between 4 and 10 seconds"
             )
         if self.config.aspect_ratio not in _VALID_RATIOS:
             raise PermanentError(
@@ -127,16 +127,28 @@ class MinimaxAdapter:
 
     def submit_video(self, request: VideoRequest) -> str:
         identity = self.video_identity()
+        duration = request.duration_seconds or identity.duration_seconds
+        if not 4 <= duration <= 10:
+            raise PermanentError(
+                "contract_violation", "MiniMax duration must be between 4 and 10 seconds"
+            )
+        resolution = (request.resolution or identity.resolution).strip().upper()
+        if resolution not in _VALID_RESOLUTIONS:
+            raise PermanentError(
+                "contract_violation", "MiniMax resolution must be 480P or 768P"
+            )
         model_path = "/".join(
             urllib.parse.quote(part, safe="") for part in self.config.model.split("/")
         )
         reference_urls = self._resolve_reference_urls(request)
         input_body: dict[str, Any] = {
             "prompt": request.prompt,
-            "duration": identity.duration_seconds,
-            "resolution": identity.resolution.upper(),
+            "duration": duration,
+            "resolution": resolution,
             "ratio": identity.aspect_ratio,
         }
+        if request.first_frame_image_bytes:
+            input_body["first_frame_image"] = self._upload_file(request.first_frame_image_bytes, 0)
         if reference_urls:
             input_body["reference_image_urls"] = reference_urls
         body = json.dumps({"input": input_body}).encode()

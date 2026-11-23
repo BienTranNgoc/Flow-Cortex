@@ -141,11 +141,16 @@ class MediaJobsImpl implements MediaJobs {
      * {@code productAdParams}/{@code speechParams} definitions the provider job schema names. */
     private void validateProviderParams(ProviderJob job) {
         ProviderParams contract = switch (job.capability()) {
-            case "generate_script" -> new ProviderParams("product_ad_v1", ProviderJobPayload.ProductAd.class);
-            case "generate_storyboard" -> new ProviderParams("product_ad_storyboard_v1",
+            case "generate_script" -> new ProviderParams(Set.of("product_ad_v1"), ProviderJobPayload.ProductAd.class);
+            case "generate_storyboard" -> new ProviderParams(Set.of("product_ad_storyboard_v1"),
                     ProviderJobPayload.Storyboard.class);
-            case "generate_speech" -> new ProviderParams("vi_voice_v1", ProviderJobPayload.Speech.class);
-            case "generate_video" -> new ProviderParams("vertical_ad_clip_v1", ProviderJobPayload.Video.class);
+            case "generate_speech" -> new ProviderParams(Set.of("vi_voice_v1"), ProviderJobPayload.Speech.class);
+            case "generate_keyframe" -> new ProviderParams(Set.of("vertical_ad_keyframe_v1"),
+                    ProviderJobPayload.Keyframe.class);
+            case "generate_video" -> new ProviderParams(Set.of("vertical_ad_clip_v1", "vertical_ad_clip_v2"),
+                    ProviderJobPayload.Video.class);
+            case "lipsync_video" -> new ProviderParams(Set.of("vertical_ad_lipsync_v1"),
+                    ProviderJobPayload.Lipsync.class);
             default -> null;
         };
         if (contract == null) {
@@ -157,8 +162,9 @@ class MediaJobsImpl implements MediaJobs {
             throw new ConstraintViolationException("params has keys the " + job.capability()
                     + " contract does not define: " + unknown, Set.of());
         }
-        if (!contract.profile().equals(job.params().get("profile"))) {
-            throw new ConstraintViolationException("params.profile must be " + contract.profile() + " for "
+        Object rawProfile = job.params().get("profile");
+        if (!(rawProfile instanceof String profileValue) || !contract.profiles().contains(profileValue)) {
+            throw new ConstraintViolationException("params.profile must be one of " + contract.profiles() + " for "
                     + job.capability(), Set.of());
         }
         Object payload;
@@ -174,7 +180,7 @@ class MediaJobsImpl implements MediaJobs {
         }
     }
 
-    private record ProviderParams(String profile, Class<?> payload) {
+    private record ProviderParams(Set<String> profiles, Class<?> payload) {
     }
 
     @Override
@@ -191,7 +197,7 @@ class MediaJobsImpl implements MediaJobs {
 
     @Override
     public MediaLimits providerLimits(String capability) {
-        if ("generate_video".equals(capability)) {
+        if ("generate_video".equals(capability) || "lipsync_video".equals(capability)) {
             return new MediaLimits(properties.providerVideoQueueTimeout(), properties.providerVideoMaxRuntime(),
                     largestMediaInputBytes());
         }

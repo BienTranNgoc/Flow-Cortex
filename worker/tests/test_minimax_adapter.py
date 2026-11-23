@@ -54,8 +54,15 @@ def test_minimax_video_identity_validates_config() -> None:
     with pytest.raises(PermanentError, match="480P or 768P"):
         MinimaxAdapter(MinimaxConfig(api_key="tok", resolution="1080P")).video_identity()
 
-    with pytest.raises(PermanentError, match="must be 5 seconds"):
-        MinimaxAdapter(MinimaxConfig(api_key="tok", duration=10)).video_identity()
+    assert (
+        MinimaxAdapter(MinimaxConfig(api_key="tok", duration=10))
+        .video_identity()
+        .duration_seconds
+        == 10
+    )
+
+    with pytest.raises(PermanentError, match="between 4 and 10 seconds"):
+        MinimaxAdapter(MinimaxConfig(api_key="tok", duration=11)).video_identity()
 
 
 def test_minimax_submit_uploads_multiple_reference_images(monkeypatch: pytest.MonkeyPatch) -> None:

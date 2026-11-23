@@ -111,6 +111,11 @@ def fingerprint_document(
         "prompt": request.prompt,
         "imageSha256": hashlib.sha256(primary_image).hexdigest() if primary_image else None,
         "extraImageSha256s": extra_images,
+        "firstFrameSha256": (
+            hashlib.sha256(request.first_frame_image_bytes).hexdigest()
+            if request.first_frame_image_bytes
+            else None
+        ),
     }
     return {key: value for key, value in document.items() if value is not None}
 

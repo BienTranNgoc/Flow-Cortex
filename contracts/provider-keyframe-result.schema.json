@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/provider-keyframe-result.schema.json",
+  "title": "ProviderKeyframeData",
+  "description": "The completed MediaResult.data payload returned by generate_keyframe/vertical_ad_keyframe_v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "provider",
+    "model",
+    "aspectRatio",
+    "width",
+    "height",
+    "sourceRevisionId",
+    "idempotencyKey",
+    "providerTaskId",
+    "format"
+  ],
+  "properties": {
+    "profile": { "const": "vertical_ad_keyframe_v1" },
+    "provider": { "enum": ["seedream", "fixture"] },
+    "model": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "aspectRatio": { "const": "9:16" },
+    "width": { "type": "integer", "minimum": 240, "maximum": 4096 },
+    "height": { "type": "integer", "minimum": 240, "maximum": 4096 },
+    "sourceRevisionId": { "type": "string", "format": "uuid" },
+    "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "providerTaskId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "format": { "enum": ["jpg", "png"] },
+    "fingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "requestKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

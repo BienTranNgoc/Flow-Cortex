@@ -35,6 +35,8 @@ from .contracts.provider_job import ProviderJob
 from .control import ControlClient, ControlConfig
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
 from .fal_queue import probe_fal_queue, urllib_fetch
+from .keyframe_adapter import SeedreamConfig, SeedreamKeyframeAdapter
+from .lipsync_adapter import KlingLipsyncAdapter, KlingLipsyncConfig
 from .minimax_adapter import PROVIDER_MINIMAX, MinimaxAdapter, MinimaxConfig
 from .openai_adapter import (
     _OPENAI_BASE_URL,
@@ -238,7 +240,9 @@ def build_probe_registry(adapter: Any, environ: Mapping[str, str]) -> ProbeRegis
     explicitly enabled and keyed, since no adapter here submits to it yet.
     """
     probes: dict[str, ProbeFn] = {
-        adapter.video_identity().provider: lambda task_id, handle: adapter.probe_video(task_id)
+        adapter.video_identity().provider: lambda task_id, handle: adapter.probe_video(task_id),
+        "seedream": lambda task_id, handle: adapter.probe_keyframe(task_id),
+        "kling_lipsync": lambda task_id, handle: adapter.probe_lipsync(task_id),
     }
     fal_key = environ.get("FAL_KEY", "").strip()
     if environ.get("FAL_QUEUE_PROBE_ENABLED", "").strip().lower() == "true" and fal_key:
@@ -351,6 +355,19 @@ def _build_adapter(
     video_adapter = _build_video_adapter(
         video_provider, video_api_key, video_base_url, video_model, s3_public_endpoint
     )
+    replicate_key = os.environ.get("REPLICATE_API_TOKEN", "").strip() or (
+        video_api_key if video_provider in {PROVIDER_MINIMAX, PROVIDER_WAN} else ""
+    )
+    keyframe_adapter = (
+        SeedreamKeyframeAdapter(SeedreamConfig(api_key=replicate_key))
+        if replicate_key
+        else (FixtureProviderAdapter() if video_provider == PROVIDER_FIXTURE else None)
+    )
+    lipsync_adapter = (
+        KlingLipsyncAdapter(KlingLipsyncConfig(api_key=replicate_key))
+        if replicate_key
+        else (FixtureProviderAdapter() if video_provider == PROVIDER_FIXTURE else None)
+    )
     log.info(
         "provider adapters selected",
         extra={
@@ -359,7 +376,13 @@ def _build_adapter(
             "videoProvider": video_provider,
         },
     )
-    return CapabilityProviderAdapter(script_adapter, speech_adapter, video_adapter)
+    return CapabilityProviderAdapter(
+        script_adapter,
+        speech_adapter,
+        video_adapter,
+        keyframe_adapter=keyframe_adapter,
+        lipsync_adapter=lipsync_adapter,
+    )
 
 
 def _build_script_adapter(

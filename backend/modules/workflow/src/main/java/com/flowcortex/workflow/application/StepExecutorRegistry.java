@@ -55,7 +55,11 @@ class StepExecutorRegistry {
         executors.add(new ProviderStepExecutor("generate_storyboard", "product_ad_storyboard_v1",
                 mediaJobs, clock));
         executors.add(new ProviderStepExecutor("generate_speech", "vi_voice_v1", mediaJobs, clock));
+        executors.add(new ProviderStepExecutor("generate_keyframe", "vertical_ad_keyframe_v1", mediaJobs, clock,
+                vendorLedger, vendorJobs));
         executors.add(new ProviderStepExecutor("generate_video", "vertical_ad_clip_v1", mediaJobs, clock,
+                vendorLedger, vendorJobs));
+        executors.add(new ProviderStepExecutor("lipsync_video", "vertical_ad_lipsync_v1", mediaJobs, clock,
                 vendorLedger, vendorJobs));
         executors.add(new FetchVideoStepExecutor(mediaJobs, clock));
         executors.add(new IngestStepExecutor("ingest_video", "video/", "video", mediaJobs));

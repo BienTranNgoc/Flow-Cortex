@@ -23,7 +23,17 @@ public record ProductVideoDraft(
         @Size(max = 500) String cta,
         @Size(max = 200) String price,
         @Size(max = 500) String promotion,
-        @NotNull @Pattern(regexp = "9:16") String aspectRatio) {
+        @NotNull @Pattern(regexp = "9:16") String aspectRatio,
+        @Pattern(regexp = "showroom-v1|mc-v1") String templateId,
+        @Pattern(regexp = "male|female") String voiceGender,
+        @Size(max = 64) String mcPresetId,
+        @Size(max = 64) String backgroundPresetId,
+        @Size(max = 500) String sceneNote) {
+
+    public ProductVideoDraft(String productName, String description, String cta, String price,
+            String promotion, String aspectRatio) {
+        this(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", "male", null, null, null);
+    }
 
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -33,13 +43,25 @@ public record ProductVideoDraft(
      */
     public static ProductVideoDraft of(String productName, String description, String cta, String price,
             String promotion, String aspectRatio) {
-        ProductVideoDraft raw = new ProductVideoDraft(productName, description, cta, price, promotion, aspectRatio);
+        return of(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", "male",
+                null, null, null);
+    }
+
+    public static ProductVideoDraft of(String productName, String description, String cta, String price,
+            String promotion, String aspectRatio, String templateId, String voiceGender, String mcPresetId,
+            String backgroundPresetId, String sceneNote) {
+        String resolvedTemplate = templateId == null || templateId.isBlank() ? "showroom-v1" : templateId.trim();
+        String resolvedVoice = voiceGender == null || voiceGender.isBlank() ? "male" : voiceGender.trim();
+        ProductVideoDraft raw = new ProductVideoDraft(productName, description, cta, price, promotion, aspectRatio,
+                resolvedTemplate, resolvedVoice, trimToNull(mcPresetId), trimToNull(backgroundPresetId),
+                trimToNull(sceneNote));
         Set<ConstraintViolation<ProductVideoDraft>> violations = VALIDATOR.validate(raw);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
         return new ProductVideoDraft(productName.trim(), description.trim(), trimToNull(cta), trimToNull(price),
-                trimToNull(promotion), aspectRatio);
+                trimToNull(promotion), aspectRatio, resolvedTemplate, resolvedVoice, trimToNull(mcPresetId),
+                trimToNull(backgroundPresetId), trimToNull(sceneNote));
     }
 
     /** Product Video takes 1 to 3 product images, and the same upload is never named twice. */

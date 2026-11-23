@@ -41,12 +41,18 @@ class SpeechArtifact:
 class StoryboardRequest:
     script: str
     source_revision_id: UUID
+    template_id: str | None = None
+    scene_preset: str | None = None
+    scene_note: str | None = None
+    mc_hook_script: str | None = None
+    product_close_script: str | None = None
 
 
 @dataclass(frozen=True)
 class StoryboardArtifact:
     scene_1_prompt: str
     scene_2_prompt: str
+    keyframe_prompt: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +60,10 @@ class SpeechRequest:
     script: str
     source_revision_id: UUID
     profile: str = "vi_voice_v1"
+    voice: str | None = None
+    voice_gender: str | None = None
+    mc_hook_script: str | None = None
+    product_close_script: str | None = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +75,26 @@ class SpeechIdentity:
 
 
 @dataclass(frozen=True)
+class KeyframeRequest:
+    prompt: str
+    source_revision_id: UUID
+    profile: str = "vertical_ad_keyframe_v1"
+    reference_images: tuple[bytes, ...] = ()
+    scene_preset: str | None = None
+    scene_note: str | None = None
+
+
+@dataclass(frozen=True)
+class KeyframeArtifact:
+    body: bytes
+    width: int
+    height: int
+    provider_task_id: str
+    format: str = "jpg"
+    mime: str = "image/jpeg"
+
+
+@dataclass(frozen=True)
 class VideoRequest:
     prompt: str
     source_revision_id: UUID
@@ -73,6 +103,18 @@ class VideoRequest:
     reference_image_bytes: bytes | None = None
     reference_images: tuple[bytes, ...] = ()
     reference_image_urls: tuple[str, ...] = ()
+    duration_seconds: int | None = None
+    resolution: str | None = None
+    first_frame_image_bytes: bytes | None = None
+
+
+@dataclass(frozen=True)
+class LipsyncRequest:
+    video_bytes: bytes
+    audio_bytes: bytes
+    source_revision_id: UUID
+    duration_seconds: int = 5
+    profile: str = "vertical_ad_lipsync_v1"
 
 
 @dataclass(frozen=True)
@@ -146,7 +188,23 @@ class VideoAdapter(Protocol):
     def cancel_video(self, task_id: str) -> CancelResult: ...
 
 
-class ProviderAdapter(ScriptAdapter, SpeechAdapter, VideoAdapter, Protocol):
+class KeyframeAdapter(Protocol):
+    def submit_keyframe(self, request: KeyframeRequest) -> str: ...
+    def await_keyframe(self, task_id: str, abort: VideoAbort) -> KeyframeArtifact: ...
+    def probe_keyframe(self, task_id: str) -> VendorProbe: ...
+    def vendor_scope(self) -> dict[str, str]: ...
+
+
+class LipsyncAdapter(Protocol):
+    def submit_lipsync(self, request: LipsyncRequest) -> str: ...
+    def await_lipsync(self, task_id: str, abort: VideoAbort) -> VideoArtifact: ...
+    def probe_lipsync(self, task_id: str) -> VendorProbe: ...
+    def vendor_scope(self) -> dict[str, str]: ...
+
+
+class ProviderAdapter(
+    ScriptAdapter, SpeechAdapter, VideoAdapter, KeyframeAdapter, LipsyncAdapter, Protocol
+):
     """A provider that handles every capability. Capability-scoped adapters implement
     only the relevant sub-protocol and are routed by CapabilityProviderAdapter."""
 
@@ -163,6 +221,8 @@ class CapabilityProviderAdapter:
     script_adapter: ScriptAdapter
     speech_adapter: SpeechAdapter
     video_adapter: VideoAdapter
+    keyframe_adapter: KeyframeAdapter | None = None
+    lipsync_adapter: LipsyncAdapter | None = None
 
     def generate_script(
         self,
@@ -219,6 +279,48 @@ class CapabilityProviderAdapter:
 
     def cancel_video(self, task_id: str) -> CancelResult:
         return self.video_adapter.cancel_video(task_id)
+
+    def submit_keyframe(self, request: KeyframeRequest) -> str:
+        if self.keyframe_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Keyframe adapter is not configured"
+            )
+        return self.keyframe_adapter.submit_keyframe(request)
+
+    def await_keyframe(self, task_id: str, abort: VideoAbort) -> KeyframeArtifact:
+        if self.keyframe_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Keyframe adapter is not configured"
+            )
+        return self.keyframe_adapter.await_keyframe(task_id, abort)
+
+    def probe_keyframe(self, task_id: str) -> VendorProbe:
+        if self.keyframe_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Keyframe adapter is not configured"
+            )
+        return self.keyframe_adapter.probe_keyframe(task_id)
+
+    def submit_lipsync(self, request: LipsyncRequest) -> str:
+        if self.lipsync_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Lipsync adapter is not configured"
+            )
+        return self.lipsync_adapter.submit_lipsync(request)
+
+    def await_lipsync(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+        if self.lipsync_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Lipsync adapter is not configured"
+            )
+        return self.lipsync_adapter.await_lipsync(task_id, abort)
+
+    def probe_lipsync(self, task_id: str) -> VendorProbe:
+        if self.lipsync_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Lipsync adapter is not configured"
+            )
+        return self.lipsync_adapter.probe_lipsync(task_id)
 
 
 class FixtureProviderAdapter:
@@ -343,3 +445,60 @@ class FixtureProviderAdapter:
                     "provider_response_invalid", "fixture video could not be generated"
                 )
             return VideoArtifact(output.read_bytes(), task_id)
+
+    def submit_keyframe(self, request: KeyframeRequest) -> str:
+        digest = hashlib.sha256(
+            f"{request.source_revision_id}|{request.prompt}".encode()
+        ).hexdigest()[:16]
+        return f"fixture-kf-{digest}"
+
+    def probe_keyframe(self, task_id: str) -> VendorProbe:
+        return "succeeded"
+
+    def await_keyframe(self, task_id: str, abort: VideoAbort) -> KeyframeArtifact:
+        abort.check()
+        with tempfile.TemporaryDirectory(prefix="flowcortex-fixture-kf-") as directory:
+            output = Path(directory) / "keyframe.jpg"
+            completed = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-nostdin",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=c=0x223344:s=720x1280",
+                    "-frames:v",
+                    "1",
+                    "-q:v",
+                    "5",
+                    str(output),
+                ],
+                check=False,
+                capture_output=True,
+            )
+            if completed.returncode != 0 or not output.is_file() or output.stat().st_size == 0:
+                raise PermanentError(
+                    "provider_response_invalid", "fixture keyframe could not be generated"
+                )
+            return KeyframeArtifact(
+                body=output.read_bytes(),
+                width=720,
+                height=1280,
+                provider_task_id=task_id,
+            )
+
+    def submit_lipsync(self, request: LipsyncRequest) -> str:
+        digest = hashlib.sha256(
+            f"{request.source_revision_id}|{len(request.video_bytes)}".encode()
+        ).hexdigest()[:16]
+        return f"fixture-ls-{digest}"
+
+    def probe_lipsync(self, task_id: str) -> VendorProbe:
+        return "succeeded"
+
+    def await_lipsync(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+        return self.await_video(task_id, abort)

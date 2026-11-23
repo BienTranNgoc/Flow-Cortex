@@ -1422,6 +1422,27 @@ export interface ProductVideoRunRequest {
   uploadIds: string[];
   video: VideoConfig;
   acknowledgeCost?: boolean;
+  /** @pattern showroom-v1|mc-v1 */
+  templateId?: string;
+  /** @pattern male|female */
+  voiceGender?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  mcPresetId?: string;
+  mcUploadId?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  backgroundPresetId?: string;
+  backgroundUploadId?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  sceneNote?: string;
 }
 
 export interface OnboardingResetResponse {
@@ -3158,6 +3179,39 @@ export interface RunTrayResponse {
 export interface CurrentImages {
   avatar?: ProfileImageView;
   cover?: ProfileImageView;
+}
+
+export interface BackgroundPreset {
+  id?: string;
+  label?: string;
+  imageUrl?: string;
+  resourcePath?: string;
+}
+
+export interface McPreset {
+  id?: string;
+  label?: string;
+  voiceGender?: string;
+  imageUrl?: string;
+  resourcePath?: string;
+}
+
+export interface TemplateSpec {
+  id?: string;
+  version?: number;
+  name?: string;
+  summary?: string;
+  estimatedCredits?: number;
+  maxProductImages?: number;
+  requiredRoles?: string[];
+  optionalRoles?: string[];
+  available?: boolean;
+}
+
+export interface TemplatesResponse {
+  templates?: TemplateSpec[];
+  mcPresets?: McPreset[];
+  backgroundPresets?: BackgroundPreset[];
 }
 
 export interface OnboardingSampleWorkflow {
@@ -16872,6 +16926,54 @@ export const getCurrentProfileImages = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getCurrentProfileImagesResponse> => {
   return customFetch<getCurrentProfileImagesResponse>(getGetCurrentProfileImagesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listTemplatesResponse200 = {
+  data: TemplatesResponse;
+  status: 200;
+};
+
+export type listTemplatesResponseSuccess = listTemplatesResponse200 & {
+  headers: Headers;
+};
+export type listTemplatesResponse = listTemplatesResponseSuccess;
+
+export const getListTemplatesUrl = () => {
+  return `/api/v1/product-videos/templates`;
+};
+
+export const listTemplates = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listTemplatesResponse> => {
+  return customFetch<listTemplatesResponse>(getListTemplatesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getPresetImageResponse200 = {
+  data: Blob;
+  status: 200;
+};
+
+export type getPresetImageResponseSuccess = getPresetImageResponse200 & {
+  headers: Headers;
+};
+export type getPresetImageResponse = getPresetImageResponseSuccess;
+
+export const getGetPresetImageUrl = (category: string, id: string) => {
+  return `/api/v1/product-videos/presets/${category}/${id}`;
+};
+
+export const getPresetImage = async (
+  category: string,
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getPresetImageResponse> => {
+  return customFetch<getPresetImageResponse>(getGetPresetImageUrl(category, id), {
     ...options,
     method: 'GET',
   });

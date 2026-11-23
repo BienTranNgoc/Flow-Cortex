@@ -115,22 +115,39 @@ class WanAdapter:
         )
 
     def submit_video(self, request: VideoRequest) -> str:
+        effective_resolution = request.resolution or self.config.resolution
+        if effective_resolution not in {"480p", "720p"}:
+            raise PermanentError(
+                "contract_violation",
+                f"Wan resolution must be 480p or 720p, got '{effective_resolution}'",
+            )
+        if request.duration_seconds is not None:
+            effective_frames = request.duration_seconds * self.config.frames_per_second + 1
+            if not 81 <= effective_frames <= 121:
+                raise PermanentError(
+                    "contract_violation",
+                    f"Wan does not support durationSeconds={request.duration_seconds} "
+                    f"at {self.config.frames_per_second}fps (num_frames={effective_frames})",
+                )
+        else:
+            effective_frames = self.config.num_frames
         model_path = "/".join(
             urllib.parse.quote(part, safe="") for part in self.config.model.split("/")
         )
         input_body: dict[str, Any] = {
             "prompt": request.prompt,
             "go_fast": True,
-            "num_frames": self.config.num_frames,
-            "resolution": self.config.resolution,
+            "num_frames": effective_frames,
+            "resolution": effective_resolution,
             "aspect_ratio": "9:16",
             "sample_shift": 8,
             "frames_per_second": self.config.frames_per_second,
             "disable_safety_checker": False,
         }
-        if request.reference_image_bytes:
-            mime = _image_mime(request.reference_image_bytes)
-            encoded = base64.b64encode(request.reference_image_bytes).decode("ascii")
+        primary_bytes = request.first_frame_image_bytes or request.reference_image_bytes
+        if primary_bytes:
+            mime = _image_mime(primary_bytes)
+            encoded = base64.b64encode(primary_bytes).decode("ascii")
             input_body["image"] = f"data:{mime};base64,{encoded}"
         elif request.reference_image_url:
             input_body["image"] = request.reference_image_url

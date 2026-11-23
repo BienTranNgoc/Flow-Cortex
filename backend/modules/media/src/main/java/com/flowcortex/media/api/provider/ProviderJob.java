@@ -25,8 +25,8 @@ public record ProviderJob(
         @NotNull @Min(1) Integer stepOrder,
         @NotBlank String capability,
         @NotNull Map<String, Object> params,
-        // Script, storyboard and video jobs may carry product-image references.
-        @JsonInclude(JsonInclude.Include.NON_EMPTY) @Size(max = 3) List<@NotNull ProviderInput> inputs,
+        // Script, storyboard, keyframe, video and lipsync jobs may carry asset references.
+        @JsonInclude(JsonInclude.Include.NON_EMPTY) @Size(max = 5) List<@NotNull ProviderInput> inputs,
         @NotNull @Pattern(regexp = ProviderJob.OUTPUT_PREFIX_PATTERN) String outputPrefix,
         @NotNull @Min(1) Integer attempt,
         @NotNull @Min(1) Integer maxRuntimeSeconds,

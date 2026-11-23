@@ -8,6 +8,7 @@ import com.flowcortex.media.api.MediaJobProgressed;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaProgress;
 import com.flowcortex.media.api.MediaResult;
+import com.flowcortex.media.api.provider.ProviderKeyframeData;
 import com.flowcortex.media.api.provider.ProviderScriptData;
 import com.flowcortex.media.api.provider.ProviderSpeechData;
 import com.flowcortex.media.api.provider.ProviderStoryboardData;
@@ -879,7 +880,9 @@ class RunAdvancer {
      * ledger failure is retried once and then logged: it must never fail a step the member paid for.
      */
     private void consumeVendorJob(MediaResult result, String capability) {
-        if (vendorLedger == null || !"generate_video".equals(capability)) {
+        if (vendorLedger == null || (!"generate_video".equals(capability)
+                && !"generate_keyframe".equals(capability)
+                && !"lipsync_video".equals(capability))) {
             return;
         }
         for (int attempt = 1; attempt <= CONSUME_TRIES; attempt++) {
@@ -931,7 +934,8 @@ class RunAdvancer {
                 case "generate_script" -> objectMapper.convertValue(data, ProviderScriptData.class);
                 case "generate_storyboard" -> objectMapper.convertValue(data, ProviderStoryboardData.class);
                 case "generate_speech" -> objectMapper.convertValue(data, ProviderSpeechData.class);
-                case "generate_video" -> objectMapper.convertValue(data, ProviderVideoData.class);
+                case "generate_keyframe" -> objectMapper.convertValue(data, ProviderKeyframeData.class);
+                case "generate_video", "lipsync_video" -> objectMapper.convertValue(data, ProviderVideoData.class);
                 default -> null;
             };
             if (parsed == null) {

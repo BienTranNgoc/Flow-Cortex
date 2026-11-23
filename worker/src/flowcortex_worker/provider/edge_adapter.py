@@ -38,8 +38,20 @@ log = logging.getLogger("flowcortex_provider_worker.edge")
 
 PROVIDER_EDGE = "edge"
 DEFAULT_EDGE_VOICE = "vi-VN-NamMinhNeural"
+FEMALE_EDGE_VOICE = "vi-VN-HoaiMyNeural"
+MALE_EDGE_VOICE = "vi-VN-NamMinhNeural"
 DEFAULT_EDGE_RATE = "+10%"
 DEFAULT_EDGE_TIMEOUT_SECONDS = 60.0
+
+
+def resolve_edge_voice(request: SpeechRequest, default_voice: str) -> str:
+    if request.voice and request.voice.strip():
+        return request.voice.strip()
+    if request.voice_gender == "female":
+        return FEMALE_EDGE_VOICE
+    if request.voice_gender == "male":
+        return MALE_EDGE_VOICE
+    return default_voice
 _MAX_SPEECH_MS = 10_000
 _SOFT_FIT_CEILING_MS = 11_500
 _TARGET_FIT_MS = 9_850
@@ -80,9 +92,75 @@ class EdgeSpeechAdapter:
     def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         if not request.script.strip():
             raise PermanentError("provider_request_failed", "speech script is blank")
+        effective_voice = resolve_edge_voice(request, self.config.voice)
+        effective_config = EdgeConfig(
+            voice=effective_voice,
+            rate=self.config.rate,
+            timeout_seconds=self.config.timeout_seconds,
+        )
         abort.check()
+        base_tempo = _rate_factor(self.config.rate)
+        if request.mc_hook_script and request.product_close_script:
+            mc_mp3 = self._download_segment(
+                request.mc_hook_script.strip(), effective_config, abort
+            )
+            sp_mp3 = self._download_segment(
+                request.product_close_script.strip(), effective_config, abort
+            )
+            atempo = None if abs(base_tempo - 1.0) < 1e-6 else base_tempo
+            mc_wav = _to_wav(mc_mp3, abort, atempo=atempo)
+            sp_wav = _to_wav(sp_mp3, abort, atempo=atempo)
+            mc_ms = _validate_wav(mc_wav)
+            sp_ms = _validate_wav(sp_wav)
+            if 5_000 < mc_ms <= 5_750:
+                mc_wav = _to_wav(mc_mp3, abort, atempo=min(2.0, base_tempo * (mc_ms / 4_850)))
+                mc_ms = _validate_wav(mc_wav)
+            if mc_ms > 5_000:
+                raise PermanentError(
+                    "provider_request_failed",
+                    f"MC hook speech is {mc_ms} ms, exceeding the 5000 ms scene limit",
+                )
+            if 5_000 < sp_ms <= 5_750:
+                sp_wav = _to_wav(sp_mp3, abort, atempo=min(2.0, base_tempo * (sp_ms / 4_850)))
+                sp_ms = _validate_wav(sp_wav)
+            if sp_ms > 5_000:
+                raise PermanentError(
+                    "provider_request_failed",
+                    f"Product close speech is {sp_ms} ms, exceeding the 5000 ms scene limit",
+                )
+            wav = _concat_aligned_wav(mc_wav, sp_wav, abort)
+            duration_ms = _validate_wav(wav)
+            return SpeechArtifact(
+                body=wav,
+                duration_ms=duration_ms,
+                provider=PROVIDER_EDGE,
+                voice=effective_voice,
+                speed=self.config.rate,
+            )
+
+        mp3 = self._download_segment(request.script, effective_config, abort)
+        wav = (
+            _to_wav(mp3, abort)
+            if abs(base_tempo - 1.0) < 1e-6
+            else _to_wav(mp3, abort, atempo=base_tempo)
+        )
+        duration_ms = _validate_wav(wav)
+        if _MAX_SPEECH_MS < duration_ms <= _SOFT_FIT_CEILING_MS:
+            abort.check()
+            combined_tempo = min(2.0, base_tempo * (duration_ms / _TARGET_FIT_MS))
+            wav = _to_wav(mp3, abort, atempo=combined_tempo)
+            duration_ms = _validate_wav(wav)
+        return SpeechArtifact(
+            body=wav,
+            duration_ms=duration_ms,
+            provider=PROVIDER_EDGE,
+            voice=effective_voice,
+            speed=self.config.rate,
+        )
+
+    def _download_segment(self, script: str, config: EdgeConfig, abort: Abort) -> bytes:
         try:
-            mp3 = _run_download(request.script, self.config, abort)
+            mp3 = _run_download(script, config, abort)
         except asyncio.CancelledError as exc:
             # Only a kill cancels the download; check() turns it into the kill's reason.
             abort.check()
@@ -111,26 +189,7 @@ class EdgeSpeechAdapter:
             # An unclassified failure keeps the retry budget instead of failing the run outright.
             raise TransientError(f"Edge TTS failed: {type(exc).__name__}") from exc
         abort.check()
-
-        base_tempo = _rate_factor(self.config.rate)
-        wav = (
-            _to_wav(mp3, abort)
-            if abs(base_tempo - 1.0) < 1e-6
-            else _to_wav(mp3, abort, atempo=base_tempo)
-        )
-        duration_ms = _validate_wav(wav)
-        if _MAX_SPEECH_MS < duration_ms <= _SOFT_FIT_CEILING_MS:
-            abort.check()
-            combined_tempo = min(2.0, base_tempo * (duration_ms / _TARGET_FIT_MS))
-            wav = _to_wav(mp3, abort, atempo=combined_tempo)
-            duration_ms = _validate_wav(wav)
-        return SpeechArtifact(
-            body=wav,
-            duration_ms=duration_ms,
-            provider=PROVIDER_EDGE,
-            voice=self.config.voice,
-            speed=self.config.rate,
-        )
+        return mp3
 
 
 def _run_download(script: str, config: EdgeConfig, abort: Abort) -> bytes:
@@ -237,6 +296,41 @@ def _to_wav(mp3: bytes, abort: Abort, *, atempo: float | None = None) -> bytes:
                 "provider_response_invalid", "Edge TTS audio could not be normalized"
             )
         return output.read_bytes()
+
+
+def _concat_aligned_wav(mc_wav: bytes, sp_wav: bytes, abort: Abort) -> bytes:
+    """Pads mc_wav to 5.0s so Scene 2 voice-over aligns cleanly at t=5.000s."""
+    with tempfile.TemporaryDirectory(prefix=TEMP_PREFIX) as directory:
+        root = Path(directory)
+        mc_path = root / "mc.wav"
+        sp_path = root / "sp.wav"
+        out_path = root / "speech.wav"
+        mc_path.write_bytes(mc_wav)
+        sp_path.write_bytes(sp_wav)
+        try:
+            completed = abort.run(
+                [
+                    "ffmpeg", "-v", "error", "-nostdin", "-y",
+                    "-i", str(mc_path),
+                    "-i", str(sp_path),
+                    "-filter_complex",
+                    "[0:a]apad=whole_dur=5,atrim=duration=5,asetpts=PTS-STARTPTS[a0];"
+                    "[1:a]asetpts=PTS-STARTPTS[a1];"
+                    "[a0][a1]concat=n=2:v=0:a=1[a]",
+                    "-map", "[a]",
+                    "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le",
+                    str(out_path),
+                ]
+            )
+        except OSError as exc:
+            raise PermanentError(
+                "provider_response_invalid", "Edge TTS segments could not be aligned"
+            ) from exc
+        if completed.returncode != 0 or not out_path.is_file():
+            raise PermanentError(
+                "provider_response_invalid", "Edge TTS segments could not be aligned"
+            )
+        return out_path.read_bytes()
 
 
 def _rate_factor(rate: str) -> float:

@@ -43,6 +43,7 @@ from .adapter import (
     VideoRequest,
 )
 from .contracts.provider_job import ProductAdPayload
+from .prompts.templates import MC_STORYBOARD_SYSTEM_PROMPT, scene_setting_instruction
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
 
@@ -345,10 +346,24 @@ class OpenAIProviderAdapter:
         deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
         images = reference_images or ((reference_image,) if reference_image is not None else ())
-        user_content = self._storyboard_user_content(request.script, images)
+        system_prompt = (
+            MC_STORYBOARD_SYSTEM_PROMPT
+            if request.template_id == "mc-v1"
+            else _STORYBOARD_SYSTEM_PROMPT
+        )
+        script_text = request.script
+        if request.mc_hook_script and request.product_close_script:
+            script_text = (
+                f"Scene 1 (MC Hook): {request.mc_hook_script}\n"
+                f"Scene 2 (Product Close): {request.product_close_script}"
+            )
+        directive = scene_setting_instruction(request.scene_preset, request.scene_note)
+        if directive:
+            script_text = f"{script_text}\n\n{directive}"
+        user_content = self._storyboard_user_content(script_text, images)
         return self._run_with_fallback(
             operation="generate_storyboard",
-            system_prompt=_STORYBOARD_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             fallback_schema_instructions=_STORYBOARD_FALLBACK_SCHEMA_INSTRUCTIONS,
             user_content=user_content,
             response_format=_STORYBOARD_RESPONSE_FORMAT,
