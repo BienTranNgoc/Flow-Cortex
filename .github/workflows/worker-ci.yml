@@ -45,7 +45,8 @@ jobs:
         run: uv run --frozen --no-build --extra overlay pytest -rs
 
   overlay-image:
-    # Builds the overlay image and proves it cleans a captioned picture with networking off.
+    # Builds the overlay image and proves it cleans a captioned picture with networking off, that
+    # its ffmpeg has libvidstab and that the video ops' vision child runs in it.
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -64,6 +65,34 @@ jobs:
           tags: flowcortex-worker-overlay:ci
           cache-from: type=gha,scope=worker-overlay
           cache-to: type=gha,scope=worker-overlay,mode=max
+
+      - name: Vidstab in the image
+        run: |
+          docker run --rm --network none --entrypoint sh flowcortex-worker-overlay:ci \
+            -c 'ffmpeg -hide_banner -filters | grep -q vidstabdetect'
+
+      - name: Vision child in the image
+        # The child takes no path: it runs in its work directory on the files the handler's own
+        # ffmpeg writes under fixed names, and each command must exit 0 and leave a result.
+        run: |
+          docker run --rm --network none --entrypoint sh flowcortex-worker-overlay:ci -c '
+            set -e
+            work=$(mktemp -d)
+            cd "$work"
+            mkdir frames
+            clip="-f lavfi -i testsrc=size=320x180:rate=25 -t 2 -c:v libx264 -pix_fmt yuv420p"
+            ffmpeg -nostdin -loglevel error $clip window.mkv
+            ffmpeg -nostdin -loglevel error $clip output.mp4
+            ffmpeg -nostdin -loglevel error -f lavfi -i testsrc=size=320x180:rate=1 \
+              -frames:v 3 -q:v 3 frames/f_%04d.jpg
+            echo "{}" > request.json
+            python -m flowcortex_worker.video_ops.vision motion
+            test -s result.json
+            rm result.json
+            echo "{\"scale\": 1}" > request.json
+            python -m flowcortex_worker.video_ops.vision faces
+            test -s result.json
+          '
 
       - name: Self-check without network
         run: |
