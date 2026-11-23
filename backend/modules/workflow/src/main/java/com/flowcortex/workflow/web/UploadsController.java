@@ -5,6 +5,7 @@ import com.flowcortex.media.api.UploadGrant;
 import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import jakarta.validation.Valid;
@@ -41,6 +42,7 @@ class UploadsController {
         this.currentUserResolver = currentUserResolver;
     }
 
+    @Operation(operationId = "requestUpload")
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UploadResponse> requestUpload(@AuthenticationPrincipal Jwt jwt,

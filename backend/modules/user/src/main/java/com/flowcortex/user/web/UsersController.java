@@ -95,6 +95,7 @@ class UsersController {
     @ResponseStatus(HttpStatus.CREATED)
     @RequirePermission(Permission.USER_ACCOUNT_CREATE)
     @AdminAudit(value = "user.create", capture = "role")
+    @Operation(operationId = "createUser")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> create(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateUserRequest request) {
@@ -104,6 +105,7 @@ class UsersController {
     }
 
     @RequirePermission(Permission.USER_ACCOUNT_VIEW)
+    @Operation(operationId = "getUser")
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return ResponseEntity.ok(UserResponse.from(userService.getUser(callerId(jwt), id)));
