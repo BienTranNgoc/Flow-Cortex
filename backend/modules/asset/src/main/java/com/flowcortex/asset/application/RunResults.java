@@ -24,7 +24,7 @@ public class RunResults {
 
     static final int MAX_RUNS = 100;
 
-    private static final Logger log = LoggerFactory.getLogger(RunResults.class);
+    private static final Logger LOG = LoggerFactory.getLogger(RunResults.class);
 
     /** One run's summary; {@code thumbnails} are signed inline links, at most three. */
     public record RunResult(UUID runId, long count, List<String> kinds, List<String> thumbnails,
@@ -47,7 +47,7 @@ public class RunResults {
     public List<RunResult> results(UUID spaceId, UUID ownerId, List<String> runIdTexts) {
         List<UUID> runIds = distinctRunIds(runIdTexts);
         List<RunResult> results = queries.results(spaceId, ownerId, runIds).stream().map(this::view).toList();
-        log.info("asset.library.runResults space={} outcome=ok runs={}", spaceId, results.size());
+        LOG.info("asset.library.runResults space={} outcome=ok runs={}", spaceId, results.size());
         return results;
     }
 

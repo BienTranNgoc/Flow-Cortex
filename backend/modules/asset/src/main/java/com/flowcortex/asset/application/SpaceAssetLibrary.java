@@ -42,7 +42,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class SpaceAssetLibrary {
 
-    private static final Logger log = LoggerFactory.getLogger(SpaceAssetLibrary.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SpaceAssetLibrary.class);
 
     private final AssetLibraryQueries queries;
     private final AssetViews views;
@@ -76,7 +76,7 @@ public class SpaceAssetLibrary {
             AssetRow last = rows.get(rows.size() - 1);
             nextCursor = AssetCursor.after(query, mark, last.createdAt(), last.id(), last.bytes()).encode();
         }
-        log.info("asset.library.list space={} outcome=ok items={} more={}", spaceId, rows.size(), more);
+        LOG.info("asset.library.list space={} outcome=ok items={} more={}", spaceId, rows.size(), more);
         return new Page(items(rows, tags), counts.total(),
                 new Counts(counts.all(), counts.video(), counts.image(), counts.audio(), counts.favorite()),
                 nextCursor, mark);
@@ -102,7 +102,7 @@ public class SpaceAssetLibrary {
                 .map(row -> new Group(row.key(), title(row), row.count(), row.runCount(), row.latestAt(),
                         items(row.items(), tags)))
                 .toList();
-        log.info("asset.library.groups space={} outcome=ok groups={} totalGroups={}", spaceId, groups.size(),
+        LOG.info("asset.library.groups space={} outcome=ok groups={} totalGroups={}", spaceId, groups.size(),
                 totalGroups);
         return new GroupPage(groups, totalGroups, mark);
     }
@@ -117,7 +117,7 @@ public class SpaceAssetLibrary {
             count += usage.count();
             bytes += usage.bytes();
         }
-        log.info("asset.library.usage space={} outcome=ok", spaceId);
+        LOG.info("asset.library.usage space={} outcome=ok", spaceId);
         return new SpaceUsage(new Usage(count, bytes), usageOf(byKind, "video"), usageOf(byKind, "image"),
                 usageOf(byKind, "audio"));
     }
@@ -125,7 +125,7 @@ public class SpaceAssetLibrary {
     /** The tags in use in the space, most used first. */
     public List<Tag> tags(UUID spaceId) {
         List<Tag> tags = queries.tags(spaceId).stream().map(tag -> new Tag(tag.label(), tag.count())).toList();
-        log.info("asset.library.tags space={} outcome=ok tags={}", spaceId, tags.size());
+        LOG.info("asset.library.tags space={} outcome=ok tags={}", spaceId, tags.size());
         return tags;
     }
 
@@ -137,15 +137,15 @@ public class SpaceAssetLibrary {
     public Item one(UUID spaceId, String idText) {
         UUID id = parseId(idText);
         if (id == null) {
-            log.info("asset.library.one space={} outcome=not_found", spaceId);
+            LOG.info("asset.library.one space={} outcome=not_found", spaceId);
             throw notFound();
         }
         AssetRow row = queries.one(spaceId, id).orElseThrow(() -> {
-            log.info("asset.library.one space={} asset={} outcome=not_found", spaceId, id);
+            LOG.info("asset.library.one space={} asset={} outcome=not_found", spaceId, id);
             return notFound();
         });
         Item item = views.item(row, queries.tagsOf(spaceId, List.of(id)).getOrDefault(id, List.of()));
-        log.info("asset.library.one space={} asset={} outcome=ok", spaceId, id);
+        LOG.info("asset.library.one space={} asset={} outcome=ok", spaceId, id);
         return item;
     }
 

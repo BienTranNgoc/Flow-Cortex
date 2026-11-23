@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class AssetViews {
 
-    private static final Logger log = LoggerFactory.getLogger(AssetViews.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AssetViews.class);
 
     /** One asset as the member sees it; {@code thumbnailUrl} is set only for an image that is not missing. */
     public record Item(UUID id, String kind, String title, String source, String mimeType, long bytes,
@@ -79,7 +79,7 @@ public class AssetViews {
             return files.sign(bucket, objectKey, Disposition.INLINE, AssetFileNames.fileName(id, title, mimeType),
                     mimeType).url();
         } catch (IllegalArgumentException e) {
-            log.warn("asset.thumbnail outcome=unsignable asset={}", id);
+            LOG.warn("asset.thumbnail outcome=unsignable asset={}", id);
             return null;
         }
     }

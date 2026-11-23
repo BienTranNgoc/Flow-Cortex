@@ -25,7 +25,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class AssetLinks {
 
-    private static final Logger log = LoggerFactory.getLogger(AssetLinks.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AssetLinks.class);
 
     private final AssetLibraryQueries queries;
     private final AssetMissingMarks marks;
@@ -61,17 +61,17 @@ public class AssetLinks {
     private AssetFileLink link(UUID spaceId, String idText, Disposition disposition, String operation) {
         UUID id = SpaceAssetLibrary.parseId(idText);
         if (id == null) {
-            log.info("asset.link.{} space={} outcome=not_found", operation, spaceId);
+            LOG.info("asset.link.{} space={} outcome=not_found", operation, spaceId);
             throw SpaceAssetLibrary.notFound();
         }
         AssetRow row = queries.one(spaceId, id).orElseThrow(() -> {
-            log.info("asset.link.{} space={} asset={} outcome=not_found", operation, spaceId, id);
+            LOG.info("asset.link.{} space={} asset={} outcome=not_found", operation, spaceId, id);
             return SpaceAssetLibrary.notFound();
         });
 
         if (!files.serves(row.bucket())) {
             // An operator or configuration fault, not proof the member's file is gone: nothing is marked missing.
-            log.warn("asset.link.{} space={} asset={} outcome=outside_media_bucket", operation, spaceId, id);
+            LOG.warn("asset.link.{} space={} asset={} outcome=outside_media_bucket", operation, spaceId, id);
             throw storeUnavailable();
         }
 
@@ -79,12 +79,12 @@ public class AssetLinks {
         try {
             size = files.probe(row.bucket(), row.objectKey());
         } catch (MediaStoreUnavailableException e) {
-            log.warn("asset.link.{} space={} asset={} outcome=store_unavailable", operation, spaceId, id);
+            LOG.warn("asset.link.{} space={} asset={} outcome=store_unavailable", operation, spaceId, id);
             throw storeUnavailable();
         }
         if (size.isEmpty()) {
             marks.markGone(id, spaceId);
-            log.info("asset.link.{} space={} asset={} outcome=file_gone", operation, spaceId, id);
+            LOG.info("asset.link.{} space={} asset={} outcome=file_gone", operation, spaceId, id);
             throw new LocalizedStatusException(HttpStatus.GONE, new LocalizedMessage("asset.fileGone"));
         }
         if (row.missing()) {
@@ -93,7 +93,7 @@ public class AssetLinks {
 
         AssetFileLink link = files.sign(row.bucket(), row.objectKey(), disposition,
                 AssetFileNames.fileName(id, row.title(), row.mimeType()), row.mimeType());
-        log.info("asset.link.{} space={} asset={} outcome=issued", operation, spaceId, id);
+        LOG.info("asset.link.{} space={} asset={} outcome=issued", operation, spaceId, id);
         return link;
     }
 
