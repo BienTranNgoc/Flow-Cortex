@@ -5,6 +5,7 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -18,9 +19,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Component
 class PasswordResetSwitch implements HandlerInterceptor, WebMvcConfigurer {
 
-    private final Settings settings;
+    private final ObjectProvider<Settings> settings;
 
-    PasswordResetSwitch(Settings settings) {
+    /** A web slice test loads every {@code WebMvcConfigurer} but not the settings registry; no reset route runs there. */
+    PasswordResetSwitch(ObjectProvider<Settings> settings) {
         this.settings = settings;
     }
 
@@ -31,7 +33,8 @@ class PasswordResetSwitch implements HandlerInterceptor, WebMvcConfigurer {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (!settings.get(PasswordResetSettings.ENABLED).effective()) {
+        Settings registry = settings.getIfAvailable();
+        if (registry == null || !registry.get(PasswordResetSettings.ENABLED).effective()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"));
         }
         return true;
