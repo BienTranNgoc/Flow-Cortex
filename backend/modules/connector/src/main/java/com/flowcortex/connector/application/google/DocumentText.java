@@ -14,7 +14,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 import javax.xml.XMLConstants;
@@ -38,8 +37,8 @@ import org.springframework.stereotype.Component;
 /**
  * Turns the bytes of an untrusted Drive file into text within fixed bounds: 50,000 characters, PDF pages 1-200, a
  * 64 MB PDF memory budget, 20 MB of expanded DOCX XML, and 20 seconds of extraction checked between PDF pages, every
- * 1,000 operators inside a page, and between DOCX paragraphs. A bound or an unreadable file is a warning on the result, never an exception, and nothing of the
- * file's content reaches a log line.
+ * 1,000 operators inside a page, and between DOCX paragraphs. A bound or an unreadable file is a warning on the result,
+ * never an exception, and nothing of the file's content reaches a log line.
  */
 @Component
 public class DocumentText {
