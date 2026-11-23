@@ -69,7 +69,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key(),
                         Permission.CONTENT_DOCUMENT_VIEW.key(), Permission.CONTENT_DOCUMENT_MANAGE.key(),
-                        Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key())
+                        Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key(),
+                        Permission.USER_ACCOUNT_EXPORT.key())
                 .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
@@ -108,6 +109,17 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
             assertThat(PermissionSetPolicy.check(keysOf(role), PermissionSetPolicy.permissionCatalog()))
                     .as("seeded set of %s", role).isEmpty();
         }
+    }
+
+    @Test
+    void operationManagerAloneAmongStaffHoldsUserAccountExport() {
+        String export = "user.account.export";
+
+        assertThat(keysOf("OPERATION_MANAGER")).contains(export);
+        assertThat(keysOf("CUSTOMER_SUPPORT")).doesNotContain(export);
+        assertThat(keysOf("CONTENT_EDITOR")).doesNotContain(export);
+        assertThat(keysOf("PLATFORM_OPERATOR")).doesNotContain(export);
+        assertThat(keysOf("ADMIN")).isEmpty();
     }
 
     @Test
