@@ -14,6 +14,8 @@ import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
+import { PaymentHistoryPage } from './features/billing/PaymentHistoryPage';
+import { TransactionDetailPage } from './features/billing/TransactionDetailPage';
 import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
@@ -134,6 +136,11 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="billing/transactions" element={<PaymentHistoryPage />} />
+              <Route
+                path="billing/transactions/:transactionId"
+                element={<TransactionDetailPage />}
+              />
               <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />

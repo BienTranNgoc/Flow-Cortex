@@ -7639,6 +7639,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BuilderChartResponse"
+  /api/v1/billing/transactions:
+    get:
+      tags:
+      - transactions-controller
+      summary: List the member's payments
+      description: Newest first. page counts from 0; settled=true keeps payments where
+        money reached us.
+      operationId: listBillingTransactions
+      parameters:
+      - name: page
+        in: query
+        description: Page number from 0 to 10000; default 0
+        required: false
+        schema:
+          type: integer
+          default: 0
+          maximum: 10000
+          minimum: 0
+      - name: size
+        in: query
+        description: Rows per page from 1 to 100; default 20
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: settled
+        in: query
+        description: "true or 1 lists only succeeded, partially refunded and refunded\
+          \ payments"
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          description: One page of the member's payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+        "400":
+          description: "page or size out of range (code invalid_pagination), or settled\
+            \ not a flag (code invalid_query_flag)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Not signed in
+  /api/v1/billing/transactions/{transactionId}:
+    get:
+      tags:
+      - transactions-controller
+      summary: Read one of the member's payments
+      operationId: getBillingTransaction
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The payment with its provider facts and timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/by-order/{orderRef}:
+    get:
+      tags:
+      - transactions-controller
+      summary: Read one of the member's payments by order reference
+      operationId: getBillingTransactionByOrder
+      parameters:
+      - name: orderRef
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The payment with its provider facts and timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/profile/preferences:
     get:
       tags:
@@ -14060,6 +14165,173 @@ components:
       - day
       - failed
       - runs
+    TransactionListMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - page
+      - size
+      - total
+    TransactionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionRow"
+        meta:
+          $ref: "#/components/schemas/TransactionListMeta"
+      required:
+      - data
+      - meta
+    TransactionRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        description:
+          type: string
+        amountVnd:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        openedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - amountVnd
+      - description
+      - id
+      - kind
+      - openedAt
+      - status
+      - succeededAt
+    TransactionDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        description:
+          type: string
+        amountVnd:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        openedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        orderRef:
+          type: string
+        provider:
+          type: string
+        instrument:
+          type:
+          - string
+          - "null"
+          enum:
+          - wallet
+          - domestic_card
+        providerPayType:
+          type:
+          - string
+          - "null"
+        providerTransactionId:
+          type:
+          - string
+          - "null"
+        outcomeCode:
+          type:
+          - string
+          - "null"
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionTimelineEvent"
+      required:
+      - amountVnd
+      - description
+      - id
+      - instrument
+      - kind
+      - openedAt
+      - orderRef
+      - outcomeCode
+      - provider
+      - providerPayType
+      - providerTransactionId
+      - status
+      - succeededAt
+      - timeline
+    TransactionTimelineEvent:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          enum:
+          - opened
+          - paid
+          - payment_failed
+          - payment_expired
+        code:
+          type:
+          - string
+          - "null"
+      required:
+      - at
+      - code
+      - kind
     PreferencesView:
       type: object
       properties:

@@ -1,5 +1,6 @@
 import { createAppI18n } from '@flow-cortex/i18n';
 import enAuth from '../locales/en/auth.json';
+import enBilling from '../locales/en/billing.json';
 import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
 import enCredits from '../locales/en/credits.json';
@@ -10,6 +11,7 @@ import enNotifications from '../locales/en/notifications.json';
 import enSupport from '../locales/en/support.json';
 import enWorkflow from '../locales/en/workflow.json';
 import viAuth from '../locales/vi/auth.json';
+import viBilling from '../locales/vi/billing.json';
 import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viCredits from '../locales/vi/credits.json';
@@ -34,6 +36,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     onboarding: viOnboarding,
     chat: viChat,
     notifications: viNotifications,
+    billing: viBilling,
   },
   en: {
     common: enCommon,
@@ -46,6 +49,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     onboarding: enOnboarding,
     chat: enChat,
     notifications: enNotifications,
+    billing: enBilling,
   },
 });
 
