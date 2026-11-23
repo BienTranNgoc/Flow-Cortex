@@ -3463,6 +3463,119 @@ export interface BuilderChartResponse {
   series: DayCountResponse[];
 }
 
+export interface TransactionListMeta {
+  total: number;
+  page: number;
+  size: number;
+}
+
+export type TransactionRowKind = (typeof TransactionRowKind)[keyof typeof TransactionRowKind];
+
+export const TransactionRowKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type TransactionRowStatus = (typeof TransactionRowStatus)[keyof typeof TransactionRowStatus];
+
+export const TransactionRowStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  expired: 'expired',
+  partially_refunded: 'partially_refunded',
+  refunded: 'refunded',
+  disputed: 'disputed',
+} as const;
+
+export interface TransactionRow {
+  id: string;
+  kind: TransactionRowKind;
+  description: string;
+  amountVnd: number;
+  status: TransactionRowStatus;
+  openedAt: string;
+  /** @nullable */
+  succeededAt: string | null;
+}
+
+export interface TransactionListResponse {
+  data: TransactionRow[];
+  meta: TransactionListMeta;
+}
+
+export type TransactionDetailResponseKind =
+  (typeof TransactionDetailResponseKind)[keyof typeof TransactionDetailResponseKind];
+
+export const TransactionDetailResponseKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type TransactionDetailResponseStatus =
+  (typeof TransactionDetailResponseStatus)[keyof typeof TransactionDetailResponseStatus];
+
+export const TransactionDetailResponseStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  expired: 'expired',
+  partially_refunded: 'partially_refunded',
+  refunded: 'refunded',
+  disputed: 'disputed',
+} as const;
+
+/**
+ * @nullable
+ */
+export type TransactionDetailResponseInstrument =
+  | (typeof TransactionDetailResponseInstrument)[keyof typeof TransactionDetailResponseInstrument]
+  | null;
+
+export const TransactionDetailResponseInstrument = {
+  wallet: 'wallet',
+  domestic_card: 'domestic_card',
+} as const;
+
+export type TransactionTimelineEventKind =
+  (typeof TransactionTimelineEventKind)[keyof typeof TransactionTimelineEventKind];
+
+export const TransactionTimelineEventKind = {
+  opened: 'opened',
+  paid: 'paid',
+  payment_failed: 'payment_failed',
+  payment_expired: 'payment_expired',
+} as const;
+
+export interface TransactionTimelineEvent {
+  at: string;
+  kind: TransactionTimelineEventKind;
+  /** @nullable */
+  code: string | null;
+}
+
+export interface TransactionDetailResponse {
+  id: string;
+  kind: TransactionDetailResponseKind;
+  description: string;
+  amountVnd: number;
+  status: TransactionDetailResponseStatus;
+  openedAt: string;
+  /** @nullable */
+  succeededAt: string | null;
+  orderRef: string;
+  provider: string;
+  /** @nullable */
+  instrument: TransactionDetailResponseInstrument;
+  /** @nullable */
+  providerPayType: string | null;
+  /** @nullable */
+  providerTransactionId: string | null;
+  /** @nullable */
+  outcomeCode: string | null;
+  timeline: TransactionTimelineEvent[];
+}
+
 /**
  * @nullable
  */
@@ -4302,6 +4415,25 @@ export const GetBuilderRunsChartPeriod = {
   '30d': '30d',
   '90d': '90d',
 } as const;
+
+export type ListBillingTransactionsParams = {
+  /**
+   * Page number from 0 to 10000; default 0
+   * @minimum 0
+   * @maximum 10000
+   */
+  page?: number;
+  /**
+   * Rows per page from 1 to 100; default 20
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  /**
+   * true or 1 lists only succeeded, partially refunded and refunded payments
+   */
+  settled?: boolean;
+};
 
 export type CallbackParams = {
   code?: string;
@@ -16249,6 +16381,155 @@ export const getBuilderRunsChart = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listBillingTransactionsResponse200 = {
+  data: TransactionListResponse;
+  status: 200;
+};
+
+export type listBillingTransactionsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listBillingTransactionsResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type listBillingTransactionsResponseSuccess = listBillingTransactionsResponse200 & {
+  headers: Headers;
+};
+export type listBillingTransactionsResponseError = (
+  listBillingTransactionsResponse400 | listBillingTransactionsResponse401
+) & {
+  headers: Headers;
+};
+
+export type listBillingTransactionsResponse =
+  listBillingTransactionsResponseSuccess | listBillingTransactionsResponseError;
+
+export const getListBillingTransactionsUrl = (params?: ListBillingTransactionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/billing/transactions?${stringifiedParams}`
+    : `/api/v1/billing/transactions`;
+};
+
+/**
+ * Newest first. page counts from 0; settled=true keeps payments where money reached us.
+ * @summary List the member's payments
+ */
+export const listBillingTransactions = async (
+  params?: ListBillingTransactionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBillingTransactionsResponse> => {
+  return customFetch<listBillingTransactionsResponse>(getListBillingTransactionsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBillingTransactionResponse200 = {
+  data: TransactionDetailResponse;
+  status: 200;
+};
+
+export type getBillingTransactionResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getBillingTransactionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBillingTransactionResponseSuccess = getBillingTransactionResponse200 & {
+  headers: Headers;
+};
+export type getBillingTransactionResponseError = (
+  getBillingTransactionResponse401 | getBillingTransactionResponse404
+) & {
+  headers: Headers;
+};
+
+export type getBillingTransactionResponse =
+  getBillingTransactionResponseSuccess | getBillingTransactionResponseError;
+
+export const getGetBillingTransactionUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}`;
+};
+
+/**
+ * @summary Read one of the member's payments
+ */
+export const getBillingTransaction = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBillingTransactionResponse> => {
+  return customFetch<getBillingTransactionResponse>(getGetBillingTransactionUrl(transactionId), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBillingTransactionByOrderResponse200 = {
+  data: TransactionDetailResponse;
+  status: 200;
+};
+
+export type getBillingTransactionByOrderResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getBillingTransactionByOrderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBillingTransactionByOrderResponseSuccess =
+  getBillingTransactionByOrderResponse200 & {
+    headers: Headers;
+  };
+export type getBillingTransactionByOrderResponseError = (
+  getBillingTransactionByOrderResponse401 | getBillingTransactionByOrderResponse404
+) & {
+  headers: Headers;
+};
+
+export type getBillingTransactionByOrderResponse =
+  getBillingTransactionByOrderResponseSuccess | getBillingTransactionByOrderResponseError;
+
+export const getGetBillingTransactionByOrderUrl = (orderRef: string) => {
+  return `/api/v1/billing/transactions/by-order/${orderRef}`;
+};
+
+/**
+ * @summary Read one of the member's payments by order reference
+ */
+export const getBillingTransactionByOrder = async (
+  orderRef: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBillingTransactionByOrderResponse> => {
+  return customFetch<getBillingTransactionByOrderResponse>(
+    getGetBillingTransactionByOrderUrl(orderRef),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type getAccountPreferencesResponse200 = {
