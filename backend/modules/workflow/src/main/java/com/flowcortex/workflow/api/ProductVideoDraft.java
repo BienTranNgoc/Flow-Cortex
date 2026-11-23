@@ -42,7 +42,7 @@ public record ProductVideoDraft(
                 trimToNull(promotion), aspectRatio);
     }
 
-    /** Product Video takes exactly one image, and the same upload is never named twice. */
+    /** Product Video takes 1 to 3 product images, and the same upload is never named twice. */
     public static void requireUploads(List<UUID> uploadIds) {
         Set<ConstraintViolation<UploadSelection>> violations = VALIDATOR.validate(new UploadSelection(uploadIds));
         if (!violations.isEmpty()) {
@@ -63,7 +63,7 @@ public record ProductVideoDraft(
         return value == null ? null : value.trim();
     }
 
-    private record UploadSelection(@NotNull @Size(min = 1, max = 1) List<@NotNull UUID> uploadIds) {
+    private record UploadSelection(@NotNull @Size(min = 1, max = 3) List<@NotNull UUID> uploadIds) {
 
         @AssertTrue(message = "uploadIds must not contain duplicates")
         boolean hasDistinctUploads() {

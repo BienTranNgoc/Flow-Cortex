@@ -6,6 +6,11 @@ export const MAX_STREAM_TOPICS = 8;
 export interface ThreadRun {
   runId: string;
   status: string | undefined;
+  hasRunningStep?: boolean;
+}
+
+function isLiveThreadRun(run: ThreadRun): boolean {
+  return isLiveRunStatus(run.status) || Boolean(run.hasRunningStep);
 }
 
 /**
@@ -16,7 +21,7 @@ export function chatTopics(
   conversationId: string,
   runs: readonly ThreadRun[],
 ): { topics: string[]; overflow: string[] } {
-  const live = [...new Set(runs.filter((run) => isLiveRunStatus(run.status)).map((run) => run.runId))];
+  const live = [...new Set(runs.filter(isLiveThreadRun).map((run) => run.runId))];
   const room = MAX_STREAM_TOPICS - 1;
   return {
     topics: [

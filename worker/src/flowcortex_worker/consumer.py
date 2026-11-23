@@ -31,7 +31,14 @@ from . import telemetry
 from .contracts.media_job import MediaJob, MediaJobInput
 from .contracts.media_progress import MediaProgress, VendorTaskReport
 from .contracts.media_result import CompletedResult, ErrorResult, MediaError, MediaOutput
-from .errors import MAX_BACKOFF_SECONDS, ErrorCode, PermanentError, TransientError, backoff_seconds
+from .errors import (
+    MAX_BACKOFF_SECONDS,
+    ErrorCode,
+    PermanentError,
+    StaleDelivery,
+    TransientError,
+    backoff_seconds,
+)
 from .handlers import Handler
 from .handlers.registry import resolve as resolve_capability
 from .runtime import ChannelLost, ProcessKilled, ProcessRunner
@@ -309,6 +316,12 @@ class Consumer:
                     # No heartbeat may follow the result: stop it before the result goes out.
                     heartbeat.stop(join=True)
                     self._publish_result(run_id, result)
+            except StaleDelivery as exc:
+                heartbeat.stop(join=True)
+                self._call_in_main(lambda: self._settle_now(delivery, "ack"))
+                outcome = "discarded_stale"
+                log.info("stale delivery discarded", extra={"reason": str(exc)})
+                return
             except TransientError as exc:
                 exhausted = self._budget_exhausted(job, delivery, exc)
                 if exhausted is None:
@@ -378,6 +391,7 @@ class Consumer:
     def _execute(self, job: Any, delivery: Delivery, stack: ExitStack) -> Result:
         runner = delivery.runner
         stack.callback(runner.close)
+        runner.set_deadline_monotonic(time.monotonic() + job.maxRuntimeSeconds)
         watchdog = threading.Timer(job.maxRuntimeSeconds, runner.kill, args=("run_timeout",))
         watchdog.daemon = True
         watchdog.start()
@@ -440,6 +454,8 @@ class Consumer:
                     job.jobId, job.runId, job.attempt, delivery.count, exc.code, exc.message
                 )
             return self._killed(job, delivery, runner.killed)
+        except StaleDelivery:
+            raise
         except TransientError:
             if runner.killed is not None:
                 return self._killed(job, delivery, runner.killed)
