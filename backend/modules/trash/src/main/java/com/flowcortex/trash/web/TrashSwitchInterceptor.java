@@ -5,6 +5,7 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.trash.application.TrashProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -19,9 +20,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Component
 class TrashSwitchInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
-    private final TrashProperties properties;
+    private final ObjectProvider<TrashProperties> properties;
 
-    TrashSwitchInterceptor(TrashProperties properties) {
+    /** A web slice test loads every {@code WebMvcConfigurer} but not the trash properties; no trash route runs there. */
+    TrashSwitchInterceptor(ObjectProvider<TrashProperties> properties) {
         this.properties = properties;
     }
 
@@ -32,7 +34,8 @@ class TrashSwitchInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (!properties.enabled()) {
+        TrashProperties trash = properties.getIfAvailable();
+        if (trash == null || !trash.enabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"));
         }
         return true;
