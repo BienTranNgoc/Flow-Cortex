@@ -252,6 +252,16 @@ class WorkflowCallStepExecutorTest {
     }
 
     @Test
+    void aChildWithAnotherMembersConnectorStepFailsNotOwnerAndCreatesNothing() {
+        parentAtDepth(0, null);
+        givenValidChild();
+        doThrow(new UnprocessableEntityException(new LocalizedMessage("workflow.connectorStepNotOwner", 2),
+                ConnectorStepOwnerGuard.CODE)).when(guards).check(any(), any(), any(), any());
+
+        assertFails(contextFor(childWorkflowId), "workflow_call_child_connector_not_owner");
+    }
+
+    @Test
     void anyOtherRefusalOfTheGuardsIsReportedUnavailableNotRolledBack() {
         parentAtDepth(0, null);
         givenValidChild();

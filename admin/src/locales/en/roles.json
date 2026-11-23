@@ -75,6 +75,7 @@
       "saved_other": "Saved. {{name}} now has {{count}} permissions.",
       "renamed": "Saved. The role is now named {{name}}."
     },
+    "refreshFailed": "Could not refresh this role. Your draft is kept.",
     "stale": "Another admin changed this role while you were editing. Your draft is kept below; Reload replaces it with the stored permissions.",
     "partialSave": "The permissions were saved but the name was not. Fix the name and save again.",
     "delete": {
