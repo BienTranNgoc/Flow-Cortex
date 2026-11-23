@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -25,12 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
  * but the create response: not the database, the audit trail, a log line or an error message.
  */
 @Service
-class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
+class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OAuthTokenIssuer {
 
     /** A principal built from a token lives at most this long, so a revoked token is dropped quickly. */
     private static final Duration PRINCIPAL_TTL = Duration.ofSeconds(60);
-
-    static final String PAT_ID_CLAIM = "pat_id";
 
     private final PersonalAccessTokenRepository tokens;
     private final AppUserRepository users;
@@ -68,19 +67,82 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
     CreatedToken create(UUID userId, String name, Integer expiresInDays, String stepUpProof, String ip,
             String userAgent) {
         Instant now = clock.instant();
+        lockEligibleBelowCap(userId, now);
+        stepUpProofs.consume(userId, StepUpPurpose.PAT_CREATE, stepUpProof);
+
+        Duration lifetime = expiresInDays == null ? properties.defaultLifetime() : Duration.ofDays(expiresInDays);
+        return mint(userId, name, now, lifetime, ip, userAgent, null);
+    }
+
+    /**
+     * Same lock, eligibility and cap path as {@link #create}, without a proof: the grant has checked the
+     * session. Both refusals come before any write and must not mark a caller's transaction
+     * rollback-only: the code exchange catches them and still commits its redemption. The row is
+     * flushed because the caller links it from a table of its own in the same transaction.
+     */
+    @Override
+    @Transactional(noRollbackFor = {PatNotEligibleException.class, PatLimitReachedException.class})
+    public Issued issue(UUID userId, String name, String clientId) {
+        Instant now = clock.instant();
+        lockEligibleBelowCap(userId, now);
+        CreatedToken created = mint(userId, name, now, properties.defaultLifetime(), null, null, clientId);
+        tokens.flush();
+        return new Issued(created.token().getId(), created.rawToken(), created.token().getExpiresAt());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Live> findLive(String rawToken) {
+        if (rawToken == null || !rawToken.startsWith(PREFIX)) {
+            return Optional.empty();
+        }
+        Instant now = clock.instant();
+        return tokens.findByTokenHash(OpaqueTokens.hash(rawToken))
+                .filter(token -> token.isLiveAt(now))
+                .map(token -> new Live(token.getId(), token.getUserId()));
+    }
+
+    @Override
+    @Transactional
+    public boolean revoke(UUID userId, UUID tokenId, String clientId) {
+        if (tokens.revoke(tokenId, userId, clock.instant()) == 0) {
+            return false;
+        }
+        audit.write(AuthEventType.PAT_REVOKED, userId, null, null,
+                AuthEventType.metadata("userId", userId.toString(), "tokenId", tokenId.toString(), "clientId",
+                        clientId));
+        return true;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean eligibleToManage(UUID userId) {
+        Instant now = clock.instant();
+        return users.findById(userId).map(user -> isEligible(user, now, PatUse.MANAGE)).orElse(false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean atCap(UUID userId) {
+        return tokens.countLive(userId, clock.instant()) >= properties.maxLivePerUser();
+    }
+
+    /** The owner's row is locked first so two mints cannot both pass the cap. */
+    private void lockEligibleBelowCap(UUID userId, Instant now) {
         AppUser owner = users.findByIdForUpdate(userId).orElseThrow(PatNotEligibleException::new);
         requireEligible(owner, now);
         if (tokens.countLive(userId, now) >= properties.maxLivePerUser()) {
             throw new PatLimitReachedException();
         }
-        stepUpProofs.consume(userId, StepUpPurpose.PAT_CREATE, stepUpProof);
+    }
 
-        Duration lifetime = expiresInDays == null ? properties.defaultLifetime() : Duration.ofDays(expiresInDays);
+    private CreatedToken mint(UUID userId, String name, Instant now, Duration lifetime, String ip, String userAgent,
+            String clientId) {
         String raw = PersonalAccessTokenAuthenticator.PREFIX + OpaqueTokens.generateRawToken();
         PersonalAccessToken token = new PersonalAccessToken(UUID.randomUUID(), userId, name,
                 OpaqueTokens.hash(raw), now, now.plus(lifetime));
         tokens.save(token);
-        record(AuthEventType.PAT_CREATED, userId, token, ip, userAgent);
+        record(AuthEventType.PAT_CREATED, userId, token, ip, userAgent, clientId);
         return new CreatedToken(token, raw);
     }
 
@@ -102,7 +164,7 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
         if (tokens.revoke(tokenId, userId, clock.instant()) == 0) {
             throw notFound(tokenId);
         }
-        record(AuthEventType.PAT_REVOKED, userId, token, ip, userAgent);
+        record(AuthEventType.PAT_REVOKED, userId, token, ip, userAgent, null);
     }
 
     /**
@@ -123,8 +185,8 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
             return Optional.empty();
         }
         PersonalAccessToken token = found.get();
-        Optional<AppUser> owner = users.findById(token.getUserId()).filter(user -> PatEligibility.eligible(
-                user.getRole(), user.getStatus(), user.getLockedUntil(), now, PatUse.AUTHENTICATE));
+        Optional<AppUser> owner = users.findById(token.getUserId())
+                .filter(user -> isEligible(user, now, PatUse.AUTHENTICATE));
         if (owner.isEmpty()) {
             return Optional.empty();
         }
@@ -142,18 +204,27 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
     }
 
     private static void requireEligible(AppUser owner, Instant now) {
-        if (!PatEligibility.eligible(owner.getRole(), owner.getStatus(), owner.getLockedUntil(), now,
-                PatUse.MANAGE)) {
+        if (!isEligible(owner, now, PatUse.MANAGE)) {
             throw new PatNotEligibleException();
         }
+    }
+
+    private static boolean isEligible(AppUser owner, Instant now, PatUse use) {
+        return PatEligibility.eligible(owner.getRole(), owner.getStatus(), owner.isAdminDisabled(),
+                owner.getLockedUntil(), now, use);
     }
 
     private static NotFoundException notFound(UUID tokenId) {
         return new NotFoundException(new LocalizedMessage("pat.notFound", tokenId));
     }
 
-    private void record(AuthEventType type, UUID userId, PersonalAccessToken token, String ip, String userAgent) {
-        audit.write(type, userId, ip, userAgent, AuthEventType.metadata("userId", userId.toString(), "tokenId",
-                token.getId().toString(), "name", token.getName()));
+    private void record(AuthEventType type, UUID userId, PersonalAccessToken token, String ip, String userAgent,
+            String clientId) {
+        Map<String, Object> metadata = AuthEventType.metadata("userId", userId.toString(), "tokenId",
+                token.getId().toString(), "name", token.getName());
+        if (clientId != null) {
+            metadata.put("clientId", clientId);
+        }
+        audit.write(type, userId, ip, userAgent, metadata);
     }
 }
