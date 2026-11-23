@@ -48,7 +48,8 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
 
     private static final String SEED = "seed-refresh-token-0001";
     private static final String KEY_1 = Base64.getEncoder().encodeToString(new byte[32]);
-    private static final String KEY_2 = Base64.getEncoder().encodeToString("0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
+    private static final String KEY_2 = Base64.getEncoder()
+            .encodeToString("0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
     private static final Clock CLOCK = Clock.systemUTC();
 
     @Autowired
@@ -110,8 +111,14 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
         CountDownLatch go = new CountDownLatch(1);
         ExecutorService readers = Executors.newFixedThreadPool(2);
         try {
-            Future<String> a = readers.submit(() -> { go.await(); return first.accessToken(); });
-            Future<String> b = readers.submit(() -> { go.await(); return second.accessToken(); });
+            Future<String> a = readers.submit(() -> {
+                go.await();
+                return first.accessToken();
+            });
+            Future<String> b = readers.submit(() -> {
+                go.await();
+                return second.accessToken();
+            });
             go.countDown();
             assertThat(a.get(10, TimeUnit.SECONDS)).isEqualTo("access-2");
             assertThat(b.get(10, TimeUnit.SECONDS)).isEqualTo("access-2");
