@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/media-control-response.schema.json",
+  "title": "MediaControlResponse",
+  "description": "Backend decision for a video worker's control check on a running job delivery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "jobId", "attempt", "decision"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "runId": { "type": "string", "format": "uuid" },
+    "jobId": { "type": "string", "format": "uuid" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "decision": {
+      "title": "MediaControlDecision",
+      "type": "string",
+      "enum": ["continue", "cancel_sibling_failed", "discard_stale"]
+    }
+  }
+}

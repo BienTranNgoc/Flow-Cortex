@@ -96,7 +96,7 @@ export function ConfirmCard({ conversationId, messageId, card }: Readonly<Confir
   const confirm = useConfirmCard(conversationId, messageId);
   const isVideo = card.kind === 'product_video';
   const hasImages = isVideo || card.uploads.length > 0;
-  const attachments = useAttachments(isVideo ? 1 : MAX_IMAGES);
+  const attachments = useAttachments(isVideo ? 3 : MAX_IMAGES);
   const [draft, setDraft] = useState<ProductFields>(card.product);
   const pressed = useRef(false);
 
@@ -187,7 +187,7 @@ export function ConfirmCard({ conversationId, messageId, card }: Readonly<Confir
       {hasImages && editable && (
         <AttachmentPicker
           attachments={attachments}
-          max={isVideo ? 1 : MAX_IMAGES}
+          max={isVideo ? 3 : MAX_IMAGES}
           label={card.state === 'images-expired' ? t('chat.card.attachAgain') : t('chat.card.changeImages')}
           disabled={confirm.isPending}
         />
