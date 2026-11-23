@@ -16,7 +16,10 @@ export default defineConfig({
     // back to the next free port automatically if this one is taken.
     port: 5173,
     // Same-origin like the nginx image: the backend sends no CORS headers.
-    proxy: { '/api': 'http://localhost:8080' },
+    proxy: {
+      '/api': 'http://localhost:8080',
+      '/.well-known/oauth-authorization-server': 'http://localhost:8080',
+    },
   },
   test: {
     globals: true,
