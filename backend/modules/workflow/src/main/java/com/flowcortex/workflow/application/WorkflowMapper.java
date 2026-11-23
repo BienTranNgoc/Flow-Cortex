@@ -32,19 +32,40 @@ final class WorkflowMapper {
     private WorkflowMapper() {
     }
 
+    /** {@code snapshotsRunInputs} tells whether a step type takes the run's uploaded files, as run start asks it. */
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
-            Predicate<String> isAvailableType) {
-        return toWorkflowView(workflow, steps, isRemoteType, isAvailableType, null, null);
+            Predicate<String> isAvailableType, Predicate<String> snapshotsRunInputs) {
+        return toWorkflowView(workflow, steps, isRemoteType, isAvailableType, snapshotsRunInputs, null, null);
     }
 
     static WorkflowView toWorkflowView(Workflow workflow, List<WorkflowStep> steps, Predicate<String> isRemoteType,
-            Predicate<String> isAvailableType, UUID publishedVersionId, Integer servedVersion) {
+            Predicate<String> isAvailableType, Predicate<String> snapshotsRunInputs, UUID publishedVersionId,
+            Integer servedVersion) {
         return new WorkflowView(workflow.getId(), workflow.getOwnerId(), workflow.getName(), workflow.getVisibility(),
                 workflow.getCreatedAt(), workflow.getUpdatedAt(),
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
                 wire(workflow.getStatus().name()), publishedVersionId, servedVersion, workflow.isAllowFork(),
-                workflow.getForkCount(), workflow.getForkedFromId());
+                workflow.getForkCount(), workflow.getForkedFromId(), startInput(steps, snapshotsRunInputs));
+    }
+
+    private static String startInput(List<WorkflowStep> steps, Predicate<String> snapshotsRunInputs) {
+        if (steps.isEmpty()) {
+            return "text";
+        }
+        WorkflowStep first = steps.getFirst();
+        if (takesLink(first)) {
+            return "link";
+        }
+        if ("ingest_image".equals(first.getType())) {
+            return "image";
+        }
+        return snapshotsRunInputs.test(first.getType()) ? "upload" : "text";
+    }
+
+    /** Whether the run's own input is the link: step 1 downloads one and its config carries none. */
+    static boolean takesLink(WorkflowStep step) {
+        return FetchVideoConfig.TYPE.equals(step.getType()) && FetchVideoConfig.configUrl(step.getConfig()).isEmpty();
     }
 
     /** The same view with every step reduced to what a reader who does not own the workflow may see. */
@@ -56,7 +77,7 @@ final class WorkflowMapper {
                                 step.mode(), null, null))
                         .toList(),
                 view.available(), view.status(), view.publishedVersionId(), view.servedVersion(), view.allowFork(),
-                view.forkCount(), view.forkedFromId());
+                view.forkCount(), view.forkedFromId(), view.startInput());
     }
 
     static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {

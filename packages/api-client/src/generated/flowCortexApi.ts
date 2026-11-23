@@ -907,6 +907,16 @@ export const WorkflowResponseStatus = {
   published: 'published',
 } as const;
 
+export type WorkflowResponseStartInput =
+  (typeof WorkflowResponseStartInput)[keyof typeof WorkflowResponseStartInput];
+
+export const WorkflowResponseStartInput = {
+  link: 'link',
+  image: 'image',
+  upload: 'upload',
+  text: 'text',
+} as const;
+
 export type WorkflowStepResponseMode =
   (typeof WorkflowStepResponseMode)[keyof typeof WorkflowStepResponseMode];
 
@@ -945,6 +955,7 @@ export interface WorkflowResponse {
   forkCount: number;
   /** @nullable */
   forkedFromId?: string | null;
+  startInput: WorkflowResponseStartInput;
 }
 
 export interface SaveVersionRequest {
