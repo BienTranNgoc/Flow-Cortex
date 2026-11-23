@@ -2,6 +2,7 @@ package com.flowcortex.user.phone;
 
 import com.flowcortex.user.phone.PhoneVerificationService.PhoneStatus;
 import com.flowcortex.user.phone.PhoneVerificationService.SentCode;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -42,6 +43,7 @@ class PhoneController {
         this.changes = changes;
     }
 
+    @Operation(operationId = "getMyPhone")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<PhoneResponse> current(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(PhoneResponse.from(service.current(userId(jwt))));
