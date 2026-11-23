@@ -191,7 +191,7 @@ class RunResumptionIT {
                             i.input().bucket(), "runs/" + to + "/inputs/" + i.input().key())))
                     .toList();
         });
-        when(registry.isAvailable(anyString())).thenReturn(true);
+        when(registry.isAvailable(anyString(), any())).thenReturn(true);
         when(registry.isRemote(anyString())).thenAnswer(call -> REMOTE.equals(call.getArgument(0)));
         when(registry.snapshotsUpload(any(), anyInt())).thenAnswer(call -> {
             List<String> types = call.getArgument(0);
@@ -461,7 +461,7 @@ class RunResumptionIT {
         assertThat(snapshot(seed)).isEqualTo(afterReset);
 
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(registry.isAvailable(REMOTE)).thenReturn(false);
+        when(registry.isAvailable(eq(REMOTE), any())).thenReturn(false);
         assertThatThrownBy(() -> resumption.executeStep(seed.ownerId(), seed.runId(), stepId))
                 .isInstanceOf(DubDisabledException.class);
         assertThat(snapshot(seed)).isEqualTo(afterReset);

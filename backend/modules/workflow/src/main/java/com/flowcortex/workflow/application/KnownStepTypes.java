@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -38,12 +39,12 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
     /**
      * The steps being created, with the types the registry knows, those of them that take the
-     * assets stored at run start, those of them that run remotely, and those that copy an upload
-     * into their own output.
+     * assets stored at run start, those of them that run remotely, those that copy an upload
+     * into their own output, and those an iterate step may run per item.
      */
     @KnownStepTypes
     record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes,
-            Set<String> remoteTypes, Set<String> ingestTypes) {
+            Set<String> remoteTypes, Set<String> ingestTypes, Set<String> iterateChildTypes) {
     }
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
@@ -91,7 +92,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
                     }
                 }
                 boolean runsInline = allowedTypes.contains(type) && !definition.remoteTypes().contains(type);
-                String configFault = configFault(steps.get(i), i + 1, runsInline);
+                String configFault = configFault(steps.get(i), i + 1, runsInline, definition.iterateChildTypes());
                 if (configFault != null) {
                     valid = false;
                     // A message parameter is inserted literally, so the caller's text is never interpolated.
@@ -121,17 +122,31 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
         /**
          * What is wrong with the config of step {@code order}: its {@code outputInputs} declaration,
-         * then its type's rule; or {@code null}.
+         * then its type's rule, then an iterate step's child type; or {@code null}.
          */
-        private static String configFault(NewWorkflowStep step, int order, boolean runsInline) {
+        private static String configFault(NewWorkflowStep step, int order, boolean runsInline,
+                Set<String> iterateChildTypes) {
             String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
-            if (fault == null && HumanSteps.QA_REVIEW.equals(step.type())) {
+            if (fault != null) {
+                return fault;
+            }
+            if (HumanSteps.QA_REVIEW.equals(step.type())) {
                 return qaReviewFault(step.config());
             }
-            return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
+            fault = StepConfigRules.fault(step.type(), step.config());
+            return fault != null ? fault : iterateChildFault(step, iterateChildTypes);
+        }
+
+        /** The child type is not echoed: it is the caller's text. */
+        private static String iterateChildFault(NewWorkflowStep step, Set<String> iterateChildTypes) {
+            if (!IterateStepConfig.TYPE.equals(step.type())
+                    || iterateChildTypes.contains(IterateStepConfig.parse(step.config()).childType())) {
+                return null;
+            }
+            return "child.type is not allowed; allowed: " + String.join(", ", new TreeSet<>(iterateChildTypes));
         }
 
         /**

@@ -146,6 +146,24 @@ class LeaseReaperTest {
     }
 
     @Test
+    void aFanOutStepPastItsDeadlineNamesTheDeadlineItWasHeldTo() {
+        LeaseReaper fanOutReaper = new LeaseReaper(runStepRepository, workflowRunRepository,
+                new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
+                        mock(RunUpdates.class), mock(ApplicationEventPublisher.class), mock(ChildRuns.class)),
+                new StepExecutorRegistry(List.of(new IterateStepExecutor(runStepRepository))), advancer, meters,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        RunStep step = new RunStep(UUID.randomUUID(), runId, (short) 1, "iterate");
+        step.markRunning(NOW.minusSeconds(3600), NOW.plusSeconds(1000));
+        step.recordPickup(NOW.minusSeconds(600), NOW.plusSeconds(60), NOW.minusSeconds(60), (short) 0);
+        givenReapable(List.of(step), 1);
+
+        fanOutReaper.reap();
+
+        verify(runStepRepository).failIfRunning(step.getId(), runId, (short) 1, "run_timeout",
+                "exceeded the maximum run time of 540 s", NOW);
+    }
+
+    @Test
     void whenBothBoundsHavePassedTheEarlierOneNamesTheFailure() {
         RunStep step = claimed(NOW.plusSeconds(1000));
         step.recordPickup(NOW.minusSeconds(400), NOW.minusSeconds(100), NOW.minusSeconds(10), (short) 0);
