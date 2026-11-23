@@ -37,6 +37,7 @@ public enum Permission {
     PLATFORM_SETTING_UPDATE("platform.setting.update", false),
     PLATFORM_SMS_OUTBOX_VIEW("platform.sms_outbox.view", false),
     SYSTEM_ROLE_VIEW("system.role.view", true),
+    SYSTEM_ROLE_MANAGE("system.role.manage", true),
     SYSTEM_ADMIN_ACCOUNT_VIEW("system.admin_account.view", true),
     SYSTEM_ADMIN_ACCOUNT_MANAGE("system.admin_account.manage", true),
     AI_PROVIDER_VIEW("ai.provider.view", false),
@@ -46,7 +47,8 @@ public enum Permission {
     WORKFLOW_WORKFLOW_VIEW("workflow.workflow.view", false),
     WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false),
     PAYMENT_SETTING_VIEW("payment.setting.view", false),
-    PAYMENT_SETTING_UPDATE("payment.setting.update", false);
+    PAYMENT_SETTING_UPDATE("payment.setting.update", false),
+    USER_ACCOUNT_EXPORT("user.account.export", false);
 
     private static final Map<String, Permission> BY_KEY =
             Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(Permission::key, Function.identity()));

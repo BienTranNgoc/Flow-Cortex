@@ -170,7 +170,7 @@ export function ProfilePage() {
           <div className="profile-identity__text">
             <h2>{me.name?.trim() || t('auth.profile.unnamed')}</h2>
             <p className="profile-identity__email">{me.email}</p>
-            <span className="profile-role-pill">{roleLabel(t, me.role)}</span>
+            <span className="profile-role-pill">{roleLabel(t, me.role, me.roleName)}</span>
           </div>
 
           {(showAccountStats || credits !== undefined) && (
@@ -289,7 +289,7 @@ export function ProfilePage() {
             </div>
             <div>
               <dt>{t('auth.profile.roleLabel')}</dt>
-              <dd>{roleLabel(t, me.role)}</dd>
+              <dd>{roleLabel(t, me.role, me.roleName)}</dd>
             </div>
             <div>
               <dt>{t('auth.profile.statusLabel')}</dt>

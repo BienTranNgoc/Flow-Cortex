@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyShort;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.ConflictException;
@@ -37,6 +39,8 @@ import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -189,6 +193,10 @@ class RunResumptionIT {
         });
         when(registry.isAvailable(anyString(), any())).thenReturn(true);
         when(registry.isRemote(anyString())).thenAnswer(call -> REMOTE.equals(call.getArgument(0)));
+        when(registry.snapshotsUpload(any(), anyInt())).thenAnswer(call -> {
+            List<String> types = call.getArgument(0);
+            return REMOTE.equals(types.get(call.<Integer>getArgument(1)));
+        });
         when(mediaJobs.isEnabled()).thenReturn(true);
         when(mediaJobs.boundRunInputs(any())).thenReturn(List.of());
         when(mediaJobs.runInputsStored(any())).thenReturn(true);
@@ -572,6 +580,54 @@ class RunResumptionIT {
                         e -> assertThat(e.getDetail().code()).isEqualTo("workflow.run.retry.objectGone"));
         assertThat(step(seed, 0).getAttempt()).isEqualTo((short) 2);
         assertThat(run(seed).getStatus()).isEqualTo(RunStatus.ERROR);
+    }
+
+    /** Answers the registry's mode and upload questions with the real rules, so a retry is held to run start's. */
+    private void useTheRealUploadRule() {
+        when(mediaJobs.providerLimits(anyString()))
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+        StepExecutorRegistry real = new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
+        when(registry.isRemote(anyString())).thenAnswer(call -> real.isRemote(call.getArgument(0)));
+        // doAnswer: re-stubbing through when(...) would first call the default stub with null arguments.
+        doAnswer(call -> real.snapshotsUpload(call.getArgument(0), call.<Integer>getArgument(1)))
+                .when(registry).snapshotsUpload(any(), anyInt());
+    }
+
+    @Test
+    void retryOfAnIngestStepKeepsTheUploadAndRetryOfTheStepAfterItHoldsNone() throws Exception {
+        useTheRealUploadRule();
+        Seed seed = failedRun("store_unavailable", 0, "ingest_video", "probe");
+        when(mediaJobs.boundRunInputs(seed.runId())).thenReturn(bound(seed.runId(), "media"));
+
+        resumption.retryStep(seed.ownerId(), seed.runId(), seed.stepIds().getFirst());
+
+        assertThat(JSON.readTree(step(seed, 0).getInput()).get("key").asText()).isEqualTo("media");
+
+        Seed after = failedRun("boom_code", 1, "ingest_video", "probe");
+        when(mediaJobs.boundRunInputs(after.runId())).thenReturn(bound(after.runId(), "media"));
+
+        resumption.retryStep(after.ownerId(), after.runId(), after.stepIds().get(1));
+
+        assertThat(step(after, 1).getInput()).isNull();
+    }
+
+    @Test
+    void aRunRetryOfAnIngestRunGivesTheUploadToTheIngestStepOnly() throws Exception {
+        useTheRealUploadRule();
+        Seed seed = failedRun("boom_code", 0, "ingest_video", "probe");
+        when(mediaJobs.boundRunInputs(seed.runId())).thenReturn(bound(seed.runId(), "media"));
+
+        RunView view = resumption.retryRun(seed.ownerId(), seed.runId(), null, false);
+
+        List<RunStep> steps = stepsOf(view.id());
+        assertThat(JSON.readTree(steps.getFirst().getInput()).get("key").asText()).isEqualTo("media");
+        assertThat(steps.get(1).getInput()).isNull();
+
+        Seed fetched = failedRun("boom_code", 0, "fetch_video", "probe");
+        when(mediaJobs.boundRunInputs(fetched.runId())).thenReturn(List.of());
+
+        List<RunStep> fetchSteps = stepsOf(resumption.retryRun(fetched.ownerId(), fetched.runId(), null, false).id());
+        assertThat(fetchSteps).extracting(RunStep::getInput).containsOnlyNulls();
     }
 
     private List<RunStep> stepsOf(UUID runId) {

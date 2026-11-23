@@ -186,9 +186,13 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
             throw new DubDisabledException();
         }
+        if (!stepDefs.isEmpty() && WorkflowMapper.takesLink(stepDefs.getFirst())
+                && FetchVideoConfig.linkFault(input) != null) {
+            throw new UploadRejectedException("input", new LocalizedMessage("workflow.start.linkRequired"));
+        }
         runStartGuards.check(currentUserId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));
 
-        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
+        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.snapshotsRunInputs(stepDefs.getFirst().getType());
         String runInput = input;
         boolean singleUpload = false;
         List<MediaAssetInput> assetInputs = List.of();

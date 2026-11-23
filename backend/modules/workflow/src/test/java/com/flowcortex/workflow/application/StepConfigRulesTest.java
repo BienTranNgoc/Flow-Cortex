@@ -83,7 +83,7 @@ class StepConfigRulesTest {
 
     private static KnownStepTypes.Definition definition(NewWorkflowStep... steps) {
         return new KnownStepTypes.Definition(List.of(steps), Set.of("echo", "connector.call", "workflow.call"),
-                Set.of(), Set.of(), Set.of());
+                Set.of(), Set.of(), Set.of(), Set.of());
     }
 
     @Test
@@ -142,7 +142,7 @@ class StepConfigRulesTest {
     private Set<ConstraintViolation<KnownStepTypes.Definition>> validate(NewWorkflowStep step) {
         var definition = new KnownStepTypes.Definition(List.of(step),
                 Set.of("echo", "fail", "translate", "tts", "iterate", "workflow.call", "probe", "generate_video"),
-                Set.of(), Set.of("probe", "generate_video"), Set.of("echo", "fail", "translate", "tts"));
+                Set.of(), Set.of("probe", "generate_video"), Set.of(), Set.of("echo", "fail", "translate", "tts"));
         return validator.validate(definition);
     }
 }
