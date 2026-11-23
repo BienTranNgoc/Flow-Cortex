@@ -41,6 +41,7 @@ public class ChatTools {
 
     static final int MAX_FOUND = 20;
     static final int MAX_IMAGES = 10;
+    static final int MAX_PRODUCT_VIDEO_IMAGES = 3;
     static final int MAX_TEXT_INPUT_CHARS = 10_000;
     static final String ASPECT_RATIO = "9:16";
 
@@ -149,9 +150,9 @@ public class ChatTools {
             }
             uploads = context.attachments();
         } else if ("product_video".equals(workflow.inputKind())) {
-            if (context.attachments().size() != 1) {
-                return refused("attachments", "Product Video needs exactly one attached product image; ask the "
-                        + "member to attach it to their message.", List.of());
+            if (context.attachments().isEmpty() || context.attachments().size() > MAX_PRODUCT_VIDEO_IMAGES) {
+                return refused("attachments", "Product Video needs 1 to " + MAX_PRODUCT_VIDEO_IMAGES
+                        + " attached product images; ask the member to attach them to their message.", List.of());
             }
             uploads = context.attachments();
             JsonNode raw = args.path("productVideo");

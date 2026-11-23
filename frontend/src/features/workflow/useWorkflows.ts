@@ -142,7 +142,7 @@ export function useRunQuery(runId: string | undefined) {
     queryFn: () => unwrap(getRun(runId as string, authHeaders())),
     enabled: Boolean(runId),
   });
-  useRunEvents(runId, query.data?.status, query.refetch);
+  useRunEvents(runId, query.data?.status, query.refetch, query.data?.steps);
   return query;
 }
 
