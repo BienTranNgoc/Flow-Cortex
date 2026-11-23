@@ -858,6 +858,37 @@ class MediaJobsImpl implements MediaJobs {
         return new MediaOutput(name, bucket, key, mime, (long) bytes.length, null);
     }
 
+    @Override
+    public MediaOutput copyRunObject(UUID runId, int stepOrder, MediaJobInput source, String name) {
+        if (!PLAIN_FILE_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Not a plain file name: " + name.replaceAll("\\p{Cntrl}", "?"));
+        }
+        String bucket = properties.s3().bucket();
+        if (!bucket.equals(source.bucket()) || !MediaJob.isBelow("runs/" + runId + "/", source.objectKey())) {
+            throw new IllegalArgumentException("Only an object of the run in the media bucket can be copied: "
+                    + source.key());
+        }
+        // The backend's store policy lets it write a step's first attempt only, and holds no tagging grant
+        // there; the untagged copy matches no lifecycle rule, so it lives as long as a worker output.
+        String key = MediaJob.outputPrefix(runId, stepOrder, 1) + name;
+        Optional<S3MediaStore.StoredObject> copy;
+        try {
+            store.copyWithoutTags(bucket, source.objectKey(), bucket, key);
+            copy = store.head(bucket, key);
+        } catch (SdkException | IllegalStateException e) {
+            // The message may reach a step's error message; where the object was going stays in the log.
+            LOG.warn("Run object not copied: bucket={} key={} source={}", bucket, key, source.objectKey(), e);
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", e);
+        }
+        if (copy.isEmpty()) {
+            LOG.warn("Run object not found after its copy: bucket={} key={} source={}", bucket, key,
+                    source.objectKey());
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", null);
+        }
+        LOG.info("Run object copied: bucket={} key={} bytes={}", bucket, key, copy.get().size());
+        return new MediaOutput(name, bucket, key, copy.get().contentType(), copy.get().size(), null);
+    }
+
     private static UploadRejectedException refused(String bucket, String key, String reason,
             LocalizedMessage detail) {
         LOG.info("Upload refused at run start: bucket={} key={} reason={}", bucket, key, reason);

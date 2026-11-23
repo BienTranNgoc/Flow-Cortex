@@ -197,7 +197,7 @@ class WorkflowVersionServiceImpl implements WorkflowVersionService {
                 .orElseThrow(() -> refused("versionId"));
         versionWriter.pointAndRelease(workflow, target);
         return WorkflowMapper.toWorkflowView(workflow, liveSteps(workflow), registry::isRemote,
-                registry::isAvailable, workflow.getPublishedVersionId(), null);
+                registry::isAvailable, registry::snapshotsRunInputs, workflow.getPublishedVersionId(), null);
     }
 
     @Override

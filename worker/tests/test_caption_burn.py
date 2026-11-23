@@ -111,6 +111,20 @@ def test_odd_dimensions_are_made_even_and_cropped_in_the_filter(tmp_path: Path) 
     assert "PlayResX: 320\nPlayResY: 320\n" in (tmp_path / caption_burn.ASS_NAME).read_text()
 
 
+@pytest.mark.parametrize("start", [0, 1e308])
+def test_a_word_time_too_large_for_centiseconds_is_a_contract_violation(
+    tmp_path: Path, start: float
+) -> None:
+    source = tmp_path / "in.mp4"
+    source.write_bytes(b"x")
+    words = [{"word": "a", "start": start, "end": 1e308}]
+    job = cast(Any, SimpleNamespace(params={"words": words, "startOffset": 0}))
+    runner = cast(ProcessRunner, FakeRunner([probe([{"width": 320, "height": 320}])]))
+    with pytest.raises(PermanentError) as excinfo:
+        caption_burn.handle(job, {"video": source}, runner)
+    assert excinfo.value.code == "contract_violation"
+
+
 def test_one_pixel_dimension_is_refused(tmp_path: Path) -> None:
     runner = cast(ProcessRunner, FakeRunner([probe([{"width": 1, "height": 1080}])]))
     with pytest.raises(PermanentError, match="usable dimensions"):

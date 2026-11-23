@@ -41,6 +41,7 @@ export const ACTION_LABEL_KEYS = {
   'workflow.workflow.export': 'roles.catalog.actions.workflow.workflow.export',
   'payment.setting.view': 'roles.catalog.actions.payment.setting.view',
   'payment.setting.update': 'roles.catalog.actions.payment.setting.update',
+  'user.account.export': 'roles.catalog.actions.user.account.export',
 } satisfies Record<PermissionKey, string>;
 
 const ACTION_KEYS: Readonly<Record<string, string>> = ACTION_LABEL_KEYS;

@@ -187,7 +187,8 @@
           "update": "Sửa tài khoản",
           "change_role": "Đổi vai trò",
           "suspend": "Tạm khóa tài khoản",
-          "delete": "Xóa tài khoản"
+          "delete": "Xóa tài khoản",
+          "export": "Xuất danh sách tài khoản"
         }
       },
       "workflow": {
