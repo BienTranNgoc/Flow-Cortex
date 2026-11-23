@@ -8,6 +8,7 @@ import {
 } from './documentModel';
 
 const section = (items: unknown): Section => ({
+  id: 'section-index',
   type: 'legalIndex',
   schemaVersion: 1,
   data: { items },
