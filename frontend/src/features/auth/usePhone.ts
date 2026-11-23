@@ -5,7 +5,7 @@ import {
   changeCancel,
   changeStart,
   changeVerify,
-  current1 as current,
+  getMyPhone,
   sendCode,
   unwrap,
   verify,
@@ -20,7 +20,7 @@ const ME_KEY = ['me'] as const;
 export function usePhoneQuery() {
   return useQuery({
     queryKey: PHONE_KEY,
-    queryFn: () => unwrap(current(authHeaders())),
+    queryFn: () => unwrap(getMyPhone(authHeaders())),
   });
 }
 

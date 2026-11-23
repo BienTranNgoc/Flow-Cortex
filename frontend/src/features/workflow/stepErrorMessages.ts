@@ -13,6 +13,7 @@ const SENTENCE_KEYS: Record<string, string> = {
   speech_too_long: 'workflow.stepError.speech_too_long',
   provider_timeout: 'workflow.stepError.provider_timeout',
   APPROVAL_REJECTED: 'workflow.stepError.APPROVAL_REJECTED',
+  REVIEW_EXPIRED: 'workflow.stepError.REVIEW_EXPIRED',
   load_template_invalid_input: 'workflow.stepError.load_template_invalid_input',
   load_template_not_found: 'workflow.stepError.load_template_not_found',
   load_template_invalid_template: 'workflow.stepError.load_template_invalid_template',

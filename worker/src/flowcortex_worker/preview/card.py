@@ -55,6 +55,7 @@ from flowcortex_worker.preview.vocabulary import (
     HANDHELD_PARAMS,
     HUMAN_HEIGHT_M,
     INSERT_WIDTH_M,
+    MAX_FRAME_COUNT,
     MOTION_BY_MOVE,
     MOVES,
     ORBIT_DEG,
@@ -294,6 +295,11 @@ def build_card(doc: Any, shot_id: str, aspect: str) -> Card:
         raise ValueError(
             f"Shot {label}: durationTargetMs must be a finite number whose frame count fits"
         ) from None
+    if frame_count > MAX_FRAME_COUNT:
+        raise ValueError(
+            f"Shot {label}: durationTargetMs gives {frame_count} frames; "
+            f"a preview holds at most {MAX_FRAME_COUNT} ({MAX_FRAME_COUNT // FPS} s)"
+        )
     frame["frameCount"] = frame_count
 
     characters = {

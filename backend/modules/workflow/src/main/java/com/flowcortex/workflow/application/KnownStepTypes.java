@@ -1,5 +1,8 @@
 package com.flowcortex.workflow.application;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -27,8 +30,6 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 @Constraint(validatedBy = KnownStepTypes.Validator.class)
 @interface KnownStepTypes {
 
-    String APPROVAL_CHECKPOINT = "APPROVAL_CHECKPOINT";
-
     String message() default "unknown step type";
 
     Class<?>[] groups() default {};
@@ -47,13 +48,17 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
 
+        private static final ObjectMapper CONFIG_READER = new ObjectMapper();
+        private static final String INSTRUCTION = "instruction";
+        private static final int MAX_INSTRUCTION_CHARACTERS = 2000;
+
         @Override
         public boolean isValid(Definition definition, ConstraintValidatorContext context) {
             boolean valid = true;
             // The caller's type goes in as a message parameter, which is inserted literally rather
             // than interpolated; the template itself holds only the registry's own type names.
             Set<String> allowedTypes = new TreeSet<>(definition.knownTypes());
-            allowedTypes.add(APPROVAL_CHECKPOINT);
+            allowedTypes.addAll(HumanSteps.TYPES);
             String template = "unknown capability '{type}'; allowed: " + String.join(", ", allowedTypes);
             HibernateConstraintValidatorContext hibernateContext =
                     context.unwrap(HibernateConstraintValidatorContext.class);
@@ -123,7 +128,43 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
+            if (fault == null && HumanSteps.QA_REVIEW.equals(step.type())) {
+                return qaReviewFault(step.config());
+            }
             return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
+        }
+
+        /**
+         * What is wrong with a {@code qa.review} config, or {@code null}. Runs after
+         * {@link StoredWithOutputsResolver#declarationFault}, so the config is absent or a JSON object here.
+         */
+        private static String qaReviewFault(String config) {
+            if (config == null || config.isBlank()) {
+                return null;
+            }
+            JsonNode root;
+            try {
+                root = CONFIG_READER.readTree(config);
+            } catch (JsonProcessingException e) {
+                return "config is not JSON";
+            }
+            for (String key : (Iterable<String>) root::fieldNames) {
+                if (!INSTRUCTION.equals(key)) {
+                    return "qa.review config takes only an instruction; found '" + key + "'";
+                }
+            }
+            JsonNode instruction = root.get(INSTRUCTION);
+            if (instruction == null) {
+                return null;
+            }
+            if (!instruction.isTextual()) {
+                return "qa.review instruction must be text";
+            }
+            String text = instruction.textValue();
+            if (text.codePointCount(0, text.length()) > MAX_INSTRUCTION_CHARACTERS) {
+                return "qa.review instruction is over " + MAX_INSTRUCTION_CHARACTERS + " characters";
+            }
+            return null;
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

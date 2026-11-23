@@ -444,6 +444,12 @@ flowcortex:
         enabled: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_ENABLED:true}
         failure-threshold: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_FAILURE_THRESHOLD:5}
         open-duration: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_OPEN_DURATION:PT30S}
+    # Applies accepted provider callbacks to payments; switched off, callbacks wait unapplied.
+    ledger:
+      apply:
+        enabled: ${FLOWCORTEX_BILLING_LEDGER_APPLY_ENABLED:true}
+        interval: ${FLOWCORTEX_BILLING_LEDGER_APPLY_INTERVAL:PT5S}
+        batch-size: ${FLOWCORTEX_BILLING_LEDGER_APPLY_BATCH_SIZE:100}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
@@ -476,6 +482,25 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    # A review nobody decided within expire-after ends as `expired` and stops its run (REVIEW_EXPIRED);
+    # the sweep looks every sweep-interval-ms. Env var + restart.
+    review:
+      expire-after: ${FLOWCORTEX_REVIEW_EXPIRE_AFTER:7d}
+      sweep-interval-ms: 60000
+    qa-review:
+      # ON SENDS RUN CONTENT TO GEMINI: the step's instruction, the run input and the reviewed content
+      # (each cut to 8000 characters, no names or ids) leave for the provider to write the questions.
+      # Off: every QA review asks the standard questions. Env var + restart.
+      ai-questions:
+        enabled: ${FLOWCORTEX_QA_REVIEW_AI_QUESTIONS_ENABLED:false}
+      # A task still waiting for its questions this long after it opened gets the standard ones.
+      generating-timeout: 2m
+      # The model call runs on its own threads so it never starves the shared async pool. `size` run
+      # at once, `queue-capacity` wait; a task arriving with both full gets the standard questions at
+      # once.
+      pool:
+        size: 2
+        queue-capacity: 50
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
@@ -559,6 +584,12 @@ flowcortex:
           attempts: 3
           retry-waits: 10s,30s
           call-timeout: 60s
+        # Questions for a QA review; its worst case (about 42 s) stays under qa-review.generating-timeout.
+        qa-questions:
+          models: gemini-3.5-flash-lite
+          attempts: 2
+          retry-waits: 2s
+          call-timeout: 20s
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
   # up). The assistant switch and the four daily limits below are configured here and changed at
   # runtime in the console Settings page; FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED=false keeps the
