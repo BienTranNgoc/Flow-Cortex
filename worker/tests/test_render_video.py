@@ -70,7 +70,7 @@ def inspect_video(path: Path) -> dict[str, Any]:
             "-v",
             "error",
             "-show_entries",
-            "format=duration:stream=codec_type,codec_name,width,height",
+            "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate",
             "-of",
             "json",
             str(path),
@@ -110,18 +110,23 @@ def test_fixture_is_deterministic_vertical_mp4_with_audio(tmp_path: Path) -> Non
     report = inspect_video(first_video.body)
     video = next(stream for stream in report["streams"] if stream["codec_type"] == "video")
     audio = next(stream for stream in report["streams"] if stream["codec_type"] == "audio")
-    assert (video["codec_name"], video["width"], video["height"]) == ("h264", 360, 640)
+    assert (video["codec_name"], video["width"], video["height"], video["r_frame_rate"]) == (
+        "h264",
+        480,
+        854,
+        "30/1",
+    )
     assert audio["codec_name"] == "aac"
     assert 9.9 <= float(report["format"]["duration"]) <= 10.1
 
     expected = {
         "aspectRatio": "9:16",
         "durationSeconds": 10,
-        "height": 640,
+        "height": 854,
         "imageCount": 2,
         "profile": "vertical_ad_v1",
         "renderer": "generated_clip",
-        "width": 360,
+        "width": 480,
     }
     assert first.data == expected
     assert (first_manifest.name, first_manifest.mime) == ("manifest.json", "application/json")
@@ -205,3 +210,29 @@ def test_empty_speech_is_rejected(tmp_path: Path) -> None:
             inputs,
             ProcessRunner(),
         )
+
+
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None,
+    reason="ffmpeg is installed in the worker image",
+)
+def test_short_speech_is_padded_to_target_duration(tmp_path: Path) -> None:
+    keys, inputs = make_media_inputs(tmp_path)
+    subprocess.run(
+        [
+            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t", "7",
+            "-c:a", "pcm_s16le", "-f", "wav", str(inputs["speech"]),
+        ],
+        check=True,
+    )
+
+    outcome = render_video.handle(make_job(keys), inputs, ProcessRunner())
+    video_file = outcome.files[0]
+    assert isinstance(video_file.body, Path)
+    report = inspect_video(video_file.body)
+    audio_streams = [s for s in report["streams"] if s["codec_type"] == "audio"]
+    assert len(audio_streams) == 1
+    assert 9.9 <= float(report["format"]["duration"]) <= 10.1
+    assert outcome.data["durationSeconds"] == 10
+

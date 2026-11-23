@@ -1,0 +1,324 @@
+.drive-memory {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+/* The shell styles every bare `button` with a right margin; Drive buttons sit in gapped rows. */
+.drive-memory .drive-button {
+  margin-right: 0;
+}
+
+.drive-memory__toolbar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+}
+
+.drive-memory__search {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.drive-memory__search input,
+.drive-memory__sort select,
+.drive-memory__date input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: inherit;
+}
+
+.drive-memory__search input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.drive-memory__search input:hover,
+.drive-memory__sort select:hover,
+.drive-memory__date input:hover {
+  border-color: var(--input-border-hover);
+}
+
+.drive-memory__search input:focus-visible,
+.drive-memory__sort select:focus-visible,
+.drive-memory__date input:focus-visible,
+.drive-memory__choice input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.drive-memory__date input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.drive-memory__sort {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-3);
+}
+
+.drive-memory__sort select {
+  width: auto;
+}
+
+/* Lets the panel anchor to the toolbar while the button stays one of its items. */
+.drive-memory__filters {
+  display: contents;
+}
+
+.drive-memory__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: min(80svh, 40rem);
+  overflow-y: auto;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.drive-memory__fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.drive-memory__fieldset legend {
+  padding: 0;
+  margin-bottom: 0.25rem;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.drive-memory__choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--control-h);
+}
+
+.drive-memory__choice input {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.drive-memory__dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.drive-memory__date {
+  display: flex;
+  flex: 1 1 9rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--ink-3);
+}
+
+.drive-memory__error {
+  margin: 0;
+}
+
+.drive-memory__panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.drive-memory__results:focus {
+  outline: none;
+}
+
+.drive-memory__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.drive-memory__count {
+  color: var(--ink-3);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.drive-memory__note {
+  margin: 0 0 0.75rem;
+  color: var(--ink-3);
+}
+
+.drive-memory__busy {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--ink-3);
+}
+
+.drive-memory__pinned > .drive-button {
+  margin-top: 0.75rem;
+}
+
+.drive-memory__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drive-memory__grid > li {
+  min-width: 0;
+}
+
+.drive-memory__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 1.5rem 0;
+}
+
+.drive-memory__empty-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.drive-memory__empty .drive-memory__note {
+  margin-bottom: 0.5rem;
+}
+
+.drive-memory__fullText-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.drive-memory__fullText-failed p {
+  margin: 0;
+}
+
+.drive-memory-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.drive-memory-card[aria-busy='true'] {
+  cursor: progress;
+}
+
+.drive-memory-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--ink-3);
+}
+
+.drive-memory-card__head > svg {
+  flex: none;
+}
+
+.drive-memory-card__title {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.drive-memory-card__preview {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.drive-memory-card__media {
+  width: 100%;
+}
+
+.drive-memory-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+}
+
+.drive-memory-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.drive-memory-card__pin[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+@media (max-width: 767px) {
+  .drive-memory__panel {
+    position: fixed;
+    inset: auto 0 0;
+    width: auto;
+    max-height: 85svh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .drive-memory__sort {
+    flex: 1 1 100%;
+  }
+
+  .drive-memory__sort select {
+    flex: 1;
+  }
+}

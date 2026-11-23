@@ -1,0 +1,100 @@
+{
+  "empty": {
+    "title": "Nothing saved here yet"
+  },
+  "types": {
+    "label": "Content types",
+    "text": "Text",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio"
+  },
+  "add": {
+    "text": "Add text",
+    "image": "Upload image",
+    "video": "Upload video",
+    "audio": "Upload audio"
+  },
+  "list": {
+    "total_one": "{{n}} item",
+    "total_other": "{{n}} items"
+  },
+  "card": {
+    "open": "Open",
+    "edit": "Edit",
+    "delete": "Delete",
+    "openLabel": "Open {{name}}",
+    "editLabel": "Edit {{name}}",
+    "deleteLabel": "Delete {{name}}"
+  },
+  "notice": {
+    "saved": "Saved “{{name}}”."
+  },
+  "form": {
+    "name": "Name",
+    "role": "Role",
+    "text": "Text",
+    "counter": "{{n}} / {{max}}",
+    "save": "Save",
+    "saving": "Saving…",
+    "failed": "We could not save this. Try again."
+  },
+  "validation": {
+    "nameRequired": "Enter a name.",
+    "nameTooLong": "A name can have at most 160 characters.",
+    "textRequired": "Enter some text.",
+    "textTooLong": "The text can have at most 32,768 characters.",
+    "roleRequired": "Choose a role.",
+    "fileRequired": "Choose a file to upload.",
+    "fileType": "This file type is not accepted here. Accepted formats: {{formats}}."
+  },
+  "text": {
+    "title": "Add a text item"
+  },
+  "edit": {
+    "title": "Edit {{name}}",
+    "formLabel": "Edit item",
+    "contentType": "Content type",
+    "file": "File"
+  },
+  "upload": {
+    "title": {
+      "image": "Upload an image",
+      "video": "Upload a video",
+      "audio": "Upload an audio file"
+    },
+    "file": "File",
+    "submit": "Upload",
+    "sending": "Sending {{percent}}%",
+    "saving": "Saving to Drive…",
+    "progress": "Upload progress",
+    "cancelled": "Upload cancelled.",
+    "putFailed": "The upload did not finish. Check your connection and try again.",
+    "tryAgainLater": "Nothing was added to your Drive. Please try again later."
+  },
+  "delete": {
+    "title": "Delete this item?",
+    "message": "“{{name}}” will be removed from your Drive. This cannot be undone.",
+    "confirm": "Delete",
+    "busy": "Deleting…",
+    "done": "Deleted “{{name}}”.",
+    "alreadyGone": "“{{name}}” was already deleted.",
+    "failed": "We could not delete this item. Try again."
+  },
+  "keep": {
+    "title": "Keep in Drive",
+    "submit": "Keep"
+  },
+  "suggestions": {
+    "title": "Suggestions from your recent runs",
+    "hint": "Outputs and inputs of your latest runs that you can keep in Drive.",
+    "empty": "No suggestions yet. Run a workflow and its results will show up here.",
+    "from": "From {{workflow}}",
+    "mediaLabel": "{{kind}} from {{workflow}}",
+    "keep": "Keep",
+    "keepLabel": "Keep {{kind}} from {{workflow}}",
+    "kept": "Kept",
+    "keptAnnouncement": "Kept “{{name}}” in Drive.",
+    "tooLong": "Too long to keep as a text item"
+  }
+}

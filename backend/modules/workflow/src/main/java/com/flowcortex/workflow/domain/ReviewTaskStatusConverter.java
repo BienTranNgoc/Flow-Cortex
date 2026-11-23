@@ -6,7 +6,7 @@ import java.util.Locale;
 
 /**
  * Persists {@link ReviewTaskStatus} as the lowercase wire/DB form ({@code pending}|{@code
- * approved}|{@code rejected}) the {@code review_task} CHECK constraint allows.
+ * approved}|{@code rejected}|{@code expired}) the {@code review_task} CHECK constraint allows.
  */
 @Converter(autoApply = true)
 public class ReviewTaskStatusConverter implements AttributeConverter<ReviewTaskStatus, String> {

@@ -18,7 +18,7 @@
 #   - only with FLOWCORTEX_PRODUCT_VIDEO_ENABLED=true (set it for the stack too):
 #     two PNGs generated in the worker image start a Product Video run, the script
 #     the provider worker writes is approved like a reviewer would, the media worker
-#     renders, the run ends `completed` and its video.mp4 downloads as 9:16 h264
+#     renders, the run ends `completed` and its video.mp4 downloads as 480x854 h264
 #     with an audio track.
 # Needs no internet. Exits non-zero on the first miss.
 #
@@ -223,9 +223,9 @@ code="$(curl -sS -o "$work/video.mp4" -w '%{http_code}' "$url")"
 docker compose cp "$work/video.mp4" worker:/tmp/product-video.mp4 >/dev/null
 video="$(docker compose exec -T worker ffprobe -v error \
   -show_entries stream=codec_type,codec_name,width,height -of json /tmp/product-video.mp4)"
-jq -e 'any(.streams[]; .codec_type == "video" and .codec_name == "h264" and .width * 16 == .height * 9)
+jq -e 'any(.streams[]; .codec_type == "video" and .codec_name == "h264" and .width == 480 and .height == 854)
   and any(.streams[]; .codec_type == "audio")' <<<"$video" >/dev/null \
-  || fail "video.mp4 is not a 9:16 h264 video with audio: $(jq -c . <<<"$video")"
+  || fail "video.mp4 is not a 480x854 h264 video with audio: $(jq -c . <<<"$video")"
 pass "Product Video video.mp4 downloaded and verified"
 
 echo "smoke-probe: all checks passed"
