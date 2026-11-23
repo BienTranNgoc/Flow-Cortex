@@ -153,3 +153,74 @@ send-job per-frame P95 (0.439 s) a capped job takes about 316 s, and about 158 s
 (0.219 s per frame). The enum owner sets the capability's max-runtime above the send figure with
 headroom for runner speed (clean overlay P95 varied 2x between runners): 10 minutes leaves about
 1.9x. Raise the cap only together with that max-runtime.
+
+## Role suggestion (`role_suggest`)
+
+Suggests where the people are in each scene of a normalised clip: it decodes the middle frame of
+every scene and runs the RT-DETR `person` detector (Apache-2.0, `PekingU/rtdetr_r50vd`) on CPU.
+The handler is registered under `role_suggest` in `HANDLER_MODULES` but no job can reach it yet:
+`MediaJob.capability` has no matching value until the owner of the capability enum adds it with
+the lane, the routing and the max-runtime.
+
+| Capability | Image | Preset queue | Lane owner |
+|---|---|---|---|
+| `role_suggest` | `trend-runtime` (`docker build --target trend-runtime worker/`) | `media.trend.jobs` | the change that adds the `MediaCapability` value, its queue and a compose service |
+
+- **Input** — `video` only: the normalised 24 fps clip of at most 60 s, the one `scene_frames`
+  produced.
+- **Params** — `scenes`: `scene_frames`' own list of `{index, startFrame, endFrame}` (other keys
+  such as `frame` are ignored). Frames are integers (a boolean or `24.0` is refused); the scenes
+  start at frame 0, run in order without gaps with `index` counting from 0, `endFrame` is
+  exclusive; at most 288 scenes and a last `endFrame` of at most 1440 (60 s at 24 fps, the most
+  `scene_frames` can produce).
+- **Result** — data `{"suggestions": [{"scene": <index>, "boxes": [[x0, y0, x1, y1, score], …]}]}`,
+  one item per scene, no output files. Boxes are fractions of the frame clamped to 0..1, a score
+  of at least 0.5, best first; a scene with nobody in it has `boxes: []`.
+- **Failures** — a refused scene list, a clip that is not 24/1 fps (the middle frame would not be
+  the operator's), a scene whose middle frame lies past the clip, or another input key is
+  `contract_violation`; a clip over 60 s is `duration_exceeded`; an unreadable file or a failed
+  decode is `probe_failed`; the detector child exiting 3 (no model or no transformers in this
+  image) is `provider_capability_unavailable`; any other detector failure is
+  `provider_request_failed` (the last stderr line, the work directory masked) and a report that
+  does not match the scenes is `provider_response_invalid`. A detector ended by a foreign signal
+  (an out-of-memory kill) is a `TransientError` and is retried.
+- **Process** — the detector runs as `python -m flowcortex_worker.engines.role_suggest`, a child
+  of the job's process runner, so the watchdog's kill reaches it and the default worker never
+  imports torch or transformers. One child loads the model once per job and detects every scene;
+  nothing is kept warm between jobs.
+
+**Image `trend-runtime`** — the torch (CPU) base shared with the audio image
+(`engines/requirements-torch-cpu.txt`), then `engines/requirements-trend.txt` (transformers,
+tokenizers, safetensors, huggingface-hub, hash-pinned wheels; the header documents how it is
+compiled against `uv.lock`). The three model files are downloaded at a pinned revision and checked
+against sha256 digests in `worker/Dockerfile`, and the child loads them with `HF_HUB_OFFLINE=1`, so
+nothing is fetched at run time. Licences and sources: `docker/TREND-LICENSES.md`
+(`/app/licenses`). The stage presets `WORKER_CAPABILITIES=role_suggest` and
+`MEDIA_QUEUE=media.trend.jobs`; the role check refuses that queue until the lane owner adds it, so
+a container started early exits 2 instead of consuming `media.jobs`. SAM 2.1 and Depth Anything
+are not installed here (SAM needs a newer torch than the shared base).
+
+**Engine tests** — `tests/engines/test_trend_engine.py` runs the real model and needs the image:
+the `trend-engines` CI job builds `trend-runtime`, runs it with `--network none` and fails if any
+test is skipped.
+
+### Role suggestion cost
+
+Measured by the `trend-engines` CI job inside the built image: `docker run --cpus=4 --network
+none`, `scripts/role_suggest_bench.py` generating three 480×854 24 fps clips (1 scene of 24 frames,
+10 scenes of 24 frames, 288 scenes of 5 frames over 60 s), three runs each through the real handler
+and `ProcessRunner`. Job seconds are the handler call's wall time, as the watchdog counts it;
+per-scene seconds are the job time minus the child's measured model load, divided by the scene
+count. The scene ceiling is structural (288), not derived from these figures.
+
+| Clip | Scenes | Job P50 / P95 (s) | Per scene P50 / P95 (s) | Model load (s) | CPU | Threads |
+|---|---|---|---|---|---|---|
+| 1 scene × 24 frames | 1 | not yet measured | not yet measured | not yet measured | not yet measured | not yet measured |
+| 10 scenes × 24 frames | 10 | not yet measured | not yet measured | not yet measured | not yet measured | not yet measured |
+| 288 scenes × 5 frames | 288 | not yet measured | not yet measured | not yet measured | not yet measured | not yet measured |
+
+The figures come from the job log of the first `trend-engines` run on the pull request (step
+"Measure the role suggestion cost"). The enum owner sets
+`flowcortex.media.max-runtime.role_suggest` from the 288-scene P95 with headroom for runner speed;
+if the P95 exceeds what a job may take, ADR-0011 promotes the capability to an API provider or
+`worker-gpu-self-host`.
