@@ -231,6 +231,7 @@ export interface MeResponse {
   email?: string;
   name?: string;
   role?: string;
+  roleName: string;
   status?: string;
   hasPassword?: boolean;
   passwordSetupRequired?: boolean;
@@ -6033,10 +6034,34 @@ export type replaceAdminRolePermissionsResponse200 = {
   status: 200;
 };
 
+export type replaceAdminRolePermissionsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replaceAdminRolePermissionsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type replaceAdminRolePermissionsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
 export type replaceAdminRolePermissionsResponseSuccess = replaceAdminRolePermissionsResponse200 & {
   headers: Headers;
 };
-export type replaceAdminRolePermissionsResponse = replaceAdminRolePermissionsResponseSuccess;
+export type replaceAdminRolePermissionsResponseError = (
+  | replaceAdminRolePermissionsResponse404
+  | replaceAdminRolePermissionsResponse409
+  | replaceAdminRolePermissionsResponse422
+) & {
+  headers: Headers;
+};
+
+export type replaceAdminRolePermissionsResponse =
+  replaceAdminRolePermissionsResponseSuccess | replaceAdminRolePermissionsResponseError;
 
 export const getReplaceAdminRolePermissionsUrl = (code: string) => {
   return `/api/v1/admin/roles/${code}/permissions`;
@@ -11828,15 +11853,36 @@ export const listAdminRoles = async (
   });
 };
 
-export type createAdminRoleResponse200 = {
+export type createAdminRoleResponse201 = {
   data: RoleResponse;
-  status: 200;
+  status: 201;
 };
 
-export type createAdminRoleResponseSuccess = createAdminRoleResponse200 & {
+export type createAdminRoleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminRoleResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminRoleResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createAdminRoleResponseSuccess = createAdminRoleResponse201 & {
   headers: Headers;
 };
-export type createAdminRoleResponse = createAdminRoleResponseSuccess;
+export type createAdminRoleResponseError = (
+  createAdminRoleResponse400 | createAdminRoleResponse409 | createAdminRoleResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminRoleResponse = createAdminRoleResponseSuccess | createAdminRoleResponseError;
 
 export const getCreateAdminRoleUrl = () => {
   return `/api/v1/admin/roles`;
@@ -13665,10 +13711,19 @@ export type getAdminRoleResponse200 = {
   status: 200;
 };
 
+export type getAdminRoleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
 export type getAdminRoleResponseSuccess = getAdminRoleResponse200 & {
   headers: Headers;
 };
-export type getAdminRoleResponse = getAdminRoleResponseSuccess;
+export type getAdminRoleResponseError = getAdminRoleResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminRoleResponse = getAdminRoleResponseSuccess | getAdminRoleResponseError;
 
 export const getGetAdminRoleUrl = (code: string) => {
   return `/api/v1/admin/roles/${code}`;
@@ -13684,15 +13739,31 @@ export const getAdminRole = async (
   });
 };
 
-export type deleteAdminRoleResponse200 = {
+export type deleteAdminRoleResponse204 = {
   data: void;
-  status: 200;
+  status: 204;
 };
 
-export type deleteAdminRoleResponseSuccess = deleteAdminRoleResponse200 & {
+export type deleteAdminRoleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminRoleResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminRoleResponseSuccess = deleteAdminRoleResponse204 & {
   headers: Headers;
 };
-export type deleteAdminRoleResponse = deleteAdminRoleResponseSuccess;
+export type deleteAdminRoleResponseError = (
+  deleteAdminRoleResponse404 | deleteAdminRoleResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminRoleResponse = deleteAdminRoleResponseSuccess | deleteAdminRoleResponseError;
 
 export const getDeleteAdminRoleUrl = (code: string) => {
   return `/api/v1/admin/roles/${code}`;
@@ -13713,10 +13784,31 @@ export type updateAdminRoleResponse200 = {
   status: 200;
 };
 
+export type updateAdminRoleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminRoleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminRoleResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
 export type updateAdminRoleResponseSuccess = updateAdminRoleResponse200 & {
   headers: Headers;
 };
-export type updateAdminRoleResponse = updateAdminRoleResponseSuccess;
+export type updateAdminRoleResponseError = (
+  updateAdminRoleResponse400 | updateAdminRoleResponse404 | updateAdminRoleResponse409
+) & {
+  headers: Headers;
+};
+
+export type updateAdminRoleResponse = updateAdminRoleResponseSuccess | updateAdminRoleResponseError;
 
 export const getUpdateAdminRoleUrl = (code: string) => {
   return `/api/v1/admin/roles/${code}`;

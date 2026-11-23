@@ -16,28 +16,40 @@ class ForkEligibilityTest {
 
     @Test
     void theOwnerIsRefusedAsOwnEvenWhenForkingIsOff() {
-        assertThat(ForkEligibility.refusal(UUID.randomUUID(), CALLER, false, CALLER)).contains(Refusal.OWN);
+        assertThat(ForkEligibility.refusal(UUID.randomUUID(), CALLER, false, false, CALLER)).contains(Refusal.OWN);
     }
 
     @Test
     void productVideoIsRefusedAsFixed() {
-        assertThat(ForkEligibility.refusal(ProductVideoWorkflow.ID, Workflow.SYSTEM_OWNER_ID, true, CALLER))
+        assertThat(ForkEligibility.refusal(ProductVideoWorkflow.ID, Workflow.SYSTEM_OWNER_ID, true, false, CALLER))
                 .contains(Refusal.FIXED);
     }
 
     @Test
     void aSourceWithForkingOffIsRefusedAsNotAllowed() {
-        assertThat(ForkEligibility.refusal(UUID.randomUUID(), OTHER_OWNER, false, CALLER))
+        assertThat(ForkEligibility.refusal(UUID.randomUUID(), OTHER_OWNER, false, false, CALLER))
+                .contains(Refusal.NOT_ALLOWED);
+    }
+
+    @Test
+    void aForkableSourceHoldingAConnectorCallIsRefusedAsConnectorStep() {
+        assertThat(ForkEligibility.refusal(UUID.randomUUID(), OTHER_OWNER, true, true, CALLER))
+                .contains(Refusal.CONNECTOR_STEP);
+    }
+
+    @Test
+    void forkingOffIsNamedBeforeTheConnectorStep() {
+        assertThat(ForkEligibility.refusal(UUID.randomUUID(), OTHER_OWNER, false, true, CALLER))
                 .contains(Refusal.NOT_ALLOWED);
     }
 
     @Test
     void anotherMembersForkableWorkflowIsAllowed() {
-        assertThat(ForkEligibility.refusal(UUID.randomUUID(), OTHER_OWNER, true, CALLER)).isEmpty();
+        assertThat(ForkEligibility.refusal(UUID.randomUUID(), OTHER_OWNER, true, false, CALLER)).isEmpty();
     }
 
     @Test
     void douyinWithForkingOnIsAllowed() {
-        assertThat(ForkEligibility.refusal(DOUYIN, Workflow.SYSTEM_OWNER_ID, true, CALLER)).isEmpty();
+        assertThat(ForkEligibility.refusal(DOUYIN, Workflow.SYSTEM_OWNER_ID, true, false, CALLER)).isEmpty();
     }
 }

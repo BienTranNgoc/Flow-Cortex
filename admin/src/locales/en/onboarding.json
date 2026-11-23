@@ -6,6 +6,7 @@
     "loading": "Loading…",
     "loadFailed": "Could not load the onboarding sample.",
     "retry": "Retry",
+    "readOnly": "You can view the onboarding sample but not change it.",
     "saveFailed": "Could not save. Please try again."
   },
   "status": {
