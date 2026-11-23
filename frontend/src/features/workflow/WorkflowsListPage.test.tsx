@@ -14,6 +14,7 @@ const CHECK: WorkflowResponse = {
   available: true,
   allowFork: false,
   forkCount: 0,
+  startInput: 'text',
   steps: [],
 };
 
@@ -24,6 +25,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   available: true,
   allowFork: false,
   forkCount: 0,
+  startInput: 'text',
   steps: [],
 };
 
@@ -34,6 +36,7 @@ const DOUYIN: WorkflowResponse = {
   available: true,
   allowFork: false,
   forkCount: 0,
+  startInput: 'text',
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
@@ -47,6 +50,7 @@ const ECHO: WorkflowResponse = {
   available: true,
   allowFork: false,
   forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -57,6 +61,7 @@ const FAIL: WorkflowResponse = {
   available: true,
   allowFork: false,
   forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };
 

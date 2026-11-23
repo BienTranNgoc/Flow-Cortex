@@ -10107,10 +10107,18 @@ components:
           - string
           - "null"
           format: uuid
+        startInput:
+          type: string
+          enum:
+          - link
+          - image
+          - upload
+          - text
       required:
       - allowFork
       - available
       - forkCount
+      - startInput
     WorkflowStepResponse:
       type: object
       properties:
