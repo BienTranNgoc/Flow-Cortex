@@ -14,6 +14,7 @@ import pytest
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.handlers import preview_video
 from flowcortex_worker.preview import build_card, dumps, send_card
+from flowcortex_worker.preview.vocabulary import FPS, MAX_FRAME_COUNT
 from flowcortex_worker.runtime import ProcessRunner
 
 FIXTURES = Path(__file__).parent / "fixtures" / "preview"
@@ -172,6 +173,55 @@ def test_a_duration_that_overflows_the_frame_count_is_a_contract_violation(
     assert invocations(blender_log) == []
 
 
+CAP_MS = MAX_FRAME_COUNT * 1000 / FPS
+
+
+@pytest.mark.parametrize("send", [False, True])
+def test_a_shot_over_the_frame_cap_is_refused_before_blender_starts(
+    tmp_path: Path, blender_log: Path, send: bool
+) -> None:
+    doc = document()
+    doc["story"]["shots"][0]["durationTargetMs"] = CAP_MS + 1000 / FPS
+    with pytest.raises(PermanentError, match=str(MAX_FRAME_COUNT)) as refused:
+        run(tmp_path, doc, send=send)
+    assert refused.value.code == "contract_violation"
+    assert invocations(blender_log) == []
+
+
+def test_a_shot_at_the_frame_cap_renders(tmp_path: Path, blender_log: Path) -> None:
+    doc = document()
+    doc["story"]["shots"][0]["durationTargetMs"] = CAP_MS
+    outcome = run(tmp_path, doc)
+    assert outcome.data["frames"] == MAX_FRAME_COUNT
+    assert len(invocations(blender_log)) == 1
+
+
+@pytest.mark.parametrize("depth", [100_000, 1_000_000])
+def test_a_deeply_nested_document_is_a_contract_violation_without_retry(
+    tmp_path: Path, blender_log: Path, depth: int
+) -> None:
+    inputs = stage_inputs(tmp_path)
+    inputs["doc"].write_text("[" * depth + "]" * depth, encoding="utf-8")
+    with pytest.raises(PermanentError) as refused:
+        preview_video.handle(job(), inputs, ProcessRunner())
+    assert refused.value.code == "contract_violation"
+    assert invocations(blender_log) == []
+
+
+@pytest.mark.parametrize("stage", ["build_card", "send_card", "dumps"])
+def test_recursion_while_staging_or_serialising_is_a_contract_violation(
+    tmp_path: Path, blender_log: Path, monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    def too_deep(*args: Any, **kwargs: Any) -> Any:
+        raise RecursionError("maximum recursion depth exceeded")
+
+    monkeypatch.setattr(preview_video, stage, too_deep)
+    with pytest.raises(PermanentError) as refused:
+        run(tmp_path, send=True)
+    assert refused.value.code == "contract_violation"
+    assert invocations(blender_log) == []
+
+
 def test_success_returns_the_preview_card_and_data(tmp_path: Path, blender_log: Path) -> None:
     doc = document()
     outcome = run(tmp_path, doc)
@@ -288,7 +338,7 @@ def test_blender_killed_by_a_signal_is_transient_and_logs_the_tail(
     assert record.exitCode < 0  # type: ignore[attr-defined]
 
 
-def test_missing_blender_is_a_contract_violation(
+def test_missing_blender_is_a_missing_host_capability(
     tmp_path: Path, blender_log: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     for value in (str(tmp_path / "absent"), str(tmp_path), None):
@@ -299,7 +349,7 @@ def test_missing_blender_is_a_contract_violation(
             monkeypatch.setenv("BLENDER_BIN", value)
         with pytest.raises(PermanentError, match="Blender") as refused:
             run(tmp_path)
-        assert refused.value.code == "contract_violation"
+        assert refused.value.code == "provider_capability_unavailable"
 
 
 def test_exit_zero_without_a_report_is_a_contract_violation(
