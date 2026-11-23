@@ -30,6 +30,12 @@ from .adapter import (
     SpeechAdapter,
     VideoAdapter,
 )
+from .azure_adapter import (
+    PROVIDER_AZURE,
+    AzureSpeechAdapter,
+    FallbackSpeechAdapter,
+    azure_config_from_env,
+)
 from .capabilities import ExecutionContext, execute
 from .contracts.provider_job import ProviderJob
 from .control import ControlClient, ControlConfig
@@ -430,6 +436,19 @@ def _build_script_adapter(
 def _build_speech_adapter(
     provider: str, api_key: str, base_url: str, model: str
 ) -> SpeechAdapter:
+    if provider == PROVIDER_AZURE:
+        primary = AzureSpeechAdapter(azure_config_from_env())
+        fallback_name = os.environ.get("SPEECH_FALLBACK_PROVIDER", PROVIDER_EDGE).strip().lower()
+        if fallback_name == PROVIDER_EDGE:
+            return FallbackSpeechAdapter(
+                primary=primary, fallback=EdgeSpeechAdapter(config_from_env())
+            )
+        if fallback_name in {"", "none", "off", "false"}:
+            return primary
+        raise RuntimeError(
+            f"Unknown SPEECH_FALLBACK_PROVIDER '{fallback_name}'; "
+            f"accepted values: {PROVIDER_EDGE}, none"
+        )
     if provider == PROVIDER_EDGE:
         return EdgeSpeechAdapter(config_from_env())
     if provider == PROVIDER_OPENAI:
@@ -439,7 +458,7 @@ def _build_speech_adapter(
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown SPEECH_PROVIDER '{provider}'; accepted values: "
-        f"{PROVIDER_FIXTURE}, {PROVIDER_EDGE}, {PROVIDER_OPENAI}"
+        f"{PROVIDER_FIXTURE}, {PROVIDER_AZURE}, {PROVIDER_EDGE}, {PROVIDER_OPENAI}"
     )
 
 

@@ -188,19 +188,28 @@ def _generate_speech(
         SpeechIdentity(
             base_identity.provider, requested_voice, base_identity.speed, base_identity.sample_rate
         )
-        if base_identity.provider == "edge"
+        if base_identity.provider in {"azure", "edge"}
         else base_identity
     )
     reused = _reuse_existing_artifact(context, request, identity)
     if reused is not None:
         return reused
     speech = adapter.generate_speech(request, context.abort)
-    if (speech.provider, speech.voice, speech.speed) != (
+    fallback_used = identity.provider == "azure" and speech.provider == "edge"
+    if fallback_used:
+        if speech.voice != identity.voice:
+            raise ValueError("speech fallback adapter returned an unexpected voice")
+        effective_identity = SpeechIdentity(
+            speech.provider, speech.voice, speech.speed, identity.sample_rate
+        )
+    elif (speech.provider, speech.voice, speech.speed) != (
         identity.provider,
         identity.voice,
         identity.speed,
     ):
         raise ValueError("speech adapter returned an identity different from its configuration")
+    else:
+        effective_identity = identity
     data = {
         "profile": request.profile,
         "durationMs": speech.duration_ms,
@@ -208,7 +217,7 @@ def _generate_speech(
         "voice": speech.voice,
         "speed": speech.speed,
         "sourceRevisionId": str(request.source_revision_id),
-        "idempotencyKey": _speech_idempotency_key(request, identity),
+        "idempotencyKey": _speech_idempotency_key(request, effective_identity),
         "format": "wav",
     }
     manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()

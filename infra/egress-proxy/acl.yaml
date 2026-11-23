@@ -15,6 +15,7 @@ default:
     - '*.volces.com'
     - '*.aliyuncs.com'
     - speech.platform.bing.com
+    - '*.tts.speech.microsoft.com'
     - ftp.apnic.net
     - ftp.arin.net
     - ftp.ripe.net

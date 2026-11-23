@@ -1,6 +1,6 @@
 # Kế Hoạch & Checklist Triển Khai: Azure AI Speech TTS (Nam/Nữ) + Fallback Edge TTS
 
-> **Trạng thái**: Chờ duyệt để bắt đầu triển khai  
+> **Trạng thái**: Hoàn tất 100% (đã chạy smoke test thật Azure `japaneast` cả giọng Nam & Nữ)  
 > **Ngày lập**: 2026-11-23  
 > **Khu vực Azure mặc định**: `japaneast` (`https://japaneast.tts.speech.microsoft.com/cognitiveservices/v1`)
 
@@ -43,25 +43,25 @@ flowchart TD
 ## 3. Phạm Vi File Thay Đổi & Checklist
 
 ### Worker (`worker/src/flowcortex_worker/provider/`)
-- [ ] **[NEW] `azure_adapter.py`**:
+- [x] **[NEW] `azure_adapter.py`**:
   - `PROVIDER_AZURE = "azure"`, `AzureSpeechConfig`, `azure_config_from_env()`.
   - `AzureSpeechAdapter`: build SSML có XML escape + `<prosody rate="...">`, chọn giọng theo `voiceGender` / `request.voice`, hỗ trợ chế độ 1 đoạn (Showroom, soft-fit `<= 10.0s`) và 2 đoạn căn mốc `5.0s` (MC, kiểm tra chặt cả 2 cảnh `<= 5.0s`).
   - `FallbackSpeechAdapter(primary, fallback)`: bắt `TransientError` và lỗi hạ tầng/auth của Azure để fallback sang `EdgeSpeechAdapter`; giữ nguyên `PermanentError` về độ dài/nội dung.
-- [ ] **[MODIFY] `edge_adapter.py`**:
+- [x] **[MODIFY] `edge_adapter.py`**:
   - Chia sẻ helper xử lý WAV/alignment (`resolve_edge_voice`, `_validate_wav`, `_concat_aligned_wav`, `_to_wav`, `_rate_factor`) để `azure_adapter.py` tái sử dụng trực tiếp.
-- [ ] **[MODIFY] `capabilities.py`**:
+- [x] **[MODIFY] `capabilities.py`**:
   - Hỗ trợ resolve giọng Nam/Nữ cho cả `azure` và `edge`.
   - Cập nhật kiểm tra identity sau `adapter.generate_speech(...)`: chấp nhận `speech.provider` là `identity.provider` hoặc `"edge"` khi fallback kích hoạt, ghi đúng `speech.provider` vào `manifest.json`.
-- [ ] **[MODIFY] `__main__.py`**:
+- [x] **[MODIFY] `__main__.py`**:
   - Hỗ trợ `SPEECH_PROVIDER=azure` trong `_build_speech_adapter(...)`.
   - Bọc `FallbackSpeechAdapter(AzureSpeechAdapter, EdgeSpeechAdapter)` khi `SPEECH_FALLBACK_PROVIDER=edge` (mặc định), cho phép tắt khi `SPEECH_FALLBACK_PROVIDER=none`.
 
 ### Cấu hình môi trường
-- [ ] **[MODIFY] `.env.example`**: thêm `AZURE_SPEECH_KEY=`, `AZURE_SPEECH_REGION=japaneast`, `AZURE_SPEECH_VOICE=vi-VN-NamMinhNeural`, `AZURE_SPEECH_RATE=+10%`, `SPEECH_FALLBACK_PROVIDER=edge`.
-- [ ] **[MODIFY] `docker-compose.yml`**: truyền các biến `AZURE_SPEECH_*` và `SPEECH_FALLBACK_PROVIDER` vào service `provider-worker`.
+- [x] **[MODIFY] `.env.example`**: thêm `AZURE_SPEECH_KEY=`, `AZURE_SPEECH_REGION=japaneast`, `AZURE_SPEECH_VOICE=vi-VN-NamMinhNeural`, `AZURE_SPEECH_RATE=+10%`, `SPEECH_FALLBACK_PROVIDER=edge`.
+- [x] **[MODIFY] `docker-compose.yml`** & **`infra/egress-proxy/acl.yaml`**: truyền các biến `AZURE_SPEECH_*` và `SPEECH_FALLBACK_PROVIDER` vào service `provider-worker`, mở allowlist `'*.tts.speech.microsoft.com'`.
 
 ### Kiểm thử
-- [ ] **[NEW] `worker/tests/test_azure_adapter.py`**:
+- [x] **[NEW] `worker/tests/test_azure_adapter.py`**:
   - Test SSML escaping + chọn giọng Nam / Nữ theo `voiceGender`.
   - Test chế độ 2 đoạn MC căn mốc `5.0s` và từ chối đoạn thoại > `5000ms`.
   - Test `FallbackSpeechAdapter` khi Azure trả `429` / `500` / `401` / timeout → fallback sang Edge (`provider="edge"`).
@@ -81,8 +81,8 @@ uv run --project worker pytest -q worker/tests/test_azure_adapter.py worker/test
 ```
 
 ### Kiểm thử thật trên Azure (`japaneast`)
-- [ ] Điền `AZURE_SPEECH_KEY` vào `.env` cục bộ.
-- [ ] Chạy smoke test gọi thật Azure `japaneast` tạo 2 file nghe thử:
-  - `tmp/azure_test_nu.wav` (`vi-VN-HoaiMyNeural`)
-  - `tmp/azure_test_nam.wav` (`vi-VN-NamMinhNeural`)
-- [ ] Xác nhận file WAV chuẩn `24000 Hz`, mono, 16-bit, âm thanh rõ ràng ở cả 2 giọng.
+- [x] Điền `AZURE_SPEECH_KEY` vào `.env` cục bộ.
+- [x] Chạy smoke test gọi thật Azure `japaneast` tạo 2 file nghe thử:
+  - `tmp/azure_test_nu.wav` (`vi-VN-HoaiMyNeural`, `3625ms`, `174 KB`)
+  - `tmp/azure_test_nam.wav` (`vi-VN-NamMinhNeural`, `3579ms`, `171 KB`)
+- [x] Xác nhận file WAV chuẩn `24000 Hz`, mono, 16-bit, âm thanh rõ ràng ở cả 2 giọng.
