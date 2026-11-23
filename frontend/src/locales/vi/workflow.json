@@ -247,7 +247,8 @@
     "scene2Title": "Cảnh 2 · Điểm nhấn & Chốt đơn (5s – 10s)",
     "referenceImage": "Ảnh tham chiếu gốc",
     "copyPrompt": "Sao chép gợi ý cảnh",
-    "copied": "Đã sao chép"
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được gợi ý. Hãy chọn đoạn văn bản và tự sao chép."
   },
   "start": {
     "formLabel": "Bắt đầu lượt chạy",
@@ -303,7 +304,10 @@
     "previewPlaceholderTitle": "Tên sản phẩm",
     "previewPlaceholderDesc": "Lời thoại ~25–30 từ cho video dọc 10s.",
     "briefSummary": "Thông tin sản phẩm",
-    "retryWithBrief": "Tạo lại với nội dung này"
+    "retryWithBrief": "Tạo lại với nội dung này",
+    "restoringImages": "Đang khôi phục ảnh sản phẩm từ lượt chạy trước…",
+    "restoreFailed_one": "Không khôi phục được {{count}} ảnh từ lượt chạy trước. Hãy thêm lại ảnh đó trước khi bắt đầu.",
+    "restoreFailed_other": "Không khôi phục được {{count}} ảnh từ lượt chạy trước. Hãy thêm lại các ảnh đó trước khi bắt đầu."
   },
   "validation": {
     "noFile": "Hãy chọn một tệp video hoặc âm thanh để tải lên",

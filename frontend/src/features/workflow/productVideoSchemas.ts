@@ -39,13 +39,6 @@ export const VideoOutputSchema = z.object({
 
 export type VideoOutput = z.infer<typeof VideoOutputSchema>;
 
-const PRODUCT_VIDEO_DELIVERY_STEPS = new Set([
-  'generate_storyboard',
-  'generate_speech',
-  'generate_video',
-  'render_video',
-]);
-
 function parseJsonString(raw: string | undefined): unknown {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -95,15 +88,15 @@ export function parseVideoOutput(rawOutput: string | undefined): VideoOutput | n
   return d;
 }
 
-/** Identifies a Product Video run from workflow capability ID, structured brief, or ad-video steps. */
+/**
+ * A run is a Product Video run only when its workflow is the one the capabilities name; step types
+ * and the brief's shape are not exclusive to it. Until that id is known, no run is.
+ */
 export function isProductVideoRun(
-  run: Pick<RunResponse, 'workflowId' | 'input'> | undefined,
-  steps: readonly RunStepResponse[],
-  productVideoWorkflowId?: string | undefined,
+  run: Pick<RunResponse, 'workflowId'> | undefined,
+  productVideoWorkflowId: string | undefined,
 ): boolean {
-  if (productVideoWorkflowId && run?.workflowId === productVideoWorkflowId) return true;
-  if (steps.some((step) => PRODUCT_VIDEO_DELIVERY_STEPS.has(step.type ?? ''))) return true;
-  return parseProductBrief(run?.input) !== null;
+  return productVideoWorkflowId !== undefined && run?.workflowId === productVideoWorkflowId;
 }
 
 /** Returns the completed `render_video` step and its downloadable final MP4 artifact, if ready. */

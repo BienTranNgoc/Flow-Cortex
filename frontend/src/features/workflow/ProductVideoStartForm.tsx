@@ -153,6 +153,8 @@ export function ProductVideoStartForm({
     readInitialDraft(location.state),
   );
   const [initialImages] = useState<DraftImage[]>(() => readInitialImages(location.state));
+  const [restoringImages, setRestoringImages] = useState(initialImages.length > 0);
+  const [unrestoredImages, setUnrestoredImages] = useState(0);
   const [blankFieldKey, setBlankFieldKey] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -174,21 +176,29 @@ export function ProductVideoStartForm({
     const controller = new AbortController();
     void (async () => {
       const loaded: File[] = [];
+      let failed = 0;
       for (const item of initialImages) {
         try {
           const response = await fetch(item.url, { signal: controller.signal });
-          if (!response.ok) continue;
+          if (!response.ok) {
+            failed += 1;
+            continue;
+          }
           const blob = await response.blob();
           const mime = blob.type || item.mimeType;
           const fileName = normalizeDraftFileName(item.name, mime);
           loaded.push(new File([blob], fileName, { type: mime }));
         } catch {
           if (controller.signal.aborted) return;
+          failed += 1;
         }
       }
-      if (!controller.signal.aborted && loaded.length > 0) {
+      if (controller.signal.aborted) return;
+      if (loaded.length > 0) {
         setFiles((current) => (current.length > 0 ? current : loaded));
       }
+      setUnrestoredImages(failed);
+      setRestoringImages(false);
     })();
     return () => controller.abort();
   }, [initialImages]);
@@ -348,7 +358,7 @@ export function ProductVideoStartForm({
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (phase || startRun.isPending) {
+    if (phase || startRun.isPending || restoringImages) {
       return;
     }
     const blank = TEXT_FIELDS.find((field) => field.required && text[field.name].trim() === '');
@@ -544,6 +554,16 @@ export function ProductVideoStartForm({
                 </p>
               </div>
             )}
+            {restoringImages && (
+              <p className="field-hint" role="status">
+                {t('workflow.productVideo.restoringImages')}
+              </p>
+            )}
+            {unrestoredImages > 0 && (
+              <div className="field-error" role="alert">
+                <p>{t('workflow.productVideo.restoreFailed', { count: unrestoredImages })}</p>
+              </div>
+            )}
           </div>
           {uploadPercent !== null && (
             <progress
@@ -580,8 +600,8 @@ export function ProductVideoStartForm({
             <button
               type="submit"
               className="primary-button"
-              aria-busy={phase !== null || startRun.isPending}
-              disabled={disabled}
+              aria-busy={phase !== null || startRun.isPending || restoringImages}
+              disabled={disabled || restoringImages}
             >
               {startButtonLabel(phase, t)}
             </button>

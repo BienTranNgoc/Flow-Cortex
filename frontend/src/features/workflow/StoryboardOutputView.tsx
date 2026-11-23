@@ -1,5 +1,5 @@
 import { Check, Copy } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { StoryboardOutput } from './productVideoSchemas';
 
@@ -10,7 +10,12 @@ interface StoryboardOutputViewProps {
 /** Displays the two 5-second visual scene prompts planned for the ad video. */
 export function StoryboardOutputView({ storyboard }: Readonly<StoryboardOutputViewProps>) {
   const { t } = useTranslation();
-  const [copiedScene, setCopiedScene] = useState<'scene1' | 'scene2' | null>(null);
+  const [copy, setCopy] = useState<{
+    scene: 'scene1' | 'scene2';
+    outcome: 'copied' | 'failed';
+  } | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(resetTimer.current), []);
 
   const scenes = [
     {
@@ -25,12 +30,17 @@ export function StoryboardOutputView({ storyboard }: Readonly<StoryboardOutputVi
     },
   ];
 
-  const onCopy = (id: 'scene1' | 'scene2', text: string) => {
-    void navigator.clipboard?.writeText(text);
-    setCopiedScene(id);
-    window.setTimeout(() => {
-      setCopiedScene((current) => (current === id ? null : current));
-    }, 1800);
+  const onCopy = async (id: 'scene1' | 'scene2', text: string) => {
+    clearTimeout(resetTimer.current);
+    let outcome: 'copied' | 'failed' = 'copied';
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // No clipboard permission or an insecure origin: the prompt stays selectable on the card.
+      outcome = 'failed';
+    }
+    setCopy({ scene: id, outcome });
+    resetTimer.current = setTimeout(() => setCopy(null), 1800);
   };
 
   return (
@@ -38,7 +48,8 @@ export function StoryboardOutputView({ storyboard }: Readonly<StoryboardOutputVi
       <h3 className="pv-storyboard-title">{t('workflow.storyboard.heading')}</h3>
       <div className="pv-storyboard-grid">
         {scenes.map((scene) => {
-          const isCopied = copiedScene === scene.id;
+          const isCopied = copy?.scene === scene.id && copy.outcome === 'copied';
+          const copyFailed = copy?.scene === scene.id && copy.outcome === 'failed';
           return (
             <article key={scene.id} className="pv-scene-card">
               <div className="pv-scene-header">
@@ -46,7 +57,7 @@ export function StoryboardOutputView({ storyboard }: Readonly<StoryboardOutputVi
                 <button
                   type="button"
                   className="pv-secondary-btn"
-                  onClick={() => onCopy(scene.id, scene.prompt)}
+                  onClick={() => void onCopy(scene.id, scene.prompt)}
                 >
                   {isCopied ? (
                     <>
@@ -61,6 +72,11 @@ export function StoryboardOutputView({ storyboard }: Readonly<StoryboardOutputVi
                   )}
                 </button>
               </div>
+              {copyFailed && (
+                <div className="field-error" role="alert">
+                  <p>{t('workflow.storyboard.copyFailed')}</p>
+                </div>
+              )}
               <p className="pv-scene-prompt">{scene.prompt}</p>
             </article>
           );

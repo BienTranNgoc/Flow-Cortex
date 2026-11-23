@@ -62,11 +62,17 @@ function push(event = 'run.updated') {
   act(() => stream.options.onEvent({ id: null, event, data: '{"runId":"r1"}' }));
 }
 
+/** The workflow the capabilities name as Product Video; a suite of Product Video runs sets it. */
+let productVideoWorkflowId: string | undefined;
+
 /** Every run here has no uploaded files unless a test says otherwise. */
 function stubApi(routes: Record<string, Handler>) {
   return stubApiWithoutInputs({
     'GET /api/v1/runs/r1/inputs': { status: 200, body: [] },
     'GET /api/v1/runs/R1/inputs': { status: 200, body: [] },
+    ...(productVideoWorkflowId && {
+      'GET /api/v1/capabilities': { status: 200, body: { productVideoWorkflowId } },
+    }),
     ...routes,
   });
 }
@@ -196,6 +202,7 @@ describe('RunProgressPage', () => {
     Object.assign(Element.prototype, { scrollIntoView });
   });
   afterEach(() => {
+    productVideoWorkflowId = undefined;
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
     setToken(null);
     vi.unstubAllGlobals();
@@ -246,6 +253,7 @@ describe('RunProgressPage', () => {
     ).toBeInTheDocument();
     await settled(queryClient);
     expect(calls.map((call) => call.path).sort()).toEqual([
+      '/api/v1/capabilities',
       '/api/v1/runs/r1',
       '/api/v1/runs/r1/inputs',
     ]);
@@ -1509,6 +1517,7 @@ describe('RunProgressPage', () => {
       );
       await settled(queryClient);
       expect(calls.map((call) => call.path).sort()).toEqual([
+        '/api/v1/capabilities',
         '/api/v1/runs/r1',
         '/api/v1/runs/r1/inputs',
       ]);
@@ -2061,6 +2070,10 @@ describe('RunProgressPage', () => {
   });
 
   describe('Product Video studio run progress & showcase', () => {
+    beforeEach(() => {
+      productVideoWorkflowId = 'w1';
+    });
+
     function productVideoSteps(completedAll = true): RunStepResponse[] {
       return [
         step({
@@ -2476,7 +2489,12 @@ describe('RunProgressPage', () => {
         );
 
         expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
-        const badge = document.querySelector('.pv-run-badge');
+        // The Product Video view needs the capabilities, which arrive after the run.
+        const badge = await waitFor(() => {
+          const found = document.querySelector('.pv-run-badge');
+          expect(found).not.toBeNull();
+          return found;
+        });
         expect(badge).toHaveTextContent(badgeLabel);
         expect(badge).not.toHaveTextContent('Error');
         expect(badge).toHaveAttribute('data-state', badgeState);
@@ -2597,6 +2615,48 @@ describe('RunProgressPage', () => {
       });
       expect(within(stoppedNode).getByText('Stopped')).toBeInTheDocument();
       await waitFor(() => expect(openStreams()).toHaveLength(0));
+    });
+  });
+
+  describe('a custom workflow that uses Product Video step types', () => {
+    const customRun = run(
+      [
+        step({
+          id: 's1',
+          stepOrder: 1,
+          type: 'generate_speech',
+          mode: 'remote',
+          status: 'completed',
+          output: JSON.stringify({ durationMs: 9200, voice: 'vi-VN-HoaiMyNeural', format: 'wav' }),
+          outputs: [
+            { name: 'speech.wav', mime: 'audio/wav', bytes: 80_000 },
+            { name: 'manifest.json', mime: 'application/json', bytes: 400 },
+          ],
+        }),
+      ],
+      {
+        status: 'completed',
+        input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+      },
+    );
+
+    async function expectGenericView() {
+      expect(await screen.findByRole('button', { name: 'Show raw' })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /Download/ }).length).toBeGreaterThan(0);
+      expect(document.querySelector('.pv-run-shell')).toBeNull();
+    }
+
+    it('keeps downloads and the raw output when the capabilities name another workflow', async () => {
+      productVideoWorkflowId = 'the-product-video-workflow';
+      renderRun(customRun);
+
+      await expectGenericView();
+    });
+
+    it('shows the generic view while the Product Video workflow id is unknown', async () => {
+      renderRun(customRun);
+
+      await expectGenericView();
     });
   });
 });

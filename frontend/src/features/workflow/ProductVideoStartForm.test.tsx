@@ -455,4 +455,111 @@ describe('ProductVideoStartForm', () => {
       vi.stubGlobal('fetch', baseFetch);
     }
   });
+
+  describe('restoring the images of a previous run', () => {
+    const baseFetch = globalThis.fetch;
+    afterEach(() => {
+      vi.stubGlobal('fetch', baseFetch);
+    });
+
+    /** Renders the form arriving with two images to restore; `answer` serves each image URL. */
+    function renderRestoring(answer: (url: string) => Promise<Response>) {
+      stubApi({
+        'GET /api/v1/workflows': { status: 200, body: [PRODUCT_VIDEO] },
+        'GET /api/v1/capabilities': {
+          status: 200,
+          body: {
+            mediaEnabled: true,
+            productVideoEnabled: true,
+            productVideoWorkflowId: PRODUCT_VIDEO_ID,
+          },
+        },
+        [`GET /api/v1/workflows/${PRODUCT_VIDEO_ID}`]: { status: 200, body: PRODUCT_VIDEO },
+      });
+      const stubbedFetch = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : input.toString();
+          return url.startsWith('http://minio.test/') ? answer(url) : stubbedFetch(input, init);
+        }),
+      );
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: `/workflows/${PRODUCT_VIDEO_ID}`,
+                state: {
+                  productDraft: {
+                    productName: 'Royal M239',
+                    description: 'Mũ bảo hiểm 1/2 đầu',
+                    images: [
+                      { name: 'image_1', mimeType: 'image/jpeg', url: 'http://minio.test/image_1' },
+                      { name: 'image_2', mimeType: 'image/jpeg', url: 'http://minio.test/image_2' },
+                    ],
+                  },
+                },
+              },
+            ]}
+          >
+            <Routes>
+              <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+    }
+
+    const jpeg = () =>
+      new Response(new Blob(['imgdata'], { type: 'image/jpeg' }), {
+        status: 200,
+        headers: { 'Content-Type': 'image/jpeg' },
+      });
+
+    it('keeps the images that came back and says how many did not', async () => {
+      renderRestoring((url) =>
+        Promise.resolve(url.endsWith('image_2') ? new Response(null, { status: 403 }) : jpeg()),
+      );
+
+      expect(await screen.findByText('image_1.jpg')).toBeInTheDocument();
+      expect(screen.queryByText('image_2.jpg')).not.toBeInTheDocument();
+      expect(screen.getByText('1 / 3 photos')).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '1 photo from the previous run could not be restored. Add it again before you start.',
+      );
+      expect(screen.queryByText(/Restoring the product photos/)).not.toBeInTheDocument();
+    });
+
+    it('says so when no image came back', async () => {
+      renderRestoring(() => Promise.reject(new TypeError('network down')));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        '2 photos from the previous run could not be restored. Add them again before you start.',
+      );
+      expect(screen.getByText('0 / 3 photos')).toBeInTheDocument();
+    });
+
+    it('shows a loading line and holds the start button while the images are fetched', async () => {
+      let release: (response: Response) => void = () => undefined;
+      const pending = new Promise<Response>((resolve) => (release = resolve));
+      renderRestoring((url) => (url.endsWith('image_1') ? pending : Promise.resolve(jpeg())));
+
+      const loading = await screen.findByText(
+        'Restoring the product photos from the previous run…',
+      );
+      expect(loading).toHaveAttribute('role', 'status');
+      expect(screen.getByRole('button', { name: 'Start run' })).toBeDisabled();
+
+      await act(async () => release(jpeg()));
+
+      await waitFor(() => expect(loading).not.toBeInTheDocument());
+      expect(screen.getByRole('button', { name: 'Start run' })).toBeEnabled();
+      expect(screen.getByText('2 / 3 photos')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -31,6 +31,7 @@ import {
   type StepChoice,
 } from './stepDisplay';
 import { NO_MESSAGE } from './stepErrorMessages';
+import { useCapabilitiesQuery } from './useCapabilities';
 import { useCancelRunMutation, useRunQuery } from './useWorkflows';
 
 const RUN_HEADING_KEYS: Record<string, string> = {
@@ -184,7 +185,8 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     if (stopped) headingRef.current?.focus();
   }, [stopped]);
 
-  const isProductVideo = isProductVideoRun(run, steps);
+  const capabilitiesQuery = useCapabilitiesQuery();
+  const isProductVideo = isProductVideoRun(run, capabilitiesQuery.data?.productVideoWorkflowId);
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
     selected && selectedState

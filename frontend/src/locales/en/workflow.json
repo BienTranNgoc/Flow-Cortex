@@ -247,7 +247,8 @@
     "scene2Title": "Scene 2 · Feature & close (5s – 10s)",
     "referenceImage": "Source product image",
     "copyPrompt": "Copy scene prompt",
-    "copied": "Copied"
+    "copied": "Copied",
+    "copyFailed": "Could not copy the prompt. Select the text and copy it yourself."
   },
   "start": {
     "formLabel": "Start run",
@@ -303,7 +304,10 @@
     "previewPlaceholderTitle": "Product name",
     "previewPlaceholderDesc": "~25–30 words for a 10s vertical video.",
     "briefSummary": "Product brief",
-    "retryWithBrief": "Edit details & start new run"
+    "retryWithBrief": "Edit details & start new run",
+    "restoringImages": "Restoring the product photos from the previous run…",
+    "restoreFailed_one": "{{count}} photo from the previous run could not be restored. Add it again before you start.",
+    "restoreFailed_other": "{{count}} photos from the previous run could not be restored. Add them again before you start."
   },
   "validation": {
     "noFile": "Choose a video or audio file to upload",

@@ -33,6 +33,13 @@ final class ProductVideoClipPair {
             }
             return false;
         }
+
+        Optional<RunStep> siblingOf(UUID stepId) {
+            if (firstClip.getId().equals(stepId)) {
+                return Optional.of(secondClip);
+            }
+            return secondClip.getId().equals(stepId) ? Optional.of(firstClip) : Optional.empty();
+        }
     }
 
     private ProductVideoClipPair() {
