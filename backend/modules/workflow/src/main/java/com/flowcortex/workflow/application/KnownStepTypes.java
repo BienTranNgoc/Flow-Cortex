@@ -1,5 +1,8 @@
 package com.flowcortex.workflow.application;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -16,8 +19,9 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
 /**
  * Every step of a new workflow names a type the engine can run. A type that consumes assets
- * snapshotted at run start is valid only when the workflow starts with that input model;
- * provider-backed remote steps resolve ordinary run/prior-step data and do not share this rule.
+ * snapshotted at run start is valid only when the workflow starts with that input model, or when
+ * it reads the file of an earlier remote or ingest step through {@code outputInputs} (and after an
+ * ingest step it must); provider-backed remote steps resolve ordinary run/prior-step data and do not share this rule.
  * Violations are reported per step as {@code steps[i].type}, the path the shared 400 handler
  * puts under {@code errors}.
  */
@@ -25,8 +29,6 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = KnownStepTypes.Validator.class)
 @interface KnownStepTypes {
-
-    String APPROVAL_CHECKPOINT = "APPROVAL_CHECKPOINT";
 
     String message() default "unknown step type";
 
@@ -36,14 +38,19 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
     /**
      * The steps being created, with the types the registry knows, those of them that take the
-     * assets stored at run start, and those of them that run remotely.
+     * assets stored at run start, those of them that run remotely, and those that copy an upload
+     * into their own output.
      */
     @KnownStepTypes
     record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes,
-            Set<String> remoteTypes) {
+            Set<String> remoteTypes, Set<String> ingestTypes) {
     }
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
+
+        private static final ObjectMapper CONFIG_READER = new ObjectMapper();
+        private static final String INSTRUCTION = "instruction";
+        private static final int MAX_INSTRUCTION_CHARACTERS = 2000;
 
         @Override
         public boolean isValid(Definition definition, ConstraintValidatorContext context) {
@@ -51,7 +58,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             // The caller's type goes in as a message parameter, which is inserted literally rather
             // than interpolated; the template itself holds only the registry's own type names.
             Set<String> allowedTypes = new TreeSet<>(definition.knownTypes());
-            allowedTypes.add(APPROVAL_CHECKPOINT);
+            allowedTypes.addAll(HumanSteps.TYPES);
             String template = "unknown capability '{type}'; allowed: " + String.join(", ", allowedTypes);
             HibernateConstraintValidatorContext hibernateContext =
                     context.unwrap(HibernateConstraintValidatorContext.class);
@@ -61,15 +68,27 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
 
             boolean startsWithStoredInput = !steps.isEmpty()
                     && definition.storedInputTypes().contains(steps.get(0).type());
+            boolean startsWithIngest = !steps.isEmpty() && definition.ingestTypes().contains(steps.get(0).type());
 
             for (int i = 0; i < steps.size(); i++) {
                 String type = steps.get(i).type();
                 if (!allowedTypes.contains(type)) {
                     valid = false;
                     violation(hibernateContext, template, type, i);
-                } else if (definition.storedInputTypes().contains(type) && !startsWithStoredInput) {
-                    valid = false;
-                    violation(hibernateContext, "'{type}' needs an uploaded file, so the workflow must start with a media step", type, i);
+                } else if (i > 0 && definition.storedInputTypes().contains(type)) {
+                    boolean readsEarlierFiles = readsOnlyFileSteps(steps, i, definition);
+                    String refusal = null;
+                    if (startsWithIngest) {
+                        if (!readsEarlierFiles) {
+                            refusal = "'{type}' follows an ingest step, so it must read the file through outputInputs";
+                        }
+                    } else if (!startsWithStoredInput && !readsEarlierFiles) {
+                        refusal = "'{type}' needs an uploaded file, so the workflow must start with a media step";
+                    }
+                    if (refusal != null) {
+                        valid = false;
+                        violation(hibernateContext, refusal, type, i);
+                    }
                 }
                 boolean runsInline = allowedTypes.contains(type) && !definition.remoteTypes().contains(type);
                 String configFault = configFault(steps.get(i), i + 1, runsInline);
@@ -86,13 +105,66 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
             return valid;
         }
 
-        /** What is wrong with the {@code outputInputs} step {@code order} declares in its config, or {@code null}. */
+        /**
+         * Whether step {@code index} declares {@code outputInputs} and every step it names is an earlier remote
+         * or ingest step: those record the file the step reads, an inline text step does not.
+         */
+        private static boolean readsOnlyFileSteps(List<NewWorkflowStep> steps, int index, Definition definition) {
+            List<Integer> sources = StoredWithOutputsResolver.declaredSourceOrders(steps.get(index).config());
+            return !sources.isEmpty() && sources.stream().allMatch(order -> order >= 1 && order <= index
+                    && isFileSource(steps.get(order - 1).type(), definition));
+        }
+
+        private static boolean isFileSource(String type, Definition definition) {
+            return definition.remoteTypes().contains(type) || definition.ingestTypes().contains(type);
+        }
+
+        /**
+         * What is wrong with the config of step {@code order}: its {@code outputInputs} declaration,
+         * then its type's rule; or {@code null}.
+         */
         private static String configFault(NewWorkflowStep step, int order, boolean runsInline) {
             String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
+            if (fault == null && HumanSteps.QA_REVIEW.equals(step.type())) {
+                return qaReviewFault(step.config());
+            }
             return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
+        }
+
+        /**
+         * What is wrong with a {@code qa.review} config, or {@code null}. Runs after
+         * {@link StoredWithOutputsResolver#declarationFault}, so the config is absent or a JSON object here.
+         */
+        private static String qaReviewFault(String config) {
+            if (config == null || config.isBlank()) {
+                return null;
+            }
+            JsonNode root;
+            try {
+                root = CONFIG_READER.readTree(config);
+            } catch (JsonProcessingException e) {
+                return "config is not JSON";
+            }
+            for (String key : (Iterable<String>) root::fieldNames) {
+                if (!INSTRUCTION.equals(key)) {
+                    return "qa.review config takes only an instruction; found '" + key + "'";
+                }
+            }
+            JsonNode instruction = root.get(INSTRUCTION);
+            if (instruction == null) {
+                return null;
+            }
+            if (!instruction.isTextual()) {
+                return "qa.review instruction must be text";
+            }
+            String text = instruction.textValue();
+            if (text.codePointCount(0, text.length()) > MAX_INSTRUCTION_CHARACTERS) {
+                return "qa.review instruction is over " + MAX_INSTRUCTION_CHARACTERS + " characters";
+            }
+            return null;
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

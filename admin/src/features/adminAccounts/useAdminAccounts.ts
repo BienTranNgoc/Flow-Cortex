@@ -5,7 +5,6 @@ import {
   changeAdminAccountRole,
   deactivateAdminAccount,
   listAdminAccounts,
-  listAdminRoles,
   unwrap,
 } from '@flow-cortex/api-client';
 
@@ -28,22 +27,13 @@ export function useAdminAccounts(page: number, role: string, q: string) {
   });
 }
 
-/** The role catalog; `enabled` is false for a caller without `system.role.view`. */
-export function useAdminRoles(enabled: boolean) {
-  return useQuery({
-    queryKey: ['admin', 'roles'],
-    queryFn: () => unwrap(listAdminRoles(authHeaders())),
-    enabled,
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
 function useRefreshAccounts() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ACCOUNTS_KEY }),
       queryClient.invalidateQueries({ queryKey: ['users'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin', 'roles'] }),
     ]);
 }
 
@@ -61,7 +51,9 @@ export function useSetAdminAccountActiveMutation() {
   return useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       unwrap(
-        active ? activateAdminAccount(id, authHeaders()) : deactivateAdminAccount(id, authHeaders()),
+        active
+          ? activateAdminAccount(id, authHeaders())
+          : deactivateAdminAccount(id, authHeaders()),
       ),
     onSuccess: refresh,
   });

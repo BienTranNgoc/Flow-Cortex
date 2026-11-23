@@ -14,6 +14,8 @@ import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
+import { PaymentHistoryPage } from './features/billing/PaymentHistoryPage';
+import { TransactionDetailPage } from './features/billing/TransactionDetailPage';
 import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
@@ -22,11 +24,13 @@ import { ChatPage } from './features/chat/ChatPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
+import { PhoneGate } from './features/auth/PhoneGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
 import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
 import { NotificationsPage } from './features/notifications/NotificationsPage';
@@ -105,13 +109,26 @@ export function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <PasswordSetupGate>
+                    <Outlet />
+                  </PasswordSetupGate>
+                </RequireAuth>
+              }
+            >
+              <Route path="/verify-phone" element={<VerifyPhonePage />} />
+            </Route>
           </Route>
           <Route
             element={
               <RequireAuth>
                 <PasswordSetupGate>
-                  <Layout />
-                  <OnboardingFlowWhenOn />
+                  <PhoneGate>
+                    <Layout />
+                    <OnboardingFlowWhenOn />
+                  </PhoneGate>
                 </PasswordSetupGate>
               </RequireAuth>
             }
@@ -119,6 +136,11 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="billing/transactions" element={<PaymentHistoryPage />} />
+              <Route
+                path="billing/transactions/:transactionId"
+                element={<TransactionDetailPage />}
+              />
               <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />

@@ -65,10 +65,41 @@ def test_a_handler_that_fails_to_import_stops_the_worker_when_accepted() -> None
     assert "probe" in str(refused.value)
 
 
-def test_no_accepted_list_loads_every_row() -> None:
+def test_no_accepted_list_loads_every_row_that_is_not_opt_in() -> None:
     handlers = registry.load_handlers(None)
 
-    assert set(handlers) == set(registry.HANDLER_MODULES)
+    assert set(handlers) == set(registry.HANDLER_MODULES) - registry.OPT_IN_CAPABILITIES
+
+
+def test_the_capabilities_that_need_a_dedicated_image_are_opt_in() -> None:
+    assert set(registry.OPT_IN_CAPABILITIES) == {"preview_video", "clean_overlay"}
+    assert set(registry.HANDLER_MODULES) >= registry.OPT_IN_CAPABILITIES
+
+
+@pytest.mark.parametrize("capability", sorted(registry.OPT_IN_CAPABILITIES))
+def test_an_opt_in_capability_loads_only_when_named(capability: str) -> None:
+    assert capability not in registry.load_handlers(None)
+    assert set(registry.load_handlers(frozenset({capability}))) == {capability}
+    assert capability in registry.load_handlers(frozenset({capability, "probe"}))
+
+
+@pytest.mark.parametrize("capability", sorted(registry.OPT_IN_CAPABILITIES))
+def test_a_generic_worker_refuses_an_opt_in_job_permanently_and_names_what_it_serves(
+    capability: str,
+) -> None:
+    generic = registry.Registry(registry.load_handlers(None), None)
+
+    with pytest.raises(PermanentError) as refused:
+        generic.resolve(capability)
+
+    assert refused.value.code == "contract_violation"
+    assert "not accepted by this worker" in refused.value.message
+    assert "probe" in refused.value.message
+
+
+def test_the_module_level_resolve_does_not_serve_an_opt_in_capability() -> None:
+    with pytest.raises(PermanentError, match="not accepted"):
+        registry.resolve("preview_video")
 
 
 def test_the_video_analysis_capabilities_are_registered() -> None:
@@ -103,3 +134,14 @@ def test_the_default_registry_resolves_every_capability() -> None:
 
 def test_the_module_level_resolve_returns_the_render_handler() -> None:
     assert registry.resolve("render_video") is render_video.handle
+
+
+def test_the_audio_capabilities_sit_beside_the_default_rows() -> None:
+    for capability in ("separate_audio", "speakers", "beats", "caption_burn"):
+        assert capability in registry.HANDLER_MODULES
+
+
+def test_an_audio_only_worker_loads_just_its_handler() -> None:
+    handlers = registry.load_handlers(frozenset({"separate_audio"}))
+
+    assert set(handlers) == {"separate_audio"}

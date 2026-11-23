@@ -4,6 +4,7 @@ import com.flowcortex.connector.application.http.HttpConnectorService;
 import com.flowcortex.connector.application.http.HttpConnectorService.Saved;
 import com.flowcortex.connector.application.http.HttpConnectorService.SaveCommand;
 import com.flowcortex.connector.application.http.HttpConnectorService.Summary;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -58,6 +59,7 @@ class HttpConnectorController {
                 request.extraHeaders()));
     }
 
+    @Operation(operationId = "listHttpConnectors")
     @GetMapping
     List<Summary> list(@AuthenticationPrincipal Jwt jwt) {
         return service.list(member.id(jwt));

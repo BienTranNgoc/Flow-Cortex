@@ -56,11 +56,274 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/reviews/{reviewId}/helpful:
+    put:
+      tags:
+      - workflow-reviews-controller
+      operationId: setWorkflowReviewHelpful
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: reviewId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HelpfulRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelpfulResponse"
+  /api/v1/workflows/{id}/reviews/mine:
+    get:
+      tags:
+      - workflow-reviews-controller
+      operationId: getMyWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+    put:
+      tags:
+      - workflow-reviews-controller
+      operationId: putMyWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewResponse"
+    delete:
+      tags:
+      - workflow-reviews-controller
+      operationId: deleteMyWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/v1/workflows/{id}/data/{key}:
+    get:
+      tags:
+      - workflow-data-store-controller
+      operationId: getWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataEntryResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - workflow-data-store-controller
+      operationId: putWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutDataEntryRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataEntryResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - workflow-data-store-controller
+      operationId: deleteWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/bookmark:
+    get:
+      tags:
+      - workflow-bookmarks-controller
+      operationId: getWorkflowBookmark
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkResponse"
+    put:
+      tags:
+      - workflow-bookmarks-controller
+      operationId: setWorkflowBookmark
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookmarkRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkResponse"
   /api/v1/users/{id}:
     get:
       tags:
       - users-controller
-      operationId: get
+      operationId: getUser
       parameters:
       - name: id
         in: path
@@ -228,7 +491,7 @@ paths:
     get:
       tags:
       - own-profile-controller
-      operationId: get_1
+      operationId: getOwnProfile
       responses:
         "200":
           description: OK
@@ -406,6 +669,49 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "409":
           description: "transition-not-allowed, request-state-changed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/{number}/assignee:
+    put:
+      tags:
+      - admin-request-controller
+      operationId: assignAdminSupportRequest
+      parameters:
+      - name: number
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportRequestAssignee"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestDetail"
+        "400":
+          description: validation-failed (errors.assigneeId)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "request-closed, request-state-changed"
           content:
             application/problem+json:
               schema:
@@ -627,6 +933,293 @@ paths:
                 $ref: "#/components/schemas/AdminSetting"
         "404":
           description: not-found (unknown key)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/roles/{code}/permissions:
+    put:
+      tags:
+      - admin-roles-controller
+      operationId: replaceAdminRolePermissions
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplacePermissionsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "Someone else changed the keys of role {0}. Reload it and try\
+            \ again."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "ROLE_NOT_EDITABLE, PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY,\
+            \ PERMISSION_SET_INCONSISTENT"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/payment-settings/{key}:
+    put:
+      tags:
+      - payment-settings-admin-controller
+      operationId: updatePaymentSetting
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentSettingUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentSettingView"
+        "400":
+          description: "validation-failed (errors.value, errors.reason)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: forbidden (needs payment.setting.update)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (key is not a payment setting)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: paymentSetting.reasonRequired (errors.reason) or setting.invalidValue
+            (errors.value)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/onboarding/sample:
+    get:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: getAdminOnboardingSample
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: updateAdminOnboardingSample
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOnboardingSampleUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: "validation-failed (errors.workflowId, errors.sampleInput,\
+            \ errors.sourceLocale)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: ONBOARDING_SAMPLE_INELIGIBLE (errors.workflowId says why);
+            the stored sample is unchanged
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/onboarding/sample/translations/{locale}:
+    put:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: updateAdminOnboardingSampleTranslation
+      parameters:
+      - name: locale
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOnboardingSampleTranslationUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: "validation-failed (errors.input, errors.sourceHash)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: no sample is set
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: the sample changed since sourceHash was read; nothing was stored
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: the sample's own language has no translation (errors.locale)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/documents/{slug}:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: getContentDocumentDraft
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentDraft"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-content-documents-controller
+      operationId: saveContentDocumentDraft
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveContentDocumentDraftRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentDraft"
+        "400":
+          description: "document-invalid (errors by field path), validation-failed"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: version-conflict (currentVersion)
           content:
             application/problem+json:
               schema:
@@ -1044,6 +1637,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+  /api/v1/workflows/{id}/reviews/{reviewId}/report:
+    post:
+      tags:
+      - workflow-reviews-controller
+      operationId: reportWorkflowReview
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: reviewId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportedResponse"
+  /api/v1/workflows/{id}/reviews/image-uploads:
+    post:
+      tags:
+      - workflow-review-image-uploads-controller
+      operationId: createReviewImageUpload
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
   /api/v1/workflows/{id}/regenerate-key:
     post:
       tags:
@@ -1216,24 +1865,149 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/fork:
+    post:
+      tags:
+      - workflows-controller
+      operationId: forkWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+  /api/v1/workflow-examples/{exampleId}/workflows:
+    post:
+      tags:
+      - workflow-examples-controller
+      operationId: useWorkflowExample
+      parameters:
+      - name: exampleId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/users:
     get:
       tags:
       - users-controller
-      operationId: list
+      operationId: listUsers
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+          minLength: 0
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]{0,19}$"
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - active
+          - pending_confirmation
+          - locked
+          - suspended
+          pattern: active|pending_confirmation|locked|suspended
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - email
+          - name
+          pattern: newest|oldest|email|name
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserResponse"
+                $ref: "#/components/schemas/PageViewUserResponse"
     post:
       tags:
       - users-controller
-      operationId: create
+      operationId: createUser
       requestBody:
         content:
           application/json:
@@ -1865,7 +2639,30 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
+        "400":
+          description: malformed Idempotency-Key
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, or REVIEW_EXPIRED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
           content:
@@ -1884,12 +2681,97 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ApproveReviewTaskRequest"
       responses:
+        "400":
+          description: malformed Idempotency-Key
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, or REVIEW_EXPIRED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "pickedOption refused (errors.pickedOption), empty content,\
+            \ or a stopping run"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTaskResponse"
+  /api/v1/review-tasks/{taskId}/answers:
+    post:
+      tags:
+      - review-tasks-controller
+      operationId: answerTask
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerReviewTaskRequest"
+        required: true
+      responses:
+        "400":
+          description: malformed Idempotency-Key or answers
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, REVIEW_EXPIRED, or REVIEW_QUESTIONS_NOT_READY"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "REVIEW_NOT_QA, an answer that does not fit (errors.answers.<id>),\
+            \ or a stopping run"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
           content:
@@ -1943,7 +2825,7 @@ paths:
     post:
       tags:
       - profile-images-controller
-      operationId: requestUpload_1
+      operationId: requestProfileImageUpload
       requestBody:
         content:
           application/json:
@@ -2263,11 +3145,149 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+  /api/v1/me/phone/change/verify:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeVerify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/phone/change/start:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeStart
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeStartRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendCodeResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/phone/change/cancel:
+    post:
+      tags:
+      - phone-controller
+      operationId: changeCancel
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneResponse"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/first-result/claim:
+    post:
+      tags:
+      - first-result-controller
+      operationId: claimFirstResult
+      responses:
+        "200":
+          description: "the account's first completed run, reported now"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstResultClaimResponse"
+        "204":
+          description: "nothing to report: no completed run, or already reported"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstResultClaimResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the account is suspended
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: the token's user no longer exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/api-tokens:
     get:
       tags:
       - personal-access-token-controller
-      operationId: list_1
+      operationId: listApiTokens
       responses:
         "200":
           description: OK
@@ -2292,7 +3312,7 @@ paths:
     post:
       tags:
       - personal-access-token-controller
-      operationId: create_1
+      operationId: createApiToken
       requestBody:
         content:
           application/json:
@@ -2561,7 +3581,7 @@ paths:
     get:
       tags:
       - http-connector-controller
-      operationId: list_2
+      operationId: listHttpConnectors
       responses:
         "200":
           description: OK
@@ -3254,6 +4274,84 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/workflows/import:
+    post:
+      tags:
+      - admin-workflow-transfer-controller
+      operationId: importAdminWorkflow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportWorkflowRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+        "200":
+          description: The token had already produced this workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflows/import/review:
+    post:
+      tags:
+      - admin-workflow-transfer-controller
+      operationId: reviewAdminWorkflowImport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowArtifact"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportReviewResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "413":
+          description: Content Too Large
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/requests/{number}/messages:
     post:
       tags:
@@ -3306,6 +4404,30 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "503":
           description: attachments-unavailable (uploadIds sent)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/bulk-assign:
+    post:
+      tags:
+      - admin-request-controller
+      operationId: bulkAssignAdminSupportRequests
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSupportBulkAssign"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportBulkAssignResult"
+        "400":
+          description: "validation-failed (errors.numbers, errors.assigneeId)"
           content:
             application/problem+json:
               schema:
@@ -3469,6 +4591,199 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminRunDetailResponse"
+  /api/v1/admin/roles:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleResponse"
+    post:
+      tags:
+      - admin-roles-controller
+      operationId: createAdminRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "A role named ''{0}'' already exists"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY, PERMISSION_SET_INCONSISTENT"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/media:
+    get:
+      tags:
+      - admin-content-media-controller
+      operationId: listContentMedia
+      parameters:
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: image|video
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 24
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewContentMediaItem"
+        "400":
+          description: validation-failed (errors by parameter name)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - admin-content-media-controller
+      operationId: registerContentMedia
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterContentMediaRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentMediaItem"
+        "400":
+          description: "content-media-rejected, validation-failed (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: content-media-unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/media/uploads:
+    post:
+      tags:
+      - admin-content-media-controller
+      operationId: requestContentMediaUpload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentMediaUploadRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadGrant"
+        "400":
+          description: "content-media-rejected, validation-failed (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: content-media-unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/documents/{slug}/publish:
+    post:
+      tags:
+      - admin-content-documents-controller
+      operationId: publishContentDocument
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishContentDocumentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentPublication"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "version-conflict (currentVersion), nothing-to-publish"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: document-incomplete (fields)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/ai/providers/{providerKey}/test:
     post:
       tags:
@@ -4470,6 +5785,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/roles/{code}:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: getAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-roles-controller
+      operationId: deleteAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "role.systemImmutable, role.hasAccounts"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - admin-roles-controller
+      operationId: updateAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "role.nameTaken, role.systemImmutable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts/{id}/role:
     patch:
       tags:
@@ -4575,6 +5986,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareSettingsResponse"
+  /api/v1/workflows/{id}/reviews:
+    get:
+      tags:
+      - workflow-reviews-controller
+      operationId: listWorkflowReviews
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - helpful
+          pattern: newest|helpful
+      - name: rating
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 5
+          minimum: 1
+      - name: withComment
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: withImages
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewPageResponse"
+  /api/v1/workflows/{id}/reviews/summary:
+    get:
+      tags:
+      - workflow-reviews-controller
+      operationId: getWorkflowReviewSummary
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSummaryResponse"
   /api/v1/workflows/{id}/link-grants:
     get:
       tags:
@@ -4738,6 +6235,37 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/workflows/{id}/data:
+    get:
+      tags:
+      - workflow-data-store-controller
+      operationId: listWorkflowData
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataEntryListResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows/{id}/access-log:
     get:
       tags:
@@ -4823,6 +6351,122 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SharedWorkflowResponse"
+  /api/v1/workflows/bookmarked:
+    get:
+      tags:
+      - workflow-bookmarks-controller
+      operationId: listBookmarkedWorkflows
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookmarkedWorkflowPageResponse"
+  /api/v1/workflow-examples:
+    get:
+      tags:
+      - workflow-examples-controller
+      operationId: listWorkflowExamples
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowExampleResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/users/stats:
+    get:
+      tags:
+      - users-controller
+      operationId: getUserStats
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+  /api/v1/users/export:
+    get:
+      tags:
+      - user-export-controller
+      operationId: exportUsers
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+          minLength: 0
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]{0,19}$"
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - active
+          - pending_confirmation
+          - locked
+          - suspended
+          pattern: active|pending_confirmation|locked|suspended
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - email
+          - name
+          pattern: newest|oldest|email|name
+      responses:
+        "200":
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: byte
+            application/problem+json:
+              schema:
+                type: string
+                format: byte
   /api/v1/support/settings:
     get:
       tags:
@@ -5427,7 +7071,7 @@ paths:
     get:
       tags:
       - profile-images-controller
-      operationId: current
+      operationId: getCurrentProfileImages
       responses:
         "200":
           description: OK
@@ -5521,7 +7165,7 @@ paths:
     get:
       tags:
       - phone-controller
-      operationId: current_1
+      operationId: getMyPhone
       responses:
         "200":
           description: OK
@@ -5722,6 +7366,119 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BalanceResponse"
+  /api/v1/content/media/{id}:
+    get:
+      tags:
+      - public-content-media-controller
+      operationId: getContentMedia
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to a time-limited URL of the stored copy
+        "404":
+          description: media-not-found (also a malformed id)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/content/documents/{slug}:
+    get:
+      tags:
+      - public-content-documents-controller
+      operationId: getPublishedContentDocument
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentPublication"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/content/documents/{slug}/history:
+    get:
+      tags:
+      - public-content-documents-controller
+      operationId: listContentDocumentHistory
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewContentDocumentHistoryEntry"
+      security: []
+  /api/v1/content/documents/{slug}/history/{id}:
+    get:
+      tags:
+      - public-content-documents-controller
+      operationId: getContentDocumentPublication
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentHistoryPublication"
+        "404":
+          description: document-not-found (also a draft snapshot or a malformed id)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/connectors/telegram:
     get:
       tags:
@@ -5738,7 +7495,7 @@ paths:
     get:
       tags:
       - telegram-connector-controller
-      operationId: health_1
+      operationId: getTelegramConnectorHealth
       responses:
         "200":
           description: OK
@@ -5821,11 +7578,116 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BuilderChartResponse"
+  /api/v1/billing/transactions:
+    get:
+      tags:
+      - transactions-controller
+      summary: List the member's payments
+      description: Newest first. page counts from 0; settled=true keeps payments where
+        money reached us.
+      operationId: listBillingTransactions
+      parameters:
+      - name: page
+        in: query
+        description: Page number from 0 to 10000; default 0
+        required: false
+        schema:
+          type: integer
+          default: 0
+          maximum: 10000
+          minimum: 0
+      - name: size
+        in: query
+        description: Rows per page from 1 to 100; default 20
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: settled
+        in: query
+        description: "true or 1 lists only succeeded, partially refunded and refunded\
+          \ payments"
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          description: One page of the member's payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+        "400":
+          description: "page or size out of range (code invalid_pagination), or settled\
+            \ not a flag (code invalid_query_flag)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Not signed in
+  /api/v1/billing/transactions/{transactionId}:
+    get:
+      tags:
+      - transactions-controller
+      summary: Read one of the member's payments
+      operationId: getBillingTransaction
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The payment with its provider facts and timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/by-order/{orderRef}:
+    get:
+      tags:
+      - transactions-controller
+      summary: Read one of the member's payments by order reference
+      operationId: getBillingTransactionByOrder
+      parameters:
+      - name: orderRef
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The payment with its provider facts and timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/profile/preferences:
     get:
       tags:
       - account-preferences-controller
-      operationId: get_2
+      operationId: getAccountPreferences
       responses:
         "200":
           description: OK
@@ -5913,6 +7775,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowReportResponse"
+  /api/v1/admin/workflows/{id}/export:
+    get:
+      tags:
+      - admin-workflow-transfer-controller
+      operationId: exportAdminWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowArtifact"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/workflows/export:
     get:
       tags:
@@ -5970,6 +7869,39 @@ paths:
           - workflow
           - technical
           - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        description: "Subject text, or a request number with or without a leading\
+          \ #"
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - oldest
       - name: page
         in: query
         required: false
@@ -5987,7 +7919,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
-          description: "validation-failed (errors.status, errors.type, errors.page)"
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -6029,6 +7962,70 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SupportCount"
+  /api/v1/admin/support/requests/facets:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportRequestFacets
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportRequestFacets"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/sms-outbox:
     get:
       tags:
@@ -6232,11 +8229,23 @@ paths:
             text/csv:
               schema:
                 type: string
-  /api/v1/admin/roles:
+  /api/v1/admin/phone-verification/status:
+    get:
+      tags:
+      - admin-phone-verification-controller
+      operationId: getAdminPhoneVerificationStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPhoneVerificationStatus"
+  /api/v1/admin/permission-catalog:
     get:
       tags:
       - admin-roles-controller
-      operationId: listAdminRoles
+      operationId: listAdminPermissionCatalog
       responses:
         "200":
           description: OK
@@ -6245,7 +8254,69 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/RoleResponse"
+                  $ref: "#/components/schemas/PermissionCatalogEntry"
+  /api/v1/admin/payment-settings:
+    get:
+      tags:
+      - payment-settings-admin-controller
+      operationId: listPaymentSettings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentSettingView"
+  /api/v1/admin/payment-settings/history:
+    get:
+      tags:
+      - payment-settings-admin-controller
+      operationId: listPaymentSettingHistory
+      parameters:
+      - name: key
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 25
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewPaymentSettingChangeView"
+        "400":
+          description: "validation-failed (errors.page, errors.size)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (key is not a payment setting)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -6288,6 +8359,125 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/content/documents:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: listContentDocuments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContentDocumentSummary"
+  /api/v1/admin/content/documents/{slug}/revisions:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: listContentDocumentRevisions
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewContentDocumentRevisionSummary"
+        "404":
+          description: document-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/content/documents/{slug}/revisions/{id}:
+    get:
+      tags:
+      - admin-content-documents-controller
+      operationId: getContentDocumentRevision
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentDocumentRevision"
+        "404":
+          description: document-not-found (also a snapshot of another document or
+            a malformed id)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/assignees:
+    get:
+      tags:
+      - admin-assignees-controller
+      operationId: listAdminAssignees
+      parameters:
+      - name: for
+        in: query
+        description: "The list to read, named by the permission it serves"
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAssignee"
+        "400":
+          description: Missing or unknown list (errors.for)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: The caller may not read this list
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/ai/providers:
     get:
       tags:
@@ -6335,7 +8525,8 @@ paths:
         required: false
         schema:
           type: string
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+          maxLength: 20
+          minLength: 0
       - name: q
         in: query
         required: false
@@ -6489,6 +8680,136 @@ components:
         properties:
           type: object
           additionalProperties: {}
+    HelpfulRequest:
+      type: object
+      properties:
+        helpful:
+          type: boolean
+      required:
+      - helpful
+    HelpfulResponse:
+      type: object
+      properties:
+        helpful:
+          type: boolean
+        helpfulCount:
+          type: integer
+          format: int32
+      required:
+      - helpful
+      - helpfulCount
+    ReviewRequest:
+      type: object
+      properties:
+        rating:
+          type: string
+          maximum: 5
+          minimum: 1
+        body:
+          type:
+          - string
+          - "null"
+          maxLength: 5000
+        images:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            format: uuid
+    ReviewImageResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - id
+      - url
+    ReviewResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          format: int32
+        body:
+          type:
+          - string
+          - "null"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewImageResponse"
+        helpfulCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - helpfulCount
+      - id
+      - images
+      - rating
+      - updatedAt
+    PutDataEntryRequest:
+      type: object
+      properties:
+        value:
+          description: Any JSON value
+        dataType:
+          type:
+          - string
+          - "null"
+      required:
+      - value
+    DataEntryResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          description: Any JSON value
+        dataType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - value
+    BookmarkRequest:
+      type: object
+      properties:
+        bookmarked:
+          type: boolean
+      required:
+      - bookmarked
+    BookmarkResponse:
+      type: object
+      properties:
+        bookmarked:
+          type: boolean
+      required:
+      - bookmarked
     UpdateUserRequest:
       type: object
       properties:
@@ -6499,7 +8820,8 @@ components:
           type: string
         role:
           type: string
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+          maxLength: 20
+          minLength: 0
         status:
           type: string
           pattern: ACTIVE|SUSPENDED
@@ -6515,6 +8837,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         createdAt:
@@ -6523,6 +8847,26 @@ components:
         updatedAt:
           type: string
           format: date-time
+        username:
+          type: string
+        state:
+          type: string
+        emailConfirmedAt:
+          type: string
+          format: date-time
+        lockedUntil:
+          type: string
+          format: date-time
+        signInMethods:
+          type: array
+          items:
+            type: string
+        adminDisabled:
+          type: boolean
+        staffTarget:
+          type: boolean
+      required:
+      - roleName
     UploadedImageRequest:
       type: object
       properties:
@@ -6632,6 +8976,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         hasPassword:
@@ -6654,14 +9000,20 @@ components:
             - support.ticket.view
             - support.ticket.reply
             - support.ticket.close
+            - support.ticket.assign
             - content.help_topic.view
             - content.help_topic.manage
             - content.help_article.view
             - content.help_article.manage
+            - content.document.view
+            - content.document.manage
+            - content.media.view
+            - content.media.manage
             - platform.setting.view
             - platform.setting.update
             - platform.sms_outbox.view
             - system.role.view
+            - system.role.manage
             - system.admin_account.view
             - system.admin_account.manage
             - ai.provider.view
@@ -6670,11 +9022,18 @@ components:
             - workflow.run.cancel
             - workflow.workflow.view
             - workflow.workflow.export
+            - payment.setting.view
+            - payment.setting.update
+            - user.account.export
         adminDisabled:
+          type: boolean
+        phoneVerificationRequired:
           type: boolean
       required:
       - adminDisabled
       - permissions
+      - phoneVerificationRequired
+      - roleName
     UsernameRequest:
       type: object
       properties:
@@ -6799,6 +9158,8 @@ components:
           format: date-time
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         messages:
           type: array
           items:
@@ -6829,6 +9190,19 @@ components:
       - status
       - subject
       - type
+    SupportAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        deleted:
+          type: boolean
+      required:
+      - deleted
+      - id
     SupportConversationMessage:
       type: object
       properties:
@@ -6913,6 +9287,12 @@ components:
       required:
       - deleted
       - id
+    AdminSupportRequestAssignee:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+          format: uuid
     AdminSupportKbGroupRequest:
       type: object
       properties:
@@ -7024,6 +9404,7 @@ components:
       properties:
         value:
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
@@ -7041,13 +9422,16 @@ components:
           enum:
           - SWITCH
           - INTEGER
+          - ENUM
         value:
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         decidedValue:
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
@@ -7062,21 +9446,28 @@ components:
         storedValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         configuredValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         defaultValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
+        options:
+          type: array
+          items:
+            type: string
         min:
           type:
           - integer
@@ -7100,9 +9491,379 @@ components:
       - decidedValue
       - group
       - key
+      - options
       - source
       - type
       - value
+    ReplacePermissionsRequest:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+            minLength: 0
+          maxItems: 200
+          minItems: 0
+        expectedVersion:
+          type: integer
+          format: int32
+          minimum: 0
+      required:
+      - expectedVersion
+      - keys
+    RoleResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        system:
+          type: boolean
+        staff:
+          type: boolean
+        superAdmin:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - support.ticket.assign
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - content.document.view
+            - content.document.manage
+            - content.media.view
+            - content.media.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.role.manage
+            - system.admin_account.view
+            - system.admin_account.manage
+            - ai.provider.view
+            - ai.provider.update
+            - workflow.run.export
+            - workflow.run.cancel
+            - workflow.workflow.view
+            - workflow.workflow.export
+            - payment.setting.view
+            - payment.setting.update
+            - user.account.export
+        permissionsVersion:
+          type: integer
+          format: int32
+        accountCount:
+          type: integer
+          format: int32
+      required:
+      - accountCount
+      - code
+      - name
+      - permissions
+      - permissionsVersion
+      - staff
+      - superAdmin
+      - system
+    PaymentSettingUpdate:
+      type: object
+      properties:
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        reason:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+          minLength: 0
+      required:
+      - value
+    PaymentSettingView:
+      type: object
+      properties:
+        key:
+          type: string
+        group:
+          type: string
+        type:
+          type: string
+          enum:
+          - SWITCH
+          - INTEGER
+          - ENUM
+        value:
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        storedValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        configuredValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        defaultValue:
+          type: "null"
+          oneOf:
+          - type: string
+          - type: boolean
+          - type: integer
+            format: int32
+        dangerous:
+          type: boolean
+        options:
+          type: array
+          items:
+            type: string
+        min:
+          type:
+          - integer
+          - "null"
+          format: int32
+        max:
+          type:
+          - integer
+          - "null"
+          format: int32
+      required:
+      - dangerous
+      - group
+      - key
+      - options
+      - source
+      - type
+      - value
+    AdminOnboardingSampleUpdate:
+      type: object
+      properties:
+        workflowId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          pattern: "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+        sampleInput:
+          type:
+          - string
+          - "null"
+          description: a single line
+          maxLength: 10000
+          minLength: 0
+          pattern: "[^\\r\\n]*"
+        sourceLocale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+          pattern: vi|en
+      required:
+      - workflowId
+    AdminOnboardingSample:
+      type: object
+      properties:
+        workflow:
+          type:
+          - object
+          - "null"
+          $ref: "#/components/schemas/AdminOnboardingSampleWorkflow"
+        shown:
+          type: boolean
+        reason:
+          type:
+          - string
+          - "null"
+        sampleInput:
+          type:
+          - string
+          - "null"
+        sourceLocale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+        sourceHash:
+          type:
+          - string
+          - "null"
+        translations:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AdminOnboardingSampleTranslation"
+          description: one entry per editable language
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - reason
+      - sampleInput
+      - shown
+      - sourceHash
+      - sourceLocale
+      - translations
+      - updatedAt
+      - updatedBy
+      - workflow
+    AdminOnboardingSampleTranslation:
+      type:
+      - string
+      - "null"
+    AdminOnboardingSampleWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AdminOnboardingSampleTranslationUpdate:
+      type: object
+      properties:
+        sourceHash:
+          type: string
+          description: the sourceHash the admin was looking at
+          pattern: "[0-9a-f]{64}"
+        input:
+          type: string
+          description: a single line
+          maxLength: 10000
+          minLength: 0
+          pattern: "[^\\r\\n]*"
+      required:
+      - input
+      - sourceHash
+    ContentSection:
+      type: object
+      properties:
+        type:
+          type: string
+          description: "The section type, e.g. richText or media"
+        schemaVersion:
+          type: integer
+          format: int32
+        data:
+          type: object
+          additionalProperties: {}
+          description: "The fields of the section type; text fields are {vi, en}"
+      required:
+      - data
+      - schemaVersion
+      - type
+    ContentSeoMeta:
+      type: object
+      properties:
+        title:
+          $ref: "#/components/schemas/LocalizedText"
+        description:
+          $ref: "#/components/schemas/LocalizedText"
+      required:
+      - description
+      - title
+    LocalizedText:
+      type: object
+      properties:
+        vi:
+          type: string
+        en:
+          type: string
+    SaveContentDocumentDraftRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: The draft version the editor loaded; 0 when none
+          minimum: 0
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+      required:
+      - sections
+      - seoMeta
+      - version
+    ContentDocumentDraft:
+      type: object
+      properties:
+        slug:
+          type: string
+        version:
+          type: integer
+          format: int32
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        updatedByEmail:
+          type:
+          - string
+          - "null"
+      required:
+      - sections
+      - seoMeta
+      - slug
+      - version
     AdminChatSettingsUpdate:
       type: object
       properties:
@@ -7248,8 +10009,28 @@ components:
           - integer
           - "null"
           format: int32
+        allowFork:
+          type: boolean
+        forkCount:
+          type: integer
+          format: int32
+        forkedFromId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        startInput:
+          type: string
+          enum:
+          - link
+          - image
+          - upload
+          - text
       required:
+      - allowFork
       - available
+      - forkCount
+      - startInput
     WorkflowStepResponse:
       type: object
       properties:
@@ -7489,6 +10270,72 @@ components:
       - deliveryCount
       - mode
       - outputs
+    ReportRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+          - spam
+          - scam
+          - harmful
+          - harassment
+          - misinformation
+          - copyright
+          - nsfw
+          - other
+        details:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    ReportedResponse:
+      type: object
+      properties:
+        reported:
+          type: boolean
+      required:
+      - reported
+    UploadRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        size:
+          type: integer
+          format: int64
+      required:
+      - fileName
+      - size
+    UploadResponse:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+      required:
+      - expiresAt
+      - headers
+      - maxBytes
+      - method
+      - uploadId
+      - url
     ShareSettingsResponse:
       type: object
       properties:
@@ -7567,53 +10414,13 @@ components:
           minLength: 1
         role:
           type: string
+          maxLength: 20
           minLength: 1
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - email
       - name
       - password
       - role
-    UploadRequest:
-      type: object
-      properties:
-        fileName:
-          type: string
-          maxLength: 255
-          minLength: 0
-        size:
-          type: integer
-          format: int64
-      required:
-      - fileName
-      - size
-    UploadResponse:
-      type: object
-      properties:
-        uploadId:
-          type: string
-          format: uuid
-        url:
-          type: string
-        method:
-          type: string
-        headers:
-          type: object
-          additionalProperties:
-            type: string
-        expiresAt:
-          type: string
-          format: date-time
-        maxBytes:
-          type: integer
-          format: int64
-      required:
-      - expiresAt
-      - headers
-      - maxBytes
-      - method
-      - uploadId
-      - url
     SupportUploadRequest:
       type: object
       properties:
@@ -7868,6 +10675,24 @@ components:
         reviewTaskVersion:
           type: integer
           format: int64
+    ReviewQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+      required:
+      - id
+      - options
+      - question
+      - type
     ReviewTaskResponse:
       type: object
       properties:
@@ -7906,6 +10731,25 @@ components:
         approvedRevisionId:
           type: string
           format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+        pickOptions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewQuestion"
+        questionsState:
+          type: string
+        answers:
+          type: object
+          additionalProperties: {}
+      required:
+      - expiresAt
     ApproveReviewTaskRequest:
       type: object
       properties:
@@ -7917,6 +10761,17 @@ components:
         expectedVersion:
           type: integer
           format: int64
+        pickedOption:
+          type: integer
+          format: int32
+    AnswerReviewTaskRequest:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties: {}
+      required:
+      - answers
     ProductVideoRunRequest:
       type: object
       properties:
@@ -8163,6 +11018,7 @@ components:
           type: string
           enum:
           - PAT_CREATE
+          - PHONE_CHANGE
       required:
       - password
       - purpose
@@ -8197,6 +11053,11 @@ components:
           type: string
           description: The verified number as shown to the member (carrier digit and
             last three digits)
+        cancelAvailableUntil:
+          type: string
+          format: date-time
+          description: "While a number change can still be undone, when that stops;\
+            \ otherwise null"
       required:
       - verified
     SendCodeRequest:
@@ -8224,6 +11085,32 @@ components:
       - expiresAt
       - maskedPhone
       - resendAfterSeconds
+    ChangeStartRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          example: "0987654321"
+          pattern: "^(0|\\+84)([35789]\\d{8})$"
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+      required:
+      - phone
+      - stepUpProof
+    FirstResultClaimResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+      required:
+      - runId
+      - workflowId
     CreateApiTokenRequest:
       type: object
       properties:
@@ -8789,6 +11676,155 @@ components:
           type: string
       required:
       - status
+    ImportWorkflowRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+        acknowledgeOutboundTargets:
+          type: boolean
+      required:
+      - token
+    WorkflowArtifact:
+      type: object
+      properties:
+        formatVersion:
+          type: integer
+          format: int32
+          maximum: 1
+          minimum: 1
+        exportedAt:
+          type: string
+          format: date-time
+        workflow:
+          $ref: "#/components/schemas/WorkflowArtifactWorkflow"
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowArtifactStep"
+      required:
+      - exportedAt
+      - formatVersion
+      - steps
+      - workflow
+    WorkflowArtifactStep:
+      type: object
+      properties:
+        stepOrder:
+          type: integer
+          format: int32
+          minimum: 1
+        name:
+          type:
+          - string
+          - "null"
+          maxLength: 255
+        type:
+          type: string
+          maxLength: 50
+          minLength: 1
+        inputRef:
+          type:
+          - string
+          - "null"
+          maxLength: 255
+        config:
+          type:
+          - string
+          - "null"
+      required:
+      - config
+      - inputRef
+      - name
+      - stepOrder
+      - type
+    WorkflowArtifactWorkflow:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+      required:
+      - name
+    ImportIssueResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum:
+          - blocking
+          - advisory
+        stepOrder:
+          type:
+          - integer
+          - "null"
+          format: int32
+        field:
+          type:
+          - string
+          - "null"
+        message:
+          type: string
+      required:
+      - code
+      - message
+      - severity
+    ImportReviewResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+        workflowName:
+          type: string
+        stepCount:
+          type: integer
+          format: int32
+        blocked:
+          type: boolean
+        outbound:
+          type: boolean
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportIssueResponse"
+        outboundTargets:
+          type: array
+          items:
+            $ref: "#/components/schemas/OutboundTargetResponse"
+      required:
+      - blocked
+      - expiresAt
+      - issues
+      - outbound
+      - outboundTargets
+      - stepCount
+      - token
+      - workflowName
+    OutboundTargetResponse:
+      type: object
+      properties:
+        stepOrder:
+          type: integer
+          format: int32
+        type:
+          type: string
+        field:
+          type: string
+        value:
+          type: string
+      required:
+      - field
+      - stepOrder
+      - type
+      - value
     AdminSupportRequestReply:
       type: object
       properties:
@@ -8808,6 +11844,60 @@ components:
       required:
       - body
       - status
+    AdminSupportBulkAssign:
+      type: object
+      properties:
+        numbers:
+          type: array
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          maxItems: 100
+          minItems: 1
+          uniqueItems: true
+        assigneeId:
+          type: string
+          format: uuid
+      required:
+      - assigneeId
+      - numbers
+    AdminSupportBulkAssignResult:
+      type: object
+      properties:
+        assigned:
+          type: array
+          items:
+            type: integer
+            format: int64
+        unchanged:
+          type: array
+          items:
+            type: integer
+            format: int64
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportBulkAssignFailure"
+      required:
+      - assigned
+      - failed
+      - unchanged
+    SupportBulkAssignFailure:
+      type: object
+      properties:
+        number:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          enum:
+          - not_found
+          - closed
+          - changed
+      required:
+      - number
+      - reason
     AdminRunDetailResponse:
       type: object
       properties:
@@ -8890,6 +11980,144 @@ components:
       - status
       - stepOrder
       - type
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        permissionKeys:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+            minLength: 0
+          maxItems: 200
+          minItems: 0
+      required:
+      - name
+    RegisterContentMediaRequest:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+          description: "The upload id of a granted, uploaded file"
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+          pattern: "[^\\p{Cntrl}/\\\\]+"
+      required:
+      - fileName
+      - uploadId
+    ContentMediaItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - image
+          - video
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        fileName:
+          type: string
+        uploaderEmail:
+          type:
+          - string
+          - "null"
+          description: Null when the uploader's account no longer exists
+        createdAt:
+          type: string
+          format: date-time
+        url:
+          type: string
+      required:
+      - contentType
+      - createdAt
+      - fileName
+      - id
+      - kind
+      - sizeBytes
+      - url
+    ContentMediaUploadRequest:
+      type: object
+      properties:
+        fileName:
+          type: string
+          maxLength: 255
+          minLength: 0
+        size:
+          type: integer
+          format: int64
+      required:
+      - fileName
+      - size
+    UploadGrant:
+      type: object
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        method:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+    PublishContentDocumentRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+          description: The draft version the editor reviewed
+          minimum: 0
+      required:
+      - version
+    ContentDocumentPublication:
+      type: object
+      properties:
+        slug:
+          type: string
+        version:
+          type: integer
+          format: int32
+        publishedAt:
+          type: string
+          format: date-time
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+      required:
+      - publishedAt
+      - sections
+      - seoMeta
+      - slug
+      - version
     ProbeResult:
       type: object
       properties:
@@ -8921,6 +12149,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         adminDisabled:
@@ -8938,6 +12168,7 @@ components:
       - id
       - name
       - role
+      - roleName
       - status
     UpdateWorkflowRequest:
       type: object
@@ -8953,6 +12184,8 @@ components:
           - draft
           - published
           pattern: draft|published
+        allowFork:
+          type: boolean
     SetVisibilityRequest:
       type: object
       properties:
@@ -9133,13 +12366,25 @@ components:
           enum:
           - show
           - hide
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+          pattern: (?s).*\S.*
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
     ChangeRoleRequest:
       type: object
       properties:
         role:
           type: string
+          maxLength: 20
           minLength: 1
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - role
     Entry:
@@ -9268,6 +12513,79 @@ components:
       required:
       - snapshot
       - version
+    ReviewListItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          format: int32
+        body:
+          type:
+          - string
+          - "null"
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewImageResponse"
+        helpfulCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        helpfulByMe:
+          type: boolean
+        mine:
+          type: boolean
+        authorName:
+          type:
+          - string
+          - "null"
+      required:
+      - createdAt
+      - helpfulByMe
+      - helpfulCount
+      - id
+      - images
+      - mine
+      - rating
+      - updatedAt
+    ReviewPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewListItemResponse"
+        meta:
+          $ref: "#/components/schemas/Meta"
+      required:
+      - data
+      - meta
+    ReviewSummaryResponse:
+      type: object
+      properties:
+        average:
+          type:
+          - number
+          - "null"
+        total:
+          type: integer
+          format: int64
+        distribution:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+      required:
+      - distribution
+      - total
     Grant:
       type: object
       properties:
@@ -9462,6 +12780,35 @@ components:
       - source
       - steps
       - target
+    DataEntryListResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataEntrySummary"
+        maxKeys:
+          type: integer
+          format: int32
+        maxValueBytes:
+          type: integer
+          format: int32
+    DataEntrySummary:
+      type: object
+      properties:
+        key:
+          type: string
+        dataType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     AccessLogPageResponse:
       type: object
       properties:
@@ -9487,6 +12834,101 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Step"
+    BookmarkedWorkflowPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        meta:
+          $ref: "#/components/schemas/Meta"
+      required:
+      - data
+      - meta
+    Item:
+      type: object
+      properties:
+        workflow:
+          $ref: "#/components/schemas/WorkflowResponse"
+        bookmarkedAt:
+          type: string
+          format: date-time
+      required:
+      - bookmarkedAt
+      - workflow
+    WorkflowExampleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        pattern:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        sampleInput:
+          type: string
+        stepTypes:
+          type: array
+          items:
+            type: string
+        stepCount:
+          type: integer
+          format: int32
+        estimatedCredits:
+          type: integer
+          format: int64
+      required:
+      - description
+      - id
+      - pattern
+      - stepCount
+      - stepTypes
+      - title
+    PageViewUserResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    UserStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        active:
+          type: integer
+          format: int64
+        pendingConfirmation:
+          type: integer
+          format: int64
+        locked:
+          type: integer
+          format: int64
+        suspended:
+          type: integer
+          format: int64
+        newLast7Days:
+          type: integer
+          format: int64
     SupportSettings:
       type: object
       properties:
@@ -9943,6 +13385,20 @@ components:
           $ref: "#/components/schemas/ProfileImageView"
         cover:
           $ref: "#/components/schemas/ProfileImageView"
+    OnboardingSampleWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        input:
+          type: string
+      required:
+      - id
+      - input
+      - name
     OnboardingStatusResponse:
       type: object
       properties:
@@ -10032,17 +13488,30 @@ components:
           - "null"
           enum:
           - first
+        sampleWorkflow:
+          type:
+          - object
+          - "null"
+          $ref: "#/components/schemas/OnboardingSampleWorkflow"
+        firstResult:
+          type: string
+          enum:
+          - reported
+          - pending
+          - none
       required:
       - aiLevel
       - completed
       - completedAt
       - contentTypes
       - entry
+      - firstResult
       - firstRunDone
       - industries
       - open
       - progress
       - purposes
+      - sampleWorkflow
       - source
       - usageType
     OnboardingResultResponse:
@@ -10441,6 +13910,62 @@ components:
         granted:
           type: integer
           format: int64
+    ContentDocumentHistoryEntry:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+      - publishedAt
+      - revisionId
+    PageViewContentDocumentHistoryEntry:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentDocumentHistoryEntry"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ContentDocumentHistoryPublication:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        publishedAt:
+          type: string
+          format: date-time
+        slug:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+      required:
+      - publishedAt
+      - revisionId
+      - sections
+      - seoMeta
+      - slug
     TelegramHealth:
       type: object
       properties:
@@ -10538,6 +14063,173 @@ components:
       - day
       - failed
       - runs
+    TransactionListMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - page
+      - size
+      - total
+    TransactionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionRow"
+        meta:
+          $ref: "#/components/schemas/TransactionListMeta"
+      required:
+      - data
+      - meta
+    TransactionRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        description:
+          type: string
+        amountVnd:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        openedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - amountVnd
+      - description
+      - id
+      - kind
+      - openedAt
+      - status
+      - succeededAt
+    TransactionDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        description:
+          type: string
+        amountVnd:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        openedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        orderRef:
+          type: string
+        provider:
+          type: string
+        instrument:
+          type:
+          - string
+          - "null"
+          enum:
+          - wallet
+          - domestic_card
+        providerPayType:
+          type:
+          - string
+          - "null"
+        providerTransactionId:
+          type:
+          - string
+          - "null"
+        outcomeCode:
+          type:
+          - string
+          - "null"
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionTimelineEvent"
+      required:
+      - amountVnd
+      - description
+      - id
+      - instrument
+      - kind
+      - openedAt
+      - orderRef
+      - outcomeCode
+      - provider
+      - providerPayType
+      - providerTransactionId
+      - status
+      - succeededAt
+      - timeline
+    TransactionTimelineEvent:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          enum:
+          - opened
+          - paid
+          - payment_failed
+          - payment_expired
+        code:
+          type:
+          - string
+          - "null"
+      required:
+      - at
+      - code
+      - kind
     PreferencesView:
       type: object
       properties:
@@ -10693,6 +14385,8 @@ components:
           - closed
         requester:
           $ref: "#/components/schemas/SupportRequester"
+        assignee:
+          $ref: "#/components/schemas/SupportAssignee"
         createdAt:
           type: string
           format: date-time
@@ -10707,6 +14401,70 @@ components:
       - status
       - subject
       - type
+    AdminSupportAssigneeFacet:
+      type: object
+      properties:
+        unassigned:
+          type: integer
+          format: int64
+        mine:
+          type: integer
+          format: int64
+        people:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAssigneeCount"
+      required:
+      - mine
+      - people
+      - unassigned
+    AdminSupportRequestFacets:
+      type: object
+      properties:
+        status:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        type:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        created:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportFacetCount"
+        assignee:
+          $ref: "#/components/schemas/AdminSupportAssigneeFacet"
+      required:
+      - assignee
+      - created
+      - status
+      - type
+    SupportAssigneeCount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - id
+    SupportFacetCount:
+      type: object
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - value
     AdminSupportKbArticleList:
       type: object
       properties:
@@ -10792,16 +14550,22 @@ components:
         previousValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         newValue:
           type: "null"
           oneOf:
+          - type: string
           - type: boolean
           - type: integer
             format: int32
         changedBy:
+          type:
+          - string
+          - "null"
+        reason:
           type:
           - string
           - "null"
@@ -10888,52 +14652,149 @@ components:
       - page
       - size
       - total
-    RoleResponse:
+    AdminPhoneVerificationStatus:
       type: object
       properties:
-        code:
+        verificationEnabled:
+          type: boolean
+        smsSender:
           type: string
-        staff:
+          description: none when no SMS sender is wired; the configured sender when
+            it is a known one; else custom
+        hashSecretConfigured:
           type: boolean
-        superAdmin:
+          description: True when the hash secret is set and at least 32 bytes; the
+            value is never returned
+        gateEnabled:
           type: boolean
-        permissions:
+        globalSendsPerDay:
+          type: integer
+          format: int32
+          description: Cap on codes sent from every member per 24 hours
+        sentLast24h:
+          type: integer
+          format: int64
+          description: Codes sent in the last 24 hours
+      required:
+      - gateEnabled
+      - globalSendsPerDay
+      - hashSecretConfigured
+      - sentLast24h
+      - smsSender
+      - verificationEnabled
+    PermissionCatalogEntry:
+      type: object
+      properties:
+        key:
+          type: string
+          enum:
+          - user.account.view
+          - user.account.create
+          - user.account.update
+          - user.account.change_role
+          - user.account.suspend
+          - user.account.delete
+          - workflow.run.view
+          - workflow.workflow.manage
+          - support.ticket.view
+          - support.ticket.reply
+          - support.ticket.close
+          - support.ticket.assign
+          - content.help_topic.view
+          - content.help_topic.manage
+          - content.help_article.view
+          - content.help_article.manage
+          - content.document.view
+          - content.document.manage
+          - content.media.view
+          - content.media.manage
+          - platform.setting.view
+          - platform.setting.update
+          - platform.sms_outbox.view
+          - system.role.view
+          - system.role.manage
+          - system.admin_account.view
+          - system.admin_account.manage
+          - ai.provider.view
+          - ai.provider.update
+          - workflow.run.export
+          - workflow.run.cancel
+          - workflow.workflow.view
+          - workflow.workflow.export
+          - payment.setting.view
+          - payment.setting.update
+          - user.account.export
+        module:
+          type: string
+        feature:
+          type: string
+        action:
+          type: string
+        superAdminOnly:
+          type: boolean
+      required:
+      - action
+      - feature
+      - key
+      - module
+      - superAdminOnly
+    PageViewPaymentSettingChangeView:
+      type: object
+      properties:
+        items:
           type: array
           items:
-            type: string
-            enum:
-            - user.account.view
-            - user.account.create
-            - user.account.update
-            - user.account.change_role
-            - user.account.suspend
-            - user.account.delete
-            - workflow.run.view
-            - workflow.workflow.manage
-            - support.ticket.view
-            - support.ticket.reply
-            - support.ticket.close
-            - content.help_topic.view
-            - content.help_topic.manage
-            - content.help_article.view
-            - content.help_article.manage
-            - platform.setting.view
-            - platform.setting.update
-            - platform.sms_outbox.view
-            - system.role.view
-            - system.admin_account.view
-            - system.admin_account.manage
-            - ai.provider.view
-            - ai.provider.update
-            - workflow.run.export
-            - workflow.run.cancel
-            - workflow.workflow.view
-            - workflow.workflow.export
+            $ref: "#/components/schemas/PaymentSettingChangeView"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
       required:
-      - code
-      - permissions
-      - staff
-      - superAdmin
+      - items
+      - page
+      - size
+      - total
+    PaymentSettingChangeView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        previousValue:
+          type:
+          - string
+          - "null"
+        newValue:
+          type:
+          - string
+          - "null"
+        actorId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        actorEmail:
+          type:
+          - string
+          - "null"
+        reason:
+          type:
+          - string
+          - "null"
+        changedAt:
+          type: string
+          format: date-time
+      required:
+      - changedAt
+      - id
+      - key
     MediaJobResponse:
       type: object
       properties:
@@ -11010,6 +14871,158 @@ components:
       - page
       - size
       - total
+    PageViewContentMediaItem:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentMediaItem"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ContentDocumentSummary:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          $ref: "#/components/schemas/LocalizedText"
+        sectionTypes:
+          type: array
+          items:
+            type: string
+        publicHistory:
+          type: boolean
+        draftVersion:
+          type: integer
+          format: int32
+        draftUpdatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        publishedVersion:
+          type: integer
+          format: int32
+        publishedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - draftVersion
+      - publicHistory
+      - publishedVersion
+      - sectionTypes
+      - slug
+      - title
+    ContentDocumentRevisionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - draft
+          - publication
+        version:
+          type: integer
+          format: int32
+        authorEmail:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - version
+    PageViewContentDocumentRevisionSummary:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentDocumentRevisionSummary"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ContentDocumentRevision:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - draft
+          - publication
+        version:
+          type: integer
+          format: int32
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContentSection"
+        seoMeta:
+          $ref: "#/components/schemas/ContentSeoMeta"
+        authorEmail:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - kind
+      - sections
+      - seoMeta
+      - version
+    AdminAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+      required:
+      - email
+      - id
+      - name
     AiProviderCategory:
       type: object
       properties:

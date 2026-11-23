@@ -5,10 +5,15 @@ import {
   ClipboardText,
   Coins,
   Cpu,
+  CreditCard,
   Cube,
+  DeviceMobile,
+  FileText,
   GearSix,
   Headset,
+  Images,
   ListChecks,
+  LockKey,
   Play,
   Pulse,
   ShieldCheck,
@@ -99,6 +104,12 @@ export const NAV: NavGroup[] = [
         icon: Cpu,
         key: 'ai.provider.view',
       },
+      {
+        label: 'common.shell.nav.items.paymentSettings',
+        path: '/payment-settings',
+        icon: CreditCard,
+        key: 'payment.setting.view',
+      },
     ],
   },
   {
@@ -118,9 +129,21 @@ export const NAV: NavGroup[] = [
         key: 'platform.sms_outbox.view',
       },
       {
+        label: 'common.shell.nav.items.phoneVerification',
+        path: '/phone-verification',
+        icon: DeviceMobile,
+        key: 'platform.setting.view',
+      },
+      {
         label: 'common.shell.nav.items.settings',
         path: '/settings',
         icon: SlidersHorizontal,
+        key: 'platform.setting.view',
+      },
+      {
+        label: 'common.shell.nav.items.onboardingSample',
+        path: '/onboarding-sample',
+        icon: Sparkle,
         key: 'platform.setting.view',
       },
       {
@@ -154,6 +177,12 @@ export const NAV: NavGroup[] = [
         path: '/admin-accounts',
         icon: UserGear,
         key: 'system.admin_account.view',
+      },
+      {
+        label: 'common.shell.nav.items.roles',
+        path: '/roles',
+        icon: LockKey,
+        key: 'system.role.view',
       },
       {
         label: 'common.shell.nav.items.voiceQuota',
@@ -199,6 +228,24 @@ export const NAV: NavGroup[] = [
         path: '/support/settings',
         icon: Sparkle,
         key: 'platform.setting.view',
+      },
+    ],
+  },
+  {
+    id: 'content',
+    label: 'common.shell.nav.groups.content',
+    items: [
+      {
+        label: 'common.shell.nav.items.contentDocuments',
+        path: '/content/documents',
+        icon: FileText,
+        key: 'content.document.view',
+      },
+      {
+        label: 'common.shell.nav.items.contentMedia',
+        path: '/content/media',
+        icon: Images,
+        key: 'content.media.view',
       },
     ],
   },

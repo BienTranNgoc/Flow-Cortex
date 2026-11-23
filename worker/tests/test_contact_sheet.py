@@ -27,9 +27,9 @@ class RecordingRunner(ProcessRunner):
         super().__init__()
         self.argvs: list[list[str]] = []
 
-    def run(self, argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+    def run(self, argv: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[bytes]:
         self.argvs.append(argv)
-        return super().run(argv)
+        return super().run(argv, cwd)
 
 
 def job(**params: Any) -> MediaJob:

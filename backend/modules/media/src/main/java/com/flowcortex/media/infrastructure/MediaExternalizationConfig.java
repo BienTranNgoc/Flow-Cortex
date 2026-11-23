@@ -63,7 +63,9 @@ class MediaExternalizationConfig {
             MessageProperties properties = message.getMessageProperties();
             boolean mediaJob = MediaTopologyConfig.EXCHANGE.equals(exchange)
                     && (MediaTopologyConfig.JOB_KEY.equals(routingKey)
-                            || MediaTopologyConfig.RENDER_JOB_KEY.equals(routingKey));
+                            || MediaTopologyConfig.RENDER_JOB_KEY.equals(routingKey)
+                            || MediaTopologyConfig.AUDIO_JOB_KEY.equals(routingKey)
+                            || MediaTopologyConfig.FETCH_JOB_KEY.equals(routingKey));
             boolean providerJob = MediaTopologyConfig.PROVIDER_EXCHANGE.equals(exchange)
                     && (MediaTopologyConfig.JOB_KEY.equals(routingKey)
                             || MediaTopologyConfig.VIDEO_JOB_KEY.equals(routingKey));

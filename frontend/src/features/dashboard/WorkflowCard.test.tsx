@@ -10,6 +10,9 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   name: 'Product Video',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [
     { id: 's1', stepOrder: 1, name: 'script', type: 'script', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },

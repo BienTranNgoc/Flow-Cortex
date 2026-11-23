@@ -115,6 +115,11 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     @Query("SELECT r.id FROM WorkflowRun r WHERE r.id > :after AND " + MEMBER_RESULT_RUN + " ORDER BY r.id")
     List<UUID> findCompletedIdsAfter(@Param("after") UUID after, Pageable page);
 
+    /** Whether the owner has a run of the workflow in {@code status}. */
+    boolean existsByWorkflowIdAndOwnerIdAndStatus(UUID workflowId, UUID ownerId, RunStatus status);
+
+    Optional<WorkflowRun> findFirstByOwnerIdAndStatusOrderByStartedAtAscIdAsc(UUID ownerId, RunStatus status);
+
     Optional<WorkflowRun> findByOwnerIdAndRequestKey(UUID ownerId, String requestKey);
 
     /**

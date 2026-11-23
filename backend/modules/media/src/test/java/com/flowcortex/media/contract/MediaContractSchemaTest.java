@@ -111,6 +111,13 @@ class MediaContractSchemaTest {
                 Map.of(), "runs/" + RUN_ID + "/steps/1/", 1, 300, 524_288_000L, AT);
     }
 
+    static MediaJob fetchJob(List<MediaJobInput> inputs, Map<String, Object> params) {
+        MediaJob j = job();
+        return new MediaJob(j.schemaVersion(), j.jobId(), j.runId(), j.correlationId(), j.stepOrder(),
+                MediaCapability.FETCH_VIDEO, inputs, params, j.outputPrefix(), j.attempt(),
+                j.maxRuntimeSeconds(), j.maxInputBytes(), j.issuedAt());
+    }
+
     static MediaResult completedResult() {
         return new MediaResult("1", JOB_ID, RUN_ID, 1, 0, MediaResult.Status.COMPLETED,
                 List.of(new MediaOutput("video-details.json", "flowcortex-media",
@@ -405,6 +412,14 @@ class MediaContractSchemaTest {
     }
 
     @Test
+    void fetchJobWithoutInputsAndWithAUrlConformsToTheJobSchema() {
+        MediaJob fetch = fetchJob(List.of(), Map.of("url", "https://cdn.example.com/a.mp4"));
+
+        assertThat(errors(jobSchema, fetch)).isEmpty();
+        assertThat(VALIDATOR.validate(fetch)).isEmpty();
+    }
+
+    @Test
     void completedAndErrorResultsConformToTheResultSchema() {
         assertThat(errors(resultSchema, completedResult())).isEmpty();
         assertThat(errors(resultSchema, errorResult())).isEmpty();
@@ -447,7 +462,7 @@ class MediaContractSchemaTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"duration_exceeded", "no_audio_stream"})
+    @ValueSource(strings = {"duration_exceeded", "no_audio_stream", "separation_failed", "no_beats_detected"})
     void dubErrorCodesConformToTheResultSchema(String code) {
         MediaError.Code parsed = Arrays.stream(MediaError.Code.values())
                 .filter(c -> c.value().equals(code)).findFirst().orElseThrow();
@@ -455,6 +470,17 @@ class MediaContractSchemaTest {
                 MediaResult.Status.ERROR, null, null, new MediaError(parsed, "limit", false), AT, "worker-1");
 
         assertThat(errors(resultSchema, failed)).isEmpty();
+    }
+
+    @Test
+    void separateAudioCapabilityConformsToTheJobSchema() {
+        MediaJob source = job();
+        MediaJob separate = new MediaJob(source.schemaVersion(), source.jobId(), source.runId(),
+                source.correlationId(), source.stepOrder(), MediaCapability.SEPARATE_AUDIO,
+                source.inputs(), source.params(), source.outputPrefix(), source.attempt(),
+                source.maxRuntimeSeconds(), source.maxInputBytes(), source.issuedAt());
+
+        assertThat(errors(jobSchema, separate)).isEmpty();
     }
 
     @Test
@@ -500,6 +526,13 @@ class MediaContractSchemaTest {
                 Arguments.of("job maxInputBytes 0", new MediaJob(j.schemaVersion(), j.jobId(), j.runId(),
                         j.correlationId(), j.stepOrder(), j.capability(), j.inputs(), j.params(), j.outputPrefix(),
                         j.attempt(), j.maxRuntimeSeconds(), 0L, j.issuedAt())),
+                Arguments.of("fetch job with an input", fetchJob(j.inputs(),
+                        Map.of("url", "https://cdn.example.com/a.mp4"))),
+                Arguments.of("fetch job without params url", fetchJob(List.of(), Map.of())),
+                Arguments.of("fetch job with an empty url", fetchJob(List.of(), Map.of("url", ""))),
+                Arguments.of("fetch job with a 2049-character url", fetchJob(List.of(),
+                        Map.of("url", "https://x.example/" + "a".repeat(2049 - 18)))),
+                Arguments.of("fetch job with a non-string url", fetchJob(List.of(), Map.of("url", 5))),
                 Arguments.of("result deliveryCount -1", new MediaResult(r.schemaVersion(), r.jobId(), r.runId(),
                         r.attempt(), -1, r.status(), r.outputs(), r.data(), r.error(), r.finishedAt(), r.workerId())),
                 Arguments.of("result output bytes -1", new MediaResult(r.schemaVersion(), r.jobId(), r.runId(),

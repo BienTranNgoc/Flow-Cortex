@@ -29,7 +29,7 @@ datasources:
         filterByTraceID: true
         filterBySpanID: false
         customQuery: true
-        query: '{service_name=~"flow-cortex|flow-worker|render-worker"} | trace_id="$${__trace.traceId}"'
+        query: '{service_name=~"flow-cortex|flow-worker|render-worker|audio-worker"} | trace_id="$${__trace.traceId}"'
       serviceMap:
         datasourceUid: prometheus
       nodeGraph:
