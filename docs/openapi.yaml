@@ -323,7 +323,7 @@ paths:
     get:
       tags:
       - users-controller
-      operationId: get
+      operationId: getUser
       parameters:
       - name: id
         in: path
@@ -491,7 +491,7 @@ paths:
     get:
       tags:
       - own-profile-controller
-      operationId: get_1
+      operationId: getOwnProfile
       responses:
         "200":
           description: OK
@@ -2007,7 +2007,7 @@ paths:
     post:
       tags:
       - users-controller
-      operationId: create
+      operationId: createUser
       requestBody:
         content:
           application/json:
@@ -2700,7 +2700,30 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
+        "400":
+          description: malformed Idempotency-Key
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, or REVIEW_EXPIRED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
           content:
@@ -2719,12 +2742,97 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ApproveReviewTaskRequest"
       responses:
+        "400":
+          description: malformed Idempotency-Key
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, or REVIEW_EXPIRED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "pickedOption refused (errors.pickedOption), empty content,\
+            \ or a stopping run"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTaskResponse"
+  /api/v1/review-tasks/{taskId}/answers:
+    post:
+      tags:
+      - review-tasks-controller
+      operationId: answerTask
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerReviewTaskRequest"
+        required: true
+      responses:
+        "400":
+          description: malformed Idempotency-Key or answers
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, REVIEW_EXPIRED, or REVIEW_QUESTIONS_NOT_READY"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "REVIEW_NOT_QA, an answer that does not fit (errors.answers.<id>),\
+            \ or a stopping run"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
           content:
@@ -2778,7 +2886,7 @@ paths:
     post:
       tags:
       - profile-images-controller
-      operationId: requestUpload_1
+      operationId: requestProfileImageUpload
       requestBody:
         content:
           application/json:
@@ -3240,7 +3348,7 @@ paths:
     get:
       tags:
       - personal-access-token-controller
-      operationId: list
+      operationId: listApiTokens
       responses:
         "200":
           description: OK
@@ -3265,7 +3373,7 @@ paths:
     post:
       tags:
       - personal-access-token-controller
-      operationId: create_1
+      operationId: createApiToken
       requestBody:
         content:
           application/json:
@@ -3534,7 +3642,7 @@ paths:
     get:
       tags:
       - http-connector-controller
-      operationId: list_1
+      operationId: listHttpConnectors
       responses:
         "200":
           description: OK
@@ -7024,7 +7132,7 @@ paths:
     get:
       tags:
       - profile-images-controller
-      operationId: current
+      operationId: getCurrentProfileImages
       responses:
         "200":
           description: OK
@@ -7118,7 +7226,7 @@ paths:
     get:
       tags:
       - phone-controller
-      operationId: current_1
+      operationId: getMyPhone
       responses:
         "200":
           description: OK
@@ -7448,7 +7556,7 @@ paths:
     get:
       tags:
       - telegram-connector-controller
-      operationId: health_1
+      operationId: getTelegramConnectorHealth
       responses:
         "200":
           description: OK
@@ -7535,7 +7643,7 @@ paths:
     get:
       tags:
       - account-preferences-controller
-      operationId: get_2
+      operationId: getAccountPreferences
       responses:
         "200":
           description: OK
@@ -10564,6 +10672,24 @@ components:
         reviewTaskVersion:
           type: integer
           format: int64
+    ReviewQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+      required:
+      - id
+      - options
+      - question
+      - type
     ReviewTaskResponse:
       type: object
       properties:
@@ -10602,6 +10728,25 @@ components:
         approvedRevisionId:
           type: string
           format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+        pickOptions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewQuestion"
+        questionsState:
+          type: string
+        answers:
+          type: object
+          additionalProperties: {}
+      required:
+      - expiresAt
     ApproveReviewTaskRequest:
       type: object
       properties:
@@ -10613,6 +10758,17 @@ components:
         expectedVersion:
           type: integer
           format: int64
+        pickedOption:
+          type: integer
+          format: int32
+    AnswerReviewTaskRequest:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties: {}
+      required:
+      - answers
     ProductVideoRunRequest:
       type: object
       properties:

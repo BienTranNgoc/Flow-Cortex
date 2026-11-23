@@ -308,12 +308,49 @@ class RunAdvancer {
             LOG.info("Step {} already {} — waiting for its result", next.getStepOrder(), next.getStatus());
             return false;
         }
-        if ("APPROVAL_CHECKPOINT".equals(next.getType())) {
-            String payload = outputsByOrder.get((int) next.getStepOrder() - 1);
-            checkpointTransactions.pause(run, next, payload, clock.instant());
+        if (HumanSteps.TYPES.contains(next.getType())) {
+            reviewOrFail(run, next, outputsByOrder);
             return false;
         }
         return dispatch(run, next, outputsByOrder, assetOutputsByOrder);
+    }
+
+    /**
+     * A human step reads its content like any other step. A reference that cannot be read fails the
+     * step through its claim, as {@link #dispatch} does, so the run ends in error with no review task.
+     */
+    private void reviewOrFail(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder) {
+        String content;
+        try {
+            content = inputResolver.resolve(step.getStepOrder(), step.getInputRef(), run.getInput(), outputsByOrder);
+        } catch (StepFailedException | IllegalStateException e) {
+            try (StepLogContext ignored = StepLogContext.step(run.getId(), step.getId(), false, step.getAttempt(),
+                    null)) {
+                Instant now = clock.instant();
+                RunStepTransactions.ClaimOutcome outcome = transactions.claim(run.getId(), step.getId(),
+                        step.getAttempt(), now, now.plus(lease), null, resolutionFailure(e));
+                switch (outcome) {
+                    case LOST -> LOG.info("Step {} claimed by another execution — stopping here", step.getStepOrder());
+                    case FAILED -> LOG.warn("Step {} failed reading its content — run halted, later steps stay pending",
+                            step.getStepOrder());
+                    default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
+                }
+            }
+            return;
+        }
+        checkpointTransactions.pause(run, step, content, clock.instant());
+    }
+
+    /** The claim body that fails the step with what its input resolution threw. */
+    private static Runnable resolutionFailure(RuntimeException e) {
+        if (e instanceof StepFailedException failed) {
+            return () -> {
+                throw failed;
+            };
+        }
+        return () -> {
+            throw new StepFailedException(null, e.getMessage());
+        };
     }
 
     private boolean dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder,
@@ -360,14 +397,8 @@ class RunAdvancer {
             } else {
                 inClaim = () -> { };
             }
-        } catch (StepFailedException e) {
-            inClaim = () -> {
-                throw e;
-            };
-        } catch (IllegalStateException e) {
-            inClaim = () -> {
-                throw new StepFailedException(null, e.getMessage());
-            };
+        } catch (StepFailedException | IllegalStateException e) {
+            inClaim = resolutionFailure(e);
         }
 
         Instant now = clock.instant();

@@ -464,14 +464,66 @@ class RunAdvancerTest {
 
     @Test
     void aCheckpointStepPausesTheRunWithThePreviousStepsOutputInsteadOfDispatching() {
-        RunStep step1 = completed(1, UUID.randomUUID(), null);
+        RunStep step1 = completed(1, UUID.randomUUID(), "Script v1");
         RunStep checkpoint = pending(2, "APPROVAL_CHECKPOINT");
         givenRun(List.of(step1, checkpoint));
 
         advancer.advance(runId);
 
-        verify(checkpoints).pause(run, checkpoint, null, NOW);
+        verify(checkpoints).pause(run, checkpoint, "Script v1", NOW);
         verify(runStepRepository, never()).claimPending(any(), any(), any(), any());
+    }
+
+    @Test
+    void aCheckpointReadsTheStepItsReferenceNames() {
+        RunStep step1 = completed(1, UUID.randomUUID(), "{\"title\":\"A\",\"body\":\"B\"}");
+        RunStep step2 = completed(2, UUID.randomUUID(), "other");
+        RunStep checkpoint = new RunStep(UUID.randomUUID(), runId, (short) 3, "APPROVAL_CHECKPOINT", null, null,
+                "{step:1.body}");
+        givenRun(List.of(step1, step2, checkpoint));
+
+        advancer.advance(runId);
+
+        verify(checkpoints).pause(run, checkpoint, "B", NOW);
+    }
+
+    @Test
+    void aFirstStepCheckpointReadsTheRunInput() {
+        RunStep checkpoint = pending(1, "APPROVAL_CHECKPOINT");
+        givenRun(List.of(checkpoint));
+
+        advancer.advance(runId);
+
+        verify(checkpoints).pause(run, checkpoint, "hello", NOW);
+    }
+
+    @Test
+    void aQaReviewStepPausesLikeACheckpoint() {
+        RunStep step1 = completed(1, UUID.randomUUID(), "Draft post");
+        RunStep review = pending(2, "qa.review");
+        givenRun(List.of(step1, review));
+
+        advancer.advance(runId);
+
+        verify(checkpoints).pause(run, review, "Draft post", NOW);
+        verify(runStepRepository, never()).claimPending(any(), any(), any(), any());
+    }
+
+    @Test
+    void anUnreadableReferenceFailsTheReviewStepWithoutPausing() {
+        RunStep step1 = completed(1, UUID.randomUUID(), "{\"title\":\"A\"}");
+        RunStep review = new RunStep(UUID.randomUUID(), runId, (short) 2, "APPROVAL_CHECKPOINT", null, null,
+                "{step:1.body}");
+        givenRun(List.of(step1, review));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).failIfRunning(eq(review.getId()), eq(runId), eq((short) 1), isNull(),
+                contains("{step:1.body}"), eq(NOW));
+        assertThat(run.getStatus().name()).isEqualTo("ERROR");
+        verify(checkpoints, never()).pause(any(), any(), any(), any());
     }
 
     @Test

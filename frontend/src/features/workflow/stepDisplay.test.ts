@@ -43,6 +43,7 @@ describe('stepLabel', () => {
     ['probe', 1, 'Inspect the file'],
     ['extract_audio', 2, 'Extract source audio'],
     ['APPROVAL_CHECKPOINT', 2, 'Review'],
+    ['qa.review', 2, 'QA review'],
     ['echo', 3, 'Step 3'],
   ])('names type %s at order %i "%s"', (type, stepOrder, label) => {
     expect(stepLabel(step({ type, stepOrder }), i18n.getFixedT('en'))).toBe(label);
@@ -97,6 +98,16 @@ describe('stepState', () => {
     const steps = [step({ status: 'completed' }), checkpoint()];
     expect(stepState(steps[1]!, steps, 'waiting_approval')).toBe('needs-you');
     expect(stepState(steps[0]!, steps, 'waiting_approval')).toBe('completed');
+  });
+
+  it('a run waiting at qa.review selects that step as needs-you', () => {
+    const steps = [
+      step({ status: 'completed' }),
+      step({ id: 'qa', stepOrder: 2, type: 'qa.review' }),
+    ];
+    expect(stepState(steps[1]!, steps, 'waiting_approval')).toBe('needs-you');
+    expect(defaultStep(steps, 'waiting_approval')?.id).toBe('qa');
+    expect(stepState(steps[1]!, steps, 'running')).toBe('pending');
   });
 
   it('marks only the first pending checkpoint of a waiting run', () => {
