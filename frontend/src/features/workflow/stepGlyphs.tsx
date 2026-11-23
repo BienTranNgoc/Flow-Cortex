@@ -62,6 +62,12 @@ const TYPE_PATHS: Record<string, ReactNode> = {
   ),
   extract_audio: <path d="M2 8h1.5M5 5v6M8 3v10M11 6v4M14 7.5v1" />,
   APPROVAL_CHECKPOINT: <path d="M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4l5-2z" />,
+  'qa.review': (
+    <>
+      <path d="M5.5 6a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.8" />
+      <path d="M8 13h.01" />
+    </>
+  ),
 };
 
 /** The step-type icon; a type without a drawing gets a plain dot. */

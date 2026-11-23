@@ -1,6 +1,7 @@
 import { ApiError, type AdminAccountResponse } from '@flow-cortex/api-client';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { Pager, Timestamp } from '../../app/AdminList';
 import { PageHeading } from '../../app/PageHeading';
 import { can } from '../../app/permissions';
@@ -8,11 +9,17 @@ import { StatusPill } from '../../app/StatusPill';
 import { TableRegion } from '../../app/TableRegion';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useMeQuery } from '../auth/useAuth';
-import { ROLE_CODES, roleLabel, STAFF_ROLES, statusLabel } from '../users/enumLabels';
+import { ROLE_CODE_PATTERN, useRolesQuery } from '../roles/useRoles';
+import {
+  customRoleNames,
+  ROLE_CODES,
+  roleLabel,
+  STAFF_ROLES,
+  statusLabel,
+} from '../users/enumLabels';
 import { AccountDialog, type AccountAction } from './AccountDialog';
 import {
   useAdminAccounts,
-  useAdminRoles,
   useChangeAdminRoleMutation,
   useSetAdminAccountActiveMutation,
 } from './useAdminAccounts';
@@ -31,13 +38,17 @@ export function AdminAccountsPage() {
   const me = useMeQuery().data;
   const canManage = can(me, 'system.admin_account.manage');
   const [page, setPage] = useState(0);
-  const [roleFilter, setRoleFilter] = useState('');
+  const [params] = useSearchParams();
+  const [roleFilter, setRoleFilter] = useState(() => {
+    const requested = params.get('role') ?? '';
+    return ROLE_CODE_PATTERN.test(requested) ? requested : '';
+  });
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [notice, setNotice] = useState('');
   const query = useAdminAccounts(page, roleFilter, q);
-  const roles = useAdminRoles(can(me, 'system.role.view'));
+  const roles = useRolesQuery(can(me, 'system.role.view'));
   const changeRole = useChangeAdminRoleMutation();
   const setActive = useSetAdminAccountActiveMutation();
   const mutation = dialog?.action === 'role' ? changeRole : setActive;
@@ -51,9 +62,14 @@ export function AdminAccountsPage() {
   }, [search]);
 
   const roleCodes = roles.data?.map((role) => role.code) ?? ROLE_CODES;
-  const filterCodes = roles.data
+  const roleNames = customRoleNames(roles.data);
+  const listedFilterCodes = roles.data
     ? roles.data.filter((role) => role.staff || role.superAdmin).map((role) => role.code)
     : ADMIN_ROLE_CODES;
+  const filterCodes =
+    roleFilter && !listedFilterCodes.includes(roleFilter)
+      ? [...listedFilterCodes, roleFilter]
+      : listedFilterCodes;
   const data = query.data;
   const filtered = roleFilter !== '' || q !== '';
 
@@ -78,7 +94,7 @@ export function AdminAccountsPage() {
             done(
               t('adminAccounts.notice.roleChanged', {
                 name: account.name,
-                role: roleLabel(t, role),
+                role: roleLabel(t, role, roleNames[role]),
               }),
             ),
         },
@@ -140,7 +156,7 @@ export function AdminAccountsPage() {
               <option value="">{t('adminAccounts.filters.allRoles')}</option>
               {filterCodes.map((code) => (
                 <option key={code} value={code}>
-                  {roleLabel(t, code)}
+                  {roleLabel(t, code, roleNames[code])}
                 </option>
               ))}
             </select>
@@ -205,7 +221,10 @@ export function AdminAccountsPage() {
                     <td data-label={columns.name}>{account.name}</td>
                     <td data-label={columns.email}>{account.email}</td>
                     <td data-label={columns.role}>
-                      <StatusPill tone="info" label={roleLabel(t, account.role)} />
+                      <StatusPill
+                        tone="info"
+                        label={roleLabel(t, account.role, account.roleName)}
+                      />
                     </td>
                     <td data-label={columns.status}>
                       {account.adminDisabled ? (
@@ -286,6 +305,7 @@ export function AdminAccountsPage() {
           account={dialog.account}
           action={dialog.action}
           roles={roleCodes}
+          roleNames={roleNames}
           pending={mutation.isPending}
           error={dialogError}
           onConfirm={confirm}

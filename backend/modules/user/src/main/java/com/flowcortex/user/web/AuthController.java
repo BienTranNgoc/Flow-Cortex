@@ -10,6 +10,7 @@ import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.OwnProfiles;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.user.application.RoleCatalog;
 import com.flowcortex.user.authz.CallerFacts;
 import com.flowcortex.user.authz.CallerFactsLoader;
 import com.flowcortex.user.phone.PhoneGate;
@@ -63,9 +64,12 @@ class AuthController {
     private final RefreshCookieSupport cookieSupport;
     private final CallerFactsLoader callerFacts;
     private final PhoneGate phoneGate;
+    private final RoleCatalog roleCatalog;
 
     AuthController(AuthService authService, UserDirectory userDirectory, OwnProfiles ownProfiles,
-            RefreshCookieSupport cookieSupport, CallerFactsLoader callerFacts, PhoneGate phoneGate) {
+            RefreshCookieSupport cookieSupport, CallerFactsLoader callerFacts, PhoneGate phoneGate,
+            RoleCatalog roleCatalog) {
+        this.roleCatalog = roleCatalog;
         this.authService = authService;
         this.userDirectory = userDirectory;
         this.ownProfiles = ownProfiles;
@@ -216,10 +220,7 @@ class AuthController {
 
     @GetMapping(value = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<MeResponse> me(@AuthenticationPrincipal Jwt jwt) {
-        UUID id = subjectId(jwt);
-        CurrentUser user = userDirectory.findById(id)
-                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
-        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id), phoneGate.holds(id)));
+        return ResponseEntity.ok(meOf(subjectId(jwt)));
     }
 
     @PutMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -228,9 +229,15 @@ class AuthController {
             @Valid @RequestBody ProfileUpdateRequest request) {
         UUID id = subjectId(jwt);
         ownProfiles.updateNames(id, request.name(), request.firstName(), request.lastName());
+        return ResponseEntity.ok(meOf(id));
+    }
+
+    /** One by-code role lookup per call: the role name is not part of the per-request {@link CurrentUser}. */
+    private MeResponse meOf(UUID id) {
         CurrentUser user = userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
-        return ResponseEntity.ok(MeResponse.from(user, callerFacts.load(id), phoneGate.holds(id)));
+        String roleName = roleCatalog.names().getOrDefault(user.role(), user.role());
+        return MeResponse.from(user, roleName, callerFacts.load(id), phoneGate.holds(id));
     }
 
     private static UUID subjectId(Jwt jwt) {
@@ -305,16 +312,19 @@ class AuthController {
      * {@code permissions}: the caller's effective admin keys sorted by key (empty for an end user and
      * once deactivated); {@code adminDisabled}: the admin console access is deactivated;
      * {@code phoneVerificationRequired}: the phone gate holds this caller until a number is verified.
+     * {@code role} is the role code; {@code roleName} its current display name (the code when no role row is found).
      */
-    record MeResponse(UUID id, String email, String name, String role, String status, boolean hasPassword,
-            boolean passwordSetupRequired,
+    record MeResponse(UUID id, String email, String name, String role,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String roleName, String status,
+            boolean hasPassword, boolean passwordSetupRequired,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Permission> permissions,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean adminDisabled,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean phoneVerificationRequired) {
-        static MeResponse from(CurrentUser user, CallerFacts facts, boolean phoneVerificationRequired) {
+        static MeResponse from(CurrentUser user, String roleName, CallerFacts facts,
+                boolean phoneVerificationRequired) {
             List<Permission> keys = facts.effectiveKeys().stream()
                     .sorted(Comparator.comparing(Permission::key)).toList();
-            return new MeResponse(user.id(), user.email(), user.name(), user.role(), user.status(),
+            return new MeResponse(user.id(), user.email(), user.name(), user.role(), roleName, user.status(),
                     user.hasPassword(), user.passwordSetupRequired(), keys, facts.adminDisabled(),
                     phoneVerificationRequired);
         }

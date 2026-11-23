@@ -1,7 +1,5 @@
 package com.flowcortex.user.phone;
 
-import com.flowcortex.user.domain.Role;
-import java.util.Arrays;
 import java.util.Optional;
 
 /**
@@ -10,8 +8,8 @@ import java.util.Optional;
  */
 final class PhoneGateDecision {
 
-    /** {@code role} is the stored role string; one the enum does not know reads as an end user. */
-    record GateFacts(boolean verified, String role) {
+    /** {@code staff} and {@code superAdmin} are the flags of the caller's row in the role table. */
+    record GateFacts(boolean verified, boolean staff, boolean superAdmin) {
     }
 
     private PhoneGateDecision() {
@@ -22,12 +20,7 @@ final class PhoneGateDecision {
      * handler's own 401/404 answers, so the gate does not hold.
      */
     static boolean holds(boolean enabled, Optional<GateFacts> facts) {
-        return enabled && facts.filter(known -> !known.verified() && !exemptRole(known.role())).isPresent();
-    }
-
-    private static boolean exemptRole(String role) {
-        return Arrays.stream(Role.values())
-                .filter(candidate -> candidate.name().equals(role))
-                .anyMatch(candidate -> candidate.isSuperAdmin() || candidate.isStaff());
+        return enabled && facts.filter(known -> !known.verified() && !known.staff() && !known.superAdmin())
+                .isPresent();
     }
 }
