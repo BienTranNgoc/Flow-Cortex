@@ -247,4 +247,23 @@ class LeaseReaperTest {
         verify(advancer).advance(second);
         assertThat(output).contains("ERROR").contains(first.toString());
     }
+
+    @Test
+    void whenParallelClipsEnabledUsesTheParallelStalledQueryToRecoverPendingClip() {
+        LeaseReaper parallelReaper = new LeaseReaper(runStepRepository, workflowRunRepository,
+                new RunStepTransactions(runStepRepository, workflowRunRepository, mock(CreditAccounts.class),
+                        mock(RunUpdates.class), mock(ApplicationEventPublisher.class), mock(ChildRuns.class)),
+                new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), advancer, meters,
+                Clock.fixed(NOW, ZoneOffset.UTC), true);
+        givenReapable(List.of(), 1);
+        UUID partialParallel = UUID.randomUUID();
+        when(workflowRunRepository.findStalledRunIdsWithParallelClips(any(Pageable.class)))
+                .thenReturn(List.of(partialParallel));
+
+        parallelReaper.reap();
+
+        verify(workflowRunRepository).findStalledRunIdsWithParallelClips(any(Pageable.class));
+        verify(workflowRunRepository, never()).findStalledRunIds(any(Pageable.class));
+        verify(advancer).advance(partialParallel);
+    }
 }

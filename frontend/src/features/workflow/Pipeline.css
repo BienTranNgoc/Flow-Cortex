@@ -177,6 +177,16 @@ button.pipeline-node:hover {
   color: var(--red);
 }
 
+.pipeline-node[data-state='stopped'] {
+  --bar: var(--warning);
+  opacity: 0.78;
+}
+
+.pipeline-node .run-step-status[data-state='stopped'] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .pipeline-node .run-step-status[data-state='needs-you'] {
   background: var(--warning-soft);
   color: var(--warning);

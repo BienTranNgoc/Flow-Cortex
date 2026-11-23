@@ -1403,7 +1403,7 @@ export interface ProductVideoRunRequest {
   promotion?: string;
   /**
    * @minItems 1
-   * @maxItems 1
+   * @maxItems 3
    */
   uploadIds: string[];
   video: VideoConfig;
