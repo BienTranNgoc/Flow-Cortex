@@ -234,3 +234,67 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
   CMD ["python", "-m", "flowcortex_worker.healthcheck"]
 
 ENTRYPOINT ["python", "-m", "flowcortex_worker"]
+
+# --- trend-build stage: the locked venv plus the RT-DETR person detector ------------------------
+# The same hash-pinned torch base as the audio image, then the transformers set (wheels only).
+FROM build AS trend-build
+COPY engines/requirements-torch-cpu.txt engines/requirements-trend.txt ./engines/
+RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+      --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple \
+      --index-strategy unsafe-best-match -r engines/requirements-torch-cpu.txt \
+ && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+      --only-binary :all: -r engines/requirements-trend.txt \
+ && uv pip check --python /app/.venv/bin/python
+
+# --- trend-models stage: the detector files at a pinned revision, checked against pinned digests --
+# A moved or replaced file fails the build; the runtime never touches the network.
+FROM trend-build AS trend-models
+ARG RTDETR_REVISION=df939e661d8c52e80608d1ec566561aabd25a4e7
+ARG RTDETR_CONFIG_SHA256=2ed2a305c51eef46715eb755a02b2a266ecfb752936cc9574bb5714601c2742d
+ARG RTDETR_PREPROCESSOR_SHA256=ffb4b9461a1dad746be8f0f9c8330ed7743a1ba5fba4f75c232cd281b3d4c64a
+ARG RTDETR_WEIGHTS_SHA256=5263d5521eff3e356f6cd8a371fd5dfb891725beda5f713674f79669115cdc64
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /models/trend/rtdetr_r50vd
+RUN set -eux; \
+    for file in config.json preprocessor_config.json model.safetensors; do \
+      curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$file" \
+        "https://huggingface.co/PekingU/rtdetr_r50vd/resolve/$RTDETR_REVISION/$file"; \
+    done; \
+    printf '%s  %s\n' \
+      "$RTDETR_CONFIG_SHA256" config.json \
+      "$RTDETR_PREPROCESSOR_SHA256" preprocessor_config.json \
+      "$RTDETR_WEIGHTS_SHA256" model.safetensors \
+    | sha256sum -c -; \
+    test "$(ls | wc -l)" = 3
+
+# --- trend-runtime stage: ffmpeg, the venv with the detector, the model, the licences -----------
+# MEDIA_QUEUE names a lane the role check does not know yet (the lane arrives with the backend
+# enum value that routes role suggestion), so a container started before then exits 2 instead of
+# taking jobs off media.jobs. HF_HOME is a writable path for libraries that create a cache dir;
+# the offline switches keep every load on the baked files.
+FROM python:3.12-slim AS trend-runtime
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg libgomp1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --uid 10001 --no-create-home worker \
+ && install -d -m 0700 -o worker -g worker /run/flowcortex
+
+COPY --from=trend-build /app/.venv /app/.venv
+COPY --from=trend-models /models/trend /app/models/trend
+COPY docker/TREND-LICENSES.md /app/licenses/
+ENV PATH=/app/.venv/bin:$PATH \
+    PYTHONUNBUFFERED=1 \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HOME=/tmp/hf \
+    WORKER_CAPABILITIES=role_suggest \
+    MEDIA_QUEUE=media.trend.jobs
+USER 10001
+WORKDIR /tmp
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["python", "-m", "flowcortex_worker.healthcheck"]
+
+ENTRYPOINT ["python", "-m", "flowcortex_worker"]
