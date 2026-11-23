@@ -43,21 +43,30 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Optional<AppUser> findByIdForUpdate(@Param("id") UUID id);
 
     /** The role alone, read without loading the entity, so a later locked read still sees the row's own state. */
-    @Query("SELECT u.role FROM AppUser u WHERE u.id = :id")
-    Optional<Role> findRoleById(@Param("id") UUID id);
+    default Optional<Role> findRoleById(UUID id) {
+        return findRoleCodeById(id).map(Role::of);
+    }
+
+    /** Native, because Spring Data would read a {@code Role}-typed result as a constructor projection. */
+    @Query(value = "SELECT role FROM app_user WHERE id = :id", nativeQuery = true)
+    Optional<String> findRoleCodeById(@Param("id") UUID id);
 
     /**
      * Row-locks every active super admin in id order (so two removals never wait on each other in
      * opposite orders); the second of two concurrent removals re-reads the set the first shrank.
      */
+    default List<AppUser> lockActiveSuperAdmins() {
+        return lockActiveWithRole(Role.ADMIN);
+    }
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT u FROM AppUser u
-            WHERE u.role = com.flowcortex.user.domain.Role.ADMIN
+            WHERE u.role = :role
               AND u.status = com.flowcortex.user.domain.UserStatus.ACTIVE
               AND u.adminDisabledAt IS NULL
             ORDER BY u.id""")
-    List<AppUser> lockActiveSuperAdmins();
+    List<AppUser> lockActiveWithRole(@Param("role") Role role);
 
     /**
      * Accounts holding one of {@code roles}, across every owner scope, newest first. {@code pattern}

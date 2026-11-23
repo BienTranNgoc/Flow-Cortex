@@ -17,6 +17,8 @@ import { DocumentsPage } from './features/content/DocumentsPage';
 import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { RoleDetailPage } from './features/roles/RoleDetailPage';
+import { RolesPage } from './features/roles/RolesPage';
 import { PhoneVerificationStatusPage } from './features/phoneVerification/PhoneVerificationStatusPage';
 import { ProvidersPage } from './features/providers/ProvidersPage';
 import { RunDetailPage } from './features/runs/RunDetailPage';
@@ -46,6 +48,7 @@ const PAGES: Record<string, ReactElement> = {
   '/settings': <SettingsPage />,
   '/media-jobs': <MediaJobsPage />,
   '/admin-accounts': <AdminAccountsPage />,
+  '/roles': <RolesPage />,
   '/payment-settings': <PaymentSettingsPage />,
   '/support/articles': <ArticlesPage />,
   '/support/groups': <TopicGroupsPage />,
@@ -61,6 +64,8 @@ const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
   { parent: '/workflows', path: '/workflows/:workflowId', element: <WorkflowReportPage /> },
   { parent: '/runs', path: '/runs/:runId', element: <RunDetailPage /> },
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
+  { parent: '/roles', path: '/roles/new', element: <RoleDetailPage /> },
+  { parent: '/roles', path: '/roles/:code', element: <RoleDetailPage /> },
   { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },
   { parent: '/support/requests', path: '/support/requests/:number', element: <RequestDetailPage /> },
   { parent: '/content/documents', path: '/content/documents/:slug', element: <DocumentEditorPage /> },
