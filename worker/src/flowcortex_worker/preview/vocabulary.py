@@ -8,6 +8,8 @@ from __future__ import annotations
 
 CARD_KIND = "flowcortex.staging-card/1"
 FPS = 24
+# 30 s: at the 0.439 s per-frame P95 of a send job this is about 316 s, inside a 10 min watchdog.
+MAX_FRAME_COUNT = 720
 FRAME_BY_ASPECT: dict[str, tuple[int, int]] = {
     "9:16": (496, 864),
     "16:9": (854, 480),
