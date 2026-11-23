@@ -49,7 +49,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { activeLocale } from '../../lib/i18n';
-import { useModalDialog } from '../runHistory/useModalDialog';
+import { useModalDialog } from '../../lib/useModalDialog';
 import { PipelineNode, type PipelineStep } from './Pipeline';
 import {
   FIT_PADDING,
