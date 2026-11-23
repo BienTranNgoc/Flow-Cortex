@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.domain.UserStatus;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class PatEligibilityTest {
@@ -67,11 +68,9 @@ class PatEligibilityTest {
     }
 
     @Test
-    void everyStaffRoleIsNeverEligible() {
-        for (Role role : Role.values()) {
-            if (!role.isStaff()) {
-                continue;
-            }
+    void everyRoleOtherThanTheSuperAdminIsNeverEligible() {
+        for (Role role : List.of(Role.MEMBER, Role.CREATOR, Role.OPERATION_MANAGER, Role.CUSTOMER_SUPPORT,
+                Role.CONTENT_EDITOR, Role.PLATFORM_OPERATOR, Role.of("SUPPORT_LEAD"))) {
             for (PatUse use : PatUse.values()) {
                 assertThat(eligible(role, UserStatus.ACTIVE, null, use)).as(role + " " + use).isFalse();
             }
