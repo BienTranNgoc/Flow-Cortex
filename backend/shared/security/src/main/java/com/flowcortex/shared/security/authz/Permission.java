@@ -29,10 +29,15 @@ public enum Permission {
     CONTENT_HELP_TOPIC_MANAGE("content.help_topic.manage", false),
     CONTENT_HELP_ARTICLE_VIEW("content.help_article.view", false),
     CONTENT_HELP_ARTICLE_MANAGE("content.help_article.manage", false),
+    CONTENT_DOCUMENT_VIEW("content.document.view", false),
+    CONTENT_DOCUMENT_MANAGE("content.document.manage", false),
+    CONTENT_MEDIA_VIEW("content.media.view", false),
+    CONTENT_MEDIA_MANAGE("content.media.manage", false),
     PLATFORM_SETTING_VIEW("platform.setting.view", false),
     PLATFORM_SETTING_UPDATE("platform.setting.update", false),
     PLATFORM_SMS_OUTBOX_VIEW("platform.sms_outbox.view", false),
     SYSTEM_ROLE_VIEW("system.role.view", true),
+    SYSTEM_ROLE_MANAGE("system.role.manage", true),
     SYSTEM_ADMIN_ACCOUNT_VIEW("system.admin_account.view", true),
     SYSTEM_ADMIN_ACCOUNT_MANAGE("system.admin_account.manage", true),
     AI_PROVIDER_VIEW("ai.provider.view", false),
@@ -42,7 +47,8 @@ public enum Permission {
     WORKFLOW_WORKFLOW_VIEW("workflow.workflow.view", false),
     WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false),
     PAYMENT_SETTING_VIEW("payment.setting.view", false),
-    PAYMENT_SETTING_UPDATE("payment.setting.update", false);
+    PAYMENT_SETTING_UPDATE("payment.setting.update", false),
+    USER_ACCOUNT_EXPORT("user.account.export", false);
 
     private static final Map<String, Permission> BY_KEY =
             Arrays.stream(values()).collect(Collectors.toUnmodifiableMap(Permission::key, Function.identity()));

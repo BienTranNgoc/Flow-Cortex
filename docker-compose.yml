@@ -14,7 +14,8 @@
 # Every published port binds 127.0.0.1. The backend and the workers sit on the
 # internal network only: their one way out is egress-proxy, which lets just the
 # allowlisted hosts through (infra/egress-proxy/acl.yaml). egress-fetch is a
-# separate open-policy proxy on the fetch network for URL-download code only.
+# separate open-policy proxy on the fetch network for URL-download code only;
+# fetch-worker is the one service that joins that network.
 # 127.0.0.1:8080 is relayed to the backend by api-publish. Traces, logs and
 # metrics are the optional overlay compose.observability.yaml. No credential has
 # a default here: a committed value would be a known secret.
@@ -193,9 +194,9 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # Creates the restricted broker identity used by provider-worker and provider-video-worker.
-  # The data volume, read-only, gives rabbitmqctl the node cookie; no password is passed on a
-  # command line.
+  # Creates the restricted broker identities: one for provider-worker and provider-video-worker,
+  # one for fetch-worker alone. The data volume, read-only, gives rabbitmqctl the node cookie; no
+  # password is passed on a command line.
   rabbitmq-init:
     image: rabbitmq:4.3.6-management
     entrypoint: ['/bin/sh', '/init/init.sh']
@@ -203,6 +204,8 @@ services:
       RABBITMQ_NODENAME: rabbit@rabbitmq
       PROVIDER_RABBITMQ_USER: ${PROVIDER_RABBITMQ_USER:?Set PROVIDER_RABBITMQ_USER (see .env.example)}
       PROVIDER_RABBITMQ_PASS: ${PROVIDER_RABBITMQ_PASS:?Set PROVIDER_RABBITMQ_PASS (see .env.example)}
+      FETCH_RABBITMQ_USER: ${FETCH_RABBITMQ_USER:?Set FETCH_RABBITMQ_USER (see .env.example)}
+      FETCH_RABBITMQ_PASS: ${FETCH_RABBITMQ_PASS:?Set FETCH_RABBITMQ_PASS (see .env.example)}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq:ro
       - ./infra/rabbitmq:/init:ro
@@ -248,6 +251,8 @@ services:
       WORKER_S3_SECRET_KEY: ${WORKER_S3_SECRET_KEY:?Set WORKER_S3_SECRET_KEY (see .env.example)}
       PROVIDER_S3_ACCESS_KEY: ${PROVIDER_S3_ACCESS_KEY:?Set PROVIDER_S3_ACCESS_KEY (see .env.example)}
       PROVIDER_S3_SECRET_KEY: ${PROVIDER_S3_SECRET_KEY:?Set PROVIDER_S3_SECRET_KEY (see .env.example)}
+      FETCH_S3_ACCESS_KEY: ${FETCH_S3_ACCESS_KEY:?Set FETCH_S3_ACCESS_KEY (see .env.example)}
+      FETCH_S3_SECRET_KEY: ${FETCH_S3_SECRET_KEY:?Set FETCH_S3_SECRET_KEY (see .env.example)}
       # Expiry of run-input copies in the media bucket; must outlast the longest review wait.
       RUN_INPUT_RETENTION_DAYS: ${RUN_INPUT_RETENTION_DAYS:-30}
     volumes:
@@ -296,6 +301,7 @@ services:
       #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend
       FLOWCORTEX_WORKFLOW_ENABLED: ${FLOWCORTEX_WORKFLOW_ENABLED:-true}
       FLOWCORTEX_PRODUCT_VIDEO_ENABLED: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:-false}
+      PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED: ${PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED:-false}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:?Set RABBITMQ_DEFAULT_USER (see .env.example)}
@@ -385,6 +391,7 @@ services:
       FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO:-15m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO:-10m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
       FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
       FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT: ${FLOWCORTEX_MEDIA_PROVIDER_QUEUE_TIMEOUT:-5m}
@@ -419,7 +426,13 @@ services:
       FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_MINUTE_PERIOD: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_MINUTE_PERIOD:-1m}
       FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_CAPACITY: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_CAPACITY:-1000}
       FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_PERIOD: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_PERIOD:-1d}
+      # The MCP authorization server stays off here (it needs the personal access token switch above and
+      # FLOWCORTEX_APP_PUBLIC_URL, or the backend refuses to start).
+      FLOWCORTEX_AUTH_MCP_OAUTH_ENABLED: ${FLOWCORTEX_AUTH_MCP_OAUTH_ENABLED:-false}
+      FLOWCORTEX_AUTH_API_TOKEN_CALLS_DAILY_WRITE_LIMIT: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_DAILY_WRITE_LIMIT:-0}
+      FLOWCORTEX_AUTH_API_TOKEN_CALLS_DAILY_WORKFLOW_CREATE_LIMIT: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_DAILY_WORKFLOW_CREATE_LIMIT:-0}
       FLOWCORTEX_PHONE_VERIFICATION_ENABLED: ${FLOWCORTEX_PHONE_VERIFICATION_ENABLED:-true}
+      FLOWCORTEX_PHONE_GATE_ENABLED: ${FLOWCORTEX_PHONE_GATE_ENABLED:-false}
       FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED: ${FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED:-true}
       FLOWCORTEX_WORKFLOW_CANCEL_ENABLED: ${FLOWCORTEX_WORKFLOW_CANCEL_ENABLED:-true}
       FLOWCORTEX_CREDITS_ENABLED: ${FLOWCORTEX_CREDITS_ENABLED:-true}
@@ -521,6 +534,36 @@ services:
     deploy:
       replicas: ${MEDIA_RENDER_WORKERS:-1}
 
+  # Fetch worker: consumes media.fetch.jobs (fetch_video) and is the only service on the
+  # `fetch` network, so it alone can download a member's link, through egress-fetch. It
+  # runs yt-dlp and ffmpeg on content from anywhere, so it gets its own object-store key
+  # (write-only under runs/, no read of uploads or run objects) and its own broker login
+  # (consume media.fetch.jobs, publish to media, nothing else) instead of the media
+  # worker's, and no database credential. No WORKER_ID: it reports its container hostname.
+  fetch-worker:
+    <<: *media-worker
+    networks: [internal, fetch]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      egress-fetch:
+        condition: service_started
+    environment:
+      <<: *media-worker-env
+      AMQP_URL: amqp://${FETCH_RABBITMQ_USER:?Set FETCH_RABBITMQ_USER (see .env.example)}:${FETCH_RABBITMQ_PASS:?Set FETCH_RABBITMQ_PASS (see .env.example)}@rabbitmq:5672/%2F
+      S3_ACCESS_KEY: ${FETCH_S3_ACCESS_KEY:?Set FETCH_S3_ACCESS_KEY (see .env.example)}
+      S3_SECRET_KEY: ${FETCH_S3_SECRET_KEY:?Set FETCH_S3_SECRET_KEY (see .env.example)}
+      MEDIA_QUEUE: media.fetch.jobs
+      WORKER_CAPABILITIES: fetch_video
+      FETCH_PROXY_URL: http://egress-fetch:4750
+      FETCH_PLATFORM_LINKS_ENABLED: ${FETCH_PLATFORM_LINKS_ENABLED:-true}
+      FETCH_UPSTREAM_ROTATES: ${FETCH_UPSTREAM_ROTATES:-false}
+      OTEL_SERVICE_NAME: fetch-worker
+
   # Audio pool: consumes media.audio.jobs (separate_audio) on the audio-runtime image
   # (torch, demucs, models baked in), so a separation never waits behind a probe and
   # the heavy image is not pulled by the other media services. One job per container;
@@ -559,6 +602,7 @@ services:
       VIDEO_PROVIDER_API_KEY: ${VIDEO_PROVIDER_API_KEY:-}
       SCRIPT_PROVIDER_BASE_URL: ${SCRIPT_PROVIDER_BASE_URL:-}
       SCRIPT_PROVIDER_MODEL: ${SCRIPT_PROVIDER_MODEL:-}
+      SCRIPT_PROVIDER_FALLBACK_MODEL: ${SCRIPT_PROVIDER_FALLBACK_MODEL:-}
       SPEECH_PROVIDER_BASE_URL: ${SPEECH_PROVIDER_BASE_URL:-}
       SPEECH_PROVIDER_MODEL: ${SPEECH_PROVIDER_MODEL:-}
       VIDEO_PROVIDER_BASE_URL: ${VIDEO_PROVIDER_BASE_URL:-}
@@ -576,11 +620,16 @@ services:
       WAN_RESOLUTION: ${WAN_RESOLUTION:-480p}
       WAN_FRAMES_PER_SECOND: ${WAN_FRAMES_PER_SECOND:-24}
       WAN_NUM_FRAMES: ${WAN_NUM_FRAMES:-121}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MINIMAX_BASE_URL: ${MINIMAX_BASE_URL:-https://api.replicate.com/v1}
+      MINIMAX_MODEL: ${MINIMAX_MODEL:-minimax/h3-lite}
+      MINIMAX_RESOLUTION: ${MINIMAX_RESOLUTION:-768P}
+      MINIMAX_DURATION: ${MINIMAX_DURATION:-5}
       VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS:-60}
       VIDEO_PROVIDER_POLL_INTERVAL_SECONDS: ${VIDEO_PROVIDER_POLL_INTERVAL_SECONDS:-5}
       VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS:-480}
       EDGE_TTS_VOICE: ${EDGE_TTS_VOICE:-vi-VN-NamMinhNeural}
-      EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+0%}
+      EDGE_TTS_RATE: ${EDGE_TTS_RATE:-+10%}
       FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS: ${FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS:-60}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FLOWCORTEX_PROVIDER_SCRIPT_MODEL: ${FLOWCORTEX_PROVIDER_SCRIPT_MODEL:-gpt-4o-mini}
@@ -596,6 +645,7 @@ services:
       <<: *provider-worker-env
       PROVIDER_QUEUE: provider.video.jobs
       OTEL_SERVICE_NAME: provider-video-worker
+      PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED: ${PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED:-false}
       VIDEO_PROVIDER: ${VIDEO_PROVIDER:-fixture}
       VIDEO_PROVIDER_API_KEY: ${VIDEO_PROVIDER_API_KEY:-}
       VIDEO_PROVIDER_BASE_URL: ${VIDEO_PROVIDER_BASE_URL:-}
@@ -613,6 +663,11 @@ services:
       WAN_RESOLUTION: ${WAN_RESOLUTION:-480p}
       WAN_FRAMES_PER_SECOND: ${WAN_FRAMES_PER_SECOND:-24}
       WAN_NUM_FRAMES: ${WAN_NUM_FRAMES:-121}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      MINIMAX_BASE_URL: ${MINIMAX_BASE_URL:-https://api.replicate.com/v1}
+      MINIMAX_MODEL: ${MINIMAX_MODEL:-minimax/h3-lite}
+      MINIMAX_RESOLUTION: ${MINIMAX_RESOLUTION:-768P}
+      MINIMAX_DURATION: ${MINIMAX_DURATION:-5}
       VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS:-60}
       VIDEO_PROVIDER_POLL_INTERVAL_SECONDS: ${VIDEO_PROVIDER_POLL_INTERVAL_SECONDS:-5}
       VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS: ${VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS:-480}
@@ -645,6 +700,10 @@ services:
       context: .
       dockerfile: admin/Dockerfile
     image: flow-cortex-admin:local
+    environment:
+      # The origin the backend signs upload and download URLs for (its S3_PUBLIC_ENDPOINT); the
+      # console's CSP lets the browser reach exactly this one origin besides itself.
+      MEDIA_ORIGIN: http://localhost:9000
     networks: [default, internal]
     ports:
       - '127.0.0.1:5174:8080'
@@ -665,7 +724,7 @@ networks:
     internal: true
   # The only network with a route out; egress-proxy and egress-fetch alone join it.
   egress: {}
-  # URL-download code only; egress-fetch is its sole other member.
+  # URL-download code only; egress-fetch and fetch-worker are its two members.
   fetch:
     internal: true
 

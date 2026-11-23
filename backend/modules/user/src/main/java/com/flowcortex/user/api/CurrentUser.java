@@ -11,7 +11,8 @@ import java.util.UUID;
  * @param ownerId      administering ADMIN's id (self for an ADMIN row)
  * @param email        login email
  * @param name         display name
- * @param role         {@code ADMIN} or {@code MEMBER}
+ * @param role         role code: a built-in one ({@code ADMIN}, {@code MEMBER}, ...) or a custom role's code;
+ *                     its display name is not carried here, so the per-request lookup stays one row read
  * @param status       {@code ACTIVE} or {@code SUSPENDED}
  * @param hasPassword  the account can sign in with a password
  * @param googleLinked the account can sign in with Google

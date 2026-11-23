@@ -14,6 +14,7 @@ from typing import Any, NoReturn
 from ..errors import PermanentError, TransientError
 from .adapter import (
     Abort,
+    CancelResult,
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
@@ -226,6 +227,9 @@ class SeedanceAdapter:
                 raise VendorJobTimeout(PROVIDER_SEEDANCE, task_id)
             remaining = max(0.0, deadline - time.monotonic())
             time.sleep(min(self.config.poll_interval_seconds, remaining))
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=False, reason="cancel is not supported for seedance")
 
     def probe_video(self, task_id: str) -> VendorProbe:
         body = probe_json(

@@ -11,8 +11,9 @@ import {
   type OnboardingStatusResponse,
 } from '@flow-cortex/api-client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useFeatures } from '../../app/useFeatures';
+import i18n from '../../lib/i18n';
 import type {
   AiLevel,
   ContentType,
@@ -75,10 +76,21 @@ async function fetchStatus(): Promise<OnboardingStatusResponse> {
 export function useOnboardingStatus() {
   const { onboarding } = useFeatures();
   const member = useAuthToken() !== null;
+  const queryClient = useQueryClient();
+  const enabled = onboarding === true && member;
+
+  // The served sample input follows the request language, so a language switch refetches it.
+  useEffect(() => {
+    if (!enabled) return;
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ONBOARDING_STATUS_KEY });
+    i18n.on('languageChanged', refresh);
+    return () => i18n.off('languageChanged', refresh);
+  }, [enabled, queryClient]);
+
   return useQuery({
     queryKey: ONBOARDING_STATUS_KEY,
     queryFn: fetchStatus,
-    enabled: onboarding === true && member,
+    enabled,
   });
 }
 

@@ -75,7 +75,8 @@ public class WorkflowForkService {
                 dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(source.getId()))));
         workflowRepository.incrementForkCount(source.getId());
 
-        return WorkflowMapper.toWorkflowView(fork, steps, registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(fork, steps, registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     /** A {@code workflow.call} step would fail at run time if the new owner cannot read the workflow it names. */

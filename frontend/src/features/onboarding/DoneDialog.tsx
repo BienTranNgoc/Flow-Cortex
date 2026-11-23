@@ -1,16 +1,30 @@
+import type { OnboardingSampleWorkflow } from '@flow-cortex/api-client';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { JourneyStep } from './onboardingFlow';
 import { JourneyDialog } from './JourneyDialog';
+import { SampleCard } from './SampleCard';
 
 interface DoneDialogProps {
   steps: readonly JourneyStep[];
+  sample: OnboardingSampleWorkflow | null;
+  /** The sample button was pressed and the journey is finishing. */
+  trying: boolean;
   onFinish: () => void;
+  onTrySample: (sample: OnboardingSampleWorkflow) => void;
   onBack: () => void;
   onClose: () => void;
 }
 
-export function DoneDialog({ steps, onFinish, onBack, onClose }: Readonly<DoneDialogProps>) {
+export function DoneDialog({
+  steps,
+  sample,
+  trying,
+  onFinish,
+  onTrySample,
+  onBack,
+  onClose,
+}: Readonly<DoneDialogProps>) {
   const { t } = useTranslation();
   const titleId = useId();
   return (
@@ -20,10 +34,23 @@ export function DoneDialog({ steps, onFinish, onBack, onClose }: Readonly<DoneDi
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onBack}>
+          <button
+            type="button"
+            aria-disabled={trying}
+            onClick={() => {
+              if (!trying) onBack();
+            }}
+          >
             {t('onboarding.quiz.back')}
           </button>
-          <button type="button" className="onboarding-primary" onClick={onFinish}>
+          <button
+            type="button"
+            className="onboarding-primary"
+            aria-disabled={trying}
+            onClick={() => {
+              if (!trying) onFinish();
+            }}
+          >
             {t('onboarding.done.action')}
           </button>
         </>
@@ -37,6 +64,7 @@ export function DoneDialog({ steps, onFinish, onBack, onClose }: Readonly<DoneDi
           ))}
         </ul>
       )}
+      {sample && <SampleCard sample={sample} busy={trying} onTry={onTrySample} />}
     </JourneyDialog>
   );
 }

@@ -13,6 +13,7 @@ import com.flowcortex.media.api.MediaStoreUnavailableException;
 import com.flowcortex.media.api.RunInput;
 import com.flowcortex.media.api.RunInputsBound;
 import com.flowcortex.media.api.StoredAttachment;
+import com.flowcortex.media.api.StoredContentMedia;
 import com.flowcortex.media.api.StoredDriveFile;
 import com.flowcortex.media.api.provider.ProviderJob;
 import com.flowcortex.media.api.provider.ProviderJobPayload;
@@ -60,6 +61,10 @@ class MediaJobsImpl implements MediaJobs {
     private static final Pattern ATTEMPT_SEGMENT = Pattern.compile("^attempts/[1-9][0-9]*/(?=.)");
     private static final ObjectMapper MAPPER = JsonMapper.builder().build();
     private static final Set<String> PROVIDER_PARAMS_KEYS = Set.of("profile", "payload");
+    private static final String CONTENT_PREFIX = "content/";
+    /** Content copies follow the same lifecycle: pending expires, kept stays. */
+    private static final String CONTENT_PENDING = "content-pending";
+    private static final String CONTENT_KEPT = "content";
     private static final String DRIVE_PREFIX = "drive/";
     /** Same retention-tag contract as support: pending expires by lifecycle, a kept Drive file does not. */
     private static final String DRIVE_PENDING = "drive-pending";
@@ -403,6 +408,73 @@ class MediaJobsImpl implements MediaJobs {
         if (first != null) {
             throw first;
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public StoredContentMedia keepContentMedia(UUID ownerId, UUID uploadId, UUID mediaId) {
+        try {
+            return keepContent(ownerId, uploadId, mediaId);
+        } catch (UploadRejectedException e) {
+            // The store and the image checks name the batch field of run starts; this port has one upload.
+            if ("uploadId".equals(e.field())) {
+                throw e;
+            }
+            throw new UploadRejectedException("uploadId", e.detail());
+        }
+    }
+
+    private StoredContentMedia keepContent(UUID ownerId, UUID uploadId, UUID mediaId) {
+        MediaAsset asset = registerUpload(UploadPurpose.CONTENT_MEDIA, ownerId, uploadId,
+                List.copyOf(purposes.mimeTypes(UploadPurpose.CONTENT_MEDIA).keySet()), null);
+        MediaJobInput source = new MediaJobInput(UPLOAD_INPUT_KEY, properties.s3().uploadBucket(),
+                purposes.objectKey(UploadPurpose.CONTENT_MEDIA, ownerId, uploadId));
+        String bucket = properties.s3().bucket();
+        String key = CONTENT_PREFIX + mediaId;
+        String kind = asset.getKind();
+        String contentType = asset.getMimeType();
+        long size = asset.getBytes();
+        if ("image".equals(kind)) {
+            HardenedImage image = hardenedImage(source, contentType,
+                    purposes.maxBytes(UploadPurpose.CONTENT_MEDIA, kind), "uploadId",
+                    reason -> refusedContent(bucket, key, reason, kind));
+            store.put(bucket, key, image.contentType(), image.bytes(), CONTENT_PENDING);
+            contentType = image.contentType();
+            size = image.bytes().length;
+        } else {
+            store.copy(source.bucket(), source.objectKey(), bucket, key, CONTENT_PENDING);
+        }
+        if (properties.upload().contentCheck().enabled()) {
+            byte[] prefix = store.readPrefix(bucket, key, ContentSniffer.PREFIX_LENGTH)
+                    .orElseThrow(() -> refusedContent(bucket, key, "gone before the content check", kind));
+            if (!ContentSniffer.matches(kind, prefix)) {
+                throw refusedContent(bucket, key, "content is not " + kind, kind);
+            }
+            if ("image".equals(kind) && !sniffedImageType(prefix).equals(contentType)) {
+                throw refusedContent(bucket, key, "content is not " + contentType, kind);
+            }
+        }
+        store.retag(bucket, key, CONTENT_KEPT);
+        LOG.info("Content media kept: bucket={} key={} kind={} bytes={}", bucket, key, kind, size);
+        return new StoredContentMedia(bucket, key, contentType, kind, size);
+    }
+
+    @Override
+    public void releaseContentMedia(StoredContentMedia media) {
+        String bucket = properties.s3().bucket();
+        if (!bucket.equals(media.bucket()) || !media.objectKey().startsWith(CONTENT_PREFIX)
+                || media.objectKey().length() == CONTENT_PREFIX.length()) {
+            throw new IllegalArgumentException("Not a kept content copy: " + media.bucket() + "/"
+                    + media.objectKey());
+        }
+        store.retag(bucket, media.objectKey(), CONTENT_PENDING);
+        LOG.info("Content media released: bucket={} key={}", bucket, media.objectKey());
+    }
+
+    /** The refused copy keeps its pending tag and expires; the backend may not delete in the media bucket. */
+    private UploadRejectedException refusedContent(String bucket, String key, String reason, String kind) {
+        LOG.info("Content media refused: bucket={} key={} reason={}", bucket, key, reason);
+        return new UploadRejectedException("uploadId", invalidContentDetail(UploadPurpose.CONTENT_MEDIA, kind));
     }
 
     @Override
@@ -786,6 +858,37 @@ class MediaJobsImpl implements MediaJobs {
         return new MediaOutput(name, bucket, key, mime, (long) bytes.length, null);
     }
 
+    @Override
+    public MediaOutput copyRunObject(UUID runId, int stepOrder, MediaJobInput source, String name) {
+        if (!PLAIN_FILE_NAME.matcher(name).matches()) {
+            throw new IllegalArgumentException("Not a plain file name: " + name.replaceAll("\\p{Cntrl}", "?"));
+        }
+        String bucket = properties.s3().bucket();
+        if (!bucket.equals(source.bucket()) || !MediaJob.isBelow("runs/" + runId + "/", source.objectKey())) {
+            throw new IllegalArgumentException("Only an object of the run in the media bucket can be copied: "
+                    + source.key());
+        }
+        // The backend's store policy lets it write a step's first attempt only, and holds no tagging grant
+        // there; the untagged copy matches no lifecycle rule, so it lives as long as a worker output.
+        String key = MediaJob.outputPrefix(runId, stepOrder, 1) + name;
+        Optional<S3MediaStore.StoredObject> copy;
+        try {
+            store.copyWithoutTags(bucket, source.objectKey(), bucket, key);
+            copy = store.head(bucket, key);
+        } catch (SdkException | IllegalStateException e) {
+            // The message may reach a step's error message; where the object was going stays in the log.
+            LOG.warn("Run object not copied: bucket={} key={} source={}", bucket, key, source.objectKey(), e);
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", e);
+        }
+        if (copy.isEmpty()) {
+            LOG.warn("Run object not found after its copy: bucket={} key={} source={}", bucket, key,
+                    source.objectKey());
+            throw new MediaStoreUnavailableException("The object store did not take the step's file", null);
+        }
+        LOG.info("Run object copied: bucket={} key={} bytes={}", bucket, key, copy.get().size());
+        return new MediaOutput(name, bucket, key, copy.get().contentType(), copy.get().size(), null);
+    }
+
     private static UploadRejectedException refused(String bucket, String key, String reason,
             LocalizedMessage detail) {
         LOG.info("Upload refused at run start: bucket={} key={} reason={}", bucket, key, reason);
@@ -794,15 +897,16 @@ class MediaJobsImpl implements MediaJobs {
 
     /** Only reached after the size check, which refuses every kind but video, audio and image. */
     private LocalizedMessage invalidContentDetail(String kind) {
-        return switch (kind) {
-            case "video" -> new LocalizedMessage("upload.invalidVideo", formats(kind));
-            case "audio" -> new LocalizedMessage("upload.invalidAudio", formats(kind));
-            default -> new LocalizedMessage("upload.invalidImage", formats(kind));
-        };
+        return invalidContentDetail(UploadPurpose.RUN_INPUT, kind);
     }
 
-    private String formats(String kind) {
-        return String.join(", ", properties.upload().extensionsOf(kind).stream().map(e -> "." + e).toList());
+    private LocalizedMessage invalidContentDetail(UploadPurpose purpose, String kind) {
+        String formats = purposes.formats(purpose, kind);
+        return switch (kind) {
+            case "video" -> new LocalizedMessage("upload.invalidVideo", formats);
+            case "audio" -> new LocalizedMessage("upload.invalidAudio", formats);
+            default -> new LocalizedMessage("upload.invalidImage", formats);
+        };
     }
 
     private static LocalizedMessage typeDetail(List<String> allowedExtensions) {

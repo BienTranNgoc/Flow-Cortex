@@ -229,7 +229,8 @@ public class WorkflowTransferService {
     }
 
     private WorkflowView view(Workflow workflow, List<WorkflowStep> steps) {
-        return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable);
+        return WorkflowMapper.toWorkflowView(workflow, steps, registry::isRemote, registry::isAvailable,
+                registry::snapshotsRunInputs);
     }
 
     private static WorkflowArtifact parse(byte[] body) {

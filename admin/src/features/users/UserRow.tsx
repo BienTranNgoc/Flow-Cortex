@@ -9,9 +9,12 @@ import { can } from '../../app/permissions';
 import { formatDateTime } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
 import { useMeQuery } from '../auth/useAuth';
-import { assignableRoles, ROLE_CODES, roleLabel, statusLabel } from './enumLabels';
+import { StatusPill } from '../../app/StatusPill';
+import { roleLabel, stateLabel, stateTone } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
+import { canManageAccount } from './userAccess';
 import { editUserSchema, type EditUserFormValues } from './userSchemas';
+import { useAssignableRoles } from './useAssignableRoles';
 import { useUpdateUserMutation } from './useUsers';
 
 /** One row of the users table — view mode, or an inline edit form. */
@@ -20,8 +23,8 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const me = useMeQuery().data;
   const [editing, setEditing] = useState(false);
   const updateMutation = useUpdateUserMutation();
-  const assignable = assignableRoles(me);
-  const role = ROLE_CODES.find((code) => code === user.role) ?? 'MEMBER';
+  const { assignable, names } = useAssignableRoles();
+  const role = user.role || 'MEMBER';
   const status = user.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
   const {
     register,
@@ -53,7 +56,9 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
   const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
 
-  if (editing) {
+  const manageable = canManageAccount(me, user);
+
+  if (editing && manageable) {
     return (
       <tr>
         <td colSpan={6}>
@@ -92,7 +97,11 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
                 disabled={assignable.length === 0}
                 {...register('role')}
               >
-                <RoleOptions roles={assignable} current={role} />
+                <RoleOptions
+                  roles={assignable}
+                  current={role}
+                  names={{ [role]: user.roleName, ...names }}
+                />
               </select>
             </div>
             <div className="cortex-admin-field">
@@ -139,18 +148,12 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
       </td>
       <td data-label={t('users.columns.email')}>{user.email}</td>
       <td data-label={t('users.columns.role')}>
-        <span className="cortex-admin-pill cortex-admin-pill--info">{roleLabel(t, user.role)}</span>
-      </td>
-      <td data-label={t('users.columns.status')}>
-        <span
-          className={
-            user.status === 'ACTIVE'
-              ? 'cortex-admin-pill cortex-admin-pill--success'
-              : 'cortex-admin-pill cortex-admin-pill--warning'
-          }
-        >
-          {statusLabel(t, user.status)}
+        <span className="cortex-admin-pill cortex-admin-pill--info">
+          {roleLabel(t, user.role, user.roleName)}
         </span>
+      </td>
+      <td data-label={t('users.columns.state')}>
+        <StatusPill tone={stateTone(user.state)} label={stateLabel(t, user.state)} />
       </td>
       <td data-label={t('users.columns.joined')}>
         {user.createdAt ? (
@@ -164,13 +167,17 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
           <Link className="cortex-admin-link" to={`/users/${id}`}>
             {t('users.row.view')}
           </Link>
-          <button
-            type="button"
-            className="cortex-admin-btn cortex-admin-btn--sm"
-            onClick={() => setEditing(true)}
-          >
-            {t('users.row.edit')}
-          </button>
+          {manageable ? (
+            <button
+              type="button"
+              className="cortex-admin-btn cortex-admin-btn--sm"
+              onClick={() => setEditing(true)}
+            >
+              {t('users.row.edit')}
+            </button>
+          ) : (
+            <span className="cortex-admin-stale">{t('users.readOnlyAdminAccount')}</span>
+          )}
         </div>
       </td>
     </tr>

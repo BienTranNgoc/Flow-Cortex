@@ -60,6 +60,7 @@
         "administration": "Administration",
         "system": "System",
         "support": "Support",
+        "content": "Content",
         "chat": "Chat"
       },
       "items": {
@@ -72,6 +73,7 @@
         "paymentSettings": "Payment settings",
         "users": "Users",
         "smsOutbox": "SMS Outbox",
+        "phoneVerification": "Phone verification",
         "settings": "Settings",
         "features": "Feature Switches",
         "auditLog": "Audit Log",
@@ -82,7 +84,11 @@
         "supportGroups": "Topics",
         "supportRequests": "Requests",
         "supportSettings": "Assistant settings",
+        "onboardingSample": "Onboarding sample",
         "adminAccounts": "Admin accounts",
+        "roles": "Roles & permissions",
+        "contentDocuments": "Documents",
+        "contentMedia": "Media library",
         "chatSettings": "Settings"
       }
     },

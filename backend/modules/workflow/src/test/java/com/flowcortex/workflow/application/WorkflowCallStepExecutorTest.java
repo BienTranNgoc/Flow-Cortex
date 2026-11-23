@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.credit.api.InsufficientCreditsException;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
@@ -21,6 +22,7 @@ import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -65,10 +67,14 @@ class WorkflowCallStepExecutorTest {
             new WorkflowStep(UUID.randomUUID(), childWorkflowId, (short) 1, "a", "echo", null),
             new WorkflowStep(UUID.randomUUID(), childWorkflowId, (short) 2, "b", "echo", null));
 
-    @SuppressWarnings("unchecked")
     private WorkflowCallStepExecutor executor(boolean workflowsEnabled) {
+        return executor(registry, workflowsEnabled);
+    }
+
+    @SuppressWarnings("unchecked")
+    private WorkflowCallStepExecutor executor(StepExecutorRegistry steps, boolean workflowsEnabled) {
         ObjectProvider<StepExecutorRegistry> provider = mock(ObjectProvider.class);
-        when(provider.getObject()).thenReturn(registry);
+        when(provider.getObject()).thenReturn(steps);
         ObjectProvider<RunStartGuards> guardsProvider = mock(ObjectProvider.class);
         when(guardsProvider.getObject()).thenReturn(guards);
         return new WorkflowCallStepExecutor(runs, workflows, served, guardsProvider, provider, mediaJobs, creation,
@@ -87,7 +93,7 @@ class WorkflowCallStepExecutorTest {
     private void givenValidChild() {
         when(workflows.findVisibleTo(childWorkflowId, owner)).thenReturn(Optional.of(child));
         when(served.stepsFor(child, owner)).thenReturn(childSteps);
-        when(registry.isAvailable(any())).thenReturn(true);
+        when(registry.isAvailable(any(), any())).thenReturn(true);
         when(mediaJobs.isEnabled()).thenReturn(true);
     }
 
@@ -206,9 +212,46 @@ class WorkflowCallStepExecutorTest {
     void aChildStartingWithAnUploadStepIsRefused() {
         parentAtDepth(0, null);
         givenValidChild();
-        when(registry.isRemote("echo")).thenReturn(true);
+        when(registry.snapshotsRunInputs("echo")).thenReturn(true);
 
         assertFails(contextFor(childWorkflowId), "workflow_call_needs_upload");
+    }
+
+    private StepExecutorRegistry realRegistry() {
+        when(mediaJobs.providerLimits(any()))
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+        return new StepExecutorRegistry(mediaJobs, Clock.systemUTC());
+    }
+
+    private void givenChildStartingWith(String type) {
+        when(workflows.findVisibleTo(childWorkflowId, owner)).thenReturn(Optional.of(child));
+        when(served.stepsFor(child, owner)).thenReturn(List.of(
+                new WorkflowStep(UUID.randomUUID(), childWorkflowId, (short) 1, "a", type, null)));
+        when(mediaJobs.isEnabled()).thenReturn(true);
+    }
+
+    @Test
+    void aChildStartingWithAnIngestStepIsRefusedBecauseItNeedsAnUpload() {
+        parentAtDepth(0, null);
+        givenChildStartingWith("ingest_video");
+
+        assertThatThrownBy(() -> executor(realRegistry(), true).execute(contextFor(childWorkflowId)))
+                .isInstanceOfSatisfying(StepFailedException.class,
+                        e -> assertThat(e.code()).isEqualTo("workflow_call_needs_upload"));
+        verify(creation, never()).create(any());
+    }
+
+    @Test
+    void aChildStartingWithAFetchStepTakesTheParentsTextAsItsLink() {
+        parentAtDepth(0, null);
+        givenChildStartingWith("fetch_video");
+
+        executor(realRegistry(), true).execute(contextFor(childWorkflowId));
+
+        ArgumentCaptor<RunCreation.NewRun> created = ArgumentCaptor.forClass(RunCreation.NewRun.class);
+        verify(creation).create(created.capture());
+        assertThat(created.getValue().input()).isEqualTo("the input");
+        assertThat(created.getValue().stepInputJson()).isNull();
     }
 
     @Test
@@ -226,7 +269,20 @@ class WorkflowCallStepExecutorTest {
     void aChildStepThatMayNotRunNowMakesTheCallUnavailable() {
         parentAtDepth(0, null);
         givenValidChild();
-        when(registry.isAvailable("echo")).thenReturn(false);
+        when(registry.isAvailable("echo", null)).thenReturn(false);
+
+        assertFails(contextFor(childWorkflowId), "workflow_call_unavailable");
+    }
+
+    @Test
+    void anIterateStepWhoseChildMayNotRunNowMakesTheCallUnavailable() {
+        parentAtDepth(0, null);
+        givenValidChild();
+        String config = "{\"child\":{\"type\":\"tts\"}}";
+        when(served.stepsFor(child, owner)).thenReturn(List.of(
+                new WorkflowStep(UUID.randomUUID(), childWorkflowId, (short) 1, "each", "iterate", null, config)));
+        when(registry.isAvailable("iterate")).thenReturn(true);
+        when(registry.isAvailable("iterate", config)).thenReturn(false);
 
         assertFails(contextFor(childWorkflowId), "workflow_call_unavailable");
     }

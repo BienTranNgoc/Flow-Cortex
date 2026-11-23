@@ -1,0 +1,327 @@
+.roles-page {
+  min-width: 0;
+}
+
+.roles-page__name {
+  font-size: 0.95rem;
+}
+
+.roles-page__count {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+}
+
+.roles-detail__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.roles-detail__note {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-left: 4px solid var(--admin-primary);
+  border-radius: var(--radius-md);
+  background: var(--admin-card-surface-2);
+  color: var(--admin-ink-2);
+}
+
+.roles-detail__banner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.roles-detail__banner p {
+  margin: 0;
+}
+
+.roles-detail__problems {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.roles-detail__form {
+  margin-top: 1rem;
+}
+
+.roles-detail__code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  color: var(--admin-ink-2);
+}
+
+.roles-detail__code small {
+  flex-basis: 100%;
+  color: var(--admin-ink-4);
+}
+
+.roles-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.roles-detail__actions .cortex-admin-btn {
+  min-height: var(--target-min);
+}
+
+/* ===== MATRIX =========================================================== */
+
+.roles-matrix {
+  margin-top: 1rem;
+  min-width: 0;
+}
+
+.roles-matrix__summary {
+  margin: 0 0 0.25rem;
+  color: var(--admin-ink);
+  font-weight: 600;
+}
+
+.roles-matrix__legend {
+  margin: 0 0 0.75rem;
+  color: var(--admin-ink-4);
+  font-size: 0.88rem;
+}
+
+.roles-matrix__empty {
+  color: var(--admin-ink-3);
+}
+
+.roles-matrix__scroll {
+  max-height: min(60dvh, 36rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--admin-card-surface-2);
+  padding: 0.75rem;
+}
+
+.roles-matrix__scroll:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.roles-matrix__modules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.roles-matrix__module {
+  min-width: 0;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-md);
+  background: var(--admin-card-surface);
+}
+
+.roles-matrix__module-head {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+  border-bottom: 1px solid var(--admin-card-edge);
+}
+
+.roles-matrix__module-head .roles-matrix__check {
+  flex: 1;
+  min-width: 0;
+}
+
+.roles-matrix__module-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.roles-matrix__collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--target-min);
+  height: var(--target-min);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--admin-ink-2);
+  cursor: pointer;
+}
+
+.roles-matrix__collapse:hover {
+  background: var(--admin-chrome-hover);
+}
+
+.roles-matrix__collapse:active {
+  background: var(--admin-chrome-active);
+}
+
+.roles-matrix__collapse:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+}
+
+.roles-matrix__features {
+  display: flex;
+  flex-direction: column;
+}
+
+.roles-matrix__feature {
+  margin: 0;
+  padding: 0.25rem 0.5rem 0.5rem;
+  border: 0;
+  border-top: 1px solid var(--admin-card-edge);
+  min-width: 0;
+}
+
+.roles-matrix__feature:first-child {
+  border-top: 0;
+}
+
+.roles-matrix__feature-legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+}
+
+.roles-matrix__feature-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.roles-matrix__feature-head .roles-matrix__check {
+  flex: 1;
+  min-width: 0;
+}
+
+.roles-matrix__feature-name {
+  font-weight: 600;
+  color: var(--admin-ink);
+  overflow-wrap: anywhere;
+}
+
+.roles-matrix__feature-legend + .roles-matrix__actions {
+  clear: both;
+}
+
+.roles-matrix__actions {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1.75rem;
+}
+
+.roles-matrix__check {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: var(--target-min);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-md);
+  color: var(--admin-ink);
+  cursor: pointer;
+  transition: background var(--dur-quick) var(--ease-standard);
+}
+
+.roles-matrix__check input {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--admin-primary);
+  cursor: inherit;
+}
+
+.roles-matrix__check:hover:not(:has(input:disabled)) {
+  background: var(--admin-chrome-hover);
+}
+
+.roles-matrix__check:active:not(:has(input:disabled)) {
+  background: var(--admin-chrome-active);
+}
+
+.roles-matrix__check:has(input:focus-visible) {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+}
+
+.roles-matrix__check:has(input:disabled) {
+  color: var(--admin-ink-3);
+  cursor: not-allowed;
+}
+
+.roles-matrix__count {
+  flex: none;
+  color: var(--admin-ink-4);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.roles-matrix__tag {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--admin-pill-muted-bg);
+  color: var(--admin-ink-2);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+/* ===== DELETE DIALOG ==================================================== */
+
+.roles-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 1px solid var(--admin-card-edge-strong);
+  border-radius: var(--radius-lg);
+  background: var(--admin-card-surface);
+  color: var(--admin-ink);
+  box-shadow: var(--admin-shadow-lg);
+  overflow: auto;
+}
+
+.roles-dialog::backdrop {
+  background: color-mix(in srgb, var(--admin-ink) 45%, transparent);
+}
+
+.roles-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+}
+
+.roles-dialog__body h2,
+.roles-dialog__body p {
+  margin: 0;
+}
+
+.roles-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.roles-dialog__actions .cortex-admin-btn {
+  min-height: var(--target-min);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roles-matrix__check {
+    transition: none;
+  }
+}

@@ -101,7 +101,13 @@
       "interface": "Looked around the interface",
       "survey": "Answered the survey"
     },
-    "action": "Start using FlowCortex"
+    "action": "Start using FlowCortex",
+    "sample": {
+      "caption": "Try a ready-made example",
+      "try": "Try this sample",
+      "tryNamed": "Try this sample: {{name}}",
+      "trying": "Opening…"
+    }
   },
   "menu": {
     "replay": "Replay guide"
