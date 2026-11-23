@@ -45,6 +45,7 @@ def test_template_prompts_and_scene_directives() -> None:
     assert "mcHookScript" in MC_SCRIPT_SYSTEM_PROMPT
     assert "productCloseScript" in MC_SCRIPT_SYSTEM_PROMPT
     assert "CRITICAL LIP-SYNC SAFETY" in MC_STORYBOARD_SYSTEM_PROMPT
+    assert "keyframePrompt" not in MC_STORYBOARD_SYSTEM_PROMPT
     directive = scene_setting_instruction("bg-luxury-dark", "đèn vàng ấm hơn")
     assert "dark slate stone" in directive
     assert "đèn vàng ấm hơn" in directive
@@ -293,6 +294,76 @@ def test_veo_api_key_never_leaks_to_replicate_adapters(monkeypatch: pytest.Monke
         built.submit_keyframe(KeyframeRequest("prompt", REV_ID))
 
 
+def test_provider_jobs_pool_uses_real_replicate_adapters_for_wan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from flowcortex_worker.provider.__main__ import _build_adapter
+
+    monkeypatch.delenv("REPLICATE_API_TOKEN", raising=False)
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+    monkeypatch.setenv("WAN_API_KEY", "wan-replicate-key")
+    monkeypatch.setenv("SCRIPT_PROVIDER", "fixture")
+    monkeypatch.setenv("SPEECH_PROVIDER", "fixture")
+    built = _build_adapter(video_enabled=False)
+    assert isinstance(built.keyframe_adapter, SeedreamKeyframeAdapter)
+    assert isinstance(built.lipsync_adapter, KlingLipsyncAdapter)
+
+
+def test_seedance_rejects_unsupported_clip_v2_overrides() -> None:
+    from flowcortex_worker.errors import PermanentError
+    from flowcortex_worker.provider.capabilities import ExecutionContext, execute
+    from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+    from flowcortex_worker.provider.seedance_adapter import SeedanceAdapter, SeedanceConfig
+
+    class _EmptyStorage:
+        def head_object(self, bucket: str, key: str) -> None:
+            return None
+
+        def fetch_bytes(self, bucket: str, key: str, abort: object) -> bytes:
+            return TINY_JPEG
+
+        def put(self, key: str, body: bytes, mime: str, abort: object) -> int:
+            return len(body)
+
+        def presigned_get_url(self, bucket: str, key: str, *, expires_seconds: int = 300) -> str:
+            return f"https://example.test/{key}"
+
+    adapter = SeedanceAdapter(SeedanceConfig(api_key="tok", base_url="https://seedance.test"))
+    job = ProviderJob.model_validate(
+        {
+            "schemaVersion": "1",
+            "jobId": str(REV_ID),
+            "runId": str(REV_ID),
+            "correlationId": str(REV_ID),
+            "stepOrder": 5,
+            "capability": "generate_video",
+            "params": {
+                "profile": "vertical_ad_clip_v2",
+                "payload": {
+                    "prompt": "Watch shot",
+                    "sourceRevisionId": str(REV_ID),
+                    "durationSeconds": 8,
+                    "resolution": "720p",
+                    "firstFrameKey": "keyframe",
+                },
+            },
+            "inputs": [{"key": "keyframe", "bucket": "b", "objectKey": "k/kf.jpg"}],
+            "outputPrefix": f"runs/{REV_ID}/steps/5/attempts/1/",
+            "attempt": 1,
+            "maxRuntimeSeconds": 480,
+            "issuedAt": "2026-11-23T00:00:00Z",
+        }
+    )
+    ctx = ExecutionContext(
+        storage=_EmptyStorage(),
+        bucket="b",
+        output_prefix=f"runs/{REV_ID}/steps/5/attempts/1/",
+        abort=_NoAbort(),
+    )
+    with pytest.raises(PermanentError, match="does not support vertical_ad_clip_v2 overrides"):
+        execute(job, adapter, ctx)
+
+
 def test_wan_adapter_honors_v2_resolution_first_frame_and_rejects_bad_duration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -329,6 +400,13 @@ def test_wan_adapter_honors_v2_resolution_first_frame_and_rejects_bad_duration(
         adapter.submit_video(
             VideoRequest("Product shot", REV_ID, profile="vertical_ad_clip_v2", duration_seconds=10)
         )
+
+    # v1 clip with 30fps / 121 frames must keep config num_frames when duration_seconds is None
+    wan_30fps = WanAdapter(WanConfig(api_key="tok", frames_per_second=30, num_frames=121))
+    wan_30fps.submit_video(
+        VideoRequest("Product shot", REV_ID, profile="vertical_ad_clip_v1", duration_seconds=None)
+    )
+    assert captured["body"]["input"]["num_frames"] == 121  # type: ignore[index]
 
 
 def test_openai_storyboard_includes_scene_preset_and_note(monkeypatch: pytest.MonkeyPatch) -> None:

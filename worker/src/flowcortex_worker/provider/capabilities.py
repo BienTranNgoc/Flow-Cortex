@@ -263,6 +263,23 @@ def _generate_video(
         raise UnsupportedCapability("generate_video received the wrong job shape")
     payload = job.params.payload
     base_identity = adapter.video_identity()
+    has_v2_override = (
+        (
+            payload.durationSeconds is not None
+            and payload.durationSeconds != base_identity.duration_seconds
+        )
+        or (
+            payload.resolution is not None
+            and payload.resolution.lower() != base_identity.resolution.lower()
+        )
+        or payload.firstFrameKey is not None
+    )
+    if has_v2_override and base_identity.provider not in {"minimax", "wan", "fixture"}:
+        raise PermanentError(
+            "provider_capability_unavailable",
+            f"Provider '{base_identity.provider}' does not support vertical_ad_clip_v2 "
+            "overrides (durationSeconds/resolution/firstFrameKey)",
+        )
     effective_duration = payload.durationSeconds or base_identity.duration_seconds
     effective_resolution = payload.resolution or base_identity.resolution
     identity = VideoIdentity(
@@ -294,8 +311,8 @@ def _generate_video(
         reference_image_bytes=ref_images[0] if ref_images else None,
         reference_images=ref_images,
         reference_image_urls=ref_urls,
-        duration_seconds=effective_duration,
-        resolution=effective_resolution,
+        duration_seconds=payload.durationSeconds,
+        resolution=payload.resolution,
         first_frame_image_bytes=first_frame_bytes,
     )
     idempotency_key = _video_idempotency_key(request, identity)

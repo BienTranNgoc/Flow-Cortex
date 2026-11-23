@@ -32,7 +32,7 @@ public record ProductVideoDraft(
 
     public ProductVideoDraft(String productName, String description, String cta, String price,
             String promotion, String aspectRatio) {
-        this(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", "male", null, null, null);
+        this(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", null, null, null, null);
     }
 
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
@@ -43,7 +43,7 @@ public record ProductVideoDraft(
      */
     public static ProductVideoDraft of(String productName, String description, String cta, String price,
             String promotion, String aspectRatio) {
-        return of(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", "male",
+        return of(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", null,
                 null, null, null);
     }
 
@@ -51,7 +51,7 @@ public record ProductVideoDraft(
             String promotion, String aspectRatio, String templateId, String voiceGender, String mcPresetId,
             String backgroundPresetId, String sceneNote) {
         String resolvedTemplate = templateId == null || templateId.isBlank() ? "showroom-v1" : templateId.trim();
-        String resolvedVoice = voiceGender == null || voiceGender.isBlank() ? "male" : voiceGender.trim();
+        String resolvedVoice = voiceGender == null || voiceGender.isBlank() ? null : voiceGender.trim();
         ProductVideoDraft raw = new ProductVideoDraft(productName, description, cta, price, promotion, aspectRatio,
                 resolvedTemplate, resolvedVoice, trimToNull(mcPresetId), trimToNull(backgroundPresetId),
                 trimToNull(sceneNote));

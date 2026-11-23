@@ -526,13 +526,15 @@ export function ProductVideoStartForm({
                   >
                     <span className="pv-template-title">{tpl.name}</span>
                     <span className="pv-template-summary">{tpl.summary}</span>
-                    <span className="pv-template-credits">
-                      {unavailable
-                        ? t('workflow.productVideo.templateComingSoon')
-                        : t('workflow.productVideo.templateCredits', {
-                            credits: tpl.estimatedCredits,
-                          })}
-                    </span>
+                    {(unavailable || tpl.estimatedCredits != null) && (
+                      <span className="pv-template-credits">
+                        {unavailable
+                          ? t('workflow.productVideo.templateComingSoon')
+                          : t('workflow.productVideo.templateCredits', {
+                              credits: tpl.estimatedCredits,
+                            })}
+                      </span>
+                    )}
                   </button>
                 );
               })}

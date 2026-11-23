@@ -224,8 +224,8 @@ class GenerateStoryboardJob(BaseModel):
     inputs: Annotated[
         list[VideoInput] | None,
         Field(
-            description="Optional product images (up to 3) the worker forwards to the multimodal storyboard provider.",
-            max_length=3,
+            description="Optional product images (up to 3) plus optional background reference image forwarded to the multimodal storyboard provider.",
+            max_length=4,
         ),
     ] = None
     outputPrefix: Annotated[

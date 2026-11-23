@@ -14326,7 +14326,7 @@ components:
           type: string
         estimatedCredits:
           type: integer
-          format: int32
+          format: int64
         maxProductImages:
           type: integer
           format: int32

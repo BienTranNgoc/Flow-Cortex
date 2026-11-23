@@ -1,7 +1,11 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.workflow.api.ProductVideoWorkflow;
+import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -22,7 +26,7 @@ public class ProductVideoPresetCatalog {
             int version,
             String name,
             String summary,
-            int estimatedCredits,
+            Long estimatedCredits,
             int maxProductImages,
             List<String> requiredRoles,
             List<String> optionalRoles,
@@ -45,25 +49,40 @@ public class ProductVideoPresetCatalog {
     }
 
     private final boolean mcEnabled;
+    private final WorkflowStepRepository workflowSteps;
 
     public ProductVideoPresetCatalog() {
-        this(false);
+        this(false, null);
+    }
+
+    public ProductVideoPresetCatalog(boolean mcEnabled, WorkflowStepRepository workflowSteps) {
+        this.mcEnabled = mcEnabled;
+        this.workflowSteps = workflowSteps;
     }
 
     @Autowired
     public ProductVideoPresetCatalog(
+            WorkflowStepRepository workflowSteps,
             @Value("${flowcortex.product-video.mc-enabled:false}") boolean mcEnabled) {
-        this.mcEnabled = mcEnabled;
+        this(mcEnabled, workflowSteps);
     }
 
-    private static List<TemplateSpec> buildTemplates(boolean mcEnabled) {
+    private static final List<String> SHOWROOM_DEFAULT_STEPS = List.of(
+            "generate_script", "generate_storyboard", "generate_speech",
+            "generate_video", "generate_video", "render_video");
+
+    private static final List<String> MC_DEFAULT_STEPS = List.of(
+            "generate_script", "generate_storyboard", "generate_speech",
+            "generate_keyframe", "generate_video", "generate_video", "lipsync_video", "render_video");
+
+    private static List<TemplateSpec> buildTemplates(boolean mcAvailable, Long showroomCredits, Long mcCredits) {
         return List.of(
                 new TemplateSpec(
                         "showroom-v1",
                         1,
                         "Showroom sản phẩm",
                         "2 cảnh sản phẩm 5s + 5s (toàn cảnh và cận cảnh chi tiết), 480P 9:16",
-                        800,
+                        showroomCredits,
                         3,
                         List.of("product"),
                         List.of("background"),
@@ -73,11 +92,11 @@ public class ProductVideoPresetCatalog {
                         1,
                         "MC giới thiệu sản phẩm",
                         "5s MC cầm sản phẩm nói trực diện + 5s cận cảnh sản phẩm, 480P 9:16",
-                        1000,
+                        mcCredits,
                         3,
                         List.of("product", "mc"),
                         List.of("background"),
-                        mcEnabled));
+                        mcAvailable));
     }
 
     private static final List<McPreset> MC_PRESETS = List.of(
@@ -112,7 +131,24 @@ public class ProductVideoPresetCatalog {
             .collect(Collectors.toUnmodifiableMap(BackgroundPreset::id, Function.identity()));
 
     public List<TemplateSpec> templates() {
-        return buildTemplates(mcEnabled);
+        return templates(null);
+    }
+
+    public List<TemplateSpec> templates(CreditAccounts credits) {
+        List<WorkflowStep> definitions = workflowSteps != null
+                ? workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID)
+                : List.of();
+        boolean mcAvailable = mcEnabled && ProductVideoService.hasMcSteps(definitions);
+        Long showroomCredits = null;
+        Long mcCredits = null;
+        if (credits != null && credits.enabled()) {
+            List<String> showroomSteps = definitions.isEmpty()
+                    ? SHOWROOM_DEFAULT_STEPS
+                    : definitions.stream().map(WorkflowStep::getType).toList();
+            showroomCredits = credits.estimate(showroomSteps);
+            mcCredits = credits.estimate(MC_DEFAULT_STEPS);
+        }
+        return buildTemplates(mcAvailable, showroomCredits, mcCredits);
     }
 
     public List<McPreset> mcPresets() {

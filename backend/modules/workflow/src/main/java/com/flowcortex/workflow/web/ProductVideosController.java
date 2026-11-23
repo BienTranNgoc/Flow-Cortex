@@ -45,7 +45,7 @@ class ProductVideosController {
     @GetMapping(value = "/templates", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<TemplatesResponse> listTemplates() {
         return ResponseEntity.ok(new TemplatesResponse(
-                presetCatalog.templates(),
+                presetCatalog.templates(creditAccounts),
                 presetCatalog.mcPresets(),
                 presetCatalog.backgroundPresets()));
     }

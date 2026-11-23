@@ -355,18 +355,25 @@ def _build_adapter(
     video_adapter = _build_video_adapter(
         video_provider, video_api_key, video_base_url, video_model, s3_public_endpoint
     )
-    replicate_key = os.environ.get("REPLICATE_API_TOKEN", "").strip() or (
-        video_api_key if video_provider in {PROVIDER_MINIMAX, PROVIDER_WAN} else ""
+    configured_replicate_key = (
+        os.environ.get("MINIMAX_API_KEY", "").strip()
+        or os.environ.get("WAN_API_KEY", "").strip()
+        or generic_video_key
+        if configured_video_provider == PROVIDER_MINIMAX
+        else os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
+        if configured_video_provider == PROVIDER_WAN
+        else ""
     )
+    replicate_key = os.environ.get("REPLICATE_API_TOKEN", "").strip() or configured_replicate_key
     keyframe_adapter = (
         SeedreamKeyframeAdapter(SeedreamConfig(api_key=replicate_key))
         if replicate_key
-        else (FixtureProviderAdapter() if video_provider == PROVIDER_FIXTURE else None)
+        else (FixtureProviderAdapter() if configured_video_provider == PROVIDER_FIXTURE else None)
     )
     lipsync_adapter = (
         KlingLipsyncAdapter(KlingLipsyncConfig(api_key=replicate_key))
         if replicate_key
-        else (FixtureProviderAdapter() if video_provider == PROVIDER_FIXTURE else None)
+        else (FixtureProviderAdapter() if configured_video_provider == PROVIDER_FIXTURE else None)
     )
     log.info(
         "provider adapters selected",

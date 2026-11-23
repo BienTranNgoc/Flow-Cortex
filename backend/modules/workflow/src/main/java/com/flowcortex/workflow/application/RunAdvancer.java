@@ -435,8 +435,14 @@ class RunAdvancer {
                         stepConfig, assetOutputsByOrder, run.getId(), order);
                 case RESOLVED -> inputResolver.resolve(order, step.getInputRef(), run.getInput(), outputsByOrder);
             };
+            String storedInput = step.getInput();
+            if (inputPolicy == StepExecutor.InputPolicy.RESOLVED
+                    && !StoredWithOutputsResolver.declaredSources(stepConfig).isEmpty()) {
+                storedInput = storedWithOutputsResolver.resolve(step.getInput(), stepConfig, assetOutputsByOrder,
+                        run.getId(), order);
+            }
             StepContext built = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
-                    resolvedInput, stepConfig, step.getInput(), options(run), new ArrayList<>());
+                    resolvedInput, stepConfig, storedInput, options(run), new ArrayList<>());
             context = built;
             if (executor.isEmpty()) {
                 inClaim = () -> {

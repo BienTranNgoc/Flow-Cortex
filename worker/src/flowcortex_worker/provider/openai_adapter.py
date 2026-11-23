@@ -360,6 +360,12 @@ class OpenAIProviderAdapter:
         directive = scene_setting_instruction(request.scene_preset, request.scene_note)
         if directive:
             script_text = f"{script_text}\n\n{directive}"
+        if len(images) >= 2:
+            script_text = (
+                f"{script_text}\n\n"
+                "If a background/environment photo is attached alongside the product photos, "
+                "incorporate its setting, lighting, and surface textures into both scenes."
+            )
         user_content = self._storyboard_user_content(script_text, images)
         return self._run_with_fallback(
             operation="generate_storyboard",

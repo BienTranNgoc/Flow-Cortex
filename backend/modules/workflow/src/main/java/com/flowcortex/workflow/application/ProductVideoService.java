@@ -191,8 +191,8 @@ public class ProductVideoService implements ProductVideoRuns {
                     now, requestKey).withTraceId(traceId));
             productInputs.save(new ProductVideoInput(run.getId(), draft.productName(), draft.description(),
                     draft.cta(), draft.price(), draft.promotion(), draft.aspectRatio(),
-                    draft.templateId(), 1, draft.voiceGender(), draft.mcPresetId(),
-                    draft.backgroundPresetId(), draft.sceneNote(), now));
+                    draft.templateId(), 1, draft.voiceGender() != null ? draft.voiceGender() : "male",
+                    draft.mcPresetId(), draft.backgroundPresetId(), draft.sceneNote(), now));
             mediaJobs.bindRunInputs(run.getId(), copies);
             List<RunStep> steps = new ArrayList<>();
             for (WorkflowStep definition : definitions) {
@@ -212,7 +212,7 @@ public class ProductVideoService implements ProductVideoRuns {
         });
     }
 
-    private static boolean hasMcSteps(List<WorkflowStep> definitions) {
+    static boolean hasMcSteps(List<WorkflowStep> definitions) {
         boolean hasKeyframe = false;
         boolean hasLipsync = false;
         for (WorkflowStep step : definitions) {
@@ -227,8 +227,7 @@ public class ProductVideoService implements ProductVideoRuns {
 
     private String enrichStepConfig(String stepType, String rawConfig, ProductVideoDraft draft) {
         Map<String, Object> defaults = new LinkedHashMap<>();
-        if ("generate_speech".equals(stepType)
-                && draft.voiceGender() != null && !"male".equals(draft.voiceGender())) {
+        if ("generate_speech".equals(stepType) && draft.voiceGender() != null) {
             defaults.put("voiceGender", draft.voiceGender());
         } else if ("generate_storyboard".equals(stepType)) {
             if (draft.templateId() != null && !"showroom-v1".equals(draft.templateId())) {

@@ -169,6 +169,14 @@ class ProviderStepExecutor implements StepExecutor {
             try {
                 List<MediaJobInput> inputs = objectMapper.readValue(context.storedInput(), INPUTS);
                 if (!inputs.isEmpty()) {
+                    if ("generate_storyboard".equals(capability)) {
+                        return inputs.stream()
+                                .filter(input -> input.key() != null
+                                        && (input.key().startsWith("image_") || "background".equals(input.key())))
+                                .limit(4)
+                                .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                                .toList();
+                    }
                     MediaJobInput first = inputs.getFirst();
                     return List.of(new ProviderInput(first.key(), first.bucket(), first.objectKey()));
                 }
@@ -181,12 +189,14 @@ class ProviderStepExecutor implements StepExecutor {
     }
 
     private List<ProviderInput> resolveMultipleReferences(StepContext context, JsonNode references) {
-        String runInputs = "runs/" + context.runId() + "/inputs/";
+        String runScope = "runs/" + context.runId() + "/";
         List<MediaJobInput> available = storedInputs(context.storedInput(), "referenceImages").stream()
                 .filter(input -> input.bucket() != null && !input.bucket().isBlank()
-                        && input.objectKey() != null && MediaJob.isBelow(runInputs, input.objectKey()))
+                        && input.objectKey() != null && MediaJob.isBelow(runScope, input.objectKey()))
                 .toList();
-        int maxRefs = "generate_keyframe".equals(capability) ? 5 : 3;
+        int maxRefs = "generate_keyframe".equals(capability)
+                ? 5
+                : "generate_video".equals(capability) ? 4 : 3;
         if (references.isTextual() && "all".equals(references.textValue())) {
             List<ProviderInput> resolved = available.stream()
                     .limit(maxRefs)
@@ -217,11 +227,46 @@ class ProviderStepExecutor implements StepExecutor {
                 "referenceImages must be 'all' or an array of 1 to 3 input keys");
     }
 
+    private boolean isLipsyncArrayInput(String input) {
+        if (!"lipsync_video".equals(capability) || input == null || input.isBlank()) {
+            return false;
+        }
+        try {
+            return objectMapper.readTree(input).isArray();
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
     private List<ProviderInput> resolveLipsyncInputs(StepContext context) {
+        String runScope = "runs/" + context.runId() + "/";
+        if (isLipsyncArrayInput(context.storedInput())) {
+            List<MediaJobInput> entries = storedInputs(context.storedInput(), "video/audio");
+            return List.of(
+                    findScopedInput(entries, "video", runScope),
+                    findScopedInput(entries, "audio", runScope));
+        }
+        if (isLipsyncArrayInput(context.input())) {
+            List<MediaJobInput> entries = storedInputs(context.input(), "video/audio");
+            return List.of(
+                    findScopedInput(entries, "video", runScope),
+                    findScopedInput(entries, "audio", runScope));
+        }
         Map<String, Object> input = payload(context.input());
         return List.of(
                 extractAssetInput(context.runId(), input, "video"),
                 extractAssetInput(context.runId(), input, "audio"));
+    }
+
+    private ProviderInput findScopedInput(List<MediaJobInput> entries, String key, String runScope) {
+        return entries.stream()
+                .filter(entry -> key.equals(entry.key())
+                        && entry.bucket() != null && !entry.bucket().isBlank()
+                        && entry.objectKey() != null && MediaJob.isBelow(runScope, entry.objectKey()))
+                .findFirst()
+                .map(entry -> new ProviderInput(entry.key(), entry.bucket(), entry.objectKey()))
+                .orElseThrow(() -> new StepFailedException("contract_violation",
+                        "lipsync_video requires '" + key + "' outputInput inside the current run"));
     }
 
     private ProviderInput extractAssetInput(UUID runId, Map<String, Object> input, String key) {

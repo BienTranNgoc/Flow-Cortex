@@ -274,9 +274,9 @@
         "params": { "$ref": "#/$defs/storyboardParams" },
         "inputs": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 4,
           "items": { "$ref": "#/$defs/videoInput" },
-          "description": "Optional product images (up to 3) the worker forwards to the multimodal storyboard provider."
+          "description": "Optional product images (up to 3) plus optional background reference image forwarded to the multimodal storyboard provider."
         },
         "outputPrefix": {
           "type": "string",
