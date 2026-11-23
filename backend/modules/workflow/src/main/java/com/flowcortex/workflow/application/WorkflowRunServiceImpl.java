@@ -168,8 +168,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             List<UUID> uploadIds, String originalName, RunOptions options, boolean acknowledgeCost,
             String requestKey) {
         List<WorkflowStep> stepDefs = preflight.checkSteps(currentUserId, workflow, acknowledgeCost);
+        if (!stepDefs.isEmpty() && WorkflowMapper.takesLink(stepDefs.getFirst())
+                && FetchVideoConfig.linkFault(input) != null) {
+            throw new UploadRejectedException("input", new LocalizedMessage("workflow.start.linkRequired"));
+        }
 
-        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.isRemote(stepDefs.getFirst().getType());
+        boolean mediaWorkflow = !stepDefs.isEmpty() && registry.snapshotsRunInputs(stepDefs.getFirst().getType());
         String runInput = input;
         boolean singleUpload = false;
         List<MediaAssetInput> assetInputs = List.of();

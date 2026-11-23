@@ -10,8 +10,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { can } from '../../app/permissions';
 import { usePageTitle } from '../../app/usePageTitle';
 import { activeLocale } from '../../lib/i18n';
+import { useMeQuery } from '../auth/useAuth';
 import { unwrapSupport } from '../support/unwrapSupport';
 import { formatVietnamTime } from '../support/vietnamTime';
 import './onboardingSample.css';
@@ -77,6 +79,7 @@ function StatusBlock({ view }: Readonly<{ view: AdminOnboardingSample }>) {
 
 interface SampleFormProps {
   view: AdminOnboardingSample;
+  canUpdate: boolean;
   busy: boolean;
   saving: boolean;
   clearing: boolean;
@@ -84,7 +87,15 @@ interface SampleFormProps {
   onSubmit: (body: AdminOnboardingSampleUpdate) => void;
 }
 
-function SampleForm({ view, busy, saving, clearing, error, onSubmit }: Readonly<SampleFormProps>) {
+function SampleForm({
+  view,
+  canUpdate,
+  busy,
+  saving,
+  clearing,
+  error,
+  onSubmit,
+}: Readonly<SampleFormProps>) {
   const { t } = useTranslation();
   const ids = { workflow: useId(), input: useId(), locale: useId() };
   const [workflowId, setWorkflowId] = useState(view.workflow?.id ?? '');
@@ -125,6 +136,7 @@ function SampleForm({ view, busy, saving, clearing, error, onSubmit }: Readonly<
             value={workflowId}
             autoComplete="off"
             spellCheck={false}
+            readOnly={!canUpdate}
             aria-invalid={errors.workflowId ? true : undefined}
             aria-describedby={describe('workflowId', `${ids.workflow}-hint`)}
             onChange={(event) => {
@@ -149,6 +161,7 @@ function SampleForm({ view, busy, saving, clearing, error, onSubmit }: Readonly<
             type="text"
             value={sampleInput}
             maxLength={MAX_INPUT}
+            readOnly={!canUpdate}
             aria-invalid={errors.sampleInput ? true : undefined}
             aria-describedby={describe('sampleInput', `${ids.input}-hint`)}
             onChange={(event) => setSampleInput(event.target.value)}
@@ -171,6 +184,7 @@ function SampleForm({ view, busy, saving, clearing, error, onSubmit }: Readonly<
           <select
             id={ids.locale}
             value={sourceLocale}
+            disabled={!canUpdate}
             aria-invalid={errors.sourceLocale ? true : undefined}
             aria-describedby={describe('sourceLocale')}
             onChange={(event) => setSourceLocale(event.target.value as SourceLocale)}
@@ -190,19 +204,21 @@ function SampleForm({ view, busy, saving, clearing, error, onSubmit }: Readonly<
 
         {generalFailure && <p role="alert" className="cortex-admin-form-error">{t('onboarding.common.saveFailed')}</p>}
 
-        <div className="onboarding-sample-actions">
-          <button type="submit" className="cortex-admin-btn cortex-admin-btn--primary" disabled={busy}>
-            {t(saving ? 'onboarding.form.saving' : 'onboarding.form.save')}
-          </button>
-          <button
-            type="button"
-            className="cortex-admin-btn"
-            disabled={busy}
-            onClick={() => onSubmit({ workflowId: null })}
-          >
-            {t(clearing ? 'onboarding.form.clearing' : 'onboarding.form.clear')}
-          </button>
-        </div>
+        {canUpdate && (
+          <div className="onboarding-sample-actions">
+            <button type="submit" className="cortex-admin-btn cortex-admin-btn--primary" disabled={busy}>
+              {t(saving ? 'onboarding.form.saving' : 'onboarding.form.save')}
+            </button>
+            <button
+              type="button"
+              className="cortex-admin-btn"
+              disabled={busy}
+              onClick={() => onSubmit({ workflowId: null })}
+            >
+              {t(clearing ? 'onboarding.form.clearing' : 'onboarding.form.clear')}
+            </button>
+          </div>
+        )}
       </form>
     </section>
   );
@@ -210,6 +226,7 @@ function SampleForm({ view, busy, saving, clearing, error, onSubmit }: Readonly<
 
 interface TranslationFieldProps {
   locale: string;
+  canUpdate: boolean;
   value: string;
   busy: boolean;
   saving: boolean;
@@ -222,7 +239,8 @@ interface TranslationFieldProps {
 }
 
 function TranslationField(props: Readonly<TranslationFieldProps>) {
-  const { locale, value, busy, saving, saved, error, reloading, onChange, onSave, onReload } = props;
+  const { locale, canUpdate, value, busy, saving, saved, error, reloading, onChange, onSave, onReload } =
+    props;
   const { t } = useTranslation();
   const inputId = useId();
   const stale = isStale(error);
@@ -244,6 +262,7 @@ function TranslationField(props: Readonly<TranslationFieldProps>) {
           value={value}
           maxLength={MAX_INPUT}
           lang={locale}
+          readOnly={!canUpdate}
           aria-invalid={message ? true : undefined}
           aria-describedby={`${inputId}-hint${message ? ` ${inputId}-error` : ''}${stale ? ` ${inputId}-stale` : ''}`}
           onChange={(event) => onChange(event.target.value)}
@@ -265,12 +284,14 @@ function TranslationField(props: Readonly<TranslationFieldProps>) {
           </button>
         </div>
       )}
-      <div className="onboarding-sample-actions">
-        <button type="button" className="cortex-admin-btn" disabled={busy} onClick={onSave}>
-          {t(saving ? 'onboarding.translations.saving' : 'onboarding.translations.save')}
-        </button>
-        {saved && <output className="cortex-admin-form-success">{t('onboarding.translations.saved')}</output>}
-      </div>
+      {canUpdate && (
+        <div className="onboarding-sample-actions">
+          <button type="button" className="cortex-admin-btn" disabled={busy} onClick={onSave}>
+            {t(saving ? 'onboarding.translations.saving' : 'onboarding.translations.save')}
+          </button>
+          {saved && <output className="cortex-admin-form-success">{t('onboarding.translations.saved')}</output>}
+        </div>
+      )}
     </div>
   );
 }
@@ -278,6 +299,7 @@ function TranslationField(props: Readonly<TranslationFieldProps>) {
 export function OnboardingSamplePage() {
   const { t } = useTranslation();
   usePageTitle(t('onboarding.title'));
+  const canUpdate = can(useMeQuery().data, 'platform.setting.update');
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const sampleQuery = useQuery({
@@ -342,10 +364,12 @@ export function OnboardingSamplePage() {
       )}
       {view && (
         <div className="onboarding-sample">
+          {!canUpdate && <p className="onboarding-sample-meta">{t('onboarding.common.readOnly')}</p>}
           <StatusBlock view={view} />
           <SampleForm
             key={`${view.workflow?.id ?? ''}|${view.sampleInput ?? ''}|${sampleLanguage}|${view.updatedAt}`}
             view={view}
+            canUpdate={canUpdate}
             busy={busy}
             saving={save.isPending && save.variables?.workflowId !== null}
             clearing={save.isPending && save.variables?.workflowId === null}
@@ -367,6 +391,7 @@ export function OnboardingSamplePage() {
                   <TranslationField
                     key={locale}
                     locale={locale}
+                    canUpdate={canUpdate}
                     value={drafts[locale] ?? view.translations[locale] ?? ''}
                     busy={busy}
                     saving={translate.isPending && own}

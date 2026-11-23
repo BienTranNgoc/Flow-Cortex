@@ -6,6 +6,7 @@
     "loading": "Đang tải…",
     "loadFailed": "Không tải được mẫu làm quen.",
     "retry": "Thử lại",
+    "readOnly": "Bạn chỉ xem được mẫu làm quen này, không thể thay đổi.",
     "saveFailed": "Không lưu được. Vui lòng thử lại."
   },
   "status": {
