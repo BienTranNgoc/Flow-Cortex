@@ -395,7 +395,7 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
-## Batch runs (`V2026.11.15.030`)
+## Batch runs (`V2026.11.15.310`)
 
 ```mermaid
 erDiagram
