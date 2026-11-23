@@ -71,12 +71,24 @@ def _count_frames(video_path: Path, stream_index: int, processes: ProcessRunner)
     return int(first)
 
 
+def frame_selection(frame_numbers: list[int]) -> str:
+    """A `select` expression true on exactly these frames, summed as a balanced tree.
+
+    ffmpeg 7.1 refuses a flat sum of more than 100 terms, and a role job carries up to 288.
+    """
+    if len(frame_numbers) == 1:
+        return f"eq(n\\,{frame_numbers[0]})"
+    middle = len(frame_numbers) // 2
+    left, right = frame_numbers[:middle], frame_numbers[middle:]
+    return f"({frame_selection(left)}+{frame_selection(right)})"
+
+
 def _extract_frames(
     video_path: Path, stream_index: int, frame_numbers: list[int], processes: ProcessRunner
 ) -> list[Path]:
     """One ffmpeg decode that writes the chosen frames beside the clip, in the order given."""
     work = video_path.parent
-    selection = "+".join(f"eq(n\\,{number})" for number in frame_numbers)
+    selection = frame_selection(frame_numbers)
     completed = processes.run(
         [
             "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",

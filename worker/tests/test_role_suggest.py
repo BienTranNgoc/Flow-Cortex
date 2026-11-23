@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -16,6 +17,7 @@ from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.handlers import role_suggest
 from flowcortex_worker.runtime import ProcessKilled, ProcessRunner
+from flowcortex_worker.trend_studio.scenes import MAX_SCENES
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ffmpeg") is None, reason="ffmpeg is installed in the worker image"
@@ -196,11 +198,28 @@ def test_three_colour_scenes_become_three_suggestions_through_one_child(clip: Pa
 
     [extraction] = runner.ffmpeg_runs()
     assert extraction[extraction.index("-protocol_whitelist") + 1] == "file"
-    assert "eq(n\\,12)+eq(n\\,48)+eq(n\\,84)" in extraction[extraction.index("-vf") + 1]
+    assert "(eq(n\\,12)+(eq(n\\,48)+eq(n\\,84)))" in extraction[extraction.index("-vf") + 1]
     [engine] = runner.engine_runs()
     frames = engine[engine.index("--output") + 2 :]
     assert [Path(f).name for f in frames] == [f"role_frame_{i:03d}.jpg" for i in range(3)]
     assert {Path(f).parent for f in frames} == {clip.parent}
+
+
+def test_the_selection_of_the_most_scenes_stays_a_shallow_tree() -> None:
+    # ffmpeg 7.1 (the image's distro build) refuses a flat sum of more than 100 terms.
+    numbers = [i * 5 + 2 for i in range(MAX_SCENES)]
+
+    selection = role_suggest.frame_selection(numbers)
+
+    assert selection.count("eq(n\\,") == MAX_SCENES
+    assert all(f"eq(n\\,{number})" in selection for number in numbers)
+    depth = deepest = 0
+    for char in selection:
+        depth += {"(": 1, ")": -1}.get(char, 0)
+        deepest = max(deepest, depth)
+    assert depth == 0
+    assert deepest <= 12
+    assert re.search(r"\+eq\(n\\,\d+\)\+", selection) is None
 
 
 def test_a_middle_frame_beyond_the_clip_names_the_scene_and_the_frame(clip: Path) -> None:
