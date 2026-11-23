@@ -4,6 +4,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(RegistrationProperties.class)
+@EnableConfigurationProperties({RegistrationProperties.class, UserExportProperties.class})
 class RegistrationConfig {
 }
