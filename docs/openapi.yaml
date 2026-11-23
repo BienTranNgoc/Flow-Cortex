@@ -951,6 +951,52 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/roles/{code}/permissions:
+    put:
+      tags:
+      - admin-roles-controller
+      operationId: replaceAdminRolePermissions
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplacePermissionsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "Someone else changed the keys of role {0}. Reload it and try\
+            \ again."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "ROLE_NOT_EDITABLE, PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY,\
+            \ PERMISSION_SET_INCONSISTENT"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/payment-settings/{key}:
     put:
       tags:
@@ -996,6 +1042,133 @@ paths:
         "422":
           description: paymentSetting.reasonRequired (errors.reason) or setting.invalidValue
             (errors.value)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/onboarding/sample:
+    get:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: getAdminOnboardingSample
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: updateAdminOnboardingSample
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOnboardingSampleUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: "validation-failed (errors.workflowId, errors.sampleInput,\
+            \ errors.sourceLocale)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: ONBOARDING_SAMPLE_INELIGIBLE (errors.workflowId says why);
+            the stored sample is unchanged
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/onboarding/sample/translations/{locale}:
+    put:
+      tags:
+      - admin-onboarding-sample-controller
+      operationId: updateAdminOnboardingSampleTranslation
+      parameters:
+      - name: locale
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOnboardingSampleTranslationUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOnboardingSample"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the caller is not an admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          description: "validation-failed (errors.input, errors.sourceHash)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: no sample is set
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: the sample changed since sourceHash was read; nothing was stored
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: the sample's own language has no translation (errors.locale)
           content:
             application/problem+json:
               schema:
@@ -3320,6 +3493,42 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/first-result/claim:
+    post:
+      tags:
+      - first-result-controller
+      operationId: claimFirstResult
+      responses:
+        "200":
+          description: "the account's first completed run, reported now"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstResultClaimResponse"
+        "204":
+          description: "nothing to report: no completed run, or already reported"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FirstResultClaimResponse"
+        "401":
+          description: unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: the account is suspended
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: the token's user no longer exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/api-tokens:
     get:
       tags:
@@ -4628,6 +4837,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminRunDetailResponse"
+  /api/v1/admin/roles:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RoleResponse"
+    post:
+      tags:
+      - admin-roles-controller
+      operationId: createAdminRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "A role named ''{0}'' already exists"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "PERMISSION_UNKNOWN, PERMISSION_SUPER_ADMIN_ONLY, PERMISSION_SET_INCONSISTENT"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/content/media:
     get:
       tags:
@@ -5829,6 +6087,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/roles/{code}:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: getAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-roles-controller
+      operationId: deleteAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "role.systemImmutable, role.hasAccounts"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - admin-roles-controller
+      operationId: updateAdminRole
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 20
+          minLength: 0
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: no role has this code
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "role.nameTaken, role.systemImmutable"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts/{id}/role:
     patch:
       tags:
@@ -8096,20 +8450,6 @@ paths:
             text/csv:
               schema:
                 type: string
-  /api/v1/admin/roles:
-    get:
-      tags:
-      - admin-roles-controller
-      operationId: listAdminRoles
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RoleResponse"
   /api/v1/admin/phone-verification/status:
     get:
       tags:
@@ -8122,6 +8462,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminPhoneVerificationStatus"
+  /api/v1/admin/permission-catalog:
+    get:
+      tags:
+      - admin-roles-controller
+      operationId: listAdminPermissionCatalog
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PermissionCatalogEntry"
   /api/v1/admin/payment-settings:
     get:
       tags:
@@ -8392,7 +8746,8 @@ paths:
         required: false
         schema:
           type: string
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+          maxLength: 20
+          minLength: 0
       - name: q
         in: query
         required: false
@@ -8707,7 +9062,8 @@ components:
           type: string
         role:
           type: string
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
+          maxLength: 20
+          minLength: 0
         status:
           type: string
           pattern: ACTIVE|SUSPENDED
@@ -8723,6 +9079,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         createdAt:
@@ -8731,6 +9089,8 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+      - roleName
     UploadedImageRequest:
       type: object
       properties:
@@ -8840,6 +9200,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         hasPassword:
@@ -8875,6 +9237,7 @@ components:
             - platform.setting.update
             - platform.sms_outbox.view
             - system.role.view
+            - system.role.manage
             - system.admin_account.view
             - system.admin_account.manage
             - ai.provider.view
@@ -8893,6 +9256,7 @@ components:
       - adminDisabled
       - permissions
       - phoneVerificationRequired
+      - roleName
     UsernameRequest:
       type: object
       properties:
@@ -9354,6 +9718,96 @@ components:
       - source
       - type
       - value
+    ReplacePermissionsRequest:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+            minLength: 0
+          maxItems: 200
+          minItems: 0
+        expectedVersion:
+          type: integer
+          format: int32
+          minimum: 0
+      required:
+      - expectedVersion
+      - keys
+    RoleResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - "null"
+        system:
+          type: boolean
+        staff:
+          type: boolean
+        superAdmin:
+          type: boolean
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+            - user.account.view
+            - user.account.create
+            - user.account.update
+            - user.account.change_role
+            - user.account.suspend
+            - user.account.delete
+            - workflow.run.view
+            - workflow.workflow.manage
+            - support.ticket.view
+            - support.ticket.reply
+            - support.ticket.close
+            - support.ticket.assign
+            - content.help_topic.view
+            - content.help_topic.manage
+            - content.help_article.view
+            - content.help_article.manage
+            - content.document.view
+            - content.document.manage
+            - content.media.view
+            - content.media.manage
+            - platform.setting.view
+            - platform.setting.update
+            - platform.sms_outbox.view
+            - system.role.view
+            - system.role.manage
+            - system.admin_account.view
+            - system.admin_account.manage
+            - ai.provider.view
+            - ai.provider.update
+            - workflow.run.export
+            - workflow.run.cancel
+            - workflow.workflow.view
+            - workflow.workflow.export
+            - payment.setting.view
+            - payment.setting.update
+        permissionsVersion:
+          type: integer
+          format: int32
+        accountCount:
+          type: integer
+          format: int32
+      required:
+      - accountCount
+      - code
+      - name
+      - permissions
+      - permissionsVersion
+      - staff
+      - superAdmin
+      - system
     PaymentSettingUpdate:
       type: object
       properties:
@@ -9443,6 +9897,115 @@ components:
       - source
       - type
       - value
+    AdminOnboardingSampleUpdate:
+      type: object
+      properties:
+        workflowId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          pattern: "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+        sampleInput:
+          type:
+          - string
+          - "null"
+          description: a single line
+          maxLength: 10000
+          minLength: 0
+          pattern: "[^\\r\\n]*"
+        sourceLocale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+          pattern: vi|en
+      required:
+      - workflowId
+    AdminOnboardingSample:
+      type: object
+      properties:
+        workflow:
+          type:
+          - object
+          - "null"
+          $ref: "#/components/schemas/AdminOnboardingSampleWorkflow"
+        shown:
+          type: boolean
+        reason:
+          type:
+          - string
+          - "null"
+        sampleInput:
+          type:
+          - string
+          - "null"
+        sourceLocale:
+          type:
+          - string
+          - "null"
+          enum:
+          - vi
+          - en
+        sourceHash:
+          type:
+          - string
+          - "null"
+        translations:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AdminOnboardingSampleTranslation"
+          description: one entry per editable language
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - reason
+      - sampleInput
+      - shown
+      - sourceHash
+      - sourceLocale
+      - translations
+      - updatedAt
+      - updatedBy
+      - workflow
+    AdminOnboardingSampleTranslation:
+      type:
+      - string
+      - "null"
+    AdminOnboardingSampleWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+      - name
+    AdminOnboardingSampleTranslationUpdate:
+      type: object
+      properties:
+        sourceHash:
+          type: string
+          description: the sourceHash the admin was looking at
+          pattern: "[0-9a-f]{64}"
+        input:
+          type: string
+          description: a single line
+          maxLength: 10000
+          minLength: 0
+          pattern: "[^\\r\\n]*"
+      required:
+      - input
+      - sourceHash
     ContentSection:
       type: object
       properties:
@@ -10065,8 +10628,8 @@ components:
           minLength: 1
         role:
           type: string
+          maxLength: 20
           minLength: 1
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - email
       - name
@@ -10868,6 +11431,18 @@ components:
       required:
       - phone
       - stepUpProof
+    FirstResultClaimResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+      required:
+      - runId
+      - workflowId
     CreateApiTokenRequest:
       type: object
       properties:
@@ -11737,6 +12312,27 @@ components:
       - status
       - stepOrder
       - type
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        permissionKeys:
+          type: array
+          items:
+            type: string
+            maxLength: 100
+            minLength: 0
+          maxItems: 200
+          minItems: 0
+      required:
+      - name
     RegisterContentMediaRequest:
       type: object
       properties:
@@ -11885,6 +12481,8 @@ components:
           type: string
         role:
           type: string
+        roleName:
+          type: string
         status:
           type: string
         adminDisabled:
@@ -11902,6 +12500,7 @@ components:
       - id
       - name
       - role
+      - roleName
       - status
     UpdateWorkflowRequest:
       type: object
@@ -12099,13 +12698,25 @@ components:
           enum:
           - show
           - hide
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 0
+          pattern: (?s).*\S.*
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
     ChangeRoleRequest:
       type: object
       properties:
         role:
           type: string
+          maxLength: 20
           minLength: 1
-          pattern: ADMIN|OPERATION_MANAGER|CUSTOMER_SUPPORT|CONTENT_EDITOR|PLATFORM_OPERATOR|MEMBER|CREATOR
       required:
       - role
     Entry:
@@ -13064,6 +13675,20 @@ components:
           $ref: "#/components/schemas/ProfileImageView"
         cover:
           $ref: "#/components/schemas/ProfileImageView"
+    OnboardingSampleWorkflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        input:
+          type: string
+      required:
+      - id
+      - input
+      - name
     OnboardingStatusResponse:
       type: object
       properties:
@@ -13153,17 +13778,30 @@ components:
           - "null"
           enum:
           - first
+        sampleWorkflow:
+          type:
+          - object
+          - "null"
+          $ref: "#/components/schemas/OnboardingSampleWorkflow"
+        firstResult:
+          type: string
+          enum:
+          - reported
+          - pending
+          - none
       required:
       - aiLevel
       - completed
       - completedAt
       - contentTypes
       - entry
+      - firstResult
       - firstRunDone
       - industries
       - open
       - progress
       - purposes
+      - sampleWorkflow
       - source
       - usageType
     OnboardingResultResponse:
@@ -14162,59 +14800,6 @@ components:
       - page
       - size
       - total
-    RoleResponse:
-      type: object
-      properties:
-        code:
-          type: string
-        staff:
-          type: boolean
-        superAdmin:
-          type: boolean
-        permissions:
-          type: array
-          items:
-            type: string
-            enum:
-            - user.account.view
-            - user.account.create
-            - user.account.update
-            - user.account.change_role
-            - user.account.suspend
-            - user.account.delete
-            - workflow.run.view
-            - workflow.workflow.manage
-            - support.ticket.view
-            - support.ticket.reply
-            - support.ticket.close
-            - support.ticket.assign
-            - content.help_topic.view
-            - content.help_topic.manage
-            - content.help_article.view
-            - content.help_article.manage
-            - content.document.view
-            - content.document.manage
-            - content.media.view
-            - content.media.manage
-            - platform.setting.view
-            - platform.setting.update
-            - platform.sms_outbox.view
-            - system.role.view
-            - system.admin_account.view
-            - system.admin_account.manage
-            - ai.provider.view
-            - ai.provider.update
-            - workflow.run.export
-            - workflow.run.cancel
-            - workflow.workflow.view
-            - workflow.workflow.export
-            - payment.setting.view
-            - payment.setting.update
-      required:
-      - code
-      - permissions
-      - staff
-      - superAdmin
     AdminPhoneVerificationStatus:
       type: object
       properties:
@@ -14245,6 +14830,61 @@ components:
       - sentLast24h
       - smsSender
       - verificationEnabled
+    PermissionCatalogEntry:
+      type: object
+      properties:
+        key:
+          type: string
+          enum:
+          - user.account.view
+          - user.account.create
+          - user.account.update
+          - user.account.change_role
+          - user.account.suspend
+          - user.account.delete
+          - workflow.run.view
+          - workflow.workflow.manage
+          - support.ticket.view
+          - support.ticket.reply
+          - support.ticket.close
+          - support.ticket.assign
+          - content.help_topic.view
+          - content.help_topic.manage
+          - content.help_article.view
+          - content.help_article.manage
+          - content.document.view
+          - content.document.manage
+          - content.media.view
+          - content.media.manage
+          - platform.setting.view
+          - platform.setting.update
+          - platform.sms_outbox.view
+          - system.role.view
+          - system.role.manage
+          - system.admin_account.view
+          - system.admin_account.manage
+          - ai.provider.view
+          - ai.provider.update
+          - workflow.run.export
+          - workflow.run.cancel
+          - workflow.workflow.view
+          - workflow.workflow.export
+          - payment.setting.view
+          - payment.setting.update
+        module:
+          type: string
+        feature:
+          type: string
+        action:
+          type: string
+        superAdminOnly:
+          type: boolean
+      required:
+      - action
+      - feature
+      - key
+      - module
+      - superAdminOnly
     PageViewPaymentSettingChangeView:
       type: object
       properties:

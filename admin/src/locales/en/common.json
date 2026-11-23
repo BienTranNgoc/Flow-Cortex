@@ -84,7 +84,9 @@
         "supportGroups": "Topics",
         "supportRequests": "Requests",
         "supportSettings": "Assistant settings",
+        "onboardingSample": "Onboarding sample",
         "adminAccounts": "Admin accounts",
+        "roles": "Roles & permissions",
         "contentDocuments": "Documents",
         "contentMedia": "Media library",
         "chatSettings": "Settings"

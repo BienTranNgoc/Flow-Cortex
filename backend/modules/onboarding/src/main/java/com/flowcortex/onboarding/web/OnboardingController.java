@@ -10,6 +10,7 @@ import com.flowcortex.onboarding.domain.StoredAnswers;
 import com.flowcortex.onboarding.web.OnboardingChoices.ContentType;
 import com.flowcortex.onboarding.web.OnboardingChoices.Industry;
 import com.flowcortex.onboarding.web.OnboardingChoices.Purpose;
+import com.flowcortex.onboarding.web.OnboardingStatusResponse.SampleWorkflowResponse;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserDirectory;
@@ -20,6 +21,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.UUID;
 import org.springframework.http.MediaType;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -55,14 +57,17 @@ class OnboardingController {
                     schema = @Schema(implementation = ProblemDetail.class)))
     @GetMapping(value = "/status", produces = MediaType.APPLICATION_JSON_VALUE)
     OnboardingStatusResponse status(@AuthenticationPrincipal Jwt jwt) {
-        Status status = onboarding.status(caller(jwt));
+        Status status = onboarding.status(caller(jwt), LocaleContextHolder.getLocale());
         StoredAnswers answers = status.record().answers();
+        SampleWorkflowResponse sample = status.sampleWorkflow() == null ? null
+                : new SampleWorkflowResponse(status.sampleWorkflow().id(), status.sampleWorkflow().name(),
+                        status.sampleWorkflow().input());
         return new OnboardingStatusResponse(status.completed(), status.record().completedAt(),
                 OnboardingChoices.of(answers.purposes(), Purpose.class), answers.source(), answers.aiLevel(),
                 OnboardingChoices.of(answers.industries(), Industry.class),
                 OnboardingChoices.of(answers.contentTypes(), ContentType.class),
                 answers.usageType(), OnboardingProgressView.of(status.record().progress()), status.firstRunDone(),
-                status.open(), status.entry());
+                status.open(), status.entry(), sample, status.firstResult().wire());
     }
 
     @Operation(operationId = "saveOnboardingQuiz",

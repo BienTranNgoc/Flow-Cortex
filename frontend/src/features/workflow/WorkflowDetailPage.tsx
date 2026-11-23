@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { ApiError, type StartRunRequest, type WorkflowStepResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
 import { PageHeading } from '../../app/PageHeading';
@@ -12,6 +12,7 @@ import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { formatCredits } from '../credits/formatCredits';
 import { invalidateBalance } from '../credits/useBalance';
+import { sampleInputFrom } from '../onboarding/sampleHandoff';
 import './WorkflowPages.css';
 import { MediaStartForm } from './MediaStartForm';
 import { Pipeline } from './Pipeline';
@@ -38,9 +39,10 @@ function InlineStartForm({
   const startRunMutation = useStartRunMutation(workflowId);
   // The refused start, so "Run anyway" resends exactly what the member submitted.
   const lastBody = useRef<StartRunRequest>({});
+  const { state: locationState } = useLocation();
   const { register, handleSubmit } = useForm<StartRunFormValues>({
     resolver: zodResolver(startRunSchema),
-    defaultValues: { input: '' },
+    defaultValues: { input: sampleInputFrom(locationState) },
   });
 
   // Execution-disabled (kill switch off) is a 503 — show the reason plus a concrete next action

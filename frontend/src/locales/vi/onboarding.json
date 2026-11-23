@@ -101,7 +101,13 @@
       "interface": "Đã xem qua giao diện",
       "survey": "Đã trả lời khảo sát"
     },
-    "action": "Bắt đầu dùng FlowCortex"
+    "action": "Bắt đầu dùng FlowCortex",
+    "sample": {
+      "caption": "Thử một ví dụ có sẵn",
+      "try": "Thử mẫu này",
+      "tryNamed": "Thử mẫu này: {{name}}",
+      "trying": "Đang mở…"
+    }
   },
   "menu": {
     "replay": "Xem lại hướng dẫn"
