@@ -216,19 +216,18 @@ class CustomRoleAssignmentIT extends AbstractUserModuleIT {
             UserView staff = userService.createUser(admin.id(), uniqueEmail("named"), PASSWORD, "Named", code);
             String token = login(admin.email(), PASSWORD);
 
-            ResponseEntity<List<UserRow>> users = restTemplate.exchange("/api/v1/users", HttpMethod.GET,
-                    bearer(token, null), new org.springframework.core.ParameterizedTypeReference<>() {
-                    });
+            ResponseEntity<UserPage> users = restTemplate.exchange("/api/v1/users?size=100", HttpMethod.GET,
+                    bearer(token, null), UserPage.class);
             ResponseEntity<AccountPage> accounts = get("/api/v1/admin/accounts?role=" + code, token,
                     AccountPage.class);
 
             assertThat(staff.roleName()).isEqualTo("Điều phối nội dung");
-            assertThat(users.getBody()).filteredOn(row -> row.id().equals(staff.id()))
+            assertThat(users.getBody().items()).filteredOn(row -> row.id().equals(staff.id()))
                     .singleElement().satisfies(row -> {
                         assertThat(row.role()).isEqualTo(code);
                         assertThat(row.roleName()).isEqualTo("Điều phối nội dung");
                     });
-            assertThat(users.getBody()).filteredOn(row -> row.id().equals(admin.id()))
+            assertThat(users.getBody().items()).filteredOn(row -> row.id().equals(admin.id()))
                     .singleElement().satisfies(row -> assertThat(row.roleName()).isEqualTo("Super admin"));
             assertThat(accounts.getBody().items()).singleElement().satisfies(row -> {
                 assertThat(row.id()).isEqualTo(staff.id());
@@ -268,6 +267,9 @@ class CustomRoleAssignmentIT extends AbstractUserModuleIT {
     }
 
     record UserRow(UUID id, String role, String roleName) {
+    }
+
+    record UserPage(List<UserRow> items, int page, int size, long total) {
     }
 
     record AccountRow(UUID id, String role, String roleName, Instant createdAt) {
