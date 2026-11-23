@@ -140,13 +140,15 @@ class ChatToolsTest {
     }
 
     @Test
-    void proposeRunRefusesAProductVideoWorkflowWithoutExactlyOneImage() {
+    void proposeRunRefusesAProductVideoWorkflowWithoutOneToThreeImages() {
         catalog(videoFlow);
+        cardWillBeStored();
         String args = "{\"workflowId\":\"" + videoFlow.id() + "\",\"productVideo\":{\"productName\":\"Lamp\","
                 + "\"description\":\"A lamp\"}}";
 
         assertRefused(propose(context(0), args), "attachments");
-        assertRefused(propose(context(2), args), "attachments");
+        assertRefused(propose(context(4), args), "attachments");
+        assertThat(propose(context(3), args).path("proposed").asBoolean()).isTrue();
     }
 
     @Test

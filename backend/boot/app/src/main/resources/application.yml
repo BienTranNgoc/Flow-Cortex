@@ -528,6 +528,7 @@ flowcortex:
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
+    parallel-clips-enabled: ${PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED:false}
   # Hosted language model (Gemini API). An empty api-key still boots; every model call then fails
   # and logs a config error. read-timeout bounds each request; answer-timeout bounds one whole
   # answer.

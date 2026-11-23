@@ -10800,7 +10800,7 @@ components:
           items:
             type: string
             format: uuid
-          maxItems: 1
+          maxItems: 3
           minItems: 1
         video:
           $ref: "#/components/schemas/VideoConfig"

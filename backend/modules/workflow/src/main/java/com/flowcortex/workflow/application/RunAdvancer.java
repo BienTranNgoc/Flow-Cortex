@@ -105,6 +105,7 @@ class RunAdvancer {
     private final MediaJobs mediaJobs;
     private final Validator validator;
     private final VendorJobLedger vendorLedger;
+    private final boolean parallelClipsEnabled;
 
     @Autowired
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -114,11 +115,12 @@ class RunAdvancer {
             ObjectProvider<Tracer> tracer, ObjectProvider<ObservationRegistry> observations, MeterRegistry meters,
             @Value("${flowcortex.workflow.lease-seconds}") long leaseSeconds,
             ReviewCheckpointTransactions checkpointTransactions, MediaJobs mediaJobs, Validator validator,
-            VendorJobLedger vendorLedger) {
+            VendorJobLedger vendorLedger,
+            @Value("${flowcortex.product-video.parallel-clips-enabled:false}") boolean parallelClipsEnabled) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, providerPool, scheduler, tracer.getIfAvailable(() -> Tracer.NOOP),
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP), meters, Duration.ofSeconds(leaseSeconds),
-                Clock.systemUTC(), checkpointTransactions, mediaJobs, validator, vendorLedger);
+                Clock.systemUTC(), checkpointTransactions, mediaJobs, validator, vendorLedger, parallelClipsEnabled);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -129,7 +131,18 @@ class RunAdvancer {
             Validator validator) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, providerPool, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
-                validator, null);
+                validator, null, false);
+    }
+
+    RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            RunStepTransactions transactions, InputResolver inputResolver, StepExecutorRegistry registry,
+            TaskExecutor taskExecutor, ProviderStepPool providerPool, TaskScheduler scheduler, Tracer tracer,
+            ObservationRegistry observations,
+            MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
+            Validator validator, boolean parallelClipsEnabled) {
+        this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
+                taskExecutor, providerPool, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
+                validator, null, parallelClipsEnabled);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -140,7 +153,7 @@ class RunAdvancer {
             Validator validator, VendorJobLedger vendorLedger) {
         this(workflowRunRepository, runStepRepository, transactions, inputResolver, registry,
                 taskExecutor, providerPool, scheduler, tracer, observations, meters, lease, clock, checkpointTransactions, null,
-                validator, vendorLedger);
+                validator, vendorLedger, false);
     }
 
     RunAdvancer(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
@@ -148,7 +161,7 @@ class RunAdvancer {
             TaskExecutor taskExecutor, ProviderStepPool providerPool, TaskScheduler scheduler, Tracer tracer,
             ObservationRegistry observations,
             MeterRegistry meters, Duration lease, Clock clock, ReviewCheckpointTransactions checkpointTransactions,
-            MediaJobs mediaJobs, Validator validator, VendorJobLedger vendorLedger) {
+            MediaJobs mediaJobs, Validator validator, VendorJobLedger vendorLedger, boolean parallelClipsEnabled) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.transactions = transactions;
@@ -171,6 +184,7 @@ class RunAdvancer {
         this.mediaJobs = mediaJobs;
         this.validator = validator;
         this.vendorLedger = vendorLedger;
+        this.parallelClipsEnabled = parallelClipsEnabled;
     }
 
     @ApplicationModuleListener
@@ -235,38 +249,37 @@ class RunAdvancer {
             LOG.warn("Workflow run {} not found — nothing to advance (should not happen)", runId);
             return;
         }
-        if (run.getStatus() != RunStatus.RUNNING) {
-            return;
-        }
-
         List<RunStep> runSteps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
-        if (starting) {
+        if (starting && run.getStatus() == RunStatus.RUNNING) {
             LOG.info("Workflow run started: runId={} steps={}", runId, runSteps.size());
         }
         Map<Integer, String> outputsByOrder = new LinkedHashMap<>();
         Map<Integer, String> assetOutputsByOrder = new LinkedHashMap<>();
-        RunStep next = null;
         for (RunStep runStep : runSteps) {
-            if (runStep.getStatus() != RunStepStatus.COMPLETED) {
-                next = runStep;
-                break;
+            if (runStep.getStatus() == RunStepStatus.COMPLETED) {
+                outputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutput());
+                assetOutputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
             }
-            outputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutput());
-            assetOutputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
         }
-        if (next == null) {
-            transactions.completeRunIfDone(runId, clock.instant());
-            return;
+        ReadyStepSelector.Decision decision = ReadyStepSelector.select(
+                parallelClipsEnabled, run.getWorkflowId(), run.getStatus(), runSteps);
+        switch (decision) {
+            case ReadyStepSelector.Decision.Halt ignored -> {
+            }
+            case ReadyStepSelector.Decision.Wait ignored ->
+                LOG.info("Run {} waiting for in-flight step(s)", runId);
+            case ReadyStepSelector.Decision.CompleteRun ignored ->
+                transactions.completeRunIfDone(runId, clock.instant());
+            case ReadyStepSelector.Decision.PauseForApproval pause -> reviewOrFail(run, pause.step(), outputsByOrder);
+            case ReadyStepSelector.Decision.Dispatch dispatch -> {
+                for (RunStep step : dispatch.steps()) {
+                    if (dispatch(run, step, outputsByOrder, assetOutputsByOrder)
+                            == RunStepTransactions.ClaimOutcome.FAILED) {
+                        break;
+                    }
+                }
+            }
         }
-        if (next.getStatus() != RunStepStatus.PENDING) {
-            LOG.info("Step {} already {} — waiting for its result", next.getStepOrder(), next.getStatus());
-            return;
-        }
-        if (HumanSteps.TYPES.contains(next.getType())) {
-            reviewOrFail(run, next, outputsByOrder);
-            return;
-        }
-        dispatch(run, next, outputsByOrder, assetOutputsByOrder);
     }
 
     /**
@@ -307,12 +320,12 @@ class RunAdvancer {
         };
     }
 
-    private void dispatch(WorkflowRun run, RunStep step, Map<Integer, String> outputsByOrder,
-            Map<Integer, String> assetOutputsByOrder) {
+    private RunStepTransactions.ClaimOutcome dispatch(WorkflowRun run, RunStep step,
+            Map<Integer, String> outputsByOrder, Map<Integer, String> assetOutputsByOrder) {
         Optional<StepExecutor> executor = registry.find(step.getType());
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         try (StepLogContext ignored = StepLogContext.step(run.getId(), step.getId(), remote, step.getAttempt(), null)) {
-            dispatch(run, step, executor, outputsByOrder, assetOutputsByOrder);
+            return dispatch(run, step, executor, outputsByOrder, assetOutputsByOrder);
         }
     }
 
@@ -320,8 +333,9 @@ class RunAdvancer {
      * Reads config and input reference only from the run step's own snapshot, never from the
      * current workflow definition: a run in flight must not change shape when the workflow does.
      */
-    private void dispatch(WorkflowRun run, RunStep step, Optional<StepExecutor> executor,
-            Map<Integer, String> outputsByOrder, Map<Integer, String> assetOutputsByOrder) {
+    private RunStepTransactions.ClaimOutcome dispatch(WorkflowRun run, RunStep step,
+            Optional<StepExecutor> executor, Map<Integer, String> outputsByOrder,
+            Map<Integer, String> assetOutputsByOrder) {
         int order = step.getStepOrder();
         boolean remote = executor.filter(e -> e.mode() == StepExecutor.Mode.REMOTE).isPresent();
         String resolvedInput = null;
@@ -373,6 +387,7 @@ class RunAdvancer {
             }
             default -> throw new IllegalStateException("Unexpected claim outcome " + outcome);
         }
+        return outcome;
     }
 
     /**

@@ -44,11 +44,19 @@ export function ThreadPane({ conversationId, chatEnabled }: Readonly<ThreadPaneP
   const runIds = useMemo(() => threadRunIds(items), [items]);
   const runs = useQueries({
     queries: runIds.map(runQueryOptions),
-    combine: (results) => results.map((result, index) => ({ runId: runIds[index] ?? '', status: result.data?.status })),
+    combine: (results) =>
+      results.map((result, index) => ({
+        runId: runIds[index] ?? '',
+        status: result.data?.status,
+        hasRunningStep: result.data?.steps?.some((step) => step.status === 'running') ?? false,
+      })),
   });
   const { topics } = useMemo(() => chatTopics(conversationId, runs), [conversationId, runs]);
   const liveRunIds = useMemo(
-    () => runs.filter((run) => isLiveRunStatus(run.status)).map((run) => run.runId),
+    () =>
+      runs
+        .filter((run) => isLiveRunStatus(run.status) || Boolean(run.hasRunningStep))
+        .map((run) => run.runId),
     [runs],
   );
   const liveRunsRef = useRef(liveRunIds);
