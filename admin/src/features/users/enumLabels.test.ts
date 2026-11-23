@@ -1,6 +1,6 @@
 import i18n from '../../lib/i18n';
 import { ADMIN_ME, staffMe } from '../../test/fakeApi';
-import { assignableRoles, roleKind, statusLabel } from './enumLabels';
+import { assignableRoles, roleKind, roleLabel, statusLabel } from './enumLabels';
 
 describe('enumLabels', () => {
   const t = i18n.t.bind(i18n);
@@ -11,6 +11,10 @@ describe('enumLabels', () => {
 
   it('shows a status code the console does not know as sent', () => {
     expect(statusLabel(t, 'PENDING')).toBe('PENDING');
+  });
+
+  it('shows no role label when the account has no role', () => {
+    expect(roleLabel(t, undefined)).toBe('');
   });
 
   it('reads a custom code as staff, MEMBER and CREATOR as end-user and ADMIN as super admin', () => {

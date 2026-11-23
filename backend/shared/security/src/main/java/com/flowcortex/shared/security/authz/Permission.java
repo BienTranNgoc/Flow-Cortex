@@ -48,6 +48,7 @@ public enum Permission {
     WORKFLOW_WORKFLOW_EXPORT("workflow.workflow.export", false),
     PAYMENT_SETTING_VIEW("payment.setting.view", false),
     PAYMENT_SETTING_UPDATE("payment.setting.update", false),
+    USER_ACCOUNT_EXPORT("user.account.export", false),
     CONTENT_TREND_TEMPLATE_VIEW("content.trend_template.view", false),
     CONTENT_TREND_TEMPLATE_MANAGE("content.trend_template.manage", false);
 
