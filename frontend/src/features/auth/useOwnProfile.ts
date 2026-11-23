@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   authHeaders,
   changeUsername as changeUsernameRequest,
-  get1 as getOwnProfile,
+  getOwnProfile,
   unwrap,
   updateProfile,
   useAuthToken,
