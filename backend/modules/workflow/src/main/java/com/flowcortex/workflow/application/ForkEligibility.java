@@ -14,10 +14,11 @@ final class ForkEligibility {
 
     /** Why a fork is refused. */
     enum Refusal {
-        OWN, FIXED, NOT_ALLOWED
+        OWN, FIXED, NOT_ALLOWED, CONNECTOR_STEP
     }
 
-    private record Subject(UUID sourceId, UUID sourceOwnerId, boolean allowFork, UUID callerId) {
+    private record Subject(UUID sourceId, UUID sourceOwnerId, boolean allowFork, boolean holdsConnectorCall,
+            UUID callerId) {
     }
 
     private record Rule(Predicate<Subject> applies, Refusal refusal) {
@@ -26,13 +27,19 @@ final class ForkEligibility {
     private static final List<Rule> RULES = List.of(
             new Rule(subject -> subject.sourceOwnerId().equals(subject.callerId()), Refusal.OWN),
             new Rule(subject -> ProductVideoWorkflow.ID.equals(subject.sourceId()), Refusal.FIXED),
-            new Rule(subject -> !subject.allowFork(), Refusal.NOT_ALLOWED));
+            new Rule(subject -> !subject.allowFork(), Refusal.NOT_ALLOWED),
+            new Rule(Subject::holdsConnectorCall, Refusal.CONNECTOR_STEP));
 
     private ForkEligibility() {
     }
 
-    static Optional<Refusal> refusal(UUID sourceId, UUID sourceOwnerId, boolean allowFork, UUID callerId) {
-        Subject subject = new Subject(sourceId, sourceOwnerId, allowFork, callerId);
+    /**
+     * A connector call step runs with the credential of whoever owns the workflow, and a copy is owned by the
+     * caller: it would send a request someone else chose, so a workflow that holds one is not copied.
+     */
+    static Optional<Refusal> refusal(UUID sourceId, UUID sourceOwnerId, boolean allowFork,
+            boolean holdsConnectorCall, UUID callerId) {
+        Subject subject = new Subject(sourceId, sourceOwnerId, allowFork, holdsConnectorCall, callerId);
         return RULES.stream().filter(rule -> rule.applies().test(subject)).map(Rule::refusal).findFirst();
     }
 }
