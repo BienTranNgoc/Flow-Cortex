@@ -2,10 +2,10 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   ApiError,
   authHeaders,
-  create,
+  createUser,
   downloadFile,
-  get,
   getExportUsersUrl,
+  getUser,
   getUserStats,
   listUsers,
   unwrap,
@@ -62,7 +62,7 @@ export function useUserStatsQuery(enabled = true) {
 export function useUserQuery(id: string) {
   return useQuery({
     queryKey: ['user', id],
-    queryFn: () => unwrap(get(id, authHeaders())),
+    queryFn: () => unwrap(getUser(id, authHeaders())),
     enabled: id.length > 0,
   });
 }
@@ -77,7 +77,7 @@ function invalidateDirectory(queryClient: ReturnType<typeof useQueryClient>) {
 export function useCreateUserMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateUserRequest) => unwrap(create(input, authHeaders())),
+    mutationFn: (input: CreateUserRequest) => unwrap(createUser(input, authHeaders())),
     onSuccess: () => invalidateDirectory(queryClient),
   });
 }
