@@ -30,7 +30,7 @@ class QaAnswersTest {
     private static final Map<String, Set<String>> VIETNAMESE_OPTIONS =
             Map.of("q1", Set.of("Chỉ mình tôi"), "q2", Set.of("Ngắn gọn, nêu ý chính"));
 
-    private static final List<QaQuestion> WITH_MULTI =List.of(
+    private static final List<QaQuestion> WITH_MULTI = List.of(
             new QaQuestion("m1", Type.MULTI, "Which channels?", List.of("Email", "Social", "Print")),
             new QaQuestion("t1", Type.TEXT, "Notes?", List.of()));
 
