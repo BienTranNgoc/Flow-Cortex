@@ -23,7 +23,7 @@ class CreditRunStartGuard implements RunStartGuard {
 
     CreditRunStartGuard(CreditAccounts creditAccounts, StepExecutorRegistry registry) {
         Set<String> runnable = new TreeSet<>(registry.knownTypes());
-        runnable.add(KnownStepTypes.APPROVAL_CHECKPOINT);
+        runnable.addAll(HumanSteps.TYPES);
         creditAccounts.requirePriced(runnable);
         this.creditAccounts = creditAccounts;
     }

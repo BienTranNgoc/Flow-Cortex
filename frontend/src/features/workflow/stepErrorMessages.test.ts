@@ -18,6 +18,17 @@ describe('stepErrorSentence', () => {
     );
   });
 
+  it('REVIEW_EXPIRED reads the member sentence in either language, not the server message', () => {
+    const fromServer = 'The server wording';
+
+    expect(stepErrorSentence('REVIEW_EXPIRED', fromServer, false, en, 'en')).toBe(
+      'No one decided in time, so the run stopped.',
+    );
+    const sentence = stepErrorSentence('REVIEW_EXPIRED', fromServer, false, vi, 'vi');
+    expect(sentence).toBe(viWorkflow.stepError.REVIEW_EXPIRED);
+    expect(sentence).not.toBe(fromServer);
+  });
+
   describe('speech_too_long with a server message', () => {
     const fromServer =
       'The approved script reads for 11.2 s, longer than the 10 s video. Start a new run with a shorter script.';
@@ -32,5 +43,41 @@ describe('stepErrorSentence', () => {
     it('reads the server message verbatim in English', () => {
       expect(stepErrorSentence('speech_too_long', fromServer, true, en, 'en')).toBe(fromServer);
     });
+  });
+
+  describe('load_template_missing_input', () => {
+    // Exactly what the backend TemplateLoad writes for two missing fields.
+    const fromServer = 'Required input missing: productName, productImage.';
+
+    it('names the missing fields in English', () => {
+      expect(stepErrorSentence('load_template_missing_input', fromServer, false, en, 'en')).toBe(
+        'Missing required template inputs: productName, productImage.',
+      );
+    });
+
+    it('names the missing fields in Vietnamese without English prose', () => {
+      const sentence = stepErrorSentence('load_template_missing_input', fromServer, false, vi, 'vi');
+
+      expect(sentence).toBe('Còn thiếu đầu vào bắt buộc của mẫu: productName, productImage.');
+      expect(sentence).not.toContain('Required');
+    });
+
+    it('does not entity-escape field names', () => {
+      expect(
+        stepErrorSentence('load_template_missing_input', 'Required input missing: a&b.', false, en, 'en'),
+      ).toBe('Missing required template inputs: a&b.');
+    });
+
+    it.each([undefined, 'Something else went wrong', 'Required input missing: .'])(
+      'falls back to the plain sentence when the message is %s',
+      (message) => {
+        expect(stepErrorSentence('load_template_missing_input', message, false, en, 'en')).toBe(
+          'Some required inputs for the template are missing.',
+        );
+        expect(stepErrorSentence('load_template_missing_input', message, false, vi, 'vi')).toBe(
+          viWorkflow.stepError.load_template_missing_input,
+        );
+      },
+    );
   });
 });

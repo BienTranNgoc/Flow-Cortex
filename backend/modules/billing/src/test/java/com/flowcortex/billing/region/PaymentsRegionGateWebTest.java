@@ -1,10 +1,17 @@
 package com.flowcortex.billing.region;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingSource;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.shared.web.LocaleConfig;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -50,13 +57,20 @@ class PaymentsRegionGateWebTest {
     }
 
     private final MeterRegistry meters = new SimpleMeterRegistry();
+    private final Settings settings = mock(Settings.class);
+
+    private void store(String mode) {
+        when(settings.get(PaymentsRegionSettings.MODE))
+                .thenReturn(new SettingRead<>(mode, mode, SettingSource.STORED));
+    }
 
     private MockMvc mvc(String mode) {
+        store(mode);
         PaymentsRegionService service = new PaymentsRegionService(
                 Clock.fixed(Instant.parse("2026-11-08T00:00:00Z"), ZoneOffset.UTC));
         service.load();
         PaymentsRegionInterceptor interceptor = new PaymentsRegionInterceptor(service,
-                new PaymentsRegionProperties(mode, null, null), new RegionTelemetry(meters));
+                new PaymentsRegionModeSource(settings), new RegionTelemetry(meters));
         return MockMvcBuilders.standaloneSetup(new Handlers())
                 .addMappedInterceptors(new String[] {"/api/**"}, interceptor)
                 .setControllerAdvice(new PaymentsRegionProblemHandler(LOCALE, LOCALE.getBean(LocaleResolver.class)))
@@ -124,5 +138,25 @@ class PaymentsRegionGateWebTest {
 
         mvc.perform(get("/api/v1/marked").with(from(VN))).andExpect(status().isOk());
         mvc.perform(get("/api/v1/marked").with(from(FOREIGN))).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aStoredModeChangeAppliesToTheNextRequest() throws Exception {
+        MockMvc mvc = mvc("enforce");
+
+        mvc.perform(get("/api/v1/marked").with(from(FOREIGN))).andExpect(status().isForbidden());
+        store("off");
+
+        mvc.perform(get("/api/v1/marked").with(from(FOREIGN))).andExpect(status().isOk());
+    }
+
+    @Test
+    void anUngatedHandlerNeverReadsTheMode() throws Exception {
+        MockMvc mvc = mvc("enforce");
+        clearInvocations(settings);
+
+        mvc.perform(get("/api/v1/unmarked").with(from(FOREIGN))).andExpect(status().isOk());
+
+        verifyNoInteractions(settings);
     }
 }

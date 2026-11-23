@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
+import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.infrastructure.MediaAssetBindingRepository;
 import com.flowcortex.media.infrastructure.MediaAssetRepository;
@@ -31,7 +32,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
 /**
- * {@code copyStepOutputs} against a real object store holding {@code infra/minio/backend-policy.json}
+ * {@code copyStepOutputs} and {@code copyRunObject} against a real object store holding {@code infra/minio/backend-policy.json}
  * on a non-root user, the way compose runs the backend: a prefix the code writes that the policy does
  * not grant fails here, not in a member's run retry.
  */
@@ -110,6 +111,35 @@ class BackendStorePolicyIT {
                 .hasMessageContaining("backend store policy");
     }
 
+    @Test
+    void copiesARunInputIntoItsStepsFirstAttemptAsAnIngestStepDoes() {
+        UUID run = UUID.randomUUID();
+        String sourceKey = "runs/" + run + "/inputs/media";
+        root.putObject(request -> request.bucket(MEDIA).key(sourceKey).tagging("flowcortex-retention=run-input"),
+                RequestBody.fromBytes(new byte[] {4, 5, 6, 7}));
+
+        MediaOutput copy = jobs.copyRunObject(run, 1, new MediaJobInput("media", MEDIA, sourceKey), "video");
+
+        String targetKey = "runs/" + run + "/steps/1/attempts/1/video";
+        assertThat(copy.objectKey()).isEqualTo(targetKey);
+        assertThat(copy.bytes()).isEqualTo(4L);
+        assertThat(root.getObjectAsBytes(request -> request.bucket(MEDIA).key(targetKey)).asByteArray())
+                .containsExactly(4, 5, 6, 7);
+        assertThat(root.getObjectTagging(request -> request.bucket(MEDIA).key(targetKey)).tagSet()).isEmpty();
+    }
+
+    @Test
+    void theBackendCannotWriteAStepOutputOutsideAnAttemptDirectory() {
+        UUID run = UUID.randomUUID();
+        String sourceKey = "runs/" + run + "/inputs/media";
+        root.putObject(request -> request.bucket(MEDIA).key(sourceKey), RequestBody.fromBytes(new byte[] {1}));
+
+        assertThatThrownBy(() -> backendStore.copyWithoutTags(MEDIA, sourceKey, MEDIA,
+                "runs/" + run + "/steps/1/video"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("backend store policy");
+    }
+
     private static void mc(String rootAlias, String command) throws Exception {
         ExecResult result = STORE.execInContainer("sh", "-c", "export MC_HOST_ROOT='" + rootAlias + "'; " + command);
         assertThat(result.getExitCode()).as(command + ": " + result.getStderr()).isZero();
@@ -131,7 +161,9 @@ class BackendStorePolicyIT {
                         "probe", Duration.ofMinutes(5),
                         "extract_audio", Duration.ofMinutes(10),
                         "align_audio", Duration.ofMinutes(10),
-                        "render_video", Duration.ofMinutes(10)),
+                        "render_video", Duration.ofMinutes(10),
+                        "separate_audio", Duration.ofMinutes(15),
+                        "fetch_video", Duration.ofMinutes(10)),
                 Duration.ofMinutes(20),
                 Duration.ofMinutes(2), Duration.ofMinutes(5),
                 Duration.ofMinutes(10), Duration.ofMinutes(15),

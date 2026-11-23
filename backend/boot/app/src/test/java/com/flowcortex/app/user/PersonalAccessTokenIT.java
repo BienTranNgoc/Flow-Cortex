@@ -1,9 +1,12 @@
 package com.flowcortex.app.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.user.api.StepUpProofs;
 import com.flowcortex.user.api.StepUpPurpose;
+import com.flowcortex.user.api.StepUpRequiredException;
+import com.flowcortex.user.application.AccountCredentials;
 import com.flowcortex.user.application.AuthRetentionJob;
 import com.flowcortex.user.application.OpaqueTokens;
 import java.sql.Timestamp;
@@ -51,6 +54,9 @@ class PersonalAccessTokenIT extends AbstractUserModuleIT {
 
     @Autowired
     private StepUpProofs stepUpProofs;
+
+    @Autowired
+    private AccountCredentials accountCredentials;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -271,6 +277,58 @@ class PersonalAccessTokenIT extends AbstractUserModuleIT {
         assertThat(jdbc.queryForObject("SELECT locked_until > now() FROM app_user WHERE id = ?", Boolean.class,
                 locked.id())).isTrue();
         assertThat(status("/api/v1/workflows", HttpMethod.GET, lockedToken)).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void aDemotedAdminsTokenStaysRefusedAfterThePromotionIsReversed() {
+        Account owner = admin("promoter");
+        TokenHolder flipped = secondAdminWithToken(owner, "flip");
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, flipped.token())).isEqualTo(HttpStatus.OK);
+
+        userService.updateUser(owner.id(), flipped.id(), null, null, "MEMBER", null);
+        userService.updateUser(owner.id(), flipped.id(), null, null, "ADMIN", null);
+
+        assertRevokedByDemotion(flipped);
+    }
+
+    @Test
+    void aTokenStaysRefusedWhenTheAdminAccountsRouteDemotesAndPromotesItsOwner() {
+        Account owner = admin("console");
+        TokenHolder flipped = secondAdminWithToken(owner, "console-flip");
+        String rolePath = "/api/v1/admin/accounts/" + flipped.id() + "/role";
+
+        for (String role : List.of("CONTENT_EDITOR", "ADMIN")) {
+            assertThat(exchange(rolePath, HttpMethod.PATCH, owner.session(), Map.of("role", role), String.class)
+                    .getStatusCode().value()).isEqualTo(200);
+        }
+
+        assertRevokedByDemotion(flipped);
+    }
+
+    private record TokenHolder(UUID id, String token) {
+    }
+
+    private TokenHolder secondAdminWithToken(Account owner, String label) {
+        String email = uniqueEmail(label);
+        UUID id = userService.createUser(owner.id(), email, PASSWORD, label, "ADMIN").id();
+        return new TokenHolder(id, createToken(new Account(id, email, login(email, PASSWORD)), label));
+    }
+
+    private void assertRevokedByDemotion(TokenHolder holder) {
+        assertThat(status("/api/v1/workflows", HttpMethod.GET, holder.token())).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_event WHERE user_id = ? AND type = 'PAT_REVOKED'"
+                + " AND metadata->>'reason' = 'role_demoted'", Integer.class, holder.id())).isEqualTo(1);
+    }
+
+    @Test
+    void aStepUpProofMintedBeforeACredentialResetCannotBeSpentAfterIt() {
+        Account a = admin("proofreset");
+        String proof = proof(a);
+
+        accountCredentials.revokeAllFor(a.id());
+
+        assertThatThrownBy(() -> stepUpProofs.consume(a.id(), StepUpPurpose.PAT_CREATE, proof))
+                .isInstanceOf(StepUpRequiredException.class);
     }
 
     @Test

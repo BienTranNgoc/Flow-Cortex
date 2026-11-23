@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   authHeaders,
-  create1,
-  list1,
+  createApiToken,
+  listApiTokens,
   revoke,
   unwrap,
   type ApiTokenView,
@@ -17,17 +17,21 @@ export function useApiTokensQuery(enabled: boolean) {
   return useQuery({
     queryKey: API_TOKENS_KEY,
     // `unwrap` throws for every status >= 400, so the generated error bodies never reach here.
-    queryFn: async () => (await unwrap(list1(authHeaders()))) as ApiTokenView[],
+    queryFn: async () => (await unwrap(listApiTokens(authHeaders()))) as ApiTokenView[],
     enabled,
   });
 }
 
-/** Creates a token; the answer carries the raw token once and is never cached. */
+/**
+ * Creates a token; the answer carries the raw token once. `gcTime: 0` drops the finished mutation
+ * from the cache as soon as the caller resets it, instead of holding the token for the default gc time.
+ */
 export function useCreateApiTokenMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    gcTime: 0,
     mutationFn: async (request: CreateApiTokenRequest) =>
-      (await unwrap(create1(request, authHeaders()))) as CreatedApiToken,
+      (await unwrap(createApiToken(request, authHeaders()))) as CreatedApiToken,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: API_TOKENS_KEY }),
   });
 }

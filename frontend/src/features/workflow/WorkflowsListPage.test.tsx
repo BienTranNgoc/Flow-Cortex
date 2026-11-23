@@ -12,6 +12,9 @@ const CHECK: WorkflowResponse = {
   name: 'Check a video file',
   visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [],
 };
 
@@ -20,6 +23,9 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   name: 'Product Video',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [],
 };
 
@@ -28,6 +34,9 @@ const DOUYIN: WorkflowResponse = {
   name: 'Douyin Video Repurpose',
   visibility: 'public',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [
     { id: 's1', stepOrder: 1, name: 'echo_input', type: 'echo', mode: 'inline' },
     { id: 's2', stepOrder: 2, name: 'approval_checkpoint', type: 'APPROVAL_CHECKPOINT', mode: 'inline' },
@@ -39,6 +48,9 @@ const ECHO: WorkflowResponse = {
   name: 'Echo Demo (all steps succeed)',
   visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 's3', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
 };
 
@@ -47,6 +59,9 @@ const FAIL: WorkflowResponse = {
   name: 'Failing Demo (deliberate)',
   visibility: 'private',
   available: true,
+  allowFork: false,
+  forkCount: 0,
+  startInput: 'text',
   steps: [{ id: 's4', stepOrder: 1, name: 'throw', type: 'fail', mode: 'inline' }],
 };
 
@@ -278,6 +293,7 @@ describe('WorkflowsListPage', () => {
           ? { status: 503, body: { status: 503 } }
           : { status: 200, body: [DOUYIN, ECHO, FAIL] };
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
@@ -300,6 +316,7 @@ describe('WorkflowsListPage', () => {
         status: 503,
         body: { status: 503, detail: 'Workflows are paused for maintenance.' },
       },
+      'GET /api/v1/workflow-examples': { status: 200, body: [] },
       'GET /api/v1/capabilities': capabilities(true),
     });
     renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
@@ -308,6 +325,42 @@ describe('WorkflowsListPage', () => {
     expect(alert).toHaveTextContent('Workflows are paused for maintenance.');
     expect(alert).not.toHaveTextContent('Could not load workflows.');
     expect(within(alert).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('keeps the loaded examples on screen when a later reload of them fails', async () => {
+    let exampleCalls = 0;
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': { status: 200, body: [ECHO] },
+      'GET /api/v1/workflow-examples': () => {
+        exampleCalls += 1;
+        return exampleCalls === 1
+          ? {
+              status: 200,
+              body: [
+                {
+                  id: 'summarize',
+                  pattern: 'single',
+                  title: 'Summarize a note',
+                  description: 'Turns a long note into three lines.',
+                  stepTypes: ['llm'],
+                  stepCount: 1,
+                },
+              ],
+            }
+          : { status: 503, body: { status: 503 } };
+      },
+      'GET /api/v1/capabilities': capabilities(true),
+    });
+    const { queryClient } = renderRoute('/workflows', '/workflows', <WorkflowsListPage />);
+    expect(await screen.findByText('Summarize a note')).toBeInTheDocument();
+
+    await act(() => queryClient.invalidateQueries({ queryKey: ['workflow-examples'] }));
+    await waitFor(() => expect(exampleCalls).toBe(2));
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+
+    expect(screen.getByText('Summarize a note')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load the examples.')).not.toBeInTheDocument();
   });
 
   it('says nothing matches a search and clears it with one action', async () => {

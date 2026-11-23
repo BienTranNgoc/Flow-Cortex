@@ -1,5 +1,6 @@
 package com.flowcortex.billing.region;
 
+import com.flowcortex.settings.api.Settings;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,8 +11,13 @@ import org.springframework.context.annotation.Configuration;
 class PaymentsRegionConfig {
 
     @Bean
+    PaymentsRegionModeSource paymentsRegionModeSource(Settings settings) {
+        return new PaymentsRegionModeSource(settings);
+    }
+
+    @Bean
     PaymentsRegionInterceptor paymentsRegionInterceptor(PaymentsRegionService service,
-            PaymentsRegionProperties properties, RegionTelemetry telemetry) {
-        return new PaymentsRegionInterceptor(service, properties, telemetry);
+            PaymentsRegionModeSource modeSource, RegionTelemetry telemetry) {
+        return new PaymentsRegionInterceptor(service, modeSource, telemetry);
     }
 }

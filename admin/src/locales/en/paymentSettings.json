@@ -1,0 +1,92 @@
+{
+  "eyebrow": "Credits & Billing",
+  "title": "Payment settings",
+  "description": "How payments behave at runtime. A change takes effect from the next request, without a restart.",
+  "tabs": {
+    "label": "Payment settings sections",
+    "settings": "Settings",
+    "history": "History"
+  },
+  "loading": "Loading…",
+  "loadFailed": "Could not load the payment settings.",
+  "retry": "Retry",
+  "empty": {
+    "title": "No payment settings",
+    "description": "No payment setting is declared on this server."
+  },
+  "groups": {
+    "region": "Region"
+  },
+  "settings": {
+    "payment_region_gate_mode": {
+      "label": "Region gate mode",
+      "description": "What the payments region gate does with a request from outside Vietnam: Off places nothing, Shadow only measures, Enforce refuses the payment.",
+      "options": {
+        "off": "Off",
+        "shadow": "Shadow",
+        "enforce": "Enforce"
+      }
+    }
+  },
+  "source": {
+    "STORED": "Set by an admin",
+    "CONFIGURED": "From server configuration",
+    "DEFAULT": "Default",
+    "VETOED": "Turned off by the server configuration",
+    "DEGRADED": "Settings store unavailable"
+  },
+  "readOnly": "Changing this setting needs the payment settings update permission.",
+  "allowedValues": "Allowed values: {{values}}",
+  "bounds": "From {{min}} to {{max}}",
+  "dangerous": "Affects real customers' payments",
+  "switch": {
+    "on": "On",
+    "off": "Off"
+  },
+  "save": "Save",
+  "saving": "Saving…",
+  "draftError": {
+    "options": "Pick one of the allowed values.",
+    "range": "Enter a whole number from {{min}} to {{max}}.",
+    "blank": "Enter a value."
+  },
+  "errors": {
+    "save": "Could not save. Please try again."
+  },
+  "dialog": {
+    "title": "Reason for the change",
+    "description": "{{setting}} will change from {{from}} to {{to}}. The reason is kept in the change history.",
+    "reasonLabel": "Reason",
+    "counter": "{{count}} / {{max}}",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…"
+  },
+  "history": {
+    "loading": "Loading history…",
+    "loadFailed": "Could not load the change history.",
+    "retry": "Retry",
+    "tableLabel": "Payment setting changes",
+    "filterLabel": "Setting",
+    "filterAll": "All settings",
+    "columns": {
+      "time": "Time",
+      "setting": "Setting",
+      "change": "Change",
+      "actor": "Changed by",
+      "reason": "Reason"
+    },
+    "transition": "{{from}} → {{to}}",
+    "unset": "not set",
+    "deletedAccount": "deleted account",
+    "noReason": "—",
+    "emptyTitle": "No changes yet",
+    "emptyDescription": "No payment setting has been changed.",
+    "emptyFilteredDescription": "This setting has not been changed.",
+    "pageOf": "Page {{page}} of {{pages}}",
+    "previous": "Previous",
+    "next": "Next",
+    "previousLabel": "Previous page of changes",
+    "nextLabel": "Next page of changes"
+  }
+}

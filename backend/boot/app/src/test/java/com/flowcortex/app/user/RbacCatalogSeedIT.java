@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.roles.PermissionSetPolicy;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,14 +65,22 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         Set<String> operationManager = new TreeSet<>(keys(Permission.values()));
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
+        operationManager.remove(Permission.PAYMENT_SETTING_UPDATE.key());
 
-        assertThat(keysOf("OPERATION_MANAGER")).isEqualTo(operationManager);
+        assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key(),
+                        Permission.CONTENT_DOCUMENT_VIEW.key(), Permission.CONTENT_DOCUMENT_MANAGE.key(),
+                        Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key(),
+                        Permission.USER_ACCOUNT_EXPORT.key())
+                .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
-                Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW, Permission.WORKFLOW_WORKFLOW_VIEW));
+                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
+                Permission.WORKFLOW_WORKFLOW_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
-                Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE));
+                Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE,
+                Permission.CONTENT_DOCUMENT_VIEW, Permission.CONTENT_DOCUMENT_MANAGE,
+                Permission.CONTENT_MEDIA_VIEW, Permission.CONTENT_MEDIA_MANAGE));
         assertThat(keysOf("PLATFORM_OPERATOR")).isEqualTo(keys(
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,
@@ -82,6 +92,34 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
                 Permission.WORKFLOW_WORKFLOW_MANAGE.key());
         assertThat(workflowManageHolders).isZero();
+
+        Integer paymentUpdateHolders = jdbc.queryForObject(
+                "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
+                Permission.PAYMENT_SETTING_UPDATE.key());
+        assertThat(paymentUpdateHolders).isZero();
+    }
+
+    @Test
+    void everySeededStaffSetPassesThePermissionSetPolicy() {
+        List<String> staffRoles = jdbc.queryForList(
+                "SELECT code FROM role WHERE staff AND NOT super_admin AND system ORDER BY code", String.class);
+
+        assertThat(staffRoles).isNotEmpty();
+        for (String role : staffRoles) {
+            assertThat(PermissionSetPolicy.check(keysOf(role), PermissionSetPolicy.permissionCatalog()))
+                    .as("seeded set of %s", role).isEmpty();
+        }
+    }
+
+    @Test
+    void operationManagerAloneAmongStaffHoldsUserAccountExport() {
+        String export = "user.account.export";
+
+        assertThat(keysOf("OPERATION_MANAGER")).contains(export);
+        assertThat(keysOf("CUSTOMER_SUPPORT")).doesNotContain(export);
+        assertThat(keysOf("CONTENT_EDITOR")).doesNotContain(export);
+        assertThat(keysOf("PLATFORM_OPERATOR")).doesNotContain(export);
+        assertThat(keysOf("ADMIN")).isEmpty();
     }
 
     @Test
@@ -97,34 +135,88 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
     }
 
     @Test
-    void theRoleEnumFlagsMatchTheRoleTable() {
-        Map<String, boolean[]> rows = jdbc.query("SELECT code, staff, super_admin FROM role", rs -> {
-            Map<String, boolean[]> map = new java.util.HashMap<>();
+    void systemRoleManageIsSeededSuperAdminOnly() {
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT module, feature, action, super_admin_only FROM permission WHERE key = 'system.role.manage'");
+
+        assertThat(row).containsEntry("module", "system").containsEntry("feature", "role")
+                .containsEntry("action", "manage").containsEntry("super_admin_only", true);
+        assertThat(keysOf("ADMIN")).isEmpty();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM role_permission WHERE permission_key = 'system.role.manage'", Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void everySystemRoleHasItsSeededName() {
+        Map<String, String> names = jdbc.query("SELECT code, name FROM role", rs -> {
+            Map<String, String> map = new java.util.HashMap<>();
             while (rs.next()) {
-                map.put(rs.getString("code"), new boolean[] {rs.getBoolean("staff"), rs.getBoolean("super_admin")});
+                map.put(rs.getString("code"), rs.getString("name"));
             }
             return map;
         });
 
-        assertThat(rows.keySet()).containsExactlyInAnyOrderElementsOf(
-                Arrays.stream(Role.values()).map(Role::name).toList());
-        for (Role role : Role.values()) {
-            boolean[] flags = rows.get(role.name());
-            assertThat(role.isStaff()).as("staff flag of %s", role).isEqualTo(flags[0]);
-            assertThat(role.isSuperAdmin()).as("super_admin flag of %s", role).isEqualTo(flags[1]);
+        assertThat(names).containsEntry("ADMIN", "Super admin")
+                .containsEntry("OPERATION_MANAGER", "Operation manager")
+                .containsEntry("CUSTOMER_SUPPORT", "Customer support")
+                .containsEntry("CONTENT_EDITOR", "Content editor")
+                .containsEntry("PLATFORM_OPERATOR", "Platform operator")
+                .containsEntry("MEMBER", "Member")
+                .containsEntry("CREATOR", "Creator");
+        assertThat(jdbc.queryForObject("SELECT permissions_version FROM role WHERE code = 'ADMIN'", Integer.class))
+                .isZero();
+    }
+
+    @Test
+    void aSecondRoleWithTheSameTrimmedCaseInsensitiveNameIsRefusedByTheIndex() {
+        insertCustomRole("INDEX_PROBE_ONE", "Index probe");
+        try {
+            assertThatThrownBy(() -> insertCustomRole("INDEX_PROBE_TWO", " index PROBE "))
+                    .isInstanceOf(DuplicateKeyException.class)
+                    .hasMessageContaining("uq_role_name_ci");
+            assertThatThrownBy(() -> insertCustomRole("INDEX_PROBE_THREE", "customer support"))
+                    .isInstanceOf(DuplicateKeyException.class)
+                    .hasMessageContaining("uq_role_name_ci");
+        } finally {
+            jdbc.update("DELETE FROM role WHERE code = 'INDEX_PROBE_ONE'");
         }
+    }
+
+    @Test
+    void aCustomRoleCannotBeSuperAdminOrEndUser() {
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO role (code, name, staff, super_admin, system, sort_order) "
+                        + "VALUES ('BAD_SUPER', 'Bad super', true, true, false, 1000)"))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_role_custom_is_staff");
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO role (code, name, staff, super_admin, system, sort_order) "
+                        + "VALUES ('BAD_END_USER', 'Bad end user', false, false, false, 1000)"))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_role_custom_is_staff");
+    }
+
+    @Test
+    void aLowercaseCodeIsRefused() {
+        assertThatThrownBy(() -> insertCustomRole("lower_case", "Lower case"))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("ck_role_code_format");
+    }
+
+    private void insertCustomRole(String code, String name) {
+        jdbc.update("INSERT INTO role (code, name, staff, super_admin, system, sort_order) "
+                + "VALUES (?, ?, true, false, false, 1000)", code, name);
     }
 
     @Test
     void everyExistingRoleValueSatisfiesTheRoleForeignKey() {
         UserView admin = userService.createInitialAdmin(uniqueEmail("rbac-fk"), "correct-password-1", "Rbac Fk");
-        for (Role role : Role.values()) {
-            if (role == Role.ADMIN) {
-                continue;
-            }
+        for (Role role : List.of(Role.MEMBER, Role.CREATOR, Role.OPERATION_MANAGER, Role.CUSTOMER_SUPPORT,
+                Role.CONTENT_EDITOR, Role.PLATFORM_OPERATOR)) {
             UserView created = userService.createUser(
-                    admin.id(), uniqueEmail("rbac-fk-" + role), "correct-password-1", role.name(), role.name());
-            assertThat(created.role()).isEqualTo(role.name());
+                    admin.id(), uniqueEmail("rbac-fk-" + role), "correct-password-1", role.code(), role.code());
+            assertThat(created.role()).isEqualTo(role.code());
         }
 
         assertThatThrownBy(() -> jdbc.update("UPDATE app_user SET role = 'NOT_A_ROLE' WHERE id = ?", admin.id()))

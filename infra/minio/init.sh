@@ -9,6 +9,7 @@ set -eu
 : "${BACKEND_S3_ACCESS_KEY:?}" "${BACKEND_S3_SECRET_KEY:?}"
 : "${WORKER_S3_ACCESS_KEY:?}" "${WORKER_S3_SECRET_KEY:?}"
 : "${PROVIDER_S3_ACCESS_KEY:?}" "${PROVIDER_S3_SECRET_KEY:?}"
+: "${FETCH_S3_ACCESS_KEY:?}" "${FETCH_S3_SECRET_KEY:?}"
 RUN_INPUT_RETENTION_DAYS=${RUN_INPUT_RETENTION_DAYS:-30}
 case "$RUN_INPUT_RETENTION_DAYS" in
     ''|0*|*[!0-9]*)
@@ -45,9 +46,10 @@ mc ilm import ROOT/flowcortex-uploads < "$DIR/uploads-lifecycle.json"
 # uploads import above, this replaces every lifecycle rule on the media bucket:
 # add rules here, not by hand, or the next init run drops them.
 # A support attachment stays support-pending until its content check passes;
-# a Drive file stays drive-pending until its item row commits; a profile image
-# stays profile-released until its record commits, and again once it leaves the
-# member's history.
+# a review image stays review-pending and a content media copy content-pending
+# likewise; a Drive file stays drive-pending until its item row commits; a
+# profile image stays profile-released until its record commits, and again once
+# it leaves the member's history.
 printf '%s\n' \
     '{"Rules":[{"ID":"expire-run-inputs","Status":"Enabled",' \
     '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"run-input"}},' \
@@ -55,11 +57,17 @@ printf '%s\n' \
     '{"ID":"expire-support-pending","Status":"Enabled",' \
     '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"support-pending"}},' \
     '"Expiration":{"Days":1}},' \
+    '{"ID":"expire-content-pending","Status":"Enabled",' \
+    '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"content-pending"}},' \
+    '"Expiration":{"Days":1}},' \
     '{"ID":"expire-drive-pending","Status":"Enabled",' \
     '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"drive-pending"}},' \
     '"Expiration":{"Days":1}},' \
     '{"ID":"expire-profile-released","Status":"Enabled",' \
     '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"profile-released"}},' \
+    '"Expiration":{"Days":1}},' \
+    '{"ID":"expire-review-pending","Status":"Enabled",' \
+    '"Filter":{"Tag":{"Key":"flowcortex-retention","Value":"review-pending"}},' \
     '"Expiration":{"Days":1}}]}' \
     | mc ilm import ROOT/flowcortex-media
 
@@ -69,9 +77,11 @@ printf '%s\n' \
 mc admin policy create ROOT flowcortex-backend "$DIR/backend-policy.json"
 mc admin policy create ROOT flowcortex-worker "$DIR/worker-policy.json"
 mc admin policy create ROOT flowcortex-provider "$DIR/provider-policy.json"
+mc admin policy create ROOT flowcortex-fetch "$DIR/fetch-policy.json"
 printf '%s\n%s\n' "$BACKEND_S3_ACCESS_KEY" "$BACKEND_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$WORKER_S3_ACCESS_KEY" "$WORKER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 printf '%s\n%s\n' "$PROVIDER_S3_ACCESS_KEY" "$PROVIDER_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
+printf '%s\n%s\n' "$FETCH_S3_ACCESS_KEY" "$FETCH_S3_SECRET_KEY" | mc admin user add ROOT >/dev/null
 
 # Re-attaching an attached policy is an error on the server; treat it as done.
 attach() {
@@ -104,5 +114,7 @@ attach flowcortex-worker "$WORKER_S3_ACCESS_KEY"
 # to this user. Merely attaching the new policy would leave those old read permissions effective.
 detach_if_present flowcortex-worker "$PROVIDER_S3_ACCESS_KEY"
 attach flowcortex-provider "$PROVIDER_S3_ACCESS_KEY"
+# The one service on the open proxy tier gets write-only access to run outputs.
+attach flowcortex-fetch "$FETCH_S3_ACCESS_KEY"
 
 echo "minio-init: done"
