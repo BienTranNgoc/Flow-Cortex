@@ -13,6 +13,7 @@ const ALL_OFF: FeaturesResponse = {
   personalAccessTokens: false,
   onboarding: false,
   chat: false,
+  drive: false,
 };
 
 /** The `/features` query itself, for a page that must tell "still loading" from "switched off". */

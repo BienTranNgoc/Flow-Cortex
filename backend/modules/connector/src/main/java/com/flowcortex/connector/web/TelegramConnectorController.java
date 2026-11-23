@@ -5,6 +5,7 @@ import com.flowcortex.connector.application.telegram.TelegramConnection;
 import com.flowcortex.connector.application.telegram.TelegramConnectorService;
 import com.flowcortex.connector.application.telegram.TelegramDefaultChat;
 import com.flowcortex.connector.application.telegram.TelegramHealth;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -72,6 +73,7 @@ class TelegramConnectorController {
         return telegram.setDefaultChat(member.id(jwt), request.chatId());
     }
 
+    @Operation(operationId = "getTelegramConnectorHealth")
     @GetMapping("/health")
     TelegramHealth health(@AuthenticationPrincipal Jwt jwt) {
         return telegram.health(member.id(jwt));

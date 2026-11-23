@@ -4,7 +4,7 @@ import { formatDateTime, formatNumber } from '../../lib/format';
 import type { Locale } from '../../lib/i18n';
 
 export type StepState =
-  'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'skipped' | 'needs-you';
+  'pending' | 'waiting' | 'running' | 'completed' | 'error' | 'stopped' | 'skipped' | 'needs-you';
 export type EdgeState = 'done' | 'active' | 'broken' | 'pending';
 
 /** The member's own pick, with the run status and the step waiting for approval at that moment. */
@@ -25,6 +25,7 @@ const STATE_WORD_KEYS: Record<StepState, string> = {
   running: 'workflow.step.state.running',
   completed: 'workflow.step.state.completed',
   error: 'workflow.step.state.error',
+  stopped: 'workflow.step.state.stopped',
   skipped: 'workflow.step.state.skipped',
   'needs-you': 'workflow.step.state.needsYou',
 };
@@ -34,23 +35,79 @@ export function stateWord(state: StepState, t: TFunction): string {
 }
 
 const CHECKPOINT = 'APPROVAL_CHECKPOINT';
+const QA_REVIEW = 'qa.review';
+
+/** The step types that pause a run for a member's decision. */
+export const HUMAN_STEP_TYPES: ReadonlySet<string> = new Set([CHECKPOINT, QA_REVIEW]);
 
 const LABEL_KEYS: Record<string, string> = {
   probe: 'workflow.step.label.probe',
   extract_audio: 'workflow.step.label.extract_audio',
   load_template: 'workflow.step.label.load_template',
   [CHECKPOINT]: 'workflow.step.label.review',
+  [QA_REVIEW]: 'workflow.step.label.qaReview',
+  generate_script: 'workflow.step.label.generate_script',
+  generate_storyboard: 'workflow.step.label.generate_storyboard',
+  generate_speech: 'workflow.step.label.generate_speech',
+  generate_video: 'workflow.step.label.generate_video',
+  render_video: 'workflow.step.label.render_video',
 };
+
+type StepIdentity = Pick<RunStepResponse, 'id' | 'stepOrder' | 'type'>;
 
 /** The id of the element holding a node's name, so the detail panel can be labelled by it. */
 export const stepNameId = (stepId: string) => `pipeline-name-${stepId}`;
 
-export function stepLabel(step: RunStepResponse, t: TFunction): string {
+/** Resolves a member-facing step label, numbering repeated `generate_video` scenes and using Ad Video script review wording when flagged. */
+export function stepLabel(
+  step: StepIdentity,
+  t: TFunction,
+  steps?: readonly StepIdentity[],
+  isProductVideo = false,
+): string {
+  if (step.type === CHECKPOINT && isProductVideo) {
+    return t('workflow.step.label.reviewScript');
+  }
+  if (step.type === 'generate_video' && steps) {
+    const videoSteps = steps.filter((s) => s.type === 'generate_video');
+    if (videoSteps.length > 1) {
+      const idx = videoSteps.findIndex((s) =>
+        step.id && s.id ? s.id === step.id : s.stepOrder === step.stepOrder,
+      );
+      if (idx >= 0) {
+        return t('workflow.step.label.generate_video_numbered', { n: idx + 1 });
+      }
+    }
+  }
   const key = LABEL_KEYS[step.type ?? ''];
   return key ? t(key) : t('workflow.step.fallback', { order: step.stepOrder });
 }
 
-/** The step a waiting run is paused on: its first pending approval checkpoint. */
+/** Formats non-negative elapsed seconds into `MM:SS` (or `H:MM:SS` beyond an hour). */
+export function formatElapsedClock(totalSeconds: number): string {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(clamped / 3600);
+  const mins = Math.floor((clamped % 3600) / 60);
+  const secs = clamped % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return hours > 0 ? `${hours}:${pad(mins)}:${pad(secs)}` : `${pad(mins)}:${pad(secs)}`;
+}
+
+/** Computes whole elapsed seconds between ISO timestamps, falling back to `nowMs` when ongoing. */
+export function computeElapsedSeconds(
+  startedAt: string | undefined,
+  finishedAt: string | undefined,
+  nowMs: number,
+): number | null {
+  if (!startedAt) return null;
+  const start = Date.parse(startedAt);
+  if (Number.isNaN(start)) return null;
+  const end = finishedAt ? Date.parse(finishedAt) : nowMs;
+  if (Number.isNaN(end)) return null;
+  return Math.max(0, Math.floor((end - start) / 1000));
+}
+
+/** The step a waiting run is paused on: its first pending human step (checkpoint or QA review). */
 export function needsYouStep(
   steps: readonly RunStepResponse[],
   runStatus: string | undefined,
@@ -58,7 +115,9 @@ export function needsYouStep(
   if (runStatus !== 'waiting_approval') {
     return undefined;
   }
-  return steps.find((step) => step.type === CHECKPOINT && (step.status ?? 'pending') === 'pending');
+  return steps.find(
+    (step) => HUMAN_STEP_TYPES.has(step.type ?? '') && (step.status ?? 'pending') === 'pending',
+  );
 }
 
 export function stepState(
@@ -73,8 +132,9 @@ export function stepState(
   switch (step.status) {
     case 'running':
       return step.pickedUpAt ? 'running' : 'waiting';
-    case 'completed':
     case 'error':
+      return step.errorCode === 'sibling_failed' ? 'stopped' : 'error';
+    case 'completed':
     case 'skipped':
       return step.status;
     default:
@@ -98,6 +158,7 @@ export function defaultStep(
 ): RunStepResponse | undefined {
   return (
     needsYouStep(steps, runStatus) ??
+    steps.find((step) => step.status === 'error' && step.errorCode !== 'sibling_failed') ??
     steps.find((step) => step.status === 'error') ??
     steps.find((step) => step.status === 'running') ??
     steps.filter((step) => step.status === 'completed').at(-1) ??
@@ -166,6 +227,21 @@ function shortSeconds(s: number, t: TFunction, locale: Locale): string {
   });
 }
 
+/** A length of time in the given language: seconds below a minute ("42s"), else "1m 20s" or "2m". */
+export function formatSeconds(seconds: number, t: TFunction, locale: Locale): string {
+  if (seconds < 60) {
+    return shortSeconds(seconds, t, locale);
+  }
+  const mins = Math.floor(seconds / 60);
+  const remSecs = Math.round(seconds % 60);
+  return remSecs > 0
+    ? t('common.units.minutesSeconds', {
+        minutes: plain(mins, locale),
+        seconds: plain(remSecs, locale),
+      })
+    : t('common.units.minutes', { value: plain(mins, locale) });
+}
+
 /**
  * Execution duration of a step in the given language (e.g. "11.3s", "1m 20s"), from its timestamps,
  * else from the duration its output report carries.
@@ -180,17 +256,7 @@ export function stepDuration(step: RunStepResponse, t: TFunction, locale: Locale
       if (s < 0.1) {
         return t('common.units.milliseconds', { value: plain(ms, locale) });
       }
-      if (s < 60) {
-        return shortSeconds(s, t, locale);
-      }
-      const mins = Math.floor(s / 60);
-      const remSecs = Math.round(s % 60);
-      return remSecs > 0
-        ? t('common.units.minutesSeconds', {
-            minutes: plain(mins, locale),
-            seconds: plain(remSecs, locale),
-          })
-        : t('common.units.minutes', { value: plain(mins, locale) });
+      return formatSeconds(s, t, locale);
     }
   }
 

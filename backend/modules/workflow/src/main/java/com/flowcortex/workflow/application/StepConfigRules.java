@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.workflow.api.IterateStepConfig;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -18,13 +19,16 @@ final class StepConfigRules {
 
     /** The fault the rule for {@code type} finds in {@code config}, or {@code null}. */
     static String fault(String type, String config) {
-        Function<String, String> rule = RULES.get(type);
+        Function<String, String> rule = type == null ? null : RULES.get(type);
         return rule == null ? null : rule.apply(config);
     }
 
     private static Map<String, Function<String, String>> rules() {
         Map<String, Function<String, String>> rules = new LinkedHashMap<>();
         rules.put("workflow.call", WorkflowCallConfig::fault);
+        rules.put("connector.call", ConnectorCallConfig::fault);
+        rules.put(IterateStepConfig.TYPE, IterateStepConfig::fault);
+        rules.put(FetchVideoConfig.TYPE, FetchVideoConfig::fault);
         return Collections.unmodifiableMap(rules);
     }
 }

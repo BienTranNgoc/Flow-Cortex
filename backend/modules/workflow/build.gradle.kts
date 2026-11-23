@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":modules:realtime"))
     implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
+    implementation(project(":modules:connector"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))
@@ -33,6 +34,9 @@ dependencies {
     // brings springdoc (and these annotations) at runtime, so compile-only here.
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
 
+    // Proves the artifact writer's output matches contracts/workflow-artifact.schema.json; the runtime parser is
+    // hand-written, so the validator stays off the runtime classpath.
+    testImplementation("com.networknt:json-schema-validator:${providers.gradleProperty("jsonSchemaValidatorVersion").get()}")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
     // The atomic step-claim IT needs a real Postgres (no H2), scoped to this module's

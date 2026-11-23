@@ -21,7 +21,9 @@ public enum MailKey {
     GOOGLE_SIGN_IN_NOTICE("google-sign-in-notice", MailCategory.TRANSACTIONAL, "email.googleSignIn.subject",
             "email.googleSignIn.body", 1),
     SUPPORT_REQUEST_REPLIED("support-request-replied", MailCategory.TRANSACTIONAL, "support.mail.subject",
-            "support.mail.body", 2);
+            "support.mail.body", 2),
+    PHONE_CHANGED("phone-changed", MailCategory.TRANSACTIONAL, "email.phoneChanged.subject",
+            "email.phoneChanged.body", 1);
 
     private final String id;
     private final MailCategory category;

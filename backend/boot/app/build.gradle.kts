@@ -25,10 +25,12 @@ dependencies {
     implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:support"))
+    implementation(project(":modules:content"))
     implementation(project(":modules:settings"))
     implementation(project(":modules:space"))
     implementation(project(":modules:drive"))
     implementation(project(":modules:profile"))
+    implementation(project(":modules:asset"))
     implementation(project(":modules:realtime"))
     implementation(project(":modules:onboarding"))
     implementation(project(":modules:notification"))
@@ -36,6 +38,8 @@ dependencies {
     implementation(project(":modules:connector"))
     implementation(project(":modules:billing"))
     implementation(project(":modules:chat"))
+    implementation(project(":modules:notification"))
+    implementation(project(":modules:mail"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))
@@ -79,8 +83,8 @@ dependencies {
 tasks.withType<Test> {
     // Every distinct @SpringBootTest property set is its own cached context, each a full application.
     // Evicting the least recently used keeps at most 8 alive. Each context grows with every module, and
-    // 2 GB ran out in CI once eight full contexts were alive, so the heap is 3 GB (one test JVM, 16 GB runners).
-    maxHeapSize = "3g"
+    // 3 GB ran out in CI once eight full contexts were alive, so the heap is 4 GB (one test JVM, 16 GB runners).
+    maxHeapSize = "4g"
     systemProperty("spring.test.context.cache.maxSize", "8")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")

@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":modules:media"))
     implementation(project(":modules:settings"))
     implementation(project(":modules:mail"))
+    implementation(project(":modules:notification"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))

@@ -20,6 +20,7 @@ import com.flowcortex.workflow.api.RunHistory;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,16 +36,18 @@ class OnboardingServiceTest {
     private final UUID userId = UUID.randomUUID();
     private OnboardingRepository repository;
     private RunHistory runHistory;
+    private FirstResultService firstResults;
 
     @BeforeEach
     void setUp() {
         repository = mock(OnboardingRepository.class);
         runHistory = mock(RunHistory.class);
+        firstResults = mock(FirstResultService.class);
     }
 
     private OnboardingService service(boolean switchOn) {
         return new OnboardingService(repository, runHistory, new OnboardingSwitch(switchOn),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                mock(OnboardingSampleService.class), firstResults, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private static ObjectNode progress(String json) {
@@ -124,7 +127,7 @@ class OnboardingServiceTest {
     void aMemberWithNoRowReadsAsOpenWithTheFirstEntry() {
         when(repository.find(userId)).thenReturn(Optional.empty());
 
-        OnboardingService.Status status = service(true).status(userId);
+        OnboardingService.Status status = service(true).status(userId, Locale.ENGLISH);
 
         assertThat(status.completed()).isFalse();
         assertThat(status.firstRunDone()).isFalse();
@@ -137,7 +140,7 @@ class OnboardingServiceTest {
     void withTheSwitchOffTheStatusIsNeverOpen() {
         when(repository.find(userId)).thenReturn(Optional.empty());
 
-        OnboardingService.Status status = service(false).status(userId);
+        OnboardingService.Status status = service(false).status(userId, Locale.ENGLISH);
 
         assertThat(status.open()).isFalse();
         assertThat(status.entry()).isNull();

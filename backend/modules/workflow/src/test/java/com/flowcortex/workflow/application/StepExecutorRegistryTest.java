@@ -11,10 +11,18 @@ import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaLimits;
+import com.flowcortex.workflow.api.NewWorkflowStep;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -39,7 +47,7 @@ class StepExecutorRegistryTest {
         assertThat(registry.knownTypes())
                 .containsExactlyInAnyOrder("echo", "fail", "generate_script", "generate_storyboard",
                         "generate_speech", "generate_video", "probe", "extract_audio", "align_audio",
-                        "render_video", "separate_audio");
+                        "render_video", "separate_audio", "fetch_video", "ingest_video", "ingest_image");
     }
 
     @Test
@@ -80,6 +88,45 @@ class StepExecutorRegistryTest {
         assertThat(registry.snapshotsRunInputs("generate_storyboard")).isTrue();
         assertThat(registry.snapshotsRunInputs("generate_video")).isTrue();
         assertThat(registry.snapshotsRunInputs("generate_speech")).isFalse();
+    }
+
+    @Test
+    void fetchVideoIsRemoteTakesNoStoredInputAndSnapshotsNoUpload() {
+        assertThat(registry.find("fetch_video")).get().isInstanceOf(FetchVideoStepExecutor.class);
+        assertThat(registry.isRemote("fetch_video")).isTrue();
+        assertThat(registry.usesStoredInput("fetch_video")).isFalse();
+        assertThat(registry.snapshotsRunInputs("fetch_video")).isFalse();
+        assertThat(registry.remoteTypes()).contains("fetch_video");
+        assertThat(registry.storedInputTypes()).doesNotContain("fetch_video");
+    }
+
+    @Test
+    void theIngestTypesAreInlineStoredInputStepsAndExactlyTwo() {
+        for (String type : List.of("ingest_video", "ingest_image")) {
+            assertThat(registry.find(type)).get().isInstanceOf(IngestStepExecutor.class);
+            assertThat(registry.isRemote(type)).isFalse();
+            assertThat(registry.usesStoredInput(type)).isTrue();
+            assertThat(registry.find(type).orElseThrow().mode()).isEqualTo(StepExecutor.Mode.INLINE);
+        }
+        assertThat(registry.ingestTypes()).containsExactlyInAnyOrder("ingest_video", "ingest_image");
+        assertThat(registry.storedInputTypes()).contains("ingest_video", "ingest_image");
+    }
+
+    @Test
+    void anUploadIsSnapshottedOnlyOntoTheStepsThatReadIt() {
+        assertThat(snapshots("ingest_video", "probe")).containsExactly(true, false);
+        assertThat(snapshots("ingest_video", "generate_script")).containsExactly(true, true);
+        assertThat(snapshots("ingest_image", "extract_audio")).containsExactly(true, false);
+        assertThat(snapshots("probe", "extract_audio")).containsExactly(true, true);
+        assertThat(snapshots("fetch_video", "probe")).containsExactly(false, false);
+        assertThat(snapshots("generate_script")).containsExactly(true);
+        assertThat(snapshots("generate_speech")).containsExactly(false);
+        assertThat(snapshots("echo", "generate_script")).containsExactly(false, false);
+    }
+
+    private List<Boolean> snapshots(String... types) {
+        List<String> list = List.of(types);
+        return IntStream.range(0, list.size()).mapToObj(index -> registry.snapshotsUpload(list, index)).toList();
     }
 
     @Test
@@ -146,6 +193,88 @@ class StepExecutorRegistryTest {
         assertThat(job.getValue().inputs()).containsExactly(
                 new MediaJobInput("image_1", "uploads", "a"),
                 new MediaJobInput("image_2", "uploads", "b"));
+    }
+
+    @Test
+    void iterateChildTypesAreTheClosedListThatIsRegistered() {
+        StepExecutorRegistry full = new StepExecutorRegistry(List.of(inline("echo", true), inline("fail", true),
+                inline("translate", true), inline("tts", true), inline("workflow.call", true)));
+
+        assertThat(full.iterateChildTypes()).containsExactlyInAnyOrder("echo", "fail", "translate", "tts");
+        assertThat(registry.iterateChildTypes()).containsExactlyInAnyOrder("echo", "fail");
+    }
+
+    @Test
+    void registeredInlineResolvedTypeOutsideTheListIsNotAChildType() {
+        StepExecutorRegistry withExtra = new StepExecutorRegistry(List.of(inline("echo", true),
+                inline("inline.extra", true)));
+
+        assertThat(withExtra.knownTypes()).contains("inline.extra");
+        assertThat(withExtra.iterateChildTypes()).containsExactly("echo");
+
+        NewWorkflowStep iterate = new NewWorkflowStep("b", "iterate", null,
+                "{\"child\":{\"type\":\"inline.extra\"}}");
+        var definition = new KnownStepTypes.Definition(List.of(iterate),
+                Stream.concat(withExtra.knownTypes().stream(), Stream.of("iterate")).collect(Collectors.toSet()),
+                Set.of(), Set.of(), withExtra.ingestTypes(), withExtra.iterateChildTypes());
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            Set<ConstraintViolation<KnownStepTypes.Definition>> violations = factory.getValidator().validate(definition);
+
+            assertThat(violations).hasSize(1);
+            assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("steps[0].config");
+            assertThat(violations.iterator().next().getMessage()).contains("child.type");
+        }
+    }
+
+    @Test
+    void isAvailableOfIterateIsItsChildTypes() {
+        StepExecutorRegistry dubOff = new StepExecutorRegistry(List.of(inline("echo", true),
+                inline("translate", false)));
+        String echoChild = "{\"child\":{\"type\":\"echo\"}}";
+        String translateChild = "{\"child\":{\"type\":\"translate\"}}";
+
+        assertThat(dubOff.isAvailable("iterate", echoChild)).isTrue();
+        assertThat(dubOff.isAvailable("iterate", translateChild)).isFalse();
+        assertThat(dubOff.isAvailable("translate", null)).isFalse();
+        assertThat(dubOff.isAvailable("echo", echoChild)).isTrue();
+    }
+
+    @Test
+    void anUnreadableIterateConfigIsAvailableLikeTheTypeAlone() {
+        StepExecutorRegistry dubOff = new StepExecutorRegistry(List.of(inline("echo", true),
+                inline("translate", false)));
+
+        assertThat(dubOff.isAvailable("iterate", null)).isTrue();
+        assertThat(dubOff.isAvailable("iterate", "{")).isTrue();
+    }
+
+    private static StepExecutor inline(String type, boolean available) {
+        return new StepExecutor() {
+            @Override
+            public String type() {
+                return type;
+            }
+
+            @Override
+            public Mode mode() {
+                return Mode.INLINE;
+            }
+
+            @Override
+            public Duration maxRuntime() {
+                return Duration.ofSeconds(60);
+            }
+
+            @Override
+            public boolean available() {
+                return available;
+            }
+
+            @Override
+            public String execute(StepContext context) {
+                return context.input();
+            }
+        };
     }
 
     @Test

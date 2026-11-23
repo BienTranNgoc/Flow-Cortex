@@ -87,7 +87,8 @@ class WorkflowWriteAccess {
     void validateDefinition(List<NewWorkflowStep> steps) {
         Set<ConstraintViolation<KnownStepTypes.Definition>> violations =
                 validator.validate(new KnownStepTypes.Definition(steps, registry.knownTypes(),
-                        registry.storedInputTypes(), registry.remoteTypes()));
+                        registry.storedInputTypes(), registry.remoteTypes(), registry.ingestTypes(),
+                        registry.iterateChildTypes()));
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }

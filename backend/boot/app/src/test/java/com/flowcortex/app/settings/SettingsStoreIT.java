@@ -4,15 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.billing.settings.PaymentSettingGroup;
+import com.flowcortex.billing.settings.PaymentSettingMeta;
 import com.flowcortex.settings.api.SettingChange;
+import com.flowcortex.settings.api.SettingChangeEntry;
 import com.flowcortex.settings.api.SettingDefinition;
+import com.flowcortex.settings.api.SettingDescription;
 import com.flowcortex.settings.api.SettingKey;
 import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingScope;
 import com.flowcortex.settings.api.SettingSource;
 import com.flowcortex.settings.application.SettingHistoryEntry;
 import com.flowcortex.settings.application.SettingsRegistry;
 import com.flowcortex.settings.application.SettingsService;
 import com.flowcortex.settings.infrastructure.SettingStore;
+import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +44,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 /**
  * The settings store against Postgres: values, history and the stamp commit together, concurrent
@@ -48,6 +57,8 @@ class SettingsStoreIT extends AbstractPostgresBootTest {
 
     private static final SettingKey<Boolean> FLAG = SettingKey.switchKey("test.store.flag");
     private static final SettingKey<Integer> LIMIT = SettingKey.integerKey("test.store.limit");
+    private static final String PAY_MODE = "test.store.pay_mode";
+    private static final String PAY_LIMIT = "test.store.pay_limit";
 
     @TestConfiguration
     static class Keys {
@@ -60,6 +71,28 @@ class SettingsStoreIT extends AbstractPostgresBootTest {
         @Bean
         SettingDefinition<Integer> testStoreLimit() {
             return SettingDefinition.integerKey("test.store.limit", 1, 100, () -> 30);
+        }
+
+        @Bean
+        SettingDefinition<String> testStorePayMode() {
+            return SettingDefinition.enumKey("test.store.pay_mode", List.of("a", "b", "c"), "a", () -> "a")
+                    .inScope(SettingScope.PAYMENT_OPS);
+        }
+
+        @Bean
+        SettingDefinition<Integer> testStorePayLimit() {
+            return SettingDefinition.integerKey("test.store.pay_limit", 1, 100, () -> 10)
+                    .inScope(SettingScope.PAYMENT_OPS);
+        }
+
+        @Bean
+        PaymentSettingMeta testStorePayModeMeta() {
+            return new PaymentSettingMeta(PAY_MODE, PaymentSettingGroup.REGION, false);
+        }
+
+        @Bean
+        PaymentSettingMeta testStorePayLimitMeta() {
+            return new PaymentSettingMeta(PAY_LIMIT, PaymentSettingGroup.REGION, false);
         }
     }
 
@@ -84,6 +117,67 @@ class SettingsStoreIT extends AbstractPostgresBootTest {
     void clean() {
         jdbc.update("DELETE FROM app_setting WHERE key LIKE 'test.store.%'");
         jdbc.update("DELETE FROM app_setting_change WHERE key LIKE 'test.store.%'");
+    }
+
+    @Test
+    void aScopedWriteRecordsItsTrimmedReasonAndAnUnchangedValueRecordsNothing() {
+        SettingDescription written = settings.write(PAY_MODE, SettingScope.PAYMENT_OPS,
+                JsonNodeFactory.instance.stringNode("b"), admin, "  contract  ");
+        settings.write(PAY_MODE, SettingScope.PAYMENT_OPS, JsonNodeFactory.instance.stringNode("b"), admin, "again");
+        settings.write(PAY_MODE, SettingScope.PAYMENT_OPS, JsonNodeFactory.instance.stringNode("c"), admin, "   ");
+
+        assertThat(written.effective()).isEqualTo("b");
+        assertThat(written.source()).isEqualTo(SettingSource.STORED);
+        assertThat(written.options()).containsExactly("a", "b", "c");
+        assertThat(jdbc.queryForList("SELECT reason FROM app_setting_change WHERE key = ? ORDER BY changed_at",
+                String.class, PAY_MODE)).containsExactly("contract", null);
+    }
+
+    @Test
+    void aScopedWriteRefusesAReasonOverTheLimitAndAKeyOfAnotherScope() {
+        String tooLong = "x".repeat(2001);
+
+        assertThatThrownBy(() -> settings.write(PAY_MODE, SettingScope.PAYMENT_OPS,
+                JsonNodeFactory.instance.stringNode("b"), admin, tooLong))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> settings.write(LIMIT.name(), SettingScope.PAYMENT_OPS,
+                JsonNodeFactory.instance.numberNode(5), admin, "x")).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> settings.write(PAY_MODE, SettingScope.PAYMENT_OPS,
+                JsonNodeFactory.instance.stringNode("B"), admin, "x"))
+                .isInstanceOf(UnprocessableEntityException.class);
+
+        assertThat(historyRows(PAY_MODE)).isZero();
+        assertThat(historyRows(LIMIT.name())).isZero();
+        assertThat(settings.describe(PAY_MODE, SettingScope.PAYMENT_OPS).orElseThrow().source())
+                .isEqualTo(SettingSource.CONFIGURED);
+        assertThat(settings.describe(LIMIT.name(), SettingScope.PAYMENT_OPS)).isEmpty();
+    }
+
+    @Test
+    void scopedHistoryCoversEveryKeyOfTheScopeNewestFirstAndNoOther() {
+        settings.write(PAY_MODE, SettingScope.PAYMENT_OPS, JsonNodeFactory.instance.stringNode("b"), admin, "one");
+        settings.write(PAY_LIMIT, SettingScope.PAYMENT_OPS, JsonNodeFactory.instance.numberNode(20), admin, "two");
+        settings.set(LIMIT, 12, admin);
+        settings.write(PAY_MODE, SettingScope.PAYMENT_OPS, JsonNodeFactory.instance.stringNode("c"), admin, "three");
+
+        PageView<SettingChangeEntry> all = settings.history(SettingScope.PAYMENT_OPS, Optional.empty(), 0, 10);
+        PageView<SettingChangeEntry> second = settings.history(SettingScope.PAYMENT_OPS, Optional.empty(), 1, 2);
+        PageView<SettingChangeEntry> one = settings.history(SettingScope.PAYMENT_OPS, Optional.of(PAY_MODE), 0, 10);
+
+        assertThat(all.total()).isEqualTo(3);
+        assertThat(all.items()).extracting(SettingChangeEntry::reason).containsExactly("three", "two", "one");
+        assertThat(all.items()).extracting(SettingChangeEntry::name)
+                .containsExactly(PAY_MODE, PAY_LIMIT, PAY_MODE);
+        assertThat(all.items().get(0).previousValue()).isEqualTo("b");
+        assertThat(all.items().get(0).newValue()).isEqualTo("c");
+        assertThat(second.items()).extracting(SettingChangeEntry::reason).containsExactly("one");
+        assertThat(second.total()).isEqualTo(3);
+        assertThat(one.total()).isEqualTo(2);
+        assertThat(one.items()).extracting(SettingChangeEntry::reason).containsExactly("three", "one");
+        assertThatThrownBy(() -> settings.history(SettingScope.PAYMENT_OPS, Optional.of(LIMIT.name()), 0, 10))
+                .isInstanceOf(NotFoundException.class);
+        assertThat(settings.declaredKeys(SettingScope.PAYMENT_OPS)).contains(PAY_MODE, PAY_LIMIT)
+                .doesNotContain(LIMIT.name());
     }
 
     @Test
@@ -183,7 +277,8 @@ class SettingsStoreIT extends AbstractPostgresBootTest {
         settings.set(LIMIT, 12, admin);
         SettingStore failing = new SettingStore(jdbc) {
             @Override
-            public void insertChange(UUID id, String key, String previous, String next, UUID actor, Instant at) {
+            public void insertChange(UUID id, String key, String previous, String next, UUID actor, Instant at,
+                    String reason) {
                 throw new IllegalStateException("history is down");
             }
         };

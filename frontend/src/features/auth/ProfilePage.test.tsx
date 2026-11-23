@@ -238,6 +238,20 @@ describe('ProfilePage', () => {
     expect(screen.getAllByText('AUDITOR')).toHaveLength(2);
   });
 
+  it('shows a custom role by the name /me carries instead of its code', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': {
+        status: 200,
+        body: { ...ME, role: 'HO_TRO_NANG_CAO', roleName: 'Advanced support' },
+      },
+    });
+
+    renderProfile();
+
+    expect(await screen.findAllByText('Advanced support')).toHaveLength(2);
+    expect(screen.queryByText('HO_TRO_NANG_CAO')).not.toBeInTheDocument();
+  });
+
   describe('in Vietnamese', () => {
     beforeEach(async () => {
       await i18n.changeLanguage('vi');

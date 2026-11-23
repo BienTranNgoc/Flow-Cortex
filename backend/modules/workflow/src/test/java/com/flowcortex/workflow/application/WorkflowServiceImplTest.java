@@ -178,6 +178,61 @@ class WorkflowServiceImplTest {
     }
 
     @Test
+    void updateSetsAllowFork() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+
+        WorkflowView on = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, true));
+        assertThat(workflow.isAllowFork()).isTrue();
+        assertThat(on.allowFork()).isTrue();
+
+        WorkflowView untouched = service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow("W2", null, null));
+        assertThat(workflow.isAllowFork()).isTrue();
+        assertThat(untouched.allowFork()).isTrue();
+
+        service.updateWorkflow(ANA, workflow.getId(), new UpdateWorkflow(null, null, false));
+        assertThat(workflow.isAllowFork()).isFalse();
+    }
+
+    @Test
+    void aNonOwnerCannotSetAllowFork() {
+        Workflow workflow = stored(published(ANA, true));
+        withSteps(workflow, "echo");
+        visibleTo(BEN, workflow);
+
+        assertThatThrownBy(() -> service.updateWorkflow(BEN, workflow.getId(),
+                new UpdateWorkflow(null, null, true))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+
+        assertThat(workflow.isAllowFork()).isFalse();
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void anAdminSetsAllowForkOnAnyWorkflow() {
+        Workflow seeded = stored(published(NIL_OWNER, true));
+        withSteps(seeded, "echo");
+        Workflow members = stored(published(ANA, false));
+        withSteps(members, "echo");
+
+        service.updateWorkflow(Caller.admin(CLEO), seeded.getId(), new UpdateWorkflow(null, null, true));
+        service.updateWorkflow(Caller.admin(CLEO), members.getId(), new UpdateWorkflow(null, null, true));
+
+        assertThat(seeded.isAllowFork()).isTrue();
+        assertThat(members.isAllowFork()).isTrue();
+    }
+
+    @Test
+    void createdDraftsHaveForkingOff() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView view = service.createDraft(ANA, "Fresh");
+
+        assertThat(view.allowFork()).isFalse();
+        assertThat(view.forkCount()).isZero();
+        assertThat(view.forkedFromId()).isNull();
+    }
+
+    @Test
     void aNonOwnerWhoCannotSeeTheDraftGetsNotFound() {
         Workflow sharedDraft = stored(draft(ANA, true));
         Workflow privatePublished = stored(published(ANA, false));
@@ -396,6 +451,100 @@ class WorkflowServiceImplTest {
         assertThat(other.getDeletedAt()).isNotNull();
     }
 
+    private static final String CONNECTOR_CONFIG =
+            "{\"connector\":\"notion-main\",\"url\":\"https://api.notion.com/v1/users\"}";
+
+    @SuppressWarnings("unchecked")
+    private WorkflowServiceImpl serviceKnowingConnectorCalls() {
+        org.springframework.beans.factory.ObjectProvider<StepExecutor> others =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        ConnectorCallStepExecutor connectorCall = new ConnectorCallStepExecutor(
+                mock(com.flowcortex.connector.api.HttpConnector.class),
+                mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(), others);
+        StepExecutorRegistry connectorRegistry = new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall));
+        return new WorkflowServiceImpl(workflowRepository, workflowStepRepository, connectorRegistry,
+                new WorkflowWriteAccess(workflowRepository, connectorRegistry,
+                        Validation.buildDefaultValidatorFactory().getValidator()),
+                new VersionWriter(versionRepository, workflowRepository, workflowStepRepository),
+                new ServedDefinitions(workflowStepRepository, versionRepository),
+                mock(com.flowcortex.credit.api.CreditAccounts.class));
+    }
+
+    private List<WorkflowStep> withEchoThenConnectorStep(Workflow workflow) {
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "Say", "echo", null, null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "Call", "connector.call", null,
+                        CONNECTOR_CONFIG));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowStepRepository.findMaxStepOrder(workflow.getId())).thenReturn(2);
+        steps.forEach(step -> when(workflowStepRepository.findById(step.getId())).thenReturn(Optional.of(step)));
+        return steps;
+    }
+
+    @Test
+    void anAdminCannotAddOrEditAConnectorCallStepOnAnotherMembersWorkflow() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        assertThatThrownBy(() -> connectorService.addStep(admin, workflow.getId(),
+                new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN))
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getDetailMessageCode())
+                        .isEqualTo("workflow.notOwner"));
+        assertThatThrownBy(() -> connectorService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"connector\":\"notion-main\",\"method\":\"DELETE\","
+                        + "\"url\":\"https://api.notion.com/v1/blocks/b1\"}", null)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> connectorService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit("renamed", null, null))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        verify(workflowStepRepository, never()).save(any());
+        assertThat(steps.get(1).getConfig()).isEqualTo(CONNECTOR_CONFIG);
+    }
+
+    @Test
+    void anAdminStillEditsOtherStepsAndDeletesOrReordersAConnectorCallStepOfAnotherMember() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        connectorService.addStep(admin, workflow.getId(), new NewStep("Say", "echo", null, null));
+        connectorService.updateStep(admin, workflow.getId(), steps.get(0).getId(), new StepEdit("renamed", null, null));
+        connectorService.reorderSteps(admin, workflow.getId(), List.of(steps.get(1).getId(), steps.get(0).getId()));
+        connectorService.deleteStep(admin, workflow.getId(), steps.get(1).getId());
+
+        verify(workflowStepRepository).deleteById(steps.get(1).getId());
+    }
+
+    @Test
+    void theOwnerAddsAndEditsAConnectorCallStepWhetherOrNotAnAdmin() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = withEchoThenConnectorStep(workflow);
+
+        for (Caller owner : List.of(Caller.member(ANA), Caller.admin(ANA))) {
+            WorkflowStepView added = connectorService.addStep(owner, workflow.getId(),
+                    new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG));
+            assertThat(added.type()).isEqualTo("connector.call");
+            connectorService.updateStep(owner, workflow.getId(), steps.get(1).getId(), new StepEdit("renamed", null, null));
+        }
+        assertThat(steps.get(1).getName()).isEqualTo("renamed");
+    }
+
+    @Test
+    void aMemberWhoIsNotTheOwnerKeepsTheirExistingRefusal() {
+        WorkflowServiceImpl connectorService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(published(ANA, true));
+        withEchoThenConnectorStep(workflow);
+        visibleTo(BEN, workflow);
+
+        assertThatThrownBy(() -> connectorService.addStep(BEN, workflow.getId(),
+                new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+    }
+
     @Test
     void appendingTakesTheNextStepOrder() {
         Workflow workflow = stored(draft(ANA, false));
@@ -592,13 +741,14 @@ class WorkflowServiceImplTest {
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
-                                        + "echo, extract_audio, fail, generate_script, generate_speech, "
-                                        + "generate_storyboard, generate_video, probe, render_video, "
-                                        + "separate_audio",
+                                        + "echo, extract_audio, fail, fetch_video, generate_script, "
+                                        + "generate_speech, generate_storyboard, generate_video, ingest_image, "
+                                        + "ingest_video, probe, qa.review, render_video, separate_audio",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
-                                        + "align_audio, echo, extract_audio, fail, generate_script, "
-                                        + "generate_speech, generate_storyboard, generate_video, probe, "
-                                        + "render_video, separate_audio"));
+                                        + "align_audio, echo, extract_audio, fail, fetch_video, "
+                                        + "generate_script, generate_speech, generate_storyboard, generate_video, "
+                                        + "ingest_image, ingest_video, probe, qa.review, render_video, "
+                                        + "separate_audio"));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());
@@ -773,6 +923,113 @@ class WorkflowServiceImplTest {
                                         + "runs inline"));
 
         verify(workflowRepository, never()).save(any());
+    }
+
+    private static final String PROBE_FROM_STEP_1 =
+            "{\"outputInputs\":[{\"stepOrder\":1,\"outputName\":\"video\",\"inputKey\":\"media\"}]}";
+    private static final String NEEDS_UPLOAD =
+            "'probe' needs an uploaded file, so the workflow must start with a media step";
+    private static final String AFTER_INGEST =
+            "'probe' follows an ingest step, so it must read the file through outputInputs";
+
+    @Test
+    void createWorkflowAcceptsAMediaStepThatReadsTheFileOfALinkStepThroughOutputInputs() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Link then probe", false, List.of(
+                new NewWorkflowStep("fetch", "fetch_video", null),
+                new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("fetch_video", "probe");
+    }
+
+    @Test
+    void createWorkflowAcceptsAMediaStepThatReadsTheFileOfAnIngestStepThroughOutputInputs() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Upload then probe", false, List.of(
+                new NewWorkflowStep("ingest", "ingest_video", null),
+                new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("ingest_video", "probe");
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterATextStepEvenWhenItNamesThatStepInOutputInputs() {
+        assertRefused("steps[1].type", NEEDS_UPLOAD,
+                new NewWorkflowStep("say", "echo", null),
+                new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1));
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterALinkStepWithoutOutputInputs() {
+        assertRefused("steps[1].type", NEEDS_UPLOAD,
+                new NewWorkflowStep("fetch", "fetch_video", null),
+                new NewWorkflowStep("probe", "probe", null));
+    }
+
+    @Test
+    void createWorkflowRefusesAMediaStepAfterAnIngestStepWithoutOutputInputs() {
+        assertRefused("steps[1].type", AFTER_INGEST,
+                new NewWorkflowStep("ingest", "ingest_video", null),
+                new NewWorkflowStep("probe", "probe", null));
+        assertRefused("steps[1].type", AFTER_INGEST,
+                new NewWorkflowStep("ingest", "ingest_video", null),
+                new NewWorkflowStep("probe", "probe", null, "{\"label\":\"x\"}"));
+    }
+
+    @Test
+    void createWorkflowRefusesOutputInputsThatNameAnInlineTextStepAfterALinkStep() {
+        String fromEcho = "{\"outputInputs\":[{\"stepOrder\":2,\"outputName\":\"video\",\"inputKey\":\"media\"}]}";
+
+        assertRefused("steps[2].type", NEEDS_UPLOAD,
+                new NewWorkflowStep("fetch", "fetch_video", null),
+                new NewWorkflowStep("say", "echo", null),
+                new NewWorkflowStep("probe", "probe", null, fromEcho));
+    }
+
+    @Test
+    void createWorkflowRefusesAFetchVideoConfigWithAnUnknownKeyOrBadQualityUnderThatStepsConfig() {
+        for (String config : List.of("{\"quality\":\"4k\"}", "{\"link\":\"https://x.example/a.mp4\"}",
+                "{\"url\":\"https://user:pw@cdn.example.com/a.mp4\"}")) {
+            assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Bad config", false,
+                    List.of(new NewWorkflowStep("fetch", "fetch_video", null, config))))
+                    .isInstanceOfSatisfying(ConstraintViolationException.class, e -> {
+                        assertThat(e.getConstraintViolations())
+                                .extracting(violation -> violation.getPropertyPath().toString())
+                                .containsExactly("steps[0].config");
+                        assertThat(e.getConstraintViolations())
+                                .extracting(violation -> violation.getMessage())
+                                .noneMatch(message -> message.contains("pw"));
+                    });
+        }
+
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void createWorkflowSavesAFetchVideoWithAValidConfig() {
+        when(workflowRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        String config = "{\"url\":\"https://www.tiktok.com/@a/video/1\",\"quality\":\"720p\",\"extractAudio\":false}";
+
+        WorkflowView created = service.createWorkflow(UUID.randomUUID(), "Fetch", false,
+                List.of(new NewWorkflowStep("fetch", "fetch_video", null, config)));
+
+        assertThat(created.steps()).extracting(step -> step.type()).containsExactly("fetch_video");
+    }
+
+    private void assertRefused(String path, String message, NewWorkflowStep... steps) {
+        assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Refused", false, List.of(steps)))
+                .isInstanceOfSatisfying(ConstraintViolationException.class,
+                        e -> assertThat(e.getConstraintViolations())
+                                .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                                .containsExactly(path + " " + message));
+
+        verify(workflowRepository, never()).save(any());
+        verify(workflowStepRepository, never()).saveAll(any());
     }
 
     @Test
