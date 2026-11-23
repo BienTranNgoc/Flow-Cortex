@@ -80,6 +80,6 @@ class StepConfigRulesTest {
 
     private static KnownStepTypes.Definition definition(NewWorkflowStep... steps) {
         return new KnownStepTypes.Definition(List.of(steps), Set.of("echo", "connector.call", "workflow.call"),
-                Set.of(), Set.of());
+                Set.of(), Set.of(), Set.of());
     }
 }
