@@ -1,5 +1,6 @@
 package com.flowcortex.app.health;
 
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthController {
 
     // Explicit produces: without it springdoc emits */* and orval generates an untyped body.
+    @Operation(operationId = "health")
     @GetMapping(value = "/health", produces = MediaType.APPLICATION_JSON_VALUE)
     public HealthResponse health() {
         return new HealthResponse("UP", "flow-cortex");
