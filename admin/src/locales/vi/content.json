@@ -95,6 +95,8 @@
     "up": "Lên",
     "down": "Xuống",
     "removeShort": "Xóa",
+    "sectionMoved": "Đã chuyển phần đến vị trí {{n}} trên {{total}}.",
+    "sectionRemoved": "Đã xóa phần {{n}}.",
     "addType": "Loại phần",
     "addSection": "Thêm phần",
     "sectionLimit_one": "Một tài liệu có tối đa {{count}} phần.",

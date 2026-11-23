@@ -7,7 +7,7 @@ interface ReasonDialogProps {
   readonly description: string;
   readonly pending: boolean;
   readonly onConfirm: (reason: string) => void;
-  /** Esc or Cancel: the change is abandoned. */
+  /** Esc or Cancel before the change is sent: it is abandoned. Neither works while it is pending. */
   readonly onCancel: () => void;
 }
 
@@ -46,6 +46,10 @@ export function ReasonDialog({
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       onClose={onCancel}
+      onCancel={(event) => {
+        // A sent change cannot be taken back, so Esc must not look like it abandons one.
+        if (pending) event.preventDefault();
+      }}
     >
       <form className="payment-dialog__form" onSubmit={submit} noValidate>
         <div className="payment-dialog__body">
@@ -71,6 +75,7 @@ export function ReasonDialog({
           <button
             type="button"
             className="cortex-admin-btn"
+            disabled={pending}
             onClick={() => dialogRef.current?.close()}
           >
             {t('paymentSettings.dialog.cancel')}

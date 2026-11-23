@@ -4,7 +4,7 @@ import type {
   ContentMediaItem,
 } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
-import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { can, type Caller } from '../../app/permissions';
 import { conflictResolution, type Versioned } from './conflictResolution';
@@ -51,6 +51,11 @@ type Dialog =
   | { kind: 'conflict'; currentVersion: number | undefined; intent: 'save' | 'publish' }
   | { kind: 'replace'; snapshot: Versioned<DocumentContent> };
 
+type SectionControl = 'up' | 'down' | 'remove';
+
+/** What takes keyboard focus once the section list has re-rendered after a move or removal. */
+type FocusTarget = { sectionId: string; control: SectionControl } | 'add';
+
 const sameContent = (a: DocumentContent, b: DocumentContent) =>
   JSON.stringify(a) === JSON.stringify(b);
 
@@ -90,6 +95,10 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
   const panelId = `${ids}-panel`;
   const hintId = `${ids}-publish-hint`;
   const tabs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const sectionControls = useRef<Record<string, HTMLButtonElement | null>>({});
+  const addButton = useRef<HTMLButtonElement | null>(null);
+  const panel = useRef<HTMLDivElement | null>(null);
+  const focusAfter = useRef<FocusTarget | null>(null);
 
   const canManage = can(me, 'content.document.manage');
   const readOnly = !canManage;
@@ -155,6 +164,47 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
       }),
       path,
     );
+
+  useEffect(() => {
+    const target = focusAfter.current;
+    if (target === null) return;
+    focusAfter.current = null;
+    const node =
+      target === 'add'
+        ? (addButton.current ?? panel.current)
+        : sectionControls.current[`${target.sectionId}:${target.control}`];
+    node?.focus();
+  }, [state.content.sections]);
+
+  const controlRef =
+    (sectionId: string, control: SectionControl) => (node: HTMLButtonElement | null) => {
+      sectionControls.current[`${sectionId}:${control}`] = node;
+    };
+
+  const moveSection = (index: number, offset: -1 | 1) => {
+    const section = state.content.sections[index];
+    const to = index + offset;
+    if (!section || to < 0 || to >= state.content.sections.length) return;
+    const same: SectionControl = offset === -1 ? 'up' : 'down';
+    const opposite: SectionControl = offset === -1 ? 'down' : 'up';
+    const atEdge = offset === -1 ? to === 0 : to === state.content.sections.length - 1;
+    focusAfter.current = { sectionId: section.id, control: atEdge ? opposite : same };
+    edit((content) => ({ ...content, sections: moved(content.sections, index, offset) }));
+    setNotice(
+      t('content.editor.sectionMoved', { n: to + 1, total: state.content.sections.length }),
+    );
+  };
+
+  const removeSection = (index: number) => {
+    const rest = state.content.sections.filter((_, i) => i !== index);
+    const next = rest[index] ?? rest[index - 1];
+    focusAfter.current = next ? { sectionId: next.id, control: 'remove' } : 'add';
+    edit((content) => ({
+      ...content,
+      sections: content.sections.filter((_, i) => i !== index),
+    }));
+    setNotice(t('content.editor.sectionRemoved', { n: index + 1 }));
+  };
 
   const showLocaleOf = (paths: readonly string[]) => {
     const target = firstLocale(paths);
@@ -411,6 +461,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
         id={panelId}
         aria-labelledby={tabId(locale)}
         tabIndex={-1}
+        ref={panel}
       >
         {readOnly && <p className="content-hint">{t('content.editor.readOnly')}</p>}
         {failure && (
@@ -515,7 +566,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
             {sectionCount === 0 && <p className="content-hint">{t('content.editor.noSections')}</p>}
             <ol className="content-sections" aria-label={t('content.editor.sections')}>
               {state.content.sections.map((section, index) => (
-                <li key={index} className="content-section">
+                <li key={section.id} className="content-section">
                   <div className="content-section__header">
                     <h3>
                       {t('content.editor.sectionTitle', {
@@ -528,45 +579,31 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
                     {!readOnly && (
                       <div className="content-section__controls">
                         <button
+                          ref={controlRef(section.id, 'up')}
                           type="button"
                           className="cortex-admin-btn cortex-admin-btn--sm"
                           aria-label={t('content.editor.moveUp', { n: index + 1 })}
                           aria-disabled={index === 0}
-                          onClick={() =>
-                            index > 0 &&
-                            edit((content) => ({
-                              ...content,
-                              sections: moved(content.sections, index, -1),
-                            }))
-                          }
+                          onClick={() => moveSection(index, -1)}
                         >
                           {t('content.editor.up')}
                         </button>
                         <button
+                          ref={controlRef(section.id, 'down')}
                           type="button"
                           className="cortex-admin-btn cortex-admin-btn--sm"
                           aria-label={t('content.editor.moveDown', { n: index + 1 })}
                           aria-disabled={index === sectionCount - 1}
-                          onClick={() =>
-                            index < sectionCount - 1 &&
-                            edit((content) => ({
-                              ...content,
-                              sections: moved(content.sections, index, 1),
-                            }))
-                          }
+                          onClick={() => moveSection(index, 1)}
                         >
                           {t('content.editor.down')}
                         </button>
                         <button
+                          ref={controlRef(section.id, 'remove')}
                           type="button"
                           className="cortex-admin-btn cortex-admin-btn--sm cortex-admin-btn--danger"
                           aria-label={t('content.editor.remove', { n: index + 1 })}
-                          onClick={() =>
-                            edit((content) => ({
-                              ...content,
-                              sections: content.sections.filter((_, i) => i !== index),
-                            }))
-                          }
+                          onClick={() => removeSection(index)}
                         >
                           {t('content.editor.removeShort')}
                         </button>
@@ -612,6 +649,7 @@ export function DocumentEditor({ slug, summary, draft, me }: DocumentEditorProps
                       </select>
                     </div>
                     <button
+                      ref={addButton}
                       type="button"
                       className="cortex-admin-btn"
                       onClick={() =>

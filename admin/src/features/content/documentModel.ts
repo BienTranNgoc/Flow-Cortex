@@ -19,6 +19,8 @@ export const DOC_VERSION = 'docVersion';
 export const EFFECTIVE_DATE = 'effectiveDate';
 
 export interface Section {
+  /** Client-side identity that keeps a section's DOM and focus with it across moves; never sent. */
+  id: string;
   type: string;
   schemaVersion: number;
   data: Record<string, unknown>;
@@ -53,12 +55,16 @@ export function characterCount(text: string): number {
   return Array.from(text).length;
 }
 
+let sectionSeq = 0;
+const nextSectionId = () => `section-${++sectionSeq}`;
+
 /** Content from the wire shape; anything that is not a section object is dropped. */
 export function parseContent(sections: unknown, seoMeta: unknown): DocumentContent {
   const list = Array.isArray(sections) ? sections : [];
   const seo = isRecord(seoMeta) ? seoMeta : {};
   return {
     sections: list.filter(isRecord).map((section) => ({
+      id: nextSectionId(),
       type: typeof section.type === 'string' ? section.type : '',
       schemaVersion: typeof section.schemaVersion === 'number' ? section.schemaVersion : 1,
       data: isRecord(section.data) ? section.data : {},
@@ -75,10 +81,27 @@ export function fromWire(wire: {
   return parseContent(wire.sections, wire.seoMeta);
 }
 
+/** The content as the API takes it: the client-side section ids are left out. */
+export function toWire(content: DocumentContent): {
+  sections: Omit<Section, 'id'>[];
+  seoMeta: SeoMeta;
+} {
+  return {
+    sections: content.sections.map(({ type, schemaVersion, data }) => ({
+      type,
+      schemaVersion,
+      data,
+    })),
+    seoMeta: content.seoMeta,
+  };
+}
+
 /** An empty section of a built-in type. A media section has no `mediaId` until one is picked. */
 export function newSection(type: string): Section {
+  const id = nextSectionId();
   if (type === LEGAL_DOC) {
     return {
+      id,
       type,
       schemaVersion: 1,
       data: {
@@ -89,15 +112,16 @@ export function newSection(type: string): Section {
       },
     };
   }
-  if (type === LEGAL_INDEX) return { type, schemaVersion: 1, data: { items: [] } };
+  if (type === LEGAL_INDEX) return { id, type, schemaVersion: 1, data: { items: [] } };
   if (type === MEDIA) {
     return {
+      id,
       type,
       schemaVersion: 1,
       data: { alt: { ...EMPTY_TEXT }, caption: { ...EMPTY_TEXT } },
     };
   }
-  return { type, schemaVersion: 1, data: { body: { ...EMPTY_TEXT } } };
+  return { id, type, schemaVersion: 1, data: { body: { ...EMPTY_TEXT } } };
 }
 
 /** The section types the console has an editor for. */
