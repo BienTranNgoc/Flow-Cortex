@@ -166,7 +166,7 @@ class ProductVideoParallelDispatchTest {
                 mock(ReviewCheckpointTransactions.class), mediaJobs, validator, null, true);
         jobControl = new WorkflowJobControl(runRepo, stepRepo);
         cancellation = new RunCancellation(runRepo, stepRepo, registry, mediaJobs,
-                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, true);
+                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, transactions, true);
     }
 
     private void wireStatefulRepos() {
@@ -200,10 +200,8 @@ class ProductVideoParallelDispatchTest {
             RunStep step = stepsById.get(inv.getArgument(0));
             return step == null ? Optional.empty() : Optional.of(timing(step));
         }));
-        when(stepRepo.countByRunIdAndStatusNot(eq(runId), any())).thenAnswer(inv -> withLock(() -> {
-            RunStepStatus unwanted = inv.getArgument(1);
-            return orderedSteps.stream().filter(s -> s.getStatus() != unwanted).count();
-        }));
+        when(stepRepo.countTopLevelNotCompleted(runId)).thenAnswer(inv -> withLock(() ->
+                orderedSteps.stream().filter(s -> s.getStatus() != RunStepStatus.COMPLETED).count()));
         when(stepRepo.claimPending(any(), any(), any(), any())).thenAnswer(inv -> withLock(() -> {
             RunStep step = stepsById.get(inv.getArgument(0));
             if (step == null || step.getStatus() != RunStepStatus.PENDING || run.getStatus() != RunStatus.RUNNING) {

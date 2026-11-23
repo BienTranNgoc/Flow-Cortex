@@ -2670,6 +2670,77 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/runs/{id}/steps/{stepId}/children/{itemIndex}/regenerate:
+    post:
+      tags:
+      - runs-controller
+      operationId: regenerateChild
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: itemIndex
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}/retry:
     post:
       tags:
@@ -10768,6 +10839,42 @@ components:
         chargedCredits:
           type: integer
           format: int64
+    RunStepChildResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        itemIndex:
+          type: integer
+          format: int32
+        status:
+          type: string
+        output:
+          type: string
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        attempt:
+          type: integer
+          format: int32
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunStepOutputResponse"
+      required:
+      - attempt
+      - id
+      - itemIndex
+      - outputs
+      - status
     RunStepOutputResponse:
       type: object
       properties:
@@ -10830,8 +10937,13 @@ components:
           enum:
           - inline
           - remote
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunStepChildResponse"
       required:
       - attempt
+      - children
       - deliveryCount
       - mode
       - outputs
