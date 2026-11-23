@@ -1,0 +1,615 @@
+{
+ "characters": [
+  {
+   "v": 1,
+   "id": "chc658mms17r",
+   "kind": "character",
+   "look": "Cô gái Việt khoảng 24 tuổi, tóc dài đen thẳng, mặc áo dài lụa đỏ, má lúm bên trái",
+   "name": "Lan",
+   "refs": [
+    "ast_8k3rxk5le816vdmh6982x2d1",
+    "ast_w8kslarmb14gohalx21up9md"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    255,
+    255
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "ch23anvogk2r",
+   "kind": "location",
+   "look": "Phố nhỏ tường vàng, đèn lồng, giờ hoàng hôn, ánh nắng xiên ấm",
+   "name": "Phố cổ Hội An",
+   "refs": [
+    "ast_eb1e8y1htyy32mq4vych8rd2"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    46,
+    110,
+    255
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "che3m7jq6crz",
+   "kind": "product",
+   "look": "Áo dài lụa đỏ trơn, cổ cao",
+   "name": "Áo dài đỏ",
+   "refs": [
+    "ast_bs5qp1mhlyryq3eh81l5vee5"
+   ],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    255,
+    99,
+    71
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  },
+  {
+   "v": 1,
+   "id": "chc935lk3s4n",
+   "kind": "character",
+   "look": "Người phụ nữ Việt khoảng 50 tuổi, mặc bà ba tối màu, tóc búi gọn, đôi mắt hiền",
+   "name": "Mẹ",
+   "refs": [],
+   "voice": null,
+   "source": null,
+   "consent": null,
+   "clayColor": [
+    60,
+    200,
+    120
+   ],
+   "providers": {
+    "kling": null,
+    "byteplus": null
+   }
+  }
+ ],
+ "story": {
+  "shots": [
+   {
+    "id": "sh1n062kljd6",
+    "order": 1,
+    "takes": [],
+    "title": "Lan bước giữa phố chiều cuối năm",
+    "beatId": "b55jcf1zbyi",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "move": "push_in",
+     "size": "LS",
+     "angle": "eye",
+     "frame": [
+      {
+       "gaze": "frame_right",
+       "role": "subject",
+       "lookAtId": null,
+       "position": "center",
+       "characterId": "chc658mms17r",
+       "faceAngleDeg": 30
+      }
+     ],
+     "setId": "setf10er9tkrq",
+     "origin": {
+      "jobId": "bb3c8fb8-02fe-48fa-8483-a5271c4eaeff",
+      "engine": "llm",
+      "proposal": 0,
+      "references": [],
+      "engineVersion": "claude-sonnet-4-6/4"
+     },
+     "actions": [
+      {
+       "text": "ôm chặt gói áo bằng hai tay, bước chậm trên đường gạch lát về phía nhà mẹ, mắt nhìn xa về phía trước",
+       "touch": null,
+       "motion": "walk_to",
+       "propIds": [],
+       "afterLine": 0,
+       "characterId": "chc658mms17r"
+      }
+     ],
+     "summary": "Cảnh rộng phố cổ Hội An, đèn lồng đỏ lung linh, Lan ôm gói áo đi về phía nhà mẹ, bước chậm, mắt nhìn xa.",
+     "shotType": "single",
+     "cutToNext": "action"
+    },
+    "dialogue": [
+     {
+      "lang": "vi",
+      "role": "tell",
+      "text": "Mẹ ơi, năm nay con tự tay may cho mẹ...",
+      "acting": "thì thầm với chính mình, môi hé nhẹ",
+      "characterId": "chc658mms17r"
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chc658mms17r",
+     "che3m7jq6crz"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 7000
+   },
+   {
+    "id": "sh2bjk9ewqj0",
+    "order": 2,
+    "takes": [],
+    "title": "Lan gọi mẹ ở hiên nhà",
+    "beatId": "bmh49lrff4l",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "move": "static",
+     "size": "MS",
+     "angle": "eye",
+     "frame": [
+      {
+       "gaze": "frame_right",
+       "role": "subject",
+       "lookAtId": "chc935lk3s4n",
+       "position": "left",
+       "characterId": "chc658mms17r",
+       "faceAngleDeg": 45
+      },
+      {
+       "gaze": "frame_left",
+       "role": "subject",
+       "lookAtId": "chc658mms17r",
+       "position": "right",
+       "characterId": "chc935lk3s4n",
+       "faceAngleDeg": 45
+      }
+     ],
+     "setId": "setr8pg9tuscr",
+     "origin": {
+      "jobId": "bb3c8fb8-02fe-48fa-8483-a5271c4eaeff",
+      "engine": "llm",
+      "proposal": 0,
+      "references": [],
+      "engineVersion": "claude-sonnet-4-6/4"
+     },
+     "actions": [
+      {
+       "text": "đứng trước bậc thềm đá, tay ôm chặt gói áo, gọi to với nét mặt rạng rỡ",
+       "touch": null,
+       "propIds": [],
+       "afterLine": 0,
+       "characterId": "chc658mms17r"
+      },
+      {
+       "text": "từ trong nhà bước ra qua cửa gỗ nâu, lau tay vào tạp dề, dừng lại nhìn con với ánh mắt sáng lên",
+       "touch": null,
+       "motion": "walk_to",
+       "propIds": [],
+       "targetId": "chc658mms17r",
+       "afterLine": 1,
+       "characterId": "chc935lk3s4n"
+      }
+     ],
+     "summary": "Lan đứng trước cửa, gọi to, tay giữ chặt gói áo. Mẹ từ trong bước ra, dừng lại nhìn con.",
+     "shotType": "two_shot",
+     "cutToNext": "action"
+    },
+    "dialogue": [
+     {
+      "lang": "vi",
+      "role": "greet",
+      "text": "Mẹ ơi, con về rồi!",
+      "acting": "gọi to, mặt rạng rỡ, ánh mắt ấm",
+      "characterId": "chc658mms17r"
+     },
+     {
+      "lang": "vi",
+      "role": "react",
+      "text": "Ủa con, về sớm vậy?",
+      "acting": "ngạc nhiên, lau tay vào tạp dề bước ra, mắt sáng lên khi thấy con",
+      "characterId": "chc935lk3s4n"
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chc658mms17r",
+     "chc935lk3s4n"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 5000
+   },
+   {
+    "id": "sh79s90cwyre",
+    "order": 3,
+    "takes": [],
+    "title": "Lan trao chiếc áo dài — showcase sản phẩm",
+    "beatId": "bmh49lrff4l",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "move": "static",
+     "size": "MCU",
+     "angle": "eye",
+     "frame": [
+      {
+       "gaze": "lens",
+       "role": "subject",
+       "lookAtId": "chc935lk3s4n",
+       "position": "left",
+       "characterId": "chc658mms17r",
+       "faceAngleDeg": 20
+      },
+      {
+       "gaze": "frame_left",
+       "role": "over_shoulder",
+       "lookAtId": "chc658mms17r",
+       "position": "right",
+       "characterId": "chc935lk3s4n",
+       "faceAngleDeg": 20
+      }
+     ],
+     "setId": "setr8pg9tuscr",
+     "origin": {
+      "jobId": "bb3c8fb8-02fe-48fa-8483-a5271c4eaeff",
+      "engine": "llm",
+      "proposal": 0,
+      "references": [],
+      "engineVersion": "claude-sonnet-4-6/4"
+     },
+     "actions": [
+      {
+       "text": "nâng gói áo bằng hai tay, mở nhẹ lớp bọc để lộ chiếc áo dài lụa đỏ cổ cao rồi từ từ trao về phía mẹ, tay run nhẹ, mắt nhìn thẳng vào mắt mẹ",
+       "touch": null,
+       "motion": "hand_over",
+       "propIds": [
+        "prh10w3412vk"
+       ],
+       "targetId": "chc935lk3s4n",
+       "afterLine": 0,
+       "characterId": "chc658mms17r"
+      },
+      {
+       "text": "thở nhẹ, tay chưa dám chạm vào áo, mắt nhìn chăm chú vào chiếc áo dài đỏ",
+       "touch": null,
+       "propIds": [],
+       "afterLine": 1,
+       "characterId": "chc935lk3s4n"
+      }
+     ],
+     "summary": "Lan nâng gói áo bằng hai tay, mở nhẹ để lộ áo dài lụa đỏ trơn cổ cao, trao cho mẹ. Cận cảnh áo dài — màu đỏ rực, đường may tỉ mỉ. Cận tay Lan run nhẹ, mắt nhìn mẹ chờ đợi.",
+     "shotType": "over_shoulder",
+     "cutToNext": "action"
+    },
+    "dialogue": [
+     {
+      "lang": "vi",
+      "role": "reveal",
+      "text": "Con tự may áo dài cho mẹ mặc Tết. Mẹ thử xem có vừa không.",
+      "acting": "giọng hơi run, mỉm cười e ngại, mắt nhìn thẳng vào mắt mẹ",
+      "characterId": "chc658mms17r"
+     },
+     {
+      "lang": "vi",
+      "role": "react",
+      "text": "Trời...",
+      "acting": "thở nhẹ, tay chưa dám chạm, mắt nhìn chăm chú vào chiếc áo",
+      "characterId": "chc935lk3s4n"
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chc658mms17r",
+     "chc935lk3s4n",
+     "che3m7jq6crz"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 6000
+   },
+   {
+    "id": "shrj4dr9kuc1",
+    "order": 4,
+    "takes": [],
+    "title": "Mẹ chạm vai áo, nghẹn lời",
+    "beatId": "b8wmjyu4y5a",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "move": "static",
+     "size": "CU",
+     "angle": "eye",
+     "frame": [
+      {
+       "gaze": "frame_left",
+       "role": "subject",
+       "lookAtId": "chc658mms17r",
+       "position": "center",
+       "characterId": "chc935lk3s4n",
+       "faceAngleDeg": 15
+      }
+     ],
+     "setId": "setr8pg9tuscr",
+     "origin": {
+      "jobId": "bb3c8fb8-02fe-48fa-8483-a5271c4eaeff",
+      "engine": "llm",
+      "proposal": 0,
+      "references": [],
+      "engineVersion": "claude-sonnet-4-6/4"
+     },
+     "actions": [
+      {
+       "text": "đưa tay run run chạm nhẹ lên vai áo lụa đỏ, môi mím lại, giọng vỡ ra giữa chừng",
+       "touch": null,
+       "motion": "reach",
+       "propIds": [
+        "prh10w3412vk"
+       ],
+       "targetId": "prh10w3412vk",
+       "afterLine": 0,
+       "characterId": "chc935lk3s4n"
+      }
+     ],
+     "summary": "Mẹ mở gói, tay chạm nhẹ lên vai áo lụa đỏ, môi mím lại. Cận mặt mẹ — mắt đỏ hoe, không nói được.",
+     "shotType": "single",
+     "cutToNext": "gaze"
+    },
+    "dialogue": [
+     {
+      "lang": "vi",
+      "role": "react",
+      "text": "Con... con may cái này à...",
+      "acting": "giọng vỡ ra giữa chừng, tay run chạm lên áo",
+      "characterId": "chc935lk3s4n"
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chc658mms17r",
+     "chc935lk3s4n"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 6000
+   },
+   {
+    "id": "shj2dxwe7gza",
+    "order": 5,
+    "takes": [],
+    "title": "Mẹ ôm Lan dưới hiên đèn lồng",
+    "beatId": "b0od2v069fq",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "move": "pull_back",
+     "size": "MS",
+     "angle": "eye",
+     "frame": [
+      {
+       "gaze": "frame_left",
+       "role": "subject",
+       "lookAtId": "chc658mms17r",
+       "position": "right",
+       "characterId": "chc935lk3s4n",
+       "faceAngleDeg": 10
+      },
+      {
+       "gaze": "frame_right",
+       "role": "subject",
+       "lookAtId": "chc935lk3s4n",
+       "position": "left",
+       "characterId": "chc658mms17r",
+       "faceAngleDeg": 10
+      }
+     ],
+     "setId": "setr8pg9tuscr",
+     "origin": {
+      "jobId": "bb3c8fb8-02fe-48fa-8483-a5271c4eaeff",
+      "engine": "llm",
+      "proposal": 0,
+      "references": [],
+      "engineVersion": "claude-sonnet-4-6/4"
+     },
+     "actions": [
+      {
+       "text": "đặt áo dài sang một bên rồi bước tới ôm chặt Lan, thì thầm vào vai con",
+       "touch": {
+        "zone": "shoulder",
+        "characterId": "chc658mms17r"
+       },
+       "motion": "hug",
+       "propIds": [],
+       "targetId": "chc658mms17r",
+       "afterLine": 0,
+       "characterId": "chc935lk3s4n"
+      },
+      {
+       "text": "đứng yên trong vòng tay mẹ, mắt nhắm lại",
+       "touch": null,
+       "propIds": [],
+       "afterLine": 0,
+       "characterId": "chc658mms17r"
+      }
+     ],
+     "summary": "Mẹ đặt áo xuống rồi ôm chặt Lan. Hai mẹ con đứng yên dưới hiên, đèn lồng đỏ đung đưa. Cảnh kéo rộng dần — áo dài đỏ trên tay mẹ hiện rõ trong khung hình cuối.",
+     "shotType": "two_shot",
+     "cutToNext": "hard"
+    },
+    "dialogue": [
+     {
+      "lang": "vi",
+      "role": "comfort",
+      "text": "Mẹ thương con nhiều lắm.",
+      "acting": "thì thầm vào vai Lan, siết chặt hơn",
+      "characterId": "chc935lk3s4n"
+     }
+    ],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chc658mms17r",
+     "chc935lk3s4n"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 6000
+   },
+   {
+    "id": "shd8lanquaydi",
+    "order": 6,
+    "takes": [],
+    "title": "Lan quay đi",
+    "beatId": "b0od2v069fq",
+    "camera": "",
+    "status": "planned",
+    "sceneId": null,
+    "staging": {
+     "v": 1,
+     "move": "static",
+     "size": "MS",
+     "angle": "eye",
+     "frame": [
+      {
+       "gaze": "frame_right",
+       "role": "subject",
+       "lookAtId": null,
+       "position": "center",
+       "characterId": "chc658mms17r",
+       "faceAngleDeg": 30
+      }
+     ],
+     "setId": "setr8pg9tuscr",
+     "actions": [
+      {
+       "text": "quay lưng, bước chậm ra khỏi hiên nhà",
+       "touch": null,
+       "motion": "walk_away",
+       "propIds": [],
+       "targetId": null,
+       "afterLine": 0,
+       "characterId": "chc658mms17r"
+      }
+     ],
+     "summary": "Lan quay lưng, bước chậm ra khỏi hiên nhà dưới ánh đèn lồng.",
+     "shotType": "single",
+     "cutToNext": null
+    },
+    "dialogue": [],
+    "negative": "",
+    "shotSize": "",
+    "placePolicy": "cut_tail",
+    "activeTakeId": null,
+    "characterIds": [
+     "chc658mms17r"
+    ],
+    "promptTemplate": "",
+    "durationTargetMs": 4000
+   }
+  ],
+  "sets": [
+   {
+    "id": "setf10er9tkrq",
+    "name": "Phố cổ Hội An chiều 30 Tết",
+    "props": [
+     {
+      "id": "prahb7w81ul5",
+      "name": "Đèn lồng đỏ",
+      "count": 6
+     },
+     {
+      "id": "pryxb2cs68hv",
+      "name": "Hoa cúc vàng",
+      "count": 3
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": "ch23anvogk2r",
+    "fixedPieces": [
+     "Mái ngói rêu phong",
+     "Tường vàng cũ",
+     "Đường gạch lát"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": null
+   },
+   {
+    "id": "setr8pg9tuscr",
+    "name": "Hiên nhà mẹ",
+    "props": [
+     {
+      "id": "presy67z12v1",
+      "name": "Chậu hoa vạn thọ",
+      "count": 2
+     },
+     {
+      "id": "prvcm6w24lpu",
+      "name": "Mâm cúng nhỏ",
+      "count": 1
+     },
+     {
+      "id": "prh10w3412vk",
+      "name": "Áo dài đỏ",
+      "count": 1,
+      "refId": "che3m7jq6crz"
+     }
+    ],
+    "space": "outdoor",
+    "backdrops": [],
+    "locationId": null,
+    "fixedPieces": [
+     "Cửa gỗ nâu cũ",
+     "Bậc thềm đá",
+     "Mái hiên thấp"
+    ],
+    "cameraPositions": {
+     "wide": "",
+     "single": [],
+     "twoClose": ""
+    },
+    "leftCharacterId": "chc658mms17r"
+   }
+  ]
+ }
+}
