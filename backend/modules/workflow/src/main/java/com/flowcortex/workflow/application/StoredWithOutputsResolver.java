@@ -16,7 +16,7 @@ import java.util.UUID;
 
 /**
  * The job inputs of a remote step whose config declares {@code outputInputs}: the references stored
- * when its run started (one object reference, or an ordered list of them), then one input per entry
+ * when its run started (one object reference, an ordered list of them, or none), then one input per entry
  * {@code {stepOrder, outputName, inputKey, optional?}} naming an object an earlier step of the same
  * run recorded. An {@code optional} entry whose object that step did not record is left out.
  */
@@ -137,6 +137,17 @@ final class StoredWithOutputsResolver {
     }
 
     /**
+     * The {@code stepOrder} of each {@code outputInputs} entry of {@code config}, or an empty list when it
+     * declares none or the declaration is not well-formed ({@link #declarationFault} says why).
+     */
+    static List<Integer> declaredSourceOrders(String config) {
+        if (!declaresOutputInputs(config) || declarationFault(config, Integer.MAX_VALUE) != null) {
+            return List.of();
+        }
+        return declaredSources(config);
+    }
+
+    /**
      * The {@code stepOrder} of each {@code outputInputs} entry of {@code config}, in declaration order;
      * empty when the config is not a JSON object or has no list. Entries without a positive integer
      * {@code stepOrder} are skipped.
@@ -166,7 +177,10 @@ final class StoredWithOutputsResolver {
     }
 
     private List<MediaJobInput> storedInputs(String storedInput) throws JsonProcessingException {
-        if (storedInput != null && json.readTree(storedInput).isObject()) {
+        if (storedInput == null || storedInput.isBlank()) {
+            return List.of();
+        }
+        if (json.readTree(storedInput).isObject()) {
             return List.of(json.readValue(storedInput, MediaJobInput.class));
         }
         return json.readValue(storedInput, INPUTS);
