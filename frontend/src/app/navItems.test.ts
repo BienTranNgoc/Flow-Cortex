@@ -2,6 +2,7 @@ import {
   BookOpen,
   ChatsCircle,
   FlowArrow,
+  HardDrives,
   House,
   PlugsConnected,
   Play,
@@ -55,5 +56,26 @@ describe('primaryNavItems', () => {
     expect(primaryNavItems(undefined, { chat: false }).map((item) => item.label)).not.toContain(
       'Chat',
     );
+  });
+
+  it('adds Drive after Runs, and after Chat when both switches are on', () => {
+    vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
+    const labelsOf = (options: { chat?: boolean; drive?: boolean }) =>
+      primaryNavItems(undefined, options).map((item) => item.label);
+
+    const both = labelsOf({ chat: true, drive: true });
+    expect(both[both.indexOf('Chat') + 1]).toBe('Drive');
+
+    const driveOnly = labelsOf({ drive: true });
+    expect(driveOnly[driveOnly.indexOf('Runs') + 1]).toBe('Drive');
+    expect(driveOnly.indexOf('Drive')).toBeLessThan(driveOnly.indexOf('Integrations'));
+    expect(both.indexOf('Drive')).toBeLessThan(both.indexOf('Integrations'));
+
+    expect(labelsOf({ drive: false })).not.toContain('Drive');
+    expect(labelsOf({})).not.toContain('Drive');
+
+    const drive = primaryNavItems(undefined, { drive: true }).find((item) => item.label === 'Drive');
+    expect(drive?.to).toBe('/drive');
+    expect(drive?.icon).toBe(HardDrives);
   });
 });

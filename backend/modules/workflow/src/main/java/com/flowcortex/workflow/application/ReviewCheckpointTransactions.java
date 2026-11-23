@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,8 @@ class ReviewCheckpointTransactions {
     private final WorkflowRunRepository workflowRunRepository;
     private final ScriptRevisionRepository scriptRevisionRepository;
     private final RunUpdates runUpdates;
+    private final ReviewSettings settings;
+    private final ApplicationEventPublisher events;
     /**
      * Its own plain mapper, like {@link InputResolver}: this module runs on Jackson 2 while Boot 4's
      * context publishes a Jackson 3 {@code tools.jackson} bean, so injecting one would not resolve.
@@ -39,12 +42,15 @@ class ReviewCheckpointTransactions {
 
     ReviewCheckpointTransactions(ReviewTaskRepository reviewTaskRepository,
             RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
-            ScriptRevisionRepository scriptRevisionRepository, RunUpdates runUpdates) {
+            ScriptRevisionRepository scriptRevisionRepository, RunUpdates runUpdates, ReviewSettings settings,
+            ApplicationEventPublisher events) {
         this.reviewTaskRepository = reviewTaskRepository;
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.scriptRevisionRepository = scriptRevisionRepository;
         this.runUpdates = runUpdates;
+        this.settings = settings;
+        this.events = events;
     }
 
     /**
@@ -67,8 +73,17 @@ class ReviewCheckpointTransactions {
             return false;
         }
         String reviewPayload = isProductVideo(run) ? scriptFrom(payload) : payload;
+        boolean qa = HumanSteps.QA_REVIEW.equals(step.getType());
+        boolean writeQuestions = qa && settings.aiQuestionsEnabled();
+        String questionsState = !qa ? null
+                : writeQuestions ? ReviewTask.QUESTIONS_GENERATING : ReviewTask.QUESTIONS_READY;
+        String questions = qa && !writeQuestions ? QaQuestions.STANDARD_MARKER : null;
         ReviewTask task = reviewTaskRepository.save(new ReviewTask(UUID.randomUUID(), run.getId(), step.getId(),
-                "APPROVAL_CHECKPOINT", reviewPayload, now));
+                HumanSteps.reviewType(step.getType()), reviewPayload, now, now.plus(settings.expireAfter()),
+                questionsState, questions));
+        if (writeQuestions) {
+            events.publishEvent(new QaReviewOpenedEvent(task.getId()));
+        }
         if (isProductVideo(run)) {
             ScriptRevision revision = scriptRevisionRepository.save(new ScriptRevision(UUID.randomUUID(), run.getId(),
                     task.getId(), 1, reviewPayload, null, now));

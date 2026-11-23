@@ -2,6 +2,7 @@ package com.flowcortex.workflow.application;
 
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.credit.api.InsufficientCreditsException;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.RunStartGuard;
 import java.util.List;
 import java.util.Set;
@@ -23,7 +24,7 @@ class CreditRunStartGuard implements RunStartGuard {
 
     CreditRunStartGuard(CreditAccounts creditAccounts, StepExecutorRegistry registry) {
         Set<String> runnable = new TreeSet<>(registry.knownTypes());
-        runnable.add(KnownStepTypes.APPROVAL_CHECKPOINT);
+        runnable.addAll(HumanSteps.TYPES);
         creditAccounts.requirePriced(runnable);
         this.creditAccounts = creditAccounts;
     }
@@ -33,7 +34,8 @@ class CreditRunStartGuard implements RunStartGuard {
         if (!creditAccounts.enabled()) {
             return;
         }
-        long required = creditAccounts.estimate(steps.stream().map(StepDef::type).toList());
+        long required = creditAccounts.estimate(steps.stream()
+                .flatMap(step -> IterateStepConfig.effectiveTypes(step.type(), step.config()).stream()).toList());
         long balance = creditAccounts.balance(ownerId);
         if (balance <= 0 || (balance < required && !context.acknowledgeCost())) {
             throw new InsufficientCreditsException(balance, required);

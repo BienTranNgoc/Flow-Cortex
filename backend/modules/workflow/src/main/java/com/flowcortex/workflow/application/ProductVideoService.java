@@ -160,7 +160,7 @@ public class ProductVideoService implements ProductVideoRuns {
             steps = runSteps.saveAll(steps);
             runUpdates.touched(run.getId());
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(run, steps, List.of(), registry::isRemote, mediaJobs::isDownloadable);
         });
     }
 
@@ -186,7 +186,8 @@ public class ProductVideoService implements ProductVideoRuns {
             return false;
         }
         try {
-            return json.readTree(config).has("referenceImage");
+            var tree = json.readTree(config);
+            return tree.has("referenceImage") || tree.has("referenceImages");
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Product Video step config is not valid JSON", e);
         }

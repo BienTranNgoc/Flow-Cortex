@@ -41,7 +41,9 @@ class PatRoutePolicyTest {
             "GET,/api/v1/support/kb",
             "GET,/api/v1/workflowsX",
             "GET,/api/v1/runsX/{id}",
-            "GET,/api/v1/creditsX"})
+            "GET,/api/v1/creditsX",
+            "POST,/api/v1/oauth/authorize",
+            "GET,/api/v1/oauth/authorize/request"})
     void refusesEverythingElse(HttpMethod method, String pattern) {
         assertThat(PatRoutePolicy.allows(method, pattern)).isFalse();
     }

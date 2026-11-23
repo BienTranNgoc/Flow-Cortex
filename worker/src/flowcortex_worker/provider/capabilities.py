@@ -15,8 +15,9 @@ from typing import Any, Literal, Protocol, cast
 from pydantic import ValidationError
 
 from ..contracts.media_progress import VendorTaskReport
-from ..errors import PermanentError
+from ..errors import PermanentError, StaleDelivery
 from .adapter import (
+    CancelResult,
     ScriptAdapter,
     SpeechAdapter,
     SpeechIdentity,
@@ -36,6 +37,7 @@ from .contracts.provider_job import (
     VendorLedger,
 )
 from .contracts.provider_speech_result import ProviderSpeechData
+from .control import ControlClient, JobControlSession, SiblingFailedSignal
 from .seedance_adapter import PROVIDER_SEEDANCE
 from .vendor_jobs import (
     ProbeRegistry,
@@ -48,6 +50,9 @@ from .vendor_jobs import (
 
 # Providers that fetch the reference image themselves from a URL instead of taking its bytes.
 _URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE})
+_CLIP_WIDTH = 480
+_CLIP_HEIGHT = 854
+_CLIP_CRF = "18"
 
 log = logging.getLogger("flowcortex_provider_worker.vendor_jobs")
 
@@ -92,6 +97,8 @@ class ExecutionContext:
     abort: Any
     report: Callable[[VendorTaskReport], None] = _discard_report
     probes: ProbeRegistry = field(default_factory=dict)
+    control: ControlClient | None = None
+    deadline_monotonic: float | None = None
 
 
 Handler = Callable[
@@ -126,7 +133,10 @@ def _generate_script(
     if not isinstance(job, GenerateScriptJob):
         raise UnsupportedCapability("generate_script received the wrong job shape")
     script = adapter.generate_script(
-        job.params.payload, _fetch_reference_image(job, context)
+        job.params.payload,
+        _fetch_reference_image(job, context),
+        abort=context.abort,
+        deadline_monotonic=context.deadline_monotonic,
     )
     return ProviderOutcome(
         data={"profile": "product_ad_v1", "language": "vi", "script": script}
@@ -181,10 +191,13 @@ def _generate_storyboard(
     if not isinstance(job, GenerateStoryboardJob):
         raise UnsupportedCapability("generate_storyboard received the wrong job shape")
     payload = job.params.payload
-    reference_image = _fetch_reference_image(job, context)
+    reference_images = _fetch_reference_images(job, context)
     storyboard = adapter.generate_storyboard(
         StoryboardRequest(payload.script, payload.sourceRevisionId),
-        reference_image=reference_image,
+        reference_image=reference_images[0] if reference_images else None,
+        reference_images=reference_images,
+        abort=context.abort,
+        deadline_monotonic=context.deadline_monotonic,
     )
     data = {
         "profile": "product_ad_storyboard_v1",
@@ -204,62 +217,101 @@ def _generate_video(
         raise UnsupportedCapability("generate_video received the wrong job shape")
     payload = job.params.payload
     identity = adapter.video_identity()
-    image_bytes, image_url = _resolve_reference_image(
+    images, image_urls = _resolve_reference_images(
         job, context, by_url=identity.provider in _URL_REFERENCE_PROVIDERS
     )
     request = VideoRequest(
         payload.prompt,
         payload.sourceRevisionId,
-        reference_image_url=image_url,
-        reference_image_bytes=image_bytes,
+        reference_image_url=image_urls[0] if image_urls else None,
+        reference_image_bytes=images[0] if images else None,
+        reference_images=images,
+        reference_image_urls=image_urls,
     )
     idempotency_key = _video_idempotency_key(request, identity)
     ledger = job.vendorLedger
     fingerprint = (
         vendor_fingerprint(identity, adapter.vendor_scope(), request) if ledger else None
     )
-    task_id = _load_video_task(context, idempotency_key, identity)
-    attached: VendorCandidate | None = None
-    if task_id is None:
-        if ledger is not None and fingerprint is not None:
-            attached = select_attach(
-                ledger.candidates,
-                fingerprint,
-                context.probes,
-                lambda candidate, status: _report_verdict(context, candidate, status),
-            )
-        task_id = (
-            attached.vendorJobId
-            if attached is not None
-            else _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
-        )
-        _store_video_task(context, task_id, idempotency_key, identity)
+    session: JobControlSession | None = (
+        context.control.open_session(job.runId, job.jobId, job.attempt, abort=context.abort)
+        if context.control is not None
+        else None
+    )
     try:
-        video = adapter.await_video(task_id, context.abort)
-    except VendorJobEnded as exc:
-        if attached is not None:
-            _report_verdict(context, attached, exc.status)
-        elif ledger is not None:
-            context.report(
-                VendorTaskReport(
-                    vendor=identity.provider,
-                    model=identity.model,
-                    vendorJobId=task_id,
-                    status=exc.status,
+        task_id = _load_video_task(context, idempotency_key, identity)
+        if session is not None:
+            initial = session.await_initial()
+            if initial == "discard_stale":
+                raise StaleDelivery(f"Job {job.jobId} attempt {job.attempt} is stale before submit")
+            if initial == "cancel_sibling_failed":
+                if task_id is not None:
+                    _cancel_on_sibling_failed(
+                        adapter, identity, ledger, task_id, context, job,
+                        "Sibling clip failed before worker resumed",
+                    )
+                raise PermanentError("sibling_failed", "Sibling clip failed before submit")
+            session.start_polling()
+        active_abort = session.wrapped_abort() if session is not None else context.abort
+        attached: VendorCandidate | None = None
+        if task_id is None:
+            if ledger is not None and fingerprint is not None:
+                attached = select_attach(
+                    ledger.candidates,
+                    fingerprint,
+                    context.probes,
+                    lambda candidate, status: _report_verdict(context, candidate, status),
                 )
+            if attached is not None:
+                task_id = attached.vendorJobId
+            else:
+                task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
+            _store_video_task(context, task_id, idempotency_key, identity)
+            if session is not None and attached is None:
+                _guard_post_submit(session, adapter, identity, ledger, task_id, context, job)
+        try:
+            video = adapter.await_video(task_id, active_abort)
+        except SiblingFailedSignal:
+            _cancel_on_sibling_failed(
+                adapter, identity, ledger, task_id, context, job,
+                "Sibling clip failed while polling video", attached=attached,
             )
-        raise
-    except VendorJobTimeout as exc:
-        if attached is not None:
-            raise exc.with_ledger(str(attached.vendorTaskId)) from exc
-        raise
-    except VendorResultGone:
-        if attached is None:
+        except VendorJobEnded as exc:
+            if attached is not None:
+                _report_verdict(context, attached, exc.status)
+            elif ledger is not None:
+                context.report(
+                    VendorTaskReport(
+                        vendor=identity.provider,
+                        model=identity.model,
+                        vendorJobId=task_id,
+                        status=exc.status,
+                    )
+                )
             raise
-        _report_verdict(context, attached, "gone")
-        task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
-        _store_video_task(context, task_id, idempotency_key, identity)
-        video = adapter.await_video(task_id, context.abort)
+        except VendorJobTimeout as exc:
+            if attached is not None:
+                raise exc.with_ledger(str(attached.vendorTaskId)) from exc
+            raise
+        except VendorResultGone:
+            if attached is None:
+                raise
+            _report_verdict(context, attached, "gone")
+            attached = None
+            task_id = _submit_recorded(adapter, request, identity, ledger, fingerprint, context)
+            _store_video_task(context, task_id, idempotency_key, identity)
+            if session is not None:
+                _guard_post_submit(session, adapter, identity, ledger, task_id, context, job)
+            try:
+                video = adapter.await_video(task_id, active_abort)
+            except SiblingFailedSignal:
+                _cancel_on_sibling_failed(
+                    adapter, identity, ledger, task_id, context, job,
+                    "Sibling clip failed while polling video",
+                )
+    finally:
+        if session is not None:
+            session.close()
     if video.provider_task_id != task_id:
         raise PermanentError(
             "provider_response_invalid",
@@ -323,6 +375,74 @@ def _submit_recorded(
     return task_id
 
 
+def _guard_post_submit(
+    session: JobControlSession,
+    adapter: VideoAdapter,
+    identity: VideoIdentity,
+    ledger: VendorLedger | None,
+    task_id: str,
+    context: ExecutionContext,
+    job: GenerateVideoJob,
+) -> None:
+    if session.is_stale():
+        raise StaleDelivery(f"Job {job.jobId} attempt {job.attempt} became stale during submit")
+    if session.is_sibling_failed():
+        _cancel_on_sibling_failed(
+            adapter, identity, ledger, task_id, context, job,
+            "Sibling clip failed during submit",
+        )
+
+
+def _cancel_on_sibling_failed(
+    adapter: VideoAdapter,
+    identity: VideoIdentity,
+    ledger: VendorLedger | None,
+    task_id: str,
+    context: ExecutionContext,
+    job: GenerateVideoJob,
+    reason: str,
+    *,
+    attached: VendorCandidate | None = None,
+) -> Any:
+    cancel_result: CancelResult = adapter.cancel_video(task_id)
+    if attached is not None:
+        _report_verdict(context, attached, "failed")
+    elif ledger is not None:
+        context.report(
+            VendorTaskReport(
+                vendor=identity.provider,
+                model=identity.model,
+                vendorJobId=task_id,
+                status="failed",
+            )
+        )
+    if cancel_result.confirmed:
+        log.info(
+            "vendor_job outcome=cancelled_sibling_failed vendor=%s "
+            "vendorTaskId=%s runId=%s jobId=%s attempt=%s",
+            identity.provider,
+            task_id,
+            job.runId,
+            job.jobId,
+            job.attempt,
+        )
+        raise PermanentError("sibling_failed", f"{reason} (cancelled provider task {task_id})")
+    log.warning(
+        "vendor_job outcome=cancel_unconfirmed vendor=%s "
+        "vendorTaskId=%s runId=%s jobId=%s attempt=%s detail=%s",
+        identity.provider,
+        task_id,
+        job.runId,
+        job.jobId,
+        job.attempt,
+        cancel_result.reason,
+    )
+    raise PermanentError(
+        "sibling_failed",
+        f"{reason}; cancel unconfirmed for provider task {task_id}: {cancel_result.reason}",
+    )
+
+
 def _report_verdict(
     context: ExecutionContext,
     candidate: VendorCandidate,
@@ -339,23 +459,43 @@ def _report_verdict(
     )
 
 
-def _resolve_reference_image(
+def _resolve_reference_images(
     job: GenerateVideoJob, context: ExecutionContext, *, by_url: bool
-) -> tuple[bytes | None, str | None]:
-    """Returns (bytes, url) of the job's reference image, or (None, None) without one.
+) -> tuple[tuple[bytes, ...], tuple[str, ...]]:
+    """Returns (images, urls) of the job's reference images (0..3)."""
+    images = _fetch_reference_images(job, context)
+    if not images:
+        return (), ()
+    if not by_url or not job.inputs:
+        return images, ()
+    urls = tuple(
+        context.storage.presigned_get_url(ref.bucket, ref.objectKey)
+        for ref in job.inputs
+    )
+    return images, urls
 
-    The bytes are always read: they are checked to be an image and key the job's idempotency.
-    The URL is signed only when the provider reads the image ``by_url`` (Seedance). Veo and Wan
-    take the bytes inline, so no URL to our store leaves the worker for them."""
-    body = _fetch_reference_image(job, context)
-    if body is None:
-        return None, None
-    if not by_url:
-        return body, None
-    if not job.inputs:
-        return body, None
-    reference = job.inputs[0]
-    return body, context.storage.presigned_get_url(reference.bucket, reference.objectKey)
+
+def _fetch_reference_images(
+    job: GenerateStoryboardJob | GenerateVideoJob, context: ExecutionContext
+) -> tuple[bytes, ...]:
+    inputs = job.inputs or ()
+    if not inputs:
+        return ()
+    if len(inputs) > 3:
+        raise PermanentError(
+            "contract_violation",
+            f"{job.capability} accepts at most three reference images",
+        )
+    bodies: list[bytes] = []
+    for reference in inputs:
+        body = context.storage.fetch_bytes(reference.bucket, reference.objectKey, context.abort)
+        if not _looks_like_image(body):
+            raise PermanentError(
+                "input_rejected",
+                f"reference image '{reference.key}' is not a recognised image format",
+            )
+        bodies.append(body)
+    return tuple(bodies)
 
 
 def _fetch_reference_image(
@@ -463,13 +603,15 @@ def _normalize_video(body: bytes, context: ExecutionContext) -> bytes:
             "-t",
             "5",
             "-vf",
-            "scale=360:640:force_original_aspect_ratio=decrease,"
-            "pad=360:640:(ow-iw)/2:(oh-ih)/2:black",
+            f"scale={_CLIP_WIDTH}:{_CLIP_HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={_CLIP_WIDTH}:{_CLIP_HEIGHT}:(ow-iw)/2:(oh-ih)/2:black",
             "-an",
             "-c:v",
             "libx264",
             "-preset",
             "fast",
+            "-crf",
+            _CLIP_CRF,
             "-pix_fmt",
             "yuv420p",
             "-movflags",
@@ -548,11 +690,14 @@ def _speech_idempotency_key(request: SpeechRequest, identity: SpeechIdentity) ->
 
 
 def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> str:
-    image_digest = (
-        hashlib.sha256(request.reference_image_bytes or b"").hexdigest()
-        if request.reference_image_bytes or request.reference_image_url
-        else ""
-    )
+    if len(request.reference_images) > 1:
+        image_digest = hashlib.sha256(
+            b"\0".join(hashlib.sha256(img).digest() for img in request.reference_images)
+        ).hexdigest()
+    elif request.reference_image_bytes or request.reference_image_url:
+        image_digest = hashlib.sha256(request.reference_image_bytes or b"").hexdigest()
+    else:
+        image_digest = ""
     value = "\0".join((
         str(request.source_revision_id),
         request.profile,

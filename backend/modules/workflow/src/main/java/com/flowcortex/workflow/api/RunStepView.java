@@ -10,10 +10,21 @@ import java.util.UUID;
  * {@code error}) the acceptance oracles assert on directly. A {@code running}
  * step with no {@code pickedUpAt} is still waiting for an executor; {@code
  * outputs} is empty unless the step produced objects. {@code mode} is {@code inline} or {@code
- * remote}, read from the step's own type, so it holds even after the workflow is edited.
+ * remote}, read from the step's own type, so it holds even after the workflow is edited. {@code
+ * children} holds an iterate step's items of its current attempt in item order and is empty for any
+ * other step.
  */
 public record RunStepView(
         UUID id, int stepOrder, String type, String status, String input, String output, String errorMessage,
         Instant startedAt, Instant finishedAt, Integer progressPercent, int attempt, String errorCode,
-        int deliveryCount, Instant pickedUpAt, List<RunStepOutputView> outputs, String mode) {
+        int deliveryCount, Instant pickedUpAt, List<RunStepOutputView> outputs, String mode,
+        List<RunStepChildView> children) {
+
+    /** A step without items. */
+    public RunStepView(UUID id, int stepOrder, String type, String status, String input, String output,
+            String errorMessage, Instant startedAt, Instant finishedAt, Integer progressPercent, int attempt,
+            String errorCode, int deliveryCount, Instant pickedUpAt, List<RunStepOutputView> outputs, String mode) {
+        this(id, stepOrder, type, status, input, output, errorMessage, startedAt, finishedAt, progressPercent,
+                attempt, errorCode, deliveryCount, pickedUpAt, outputs, mode, List.of());
+    }
 }
