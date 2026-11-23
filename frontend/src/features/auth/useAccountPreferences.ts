@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   authHeaders,
-  get2 as getPreferences,
+  getAccountPreferences,
   patchPrivacy as patchPrivacyRequest,
   patchUi as patchUiRequest,
   setLocale as setLocaleRequest,
@@ -17,7 +17,7 @@ export function useAccountPreferencesQuery() {
   const token = useAuthToken();
   return useQuery({
     queryKey: preferencesKey(token),
-    queryFn: () => unwrap(getPreferences(authHeaders())),
+    queryFn: () => unwrap(getAccountPreferences(authHeaders())),
     enabled: Boolean(token),
     retry: false,
     // Applied once after sign-in; a refetch must not overwrite a choice made on this device since.

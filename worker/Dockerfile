@@ -160,7 +160,8 @@ COPY --from=overlay-models /SHA256SUMS /opt/flowcortex/SHA256SUMS
 COPY models/face_detection_yunet_2023mar.onnx /opt/flowcortex/models/
 RUN cd /opt/flowcortex/models && sha256sum -c ../SHA256SUMS
 ENV FLOWCORTEX_OVERLAY_MODELS=/opt/flowcortex/models \
-    EASYOCR_MODULE_PATH=/opt/flowcortex/models/easyocr
+    EASYOCR_MODULE_PATH=/opt/flowcortex/models/easyocr \
+    WORKER_CAPABILITIES=clean_overlay
 USER 10001
 # --- audio-build stage: the locked venv plus the torch audio engines -------------------------
 # One hash-pinned torch base (requirements-torch-cpu.txt), then the engines. Only demucs is a
