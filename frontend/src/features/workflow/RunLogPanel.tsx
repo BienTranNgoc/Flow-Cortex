@@ -27,6 +27,7 @@ function asStep(entry: RunLogEntry): RunStepResponse {
     attempt: entry.attempt,
     deliveryCount: entry.deliveryCount,
     outputs: [],
+    children: [],
     mode: 'inline',
     ...(entry.startedAt ? { startedAt: entry.startedAt } : {}),
     ...(entry.finishedAt ? { finishedAt: entry.finishedAt } : {}),
