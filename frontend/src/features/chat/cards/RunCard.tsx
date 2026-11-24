@@ -60,7 +60,7 @@ export function RunCard({ runId }: Readonly<{ runId: string }>) {
           <ol className="chat-card__steps">
             {steps.map((step) => (
               <li key={stepKey(step)}>
-                {stepLabel(step, t)}: {stateWord(stepState(step, steps, run.status), t)}
+                {stepLabel(step, t, steps)}: {stateWord(stepState(step, steps, run.status), t)}
               </li>
             ))}
           </ol>

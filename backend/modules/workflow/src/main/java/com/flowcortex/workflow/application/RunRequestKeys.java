@@ -30,7 +30,8 @@ final class RunRequestKeys {
         }
         return runs.findByOwnerIdAndRequestKey(ownerId, requestKey).map(run -> {
             List<RunStep> steps = runSteps.findByRunIdOrderByStepOrderAsc(run.getId());
-            return WorkflowMapper.toRunView(run, steps, registry::isRemote, isDownloadable);
+            return WorkflowMapper.toRunView(run, steps, runSteps.findCurrentChildren(run.getId()), registry::isRemote,
+                    isDownloadable);
         });
     }
 

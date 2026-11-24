@@ -1,6 +1,21 @@
+import { CONSENT_PATH } from './oauthConsent';
+
+// The backend replaces a longer `return_to` with `/` (SafeReturnTo).
+const RETURN_TO_MAX_LENGTH = 512;
+
+/** A consent link's query waits in the tab (see `rememberConsentQuery`), so only its path travels. */
+function shortReturnTo(returnTo: string): string {
+  return returnTo.length > RETURN_TO_MAX_LENGTH && returnTo.startsWith(`${CONSENT_PATH}?`)
+    ? CONSENT_PATH
+    : returnTo;
+}
+
 /** Where the browser goes to start Google sign-in; the backend answers with a redirect to Google. */
 export function googleAuthorizeUrl(rememberMe: boolean, returnTo: string): string {
-  const params = new URLSearchParams({ remember_me: String(rememberMe), return_to: returnTo });
+  const params = new URLSearchParams({
+    remember_me: String(rememberMe),
+    return_to: shortReturnTo(returnTo),
+  });
   return `/api/v1/auth/oauth/google/authorize?${params}`;
 }
 
