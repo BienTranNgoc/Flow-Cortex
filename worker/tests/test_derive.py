@@ -50,12 +50,15 @@ def job(**params: Any) -> MediaJob:
 def make_clip(
     path: Path, *, seconds: int = 3, size: str = "320x180", audio: bool = True, rotation: int = 0
 ) -> Path:
-    """A 25 fps test pattern, with an AAC sine when `audio`, tagged `rotation` degrees."""
+    """A 25 fps test pattern, with an AAC sine when `audio`, tagged `rotation` degrees.
+
+    A source with an odd side is stored as yuv444p, the only layout libx264 accepts for it."""
     command = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i"]
     command += [f"testsrc=size={size}:rate=25:duration={seconds}"]
     if audio:
         command += ["-f", "lavfi", "-i", f"sine=duration={seconds}"]
-    command += ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+    odd = any(int(side) % 2 for side in size.split("x"))
+    command += ["-c:v", "libx264", "-pix_fmt", "yuv444p" if odd else "yuv420p"]
     if audio:
         command += ["-c:a", "aac"]
     target = path.with_name("upright") if rotation else path
@@ -177,6 +180,15 @@ def test_cut_without_a_window_covers_the_whole_clip_and_passes_no_seek_or_length
     assert "-ss" not in encode
     assert "-t" not in encode
     assert abs(outcome.data["durationMs"] - 3000) <= 100
+
+
+@needs_ffmpeg
+def test_cut_trims_an_odd_sided_source_to_even_sides(tmp_path: Path) -> None:
+    clip = make_clip(tmp_path / "input", size="321x181", seconds=2)
+
+    outcome = run_derive(clip, RecordingRunner(), op="cut")
+
+    assert (outcome.data["width"], outcome.data["height"]) == (320, 180)
 
 
 @needs_ffmpeg

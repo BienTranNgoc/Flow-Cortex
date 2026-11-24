@@ -128,6 +128,7 @@ def shot_faces(frames: int, cut: int, first: float, second: float) -> dict[str, 
     [
         ({"op": "stabilize", "opParams": {"smoothing": True}}, "smoothing"),
         ({"op": "stabilize", "opParams": {"smoothing": -1}}, "smoothing"),
+        ({"op": "stabilize", "opParams": {"smoothing": 1001}}, "smoothing"),
         ({"op": "stabilize", "opParams": {"optzoom": 3}}, "optzoom"),
         ({"op": "reframe", "opParams": {"sheet": []}}, "sheet"),
     ],
@@ -196,6 +197,26 @@ def test_the_window_is_cut_once_to_an_intra_copy_that_both_vidstab_passes_read(
     assert transform.count("-i") == 1  # no audio input when keepAudio is false
     assert "-an" in transform
     assert any("optzoom=1" in a and "smoothing=10" in a for a in transform)
+
+
+@needs_vidstab
+def test_stabilize_trims_an_odd_sided_source_to_even_sides(tmp_path: Path) -> None:
+    clip = make_clip(tmp_path / "input", size="321x181", seconds=2)
+    runner = VisionRunner(result={"windowMotion": 2.0, "outputMotion": 1.0})
+
+    outcome = run_derive(clip, runner, op="stabilize")
+
+    assert (outcome.data["width"], outcome.data["height"]) == (320, 180)
+
+
+@needs_ffmpeg
+def test_reframe_crops_an_odd_high_source_to_an_even_height(tmp_path: Path) -> None:
+    clip = make_clip(tmp_path / "input", size="1281x721", seconds=2)
+    track = shot_faces(50, 25, 202, 402)
+
+    outcome = run_derive(clip, VisionRunner(result=track), op="reframe", keepAudio=False)
+
+    assert (outcome.data["width"], outcome.data["height"]) == (404, 720)
 
 
 @needs_vidstab

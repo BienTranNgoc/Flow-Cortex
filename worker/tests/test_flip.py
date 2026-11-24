@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from conftest import job_body
+from test_derive import make_clip as make_pattern
 
 from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError
@@ -166,6 +167,15 @@ def test_the_left_half_becomes_the_right_half_and_the_audio_codec_is_kept(
     assert encode[encode.index("-c:a") + 1] == "copy"
     assert encode[encode.index("-map") + 1] == "0:0"
     assert "0:a:0?" in encode
+
+
+@needs_ffmpeg
+def test_an_odd_sided_source_is_flipped_to_even_sides(tmp_path: Path) -> None:
+    clip = make_pattern(tmp_path / "input", size="321x181", seconds=2)
+
+    outcome = run_flip({"video": clip}, RecordingRunner())
+
+    assert (outcome.data["width"], outcome.data["height"]) == (320, 180)
 
 
 @needs_ffmpeg

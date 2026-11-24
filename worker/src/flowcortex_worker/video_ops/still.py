@@ -73,7 +73,8 @@ def zoom_filter(width: int, height: int, duration: float, fps: int, motion: str)
     if motion == "zoom_in":
         zoom = f"min(zoom+{ZOOM_STEP},{ZOOM_MAX})"
     elif motion == "zoom_out":
-        zoom = f"if(lte(zoom,1.0),{ZOOM_MAX},max(zoom-{ZOOM_STEP},1.0))"
+        # Starts at the top on the first frame only: once the ramp reaches 1.0 it holds there.
+        zoom = f"if(eq(on,0),{ZOOM_MAX},max(zoom-{ZOOM_STEP},1.0))"
     else:
         raise ValueError(f"{motion!r} is not a zoom motion")
     frames = max(1, round(duration * fps))

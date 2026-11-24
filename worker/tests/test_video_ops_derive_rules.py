@@ -41,6 +41,7 @@ def test_the_whole_domain_is_accepted() -> None:
     assert stabilize.read_params({"smoothing": 0, "optzoom": 0}) == (0, 0)
     assert stabilize.read_params({"smoothing": 25, "optzoom": 2}) == (25, 2)
     assert stabilize.read_params({"smoothing": 4.0}) == (4, 1)
+    assert stabilize.read_params({"smoothing": 1000}) == (1000, 1)
 
 
 @pytest.mark.parametrize(
@@ -48,6 +49,7 @@ def test_the_whole_domain_is_accepted() -> None:
     [
         ({"smoothing": True}, "smoothing"),
         ({"smoothing": -1}, "smoothing"),
+        ({"smoothing": 1001}, "smoothing"),
         ({"smoothing": 1.5}, "smoothing"),
         ({"smoothing": "5"}, "smoothing"),
         ({"smoothing": None}, "smoothing"),

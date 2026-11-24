@@ -30,6 +30,10 @@ _CLIP_ENTRIES = (
 _IMAGE_ENTRIES = "stream=index,codec_type,width,height:format=format_name"
 _UNTAGGED_COLOR_SPACES = frozenset({"", "unknown"})
 
+# libx264 refuses an odd side in yuv420p, so an op that does not size its own output trims one
+# pixel off an odd source first.
+EVEN_SIDES = "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+
 
 @dataclass(frozen=True)
 class Clip:

@@ -14,6 +14,8 @@ from ..video_analysis.streams import finite_param
 DEFAULT_SMOOTHING = 10
 DEFAULT_OPTZOOM = 1
 OPTZOOM_VALUES = (0, 1, 2)
+# vf_vidstabtransform's own option range; a value past it fails only at the last ffmpeg run.
+SMOOTHING_RANGE = (0, 1000)
 
 # Worst case measured for the all-intra copy: 49 MB/s at 1920x1080x30 of pure noise (0.79 B/px).
 INTRA_BYTES_PER_PIXEL = 0.8
@@ -42,9 +44,10 @@ def _whole(op_params: Mapping[str, Any], key: str, default: int) -> int:
 def read_params(op_params: Mapping[str, Any]) -> tuple[int, int]:
     """`(smoothing, optzoom)`; an absent key takes its default, a bad value is refused."""
     smoothing = _whole(op_params, "smoothing", DEFAULT_SMOOTHING)
-    if smoothing < 0:
+    low, high = SMOOTHING_RANGE
+    if not low <= smoothing <= high:
         raise PermanentError(
-            "contract_violation", f"param 'smoothing' must be >= 0 (got {smoothing})"
+            "contract_violation", f"param 'smoothing' must be {low}-{high} (got {smoothing})"
         )
     optzoom = _whole(op_params, "optzoom", DEFAULT_OPTZOOM)
     if optzoom not in OPTZOOM_VALUES:

@@ -10,7 +10,7 @@ from ..contracts.media_job import MediaJob
 from ..errors import PermanentError
 from ..runtime import ProcessRunner
 from ..video_analysis.streams import last_line, tool_failure
-from ..video_ops.media import describe_output, probe_clip
+from ..video_ops.media import EVEN_SIDES, describe_output, probe_clip
 from . import HandlerOutcome, OutputFile
 
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def _encode_argv(video: Path, index: int, output: Path, audio: list[str]) -> lis
         "-protocol_whitelist", "file",
         "-i", str(video),
         "-map", f"0:{index}", "-map", "0:a:0?",
-        "-vf", "hflip",
+        "-vf", f"{EVEN_SIDES},hflip",
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
         *audio,
         "-movflags", "+faststart",

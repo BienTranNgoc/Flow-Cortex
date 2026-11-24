@@ -168,7 +168,7 @@ def test_zoom_out_filter_of_a_two_second_clip() -> None:
     filter_ = still.zoom_filter(640, 360, 2.0, 25, "zoom_out")
 
     assert "scale=2560:-2" in filter_
-    assert "zoompan=z='if(lte(zoom,1.0),1.12,max(zoom-0.0005,1.0))':d=50" in filter_
+    assert "zoompan=z='if(eq(on,0),1.12,max(zoom-0.0005,1.0))':d=50" in filter_
     assert "s=640x360:fps=25" in filter_
 
 
@@ -336,9 +336,43 @@ def test_the_zoom_encode_runs_once_with_the_zoom_filter_over_the_whole_clip(
     )
 
     [encode] = runner.encodes
-    assert "zoompan=z='if(lte(zoom,1.0),1.12,max(zoom-0.0005,1.0))':d=50" in encode_filter(encode)
+    assert "zoompan=z='if(eq(on,0),1.12,max(zoom-0.0005,1.0))':d=50" in encode_filter(encode)
     assert outcome.data["motion"] == "zoom_out"
     assert abs(outcome.data["durationMs"] - 2000) <= 40
+
+
+def gray_frames(path: Path, width: int, height: int) -> list[bytes]:
+    raw = subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-i", str(path), "-vf", "format=gray",
+            "-f", "rawvideo", "-",
+        ],
+        check=True, capture_output=True,
+    ).stdout  # fmt: skip
+    size = width * height
+    return [raw[i : i + size] for i in range(0, len(raw), size)]
+
+
+def mean_abs_diff(a: bytes, b: bytes) -> float:
+    return sum(abs(x - y) for x, y in zip(a, b, strict=True)) / len(a)
+
+
+@needs_ffmpeg
+def test_zoom_out_holds_at_the_full_frame_after_its_ramp_instead_of_restarting(
+    tmp_path: Path,
+) -> None:
+    image = make_image(tmp_path / "input", size="320x180")
+
+    still_handler.handle(
+        job(durationSec=10, fps=30, motion="zoom_out"), {"image": image}, ProcessRunner()
+    )
+
+    frames = gray_frames(tmp_path / "still.mp4", 320, 180)
+    assert len(frames) == 300
+    # The ramp ends after 240 frames; later frames stay at zoom 1.0 and do not snap back to 1.12.
+    assert mean_abs_diff(frames[238], frames[245]) < 3
+    assert mean_abs_diff(frames[245], frames[290]) < 3
+    assert mean_abs_diff(frames[245], frames[2]) > 10
 
 
 @needs_ffmpeg

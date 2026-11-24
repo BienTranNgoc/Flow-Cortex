@@ -18,7 +18,7 @@ from ..runtime import ProcessRunner
 from ..video_analysis.streams import VideoStream, last_line, tool_failure
 from ..video_ops import protocol, reframe_path, stabilize
 from ..video_ops.effects import check_effect, effect_filter
-from ..video_ops.media import Clip, describe_output, probe_clip, read_window
+from ..video_ops.media import EVEN_SIDES, Clip, describe_output, probe_clip, read_window
 from . import HandlerOutcome, OutputFile
 
 OUTPUT_NAME = "derive.mp4"
@@ -90,7 +90,7 @@ def _prepare_cut(_op_params: Mapping[str, Any]) -> Render:
     def render(request: Request) -> dict[str, Any]:
         # Without srcOutMs the encode runs to the end of the input, so a measured end never
         # cuts its last frame.
-        _encode(request, None, request.window_seconds if request.bounded else None, "cut")
+        _encode(request, EVEN_SIDES, request.window_seconds if request.bounded else None, "cut")
         return {}
 
     return render
@@ -187,7 +187,7 @@ def _prepare_stabilize(op_params: Mapping[str, Any]) -> Render:
                 request,
                 [
                     *_FFMPEG, *_FILE_ONLY, *_seek(request), "-i", str(request.video),
-                    *_limit(request), "-map", f"0:{stream.index}", "-an",
+                    *_limit(request), "-map", f"0:{stream.index}", "-an", "-vf", EVEN_SIDES,
                     "-c:v", "libx264", "-preset", "ultrafast", "-g", "1", "-crf", "10",
                     "-pix_fmt", "yuv420p", str(window),
                 ],
@@ -327,7 +327,8 @@ def _prepare_reframe(op_params: Mapping[str, Any]) -> Render:
                     *_limit(request), "-map", f"0:{stream.index}",
                     *(["-map", "0:a:0"] if request.keep_audio else []),
                     "-vf",
-                    f"{timing},sendcmd=f={commands},crop={win}:{stream.height}:{path[0]}:0",
+                    f"{timing},sendcmd=f={commands},"
+                    f"crop={win}:{stream.height // 2 * 2}:{path[0]}:0",
                     "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
                     "-metadata:s:v:0", "rotate=0", *_audio_codec(request),
                     "-movflags", "+faststart", str(request.output),

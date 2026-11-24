@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..errors import PermanentError
+from .media import EVEN_SIDES as _EVEN_SIDES
 
 EFFECTS = ("flash", "zoom", "shake", "glitch", "slowmo")
 
@@ -15,8 +16,6 @@ GLITCH_PERIOD = 10
 # Constants of the sine hash behind the shake offsets; changing them changes every offset.
 _SHAKE_X = (12.9898, 78.233, 43758.5453)
 _SHAKE_Y = (39.3468, 11.135, 24634.6345)
-# yuv420p needs even sides; the effects that do not size their own output trim an odd source first.
-_EVEN_SIDES = "scale=trunc(iw/2)*2:trunc(ih/2)*2"
 
 
 def check_effect(name: object) -> str:
