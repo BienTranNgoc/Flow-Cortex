@@ -158,7 +158,6 @@ Migration filenames under `backend/boot/app/src/main/resources/db/migration/` MU
 
 ## 16. Update documentation alongside code
 
-- Before changing behavior, consult the [documentation index](docs/README.md) and read `docs/features/<slug>/README.md` and its testing documentation. If the feature needs a new specification, create a page and add it to the index. Document user flows and admin actions for the same business capability together.
+- Before implementing a new business workflow or changing behavior that affects documentation, read the [documentation rules](docs/AGENTS.md) and review the relevant feature specification and test cases.
 - In the same PR, update affected use cases, diagrams, test cases, and links to test assertions. For changes to shared mechanisms, update the [architecture documentation](docs/ARCHITECTURE.md). For schema changes, check the Flyway migrations and update the [ERD](docs/ERD.md). Record lasting technical decisions in the [ADR log](docs/ADR.md) and follow the existing snapshot process when the HTTP contract changes.
-- Write explanatory documentation in Vietnamese and preserve technical identifiers. Verify behavior against code, configuration, or tests. Mark proposed designs and test cases that have yet to be automated as described in the [testing guide](docs/TESTING.md).
 - Before handing off, list the documentation and test cases you updated. For a behavior-preserving refactor, explain in one sentence why the existing documentation still applies.

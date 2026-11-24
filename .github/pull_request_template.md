@@ -22,4 +22,8 @@ wrong name, not a style problem.
 - [ ] If this PR adds or changes a SQL migration, its version
       (`V<yyyy.MM.dd>.NNN__…`) is **strictly newer** than the latest version
       already on `origin/development` (AGENTS.md §15).
-- [ ] Đã cập nhật tài liệu và ca kiểm thử bị ảnh hưởng, hoặc ghi lý do tài liệu hiện tại vẫn đúng (AGENTS.md §16).
+- [ ] Updated affected documentation and test cases, or explained why the existing
+      documentation still applies. The first PR that makes a business workflow usable
+      includes Use Case and Activity diagrams. For diagram changes, verify that the
+      diagrams match the implementation, the SVGs were regenerated from their sources,
+      and the README links work. See `docs/AGENTS.md`.
