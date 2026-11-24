@@ -78,6 +78,17 @@ describe('TrendTaxonomyPage', () => {
     expect(screen.getByText('There are no tags.')).toBeInTheDocument();
   });
 
+  it('keeps the empty live region in the accessibility tree so a first announcement is spoken', async () => {
+    renderPage({ [LIST]: { status: 200, body: TAXONOMY } });
+
+    await screen.findByText('People');
+    const region = screen.getByRole('status', { hidden: true });
+
+    expect(region).toBeEmptyDOMElement();
+    expect(getComputedStyle(region).display).not.toBe('none');
+    expect(screen.getByRole('status')).toBe(region);
+  });
+
   it('adds a category, closes the dialog and returns focus to Add', async () => {
     let stored = [PEOPLE];
     const { user, calls } = renderPage({
