@@ -4,18 +4,15 @@ import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 /**
  * Decides whether a finished or stopped run may be resumed, as a pure function of the run status
- * and its steps in order; the first failing check of each operation wins. The error codes below
- * are the workflow's own "a retry cannot succeed" rule, separate from the credit module's refund
- * rule.
+ * and its steps in order; the first failing check of each operation wins. Whether a failed step
+ * may be retried is read from {@link StepFailureTaxonomy}, the same table the run page shows, and
+ * stays separate from the credit module's refund rule.
  */
 final class RunResumeRules {
-
-    private static final Set<String> NON_RETRYABLE_CODES = Set.of("APPROVAL_REJECTED", "input_rejected", "probe_failed");
 
     private RunResumeRules() {}
 
@@ -56,7 +53,7 @@ final class RunResumeRules {
             return refused(Kind.STEP_NOT_FAILED);
         }
         if (KnownStepTypes.APPROVAL_CHECKPOINT.equals(step.type())
-                || (step.errorCode() != null && NON_RETRYABLE_CODES.contains(step.errorCode()))) {
+                || !StepFailureTaxonomy.recordFor(step.errorCode()).retryable()) {
             return refused(Kind.STEP_NOT_RETRYABLE);
         }
         if (step.attempt() >= Short.MAX_VALUE) {

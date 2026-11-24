@@ -103,6 +103,50 @@ class RunResumeRulesTest {
     }
 
     @Test
+    void inputUnresolvedIsNotRetryable() {
+        StepState step = failed(2, "echo", "input_unresolved", (short) 1);
+
+        assertRefused(RunResumeRules.forRetry(RunStatus.ERROR, List.of(step), step.id()), Kind.STEP_NOT_RETRYABLE);
+    }
+
+    @Test
+    void durationExceededIsNotRetryable() {
+        StepState step = failed(1, "echo", "duration_exceeded", (short) 1);
+
+        assertRefused(RunResumeRules.forRetry(RunStatus.ERROR, List.of(step), step.id()), Kind.STEP_NOT_RETRYABLE);
+    }
+
+    @Test
+    void workflowCallCycleIsNotRetryable() {
+        StepState step = failed(1, "workflow.call", "workflow_call_cycle", (short) 1);
+
+        assertRefused(RunResumeRules.forRetry(RunStatus.ERROR, List.of(step), step.id()), Kind.STEP_NOT_RETRYABLE);
+    }
+
+    @Test
+    void contractViolationStaysRetryable() {
+        StepState step = failed(3, "render_video", "contract_violation", (short) 1);
+
+        assertAllowed(RunResumeRules.forRetry(RunStatus.ERROR, List.of(step), step.id()), 3);
+    }
+
+    @Test
+    void leaseExpiredStaysRetryable() {
+        StepState step = failed(2, "echo", "lease_expired", (short) 1);
+
+        assertAllowed(RunResumeRules.forRetry(RunStatus.ERROR, List.of(step), step.id()), 2);
+    }
+
+    @Test
+    void unknownAndNullCodesStayRetryable() {
+        for (String code : new String[] {"a_code_nobody_listed", "", null}) {
+            StepState step = failed(1, "echo", code, (short) 1);
+
+            assertAllowed(RunResumeRules.forRetry(RunStatus.ERROR, List.of(step), step.id()), 1);
+        }
+    }
+
+    @Test
     void theLastAttemptIsRefused() {
         StepState allowed = failed(1, "echo", null, (short) 32766);
         StepState last = failed(1, "echo", null, Short.MAX_VALUE);
