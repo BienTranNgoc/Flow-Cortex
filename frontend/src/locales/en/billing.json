@@ -1,0 +1,71 @@
+{
+  "menu": {
+    "paymentHistory": "Payment history"
+  },
+  "amount": "{{amount}} ₫",
+  "none": "Not available",
+  "status": {
+    "pending": "Pending",
+    "succeeded": "Paid",
+    "failed": "Failed",
+    "expired": "Expired",
+    "partially_refunded": "Partially refunded",
+    "refunded": "Refunded",
+    "disputed": "Disputed"
+  },
+  "kind": {
+    "plan_purchase": "Plan purchase",
+    "topup": "Top-up"
+  },
+  "history": {
+    "title": "Payment history",
+    "lede": "Every payment you have started, newest first.",
+    "settledOnly": "Settled only",
+    "tableLabel": "Your payments",
+    "column": {
+      "date": "Date",
+      "description": "Description",
+      "kind": "Type",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "pagination": {
+      "label": "Payment pages",
+      "previous": "Previous",
+      "next": "Next",
+      "position": "Page {{page}} of {{pages}}"
+    },
+    "empty": "You have no payments yet.",
+    "emptySettled": "You have no settled payments yet.",
+    "loadError": "We could not load your payments.",
+    "retry": "Retry"
+  },
+  "detail": {
+    "title": "Payment details",
+    "back": "Back to payment history",
+    "notFound": "We could not find this payment.",
+    "loadError": "We could not load this payment.",
+    "retry": "Retry",
+    "factsLabel": "Payment facts",
+    "fact": {
+      "description": "Description",
+      "kind": "Type",
+      "amount": "Amount",
+      "status": "Status",
+      "openedAt": "Opened",
+      "paidAt": "Paid",
+      "payType": "Pay type",
+      "orderRef": "Order reference",
+      "providerTransactionId": "Provider transaction ID"
+    },
+    "timeline": {
+      "title": "Timeline",
+      "empty": "Nothing has happened to this payment yet.",
+      "opened": "Payment opened",
+      "paid": "Payment received",
+      "payment_failed": "Payment failed",
+      "payment_expired": "Payment expired",
+      "code": "Provider code {{code}}"
+    }
+  }
+}

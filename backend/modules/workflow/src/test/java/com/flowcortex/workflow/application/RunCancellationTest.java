@@ -2,6 +2,7 @@ package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 class RunCancellationTest {
 
@@ -30,12 +32,13 @@ class RunCancellationTest {
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final RunUpdates runUpdates = mock(RunUpdates.class);
     private final ChildRuns childRuns = mock(ChildRuns.class);
+    private final RunStepTransactions transactions = mock(RunStepTransactions.class);
     private final RunCancellation cancellation = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, childRuns, true);
+            runUpdates, childRuns, transactions, true);
     private final RunCancellation switchedOff = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, childRuns, false);
+            runUpdates, childRuns, transactions, false);
     private final UUID adminId = UUID.randomUUID();
 
     private final UUID ownerId = UUID.randomUUID();
@@ -162,5 +165,37 @@ class RunCancellationTest {
         cancellation.cancelRun(ownerId, runId);
 
         verify(runUpdates, never()).touched(any());
+    }
+
+    @Test
+    void stopWithOnlyPendingChildrenFailsTheIterateAndSettlesAtOnce() {
+        when(runs.requestCancel(runId, ownerId)).thenReturn(1);
+        when(steps.skipPending(runId)).thenReturn(4);
+        when(transactions.failIdleIterateParents(runId, NOW)).thenReturn(true);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(steps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of());
+
+        cancellation.cancelRun(ownerId, runId);
+
+        InOrder order = inOrder(steps, transactions, childRuns);
+        order.verify(steps).skipPending(runId);
+        order.verify(transactions).failIdleIterateParents(runId, NOW);
+        order.verify(childRuns).stopChildrenOf(runId);
+        verify(runs, never()).settleCancelled(any(), any());
+        verify(childRuns, never()).finished(any());
+    }
+
+    @Test
+    void stopWithARunningChildLeavesTheIterateToTheChildsEnd() {
+        when(runs.requestCancel(runId, ownerId)).thenReturn(1);
+        when(transactions.failIdleIterateParents(runId, NOW)).thenReturn(false);
+        when(runs.settleCancelled(runId, NOW)).thenReturn(0);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(steps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of());
+
+        cancellation.cancelRun(ownerId, runId);
+
+        verify(runs).settleCancelled(runId, NOW);
+        verify(childRuns, never()).finished(any());
     }
 }
