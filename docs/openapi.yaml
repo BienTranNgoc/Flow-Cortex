@@ -84,6 +84,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
     put:
       tags:
       - schedules-controller
@@ -127,6 +133,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
     delete:
@@ -154,6 +166,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/reviews/{reviewId}/helpful:
@@ -1828,6 +1842,15 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
         "400":
           $ref: "#/components/responses/IdempotencyKeyInvalid"
         "409":
@@ -1867,6 +1890,15 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
         "400":
           $ref: "#/components/responses/IdempotencyKeyInvalid"
         "409":
@@ -1900,6 +1932,15 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
         "400":
           $ref: "#/components/responses/IdempotencyKeyInvalid"
         "409":
@@ -6887,6 +6928,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewScheduleFireResponse"
   /api/v1/workflows/{id}/reviews:
     get:
       tags:
@@ -9771,6 +9818,86 @@ components:
       required:
       - frequency
       - time
+    ScheduleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        frequency:
+          type: string
+          enum:
+          - daily
+          - weekly
+          - monthly
+        dayOfWeek:
+          type:
+          - string
+          - "null"
+          enum:
+          - monday
+          - tuesday
+          - wednesday
+          - thursday
+          - friday
+          - saturday
+          - sunday
+        dayOfMonth:
+          type:
+          - integer
+          - "null"
+          format: int32
+        time:
+          type: string
+          example: 08:00
+        timezone:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+        pausedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        nextRunAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        nextRunLocal:
+          type:
+          - string
+          - "null"
+          format: date-time
+          example: 2026-11-17T08:00:00+07:00
+        input:
+          type:
+          - string
+          - "null"
+        acknowledgeCost:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - acknowledgeCost
+      - createdAt
+      - frequency
+      - id
+      - status
+      - time
+      - timezone
+      - updatedAt
+      - workflowId
     HelpfulRequest:
       type: object
       properties:
@@ -11305,41 +11432,6 @@ components:
           type: string
       required:
       - type
-    RunOptionsRequest:
-      type: object
-      properties:
-        voice:
-          type: string
-          default: female
-          enum:
-          - female
-          - male
-          pattern: female|male
-    StartRunRequest:
-      type: object
-      properties:
-        input:
-          type: string
-          maxLength: 10000
-          minLength: 0
-        uploadId:
-          type: string
-          format: uuid
-        uploadIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          maxItems: 10
-          minItems: 1
-        originalName:
-          type: string
-          maxLength: 1024
-          minLength: 0
-        options:
-          $ref: "#/components/schemas/RunOptionsRequest"
-        acknowledgeCost:
-          type: boolean
     RunResponse:
       type: object
       properties:
@@ -11476,6 +11568,41 @@ components:
       - deliveryCount
       - mode
       - outputs
+    RunOptionsRequest:
+      type: object
+      properties:
+        voice:
+          type: string
+          default: female
+          enum:
+          - female
+          - male
+          pattern: female|male
+    StartRunRequest:
+      type: object
+      properties:
+        input:
+          type: string
+          maxLength: 10000
+          minLength: 0
+        uploadId:
+          type: string
+          format: uuid
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 10
+          minItems: 1
+        originalName:
+          type: string
+          maxLength: 1024
+          minLength: 0
+        options:
+          $ref: "#/components/schemas/RunOptionsRequest"
+        acknowledgeCost:
+          type: boolean
     ReportRequest:
       type: object
       properties:
@@ -13931,6 +14058,73 @@ components:
       required:
       - snapshot
       - version
+    PageViewScheduleFireResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleFireResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ScheduleFireResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        trigger:
+          type: string
+          enum:
+          - manual
+          - scheduled
+        scheduledAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - starting
+          - started
+          - failed
+        runId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        runStatus:
+          type:
+          - string
+          - "null"
+        errorCode:
+          type:
+          - string
+          - "null"
+        errorMessage:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - scheduledAt
+      - status
+      - trigger
     ReviewListItemResponse:
       type: object
       properties:

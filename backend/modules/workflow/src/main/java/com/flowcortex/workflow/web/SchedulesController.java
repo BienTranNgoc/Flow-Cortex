@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -64,6 +65,7 @@ class SchedulesController {
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "setWorkflowSchedule", summary = "Create or replace the caller's schedule")
+    @ResponseStatus(HttpStatus.OK)
     @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ScheduleResponse> set(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Valid @RequestBody SetScheduleRequest request) {
@@ -76,6 +78,7 @@ class SchedulesController {
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "getWorkflowSchedule", summary = "The caller's schedule for the workflow")
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ScheduleResponse> get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID callerId = currentUserResolver.require(jwt);
@@ -87,6 +90,7 @@ class SchedulesController {
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "deleteWorkflowSchedule", summary = "Delete the caller's schedule; its fires stay")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping
     ResponseEntity<Void> delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         schedules.delete(currentUserResolver.require(jwt), id);
@@ -98,6 +102,7 @@ class SchedulesController {
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "pauseWorkflowSchedule", summary = "Pause the caller's schedule")
+    @ResponseStatus(HttpStatus.OK)
     @PostMapping(value = "/pause", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ScheduleResponse> pause(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID callerId = currentUserResolver.require(jwt);
@@ -111,6 +116,7 @@ class SchedulesController {
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "resumeWorkflowSchedule", summary = "Resume the caller's schedule")
+    @ResponseStatus(HttpStatus.OK)
     @PostMapping(value = "/resume", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ScheduleResponse> resume(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID callerId = currentUserResolver.require(jwt);
@@ -127,6 +133,7 @@ class SchedulesController {
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "runWorkflowScheduleNow",
             summary = "Start one run with the schedule's input now, without changing the schedule")
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(value = "/run-now", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<RunResponse> runNow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID callerId = currentUserResolver.require(jwt);
@@ -139,6 +146,7 @@ class SchedulesController {
     @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "listWorkflowScheduleRuns", summary = "The caller's fires of the workflow, newest first")
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping(value = "/runs", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<PageView<ScheduleFireResponse>> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,

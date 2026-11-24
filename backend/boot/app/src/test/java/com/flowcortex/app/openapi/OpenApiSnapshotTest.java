@@ -92,6 +92,28 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
         assertThat(outsideTheTokenRoutes).doesNotContain("IdempotencyKey", "ApiTokenDailyLimit");
     }
 
+    @Test
+    void everyScheduleOperationDocumentsItsSuccessAnswer() throws IOException {
+        JsonNode paths = liveDocument().get("paths");
+        String schedule = "/api/v1/workflows/{id}/schedule";
+        String[][] successes = {
+                {schedule, "put", "200", "ScheduleResponse"},
+                {schedule, "get", "200", "ScheduleResponse"},
+                {schedule + "/pause", "post", "200", "ScheduleResponse"},
+                {schedule + "/resume", "post", "200", "ScheduleResponse"},
+                {schedule + "/run-now", "post", "201", "RunResponse"},
+                {schedule + "/runs", "get", "200", "PageViewScheduleFireResponse"}};
+
+        for (String[] operation : successes) {
+            JsonNode success = paths.at(pointer(operation[0]) + "/" + operation[1] + "/responses/" + operation[2]);
+            assertThat(success.at("/content/application~1json/schema/$ref").asText())
+                    .as("%s %s %s", operation[1], operation[0], operation[2])
+                    .isEqualTo("#/components/schemas/" + operation[3]);
+        }
+        assertThat(paths.at(pointer(schedule) + "/delete/responses/204").isMissingNode())
+                .as("delete answers 204").isFalse();
+    }
+
     private JsonNode liveDocument() throws IOException {
         ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs.yaml", String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
