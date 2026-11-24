@@ -91,6 +91,7 @@ class BatchRunsController {
     @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "getBatch")
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping(value = "/batches/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<BatchResponse> get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         UUID currentUserId = currentUserResolver.require(jwt);
@@ -103,6 +104,7 @@ class BatchRunsController {
     @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @Operation(operationId = "listBatchRows")
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping(value = "/batches/{id}/rows", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<PageView<BatchRowResponse>> rows(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Parameter(schema = @Schema(allowableValues = {"pending", "running", "completed", "failed",

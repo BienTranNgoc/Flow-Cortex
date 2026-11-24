@@ -3915,6 +3915,36 @@ export interface PageViewBatchResponse {
   total: number;
 }
 
+export type BatchRowResponseStatus =
+  (typeof BatchRowResponseStatus)[keyof typeof BatchRowResponseStatus];
+
+export const BatchRowResponseStatus = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface BatchRowResponse {
+  rowIndex: number;
+  sourceRowIndex?: number;
+  input: string;
+  status: BatchRowResponseStatus;
+  runId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface PageViewBatchRowResponse {
+  items: BatchRowResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 /**
  * @nullable
  */
@@ -18583,16 +18613,24 @@ export const listBatches = async (
   });
 };
 
+export type getBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
 export type getBatchResponse404 = {
   data: ProblemDetail;
   status: 404;
 };
 
+export type getBatchResponseSuccess = getBatchResponse200 & {
+  headers: Headers;
+};
 export type getBatchResponseError = getBatchResponse404 & {
   headers: Headers;
 };
 
-export type getBatchResponse = getBatchResponseError;
+export type getBatchResponse = getBatchResponseSuccess | getBatchResponseError;
 
 export const getGetBatchUrl = (id: string) => {
   return `/api/v1/batches/${id}`;
@@ -18608,6 +18646,11 @@ export const getBatch = async (
   });
 };
 
+export type listBatchRowsResponse200 = {
+  data: PageViewBatchRowResponse;
+  status: 200;
+};
+
 export type listBatchRowsResponse400 = {
   data: ProblemDetail;
   status: 400;
@@ -18618,11 +18661,14 @@ export type listBatchRowsResponse404 = {
   status: 404;
 };
 
+export type listBatchRowsResponseSuccess = listBatchRowsResponse200 & {
+  headers: Headers;
+};
 export type listBatchRowsResponseError = (listBatchRowsResponse400 | listBatchRowsResponse404) & {
   headers: Headers;
 };
 
-export type listBatchRowsResponse = listBatchRowsResponseError;
+export type listBatchRowsResponse = listBatchRowsResponseSuccess | listBatchRowsResponseError;
 
 export const getListBatchRowsUrl = (id: string, params?: ListBatchRowsParams) => {
   const normalizedParams = new URLSearchParams();

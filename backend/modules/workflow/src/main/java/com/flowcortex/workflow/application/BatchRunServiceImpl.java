@@ -37,6 +37,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -57,6 +58,8 @@ class BatchRunServiceImpl implements BatchRunService {
     /** The longest stored name is 200 characters; the suffix is 8 of them. */
     private static final int MAX_RETRIED_NAME_CODE_POINTS = 192;
     private static final String PARENT_INDEX = "uq_batch_run_parent";
+    private static final String CREATE_LOCK = "SELECT pg_advisory_xact_lock(hashtext(?))";
+    private static final String CREATE_LOCK_PREFIX = "workflow.batch.create:";
 
     private final BatchRunRepository batches;
     private final BatchRunRowRepository rows;
@@ -200,6 +203,10 @@ class BatchRunServiceImpl implements BatchRunService {
             throw new UnprocessableEntityException(new LocalizedMessage("workflow.batch.textInputOnly"),
                     "workflow.batch.textInputOnly");
         }
+        throwIfTooManyUnfinished(ownerId);
+    }
+
+    private void throwIfTooManyUnfinished(UUID ownerId) {
         if (batches.countUnfinishedByOwner(ownerId) >= MAX_UNFINISHED_BATCHES) {
             throw new ConflictException(new LocalizedMessage("workflow.batch.tooManyActive", MAX_UNFINISHED_BATCHES));
         }
@@ -217,6 +224,11 @@ class BatchRunServiceImpl implements BatchRunService {
                         sourceIndexes == null ? null : sourceIndexes.get(index), inputs.get(index)))
                 .toList();
         transactions.executeWithoutResult(status -> {
+            // The check in checkCanStart is a fast refusal only: parallel creates all pass it, so the limit is
+            // enforced here, serialised per member until this transaction commits.
+            jdbc.query(CREATE_LOCK, (RowCallbackHandler) row -> {
+            }, CREATE_LOCK_PREFIX + ownerId);
+            throwIfTooManyUnfinished(ownerId);
             batches.save(batch);
             rows.saveAll(newRows);
             events.publishEvent(new BatchDispatchRequested(batchId));

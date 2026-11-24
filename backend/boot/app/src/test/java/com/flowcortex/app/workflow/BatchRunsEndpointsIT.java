@@ -13,6 +13,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
@@ -165,6 +170,52 @@ class BatchRunsEndpointsIT extends AbstractWorkflowHttpIT {
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(post("/api/v1/workflows/" + w.id() + "/batches", token, Map.of("rows", List.of("row")),
                 BatchView.class).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void parallelCreatesNeverHoldMoreThanTheUnfinishedLimit() throws Exception {
+        UserView m = newUser("batch-parallel");
+        WorkflowView w = echoWorkflow(m);
+        String token = loginAs(m);
+        int attempts = 12;
+        ExecutorService pool = Executors.newFixedThreadPool(attempts);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<HttpStatus>> answers = new ArrayList<>();
+            for (int i = 0; i < attempts; i++) {
+                answers.add(pool.submit(() -> {
+                    start.await();
+                    return HttpStatus.valueOf(post("/api/v1/workflows/" + w.id() + "/batches", token,
+                            Map.of("rows", List.of("row")), String.class).getStatusCode().value());
+                }));
+            }
+            start.countDown();
+            List<HttpStatus> statuses = new ArrayList<>();
+            for (Future<HttpStatus> answer : answers) {
+                statuses.add(answer.get(60, TimeUnit.SECONDS));
+            }
+
+            assertThat(statuses.stream().filter(HttpStatus.CREATED::equals).count()).isEqualTo(5);
+            assertThat(statuses.stream().filter(HttpStatus.CONFLICT::equals).count()).isEqualTo(attempts - 5);
+            assertThat(batchesOf(m)).isEqualTo(5);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void cancelOfAPausedBatchReportsNoPauseReason() {
+        UserView m = newUser("batch-pause-cancel");
+        String token = loginAs(m);
+        BatchView batch = createBatch(echoWorkflow(m), token, List.of("a"));
+        String base = "/api/v1/batches/" + batch.id();
+        assertThat(post(base + "/pause", token, null, BatchView.class).getBody().pauseReason()).isEqualTo("member");
+
+        BatchView cancelled = post(base + "/cancel", token, null, BatchView.class).getBody();
+
+        assertThat(cancelled.status()).isEqualTo("cancelled");
+        assertThat(cancelled.cancelReason()).isEqualTo("member");
+        assertThat(cancelled.pauseReason()).isNull();
     }
 
     @Test

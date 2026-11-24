@@ -374,6 +374,29 @@ class BatchRunRepositoryIT extends AbstractWorkflowModuleIT {
     }
 
     @Test
+    void aBatchLeavingPausedByAnyExitDropsItsPauseReason() {
+        UserView owner = newUser("pause-reason");
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+
+        UUID memberCancelled = settledBatch(owner, "running");
+        assertThat(batches.pause(memberCancelled, owner.id(), "member")).isEqualTo(1);
+        assertThat(batches.cancel(memberCancelled, owner.id(), "member")).isEqualTo(1);
+        assertThat(pauseReason(memberCancelled)).as("member cancel of a paused batch").isNull();
+
+        UUID dispatcherCancelled = settledBatch(owner, "running");
+        UUID token = leased(dispatcherCancelled);
+        assertThat(batches.pauseUnderLease(dispatcherCancelled, token, "insufficientCredits")).isEqualTo(1);
+        assertThat(batches.cancelUnderLease(dispatcherCancelled, token, "ownerInactive")).isEqualTo(1);
+        assertThat(pauseReason(dispatcherCancelled)).as("dispatcher cancel of a paused batch").isNull();
+
+        UUID finished = settledBatch(owner, "running");
+        UUID finishToken = leased(finished);
+        assertThat(batches.pauseUnderLease(finished, finishToken, "unavailable")).isEqualTo(1);
+        assertThat(batches.finish(finished, BatchRun.COMPLETED_WITH_ERRORS, now, finishToken)).isEqualTo(1);
+        assertThat(pauseReason(finished)).as("finish of a paused batch").isNull();
+    }
+
+    @Test
     void backToPendingInACancelledBatchWritesCancelled() {
         UserView owner = newUser("back-to-pending");
         UUID batch = seedBatch(owner, "running", 5);
@@ -668,6 +691,10 @@ class BatchRunRepositoryIT extends AbstractWorkflowModuleIT {
 
     private String batchStatus(UUID batch) {
         return jdbc.queryForObject("SELECT status FROM batch_run WHERE id = ?", String.class, batch);
+    }
+
+    private String pauseReason(UUID batch) {
+        return jdbc.queryForObject("SELECT pause_reason FROM batch_run WHERE id = ?", String.class, batch);
     }
 
     private Timestamp finishedAt(UUID batch) {

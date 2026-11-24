@@ -92,6 +92,17 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
         assertThat(outsideTheTokenRoutes).doesNotContain("IdempotencyKey", "ApiTokenDailyLimit");
     }
 
+    @Test
+    void theBatchReadsPublishTheirSuccessAnswers() throws IOException {
+        JsonNode paths = liveDocument().get("paths");
+
+        assertThat(paths.at(pointer("/api/v1/batches/{id}") + "/get/responses/200/content/application~1json/schema/$ref")
+                .asText()).isEqualTo("#/components/schemas/BatchResponse");
+        assertThat(paths.at(pointer("/api/v1/batches/{id}/rows")
+                + "/get/responses/200/content/application~1json/schema/$ref").asText())
+                .isEqualTo("#/components/schemas/PageViewBatchRowResponse");
+    }
+
     private JsonNode liveDocument() throws IOException {
         ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs.yaml", String.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

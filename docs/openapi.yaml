@@ -8700,6 +8700,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
   /api/v1/batches/{id}/rows:
     get:
       tags:
@@ -8754,6 +8760,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewBatchRowResponse"
   /api/v1/auth/profile/preferences:
     get:
       tags:
@@ -15855,6 +15867,63 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BatchResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    BatchRowResponse:
+      type: object
+      properties:
+        rowIndex:
+          type: integer
+          format: int32
+        sourceRowIndex:
+          type: integer
+          format: int32
+        input:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - failed
+          - cancelled
+        runId:
+          type: string
+          format: uuid
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - input
+      - rowIndex
+      - status
+    PageViewBatchRowResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchRowResponse"
         page:
           type: integer
           format: int32

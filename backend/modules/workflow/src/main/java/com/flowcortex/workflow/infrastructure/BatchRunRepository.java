@@ -109,14 +109,14 @@ public interface BatchRunRepository extends JpaRepository<BatchRun, UUID> {
     /** The member's cancel: {@code running|paused} -> {@code cancelled} for the owner's batch. */
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE batch_run SET status = 'cancelled', cancel_reason = :reason "
+    @Query(value = "UPDATE batch_run SET status = 'cancelled', cancel_reason = :reason, pause_reason = NULL "
             + "WHERE id = :id AND owner_id = :ownerId AND status IN ('running', 'paused')", nativeQuery = true)
     int cancel(@Param("id") UUID id, @Param("ownerId") UUID ownerId, @Param("reason") String reason);
 
     /** The dispatcher's cancel (workflow gone, owner suspended): {@code running|paused} -> {@code cancelled}. */
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE batch_run SET status = 'cancelled', cancel_reason = :reason "
+    @Query(value = "UPDATE batch_run SET status = 'cancelled', cancel_reason = :reason, pause_reason = NULL "
             + "WHERE id = :id AND status IN ('running', 'paused') AND lease_token = :token", nativeQuery = true)
     int cancelUnderLease(@Param("id") UUID id, @Param("token") UUID token, @Param("reason") String reason);
 
@@ -126,7 +126,7 @@ public interface BatchRunRepository extends JpaRepository<BatchRun, UUID> {
      */
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE batch_run SET status = :status, finished_at = :now "
+    @Query(value = "UPDATE batch_run SET status = :status, finished_at = :now, pause_reason = NULL "
             + "WHERE id = :id AND status IN ('running', 'paused') AND lease_token = :token "
             + "AND NOT EXISTS (SELECT 1 FROM batch_run_row r WHERE r.batch_id = batch_run.id "
             + "AND r.status IN ('pending', 'starting', 'running'))", nativeQuery = true)
