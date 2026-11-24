@@ -14,10 +14,11 @@ import java.util.UUID;
  * started with.
  *
  * <p>{@code storedOutputs} are recorded as the step's outputs when it completes; an inline executor
- * fills it by storing each object through {@link #store}.
+ * fills it by storing each object through {@link #store}. {@code itemIndex} is set for an item of an
+ * iterate step and {@code null} for every other step.
  */
 record StepContext(UUID runId, UUID stepId, int stepOrder, String type, short attempt, String input, String config,
-        String storedInput, RunOptions options, List<MediaOutput> storedOutputs) {
+        String storedInput, RunOptions options, List<MediaOutput> storedOutputs, Integer itemIndex) {
 
     /** A context with the default run options and nothing stored yet. */
     StepContext(UUID runId, UUID stepId, int stepOrder, String type, short attempt, String input, String config,
@@ -26,13 +27,21 @@ record StepContext(UUID runId, UUID stepId, int stepOrder, String type, short at
                 new ArrayList<>());
     }
 
+    StepContext(UUID runId, UUID stepId, int stepOrder, String type, short attempt, String input, String config,
+            String storedInput, RunOptions options, List<MediaOutput> storedOutputs) {
+        this(runId, stepId, stepOrder, type, attempt, input, config, storedInput, options, storedOutputs, null);
+    }
+
     /**
-     * Stores {@code bytes} as object {@code name} of this step and adds it to {@link #storedOutputs}.
+     * Stores {@code bytes} as object {@code name} of this step and adds it to {@link #storedOutputs}; an
+     * item of an iterate step stores it as {@code item-<itemIndex>-<attempt>-<name>} under the iterate
+     * step's order, so a regenerated attempt never overwrites the earlier one's file.
      * @throws IllegalArgumentException if {@code name} is not a plain file name; nothing is stored or recorded
      * @throws com.flowcortex.media.api.MediaStoreUnavailableException if the store does not take the write
      */
     MediaOutput store(MediaJobs media, String name, String mime, byte[] bytes) {
-        MediaOutput stored = media.putRunObject(runId, stepOrder, name, mime, bytes);
+        String objectName = itemIndex == null ? name : "item-" + itemIndex + "-" + attempt + "-" + name;
+        MediaOutput stored = media.putRunObject(runId, stepOrder, objectName, mime, bytes);
         storedOutputs.add(stored);
         return stored;
     }

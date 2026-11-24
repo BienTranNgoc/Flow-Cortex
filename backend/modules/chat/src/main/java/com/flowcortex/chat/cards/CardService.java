@@ -91,7 +91,7 @@ public class CardService {
 
         if (imageCard && edits.attachments() != null) {
             Optional<List<Attachment>> replacement = Attachments.clean(edits.attachments(), 1,
-                    video ? 1 : MAX_IMAGES);
+                    video ? 3 : MAX_IMAGES);
             if (replacement.isPresent()) {
                 uploads = replacement.get();
                 patch.set("uploads", json.valueToTree(uploads));
@@ -213,7 +213,7 @@ public class CardService {
     }
 
     private static LocalizedMessage attachmentsInvalid(boolean video) {
-        return new LocalizedMessage("chat.card.attachments.invalid", video ? "1" : "1-" + MAX_IMAGES);
+        return new LocalizedMessage("chat.card.attachments.invalid", video ? "1-3" : "1-" + MAX_IMAGES);
     }
 
     /** Localized messages for the fields a validation refused; never the validator's own wording. */

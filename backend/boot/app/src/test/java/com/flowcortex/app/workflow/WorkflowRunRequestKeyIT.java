@@ -189,7 +189,7 @@ class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
         assertThatThrownBy(() -> productVideoRuns.start(owner.id(), draft(), List.of(upload, upload), false, "k2"))
                 .isInstanceOf(ConstraintViolationException.class);
         assertThatThrownBy(() -> productVideoRuns.start(owner.id(), draft(), List.of(UUID.randomUUID(),
-                UUID.randomUUID()), false, "k3"))
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()), false, "k3"))
                 .isInstanceOf(ConstraintViolationException.class);
         assertThat(rowsFor(owner.id(), "k1") + rowsFor(owner.id(), "k2") + rowsFor(owner.id(), "k3")).isZero();
     }

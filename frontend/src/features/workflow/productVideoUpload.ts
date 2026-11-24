@@ -17,7 +17,7 @@ export type MultiUploadPhase =
   | { kind: 'done' };
 
 const MIN_IMAGES = 1;
-const MAX_IMAGES = 1;
+export const MAX_IMAGES = 3;
 
 export type ImageProblem = FileProblem;
 
