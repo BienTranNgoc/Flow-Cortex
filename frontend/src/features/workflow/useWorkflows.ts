@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
+  answerTask,
   approveTask,
   authHeaders,
   cancelRun,
@@ -31,13 +33,32 @@ import type {
   UploadRequest,
 } from '@flow-cortex/api-client';
 import { activeLocale } from '../../lib/i18n';
+import { untilLinkRenewal } from '../../lib/signedLinks';
+import { newUuidV4 } from '../support/uuid';
 import { useRunEvents } from './useRunEvents';
 
-/** What a reviewer decided: the edited text for a plain checkpoint, the revision for a script one. */
+/**
+ * What a reviewer decided: the edited text for a plain checkpoint, the revision for a script one,
+ * the zero-based option for a pick list.
+ */
 export interface ApproveTaskInput {
   reviewedPayload?: string | undefined;
   revisionId?: string | undefined;
   expectedVersion?: number | undefined;
+  pickedOption?: number | undefined;
+}
+
+/** A QA answer: the chosen option, the chosen options of a multiple-choice question, or free text. */
+export type QaAnswers = Record<string, string | string[]>;
+
+/** A fresh key for one review form; every decision the form sends carries it, so a resend replays. */
+export function useDecisionKey(): string {
+  return useState(newUuidV4)[0];
+}
+
+function withKey(key: string): RequestInit {
+  const auth = authHeaders().headers as Record<string, string> | undefined;
+  return { headers: { ...auth, 'Idempotency-Key': key } };
 }
 
 /** ALL authenticated users (owner OR shared) — no admin gate. */
@@ -122,28 +143,12 @@ export function useRunQuery(runId: string | undefined) {
     queryFn: () => unwrap(getRun(runId as string, authHeaders())),
     enabled: Boolean(runId),
   });
-  useRunEvents(runId, query.data?.status, query.refetch);
+  useRunEvents(runId, query.data?.status, query.refetch, query.data?.steps);
   return query;
 }
 
-const INPUT_URL_REFRESH_LEAD_MS = 60_000;
-// A stale timer longer than ~24.8 days overflows setTimeout and fires at once.
-const MAX_INPUT_STALE_MS = 24 * 60 * 60 * 1000;
-
-/** Whether a signed link is expired or about to be, so a failed load means "renew", not "gone". */
-export function inputUrlNeedsRenewal(expiresAt: string, now = Date.now()): boolean {
-  const expiry = Date.parse(expiresAt);
-  return Number.isNaN(expiry) || now >= expiry - INPUT_URL_REFRESH_LEAD_MS;
-}
-
-/** Milliseconds until the earliest link needs renewing; 0 when none is known or one already does. */
 function untilInputRefresh(inputs: RunInputResponse[] | undefined): number {
-  const expiries = (inputs ?? []).map((input) => Date.parse(input.expiresAt));
-  if (expiries.length === 0 || expiries.some(Number.isNaN)) {
-    return 0;
-  }
-  const untilRefresh = Math.min(...expiries) - INPUT_URL_REFRESH_LEAD_MS - Date.now();
-  return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
+  return untilLinkRenewal((inputs ?? []).map((input) => input.expiresAt));
 }
 
 /**
@@ -187,12 +192,13 @@ export function useReviewTasksQuery(runId: string) {
   return useQuery({
     queryKey: ['runs', runId, 'review-tasks'],
     queryFn: () => unwrap(getReviewTasks(runId, authHeaders())),
-    // A review can be created a moment after the run already reads as waiting for it.
-    refetchInterval: (query) =>
-      query.state.status === 'success' &&
-      !query.state.data?.some((task) => task.status === 'pending')
-        ? 1000
-        : false,
+    // A review can be created a moment after the run already reads as waiting for it, and a QA
+    // review's questions arrive a moment after the review itself.
+    refetchInterval: (query) => {
+      if (query.state.status !== 'success') return false;
+      const pending = query.state.data?.find((task) => task.status === 'pending');
+      return !pending || pending.questionsState === 'generating' ? 1000 : false;
+    },
   });
 }
 
@@ -226,11 +232,21 @@ export function useSaveRevisionMutation(runId: string, taskId: string) {
  * script revisions must always name the revision and the task version it saw, or the server
  * rejects the decision with a 409 instead of approving something the reviewer never read.
  */
-export function useApproveTaskMutation(runId: string, taskId: string) {
+export function useApproveTaskMutation(runId: string, taskId: string, idempotencyKey: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ApproveTaskInput) =>
-      unwrap(approveTask(taskId, approveBody(input), authHeaders())),
+      unwrap(approveTask(taskId, approveBody(input), withKey(idempotencyKey))),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['runs', runId] }),
+  });
+}
+
+/** Sends a QA review's answers; the next step receives the content followed by them. */
+export function useAnswerTaskMutation(runId: string, taskId: string, idempotencyKey: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (answers: QaAnswers) =>
+      unwrap(answerTask(taskId, { answers }, withKey(idempotencyKey))),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['runs', runId] }),
   });
 }
@@ -241,6 +257,9 @@ export function useApproveTaskMutation(runId: string, taskId: string) {
  * this decision is omitted from the body rather than sent as null.
  */
 function approveBody(input: ApproveTaskInput): ApproveReviewTaskRequest | undefined {
+  if (input.pickedOption !== undefined) {
+    return { pickedOption: input.pickedOption };
+  }
   if (input.revisionId !== undefined || input.expectedVersion !== undefined) {
     return {
       ...(input.revisionId === undefined ? {} : { revisionId: input.revisionId }),
@@ -288,10 +307,10 @@ export function useOutputPeaksQuery(
   });
 }
 
-export function useRejectTaskMutation(runId: string, taskId: string) {
+export function useRejectTaskMutation(runId: string, taskId: string, idempotencyKey: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => unwrap(rejectTask(taskId, authHeaders())),
+    mutationFn: () => unwrap(rejectTask(taskId, withKey(idempotencyKey))),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['runs', runId] }),
   });
 }

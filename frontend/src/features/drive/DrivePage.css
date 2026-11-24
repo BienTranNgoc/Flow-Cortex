@@ -1,0 +1,73 @@
+.drive-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  /* Keeps the card grids to six columns on very wide screens. */
+  max-width: 90rem;
+  margin-inline: auto;
+}
+
+.drive-page__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.75rem;
+}
+
+.drive-page__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-h);
+  min-width: var(--control-h);
+  margin: 0;
+  padding: 0 1.25rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  background: var(--btn-bg);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--dur-quick) var(--ease-standard);
+}
+
+.drive-page__tab:hover {
+  background: var(--btn-bg-hover);
+}
+
+.drive-page__tab:active {
+  transform: scale(0.98);
+}
+
+.drive-page__tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.drive-page__tab[aria-selected='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  font-weight: 600;
+}
+
+.drive-page__panel {
+  min-width: 0;
+}
+
+@media (pointer: coarse), (max-width: 1023px) {
+  .drive-page__tab {
+    min-height: var(--hit-min);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drive-page__tab {
+    transition: none;
+  }
+
+  .drive-page__tab:active {
+    transform: none;
+  }
+}

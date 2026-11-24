@@ -954,3 +954,151 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
   - The executor and `RunCreation` need the step registry, which takes the
     executor; they resolve it, and the start guards, when they run rather than
     at construction.
+
+---
+
+## ADR-0043 — MCP authorization server: personal access tokens for consenting admins
+
+Number provisional until merge; see `openspec/changes/mcp-oauth-runtime/`.
+
+- **Context:** An MCP client (Claude Desktop, Claude Code, claude.ai) needs a
+  credential for the Nodi API without handling an admin's password. ADR-0022
+  made the personal access token the one scripted credential of an admin
+  account, with its own cap, route allowlist and revocation. The client must get
+  one through an OAuth 2.1 authorization-code flow with PKCE, with the admin's
+  consent in the member app.
+- **Decision:**
+  - **The access token is a personal access token.** The token endpoint answers
+    with a new `fc_pat_` token named `MCP: <client name>`, minted through the
+    one port `OAuthTokenIssuer` of the token service, so the cap of live tokens,
+    the eligibility rule (an active, unlocked super admin whose admin access is
+    not disabled), the route allowlist, the profile page and credential-reset
+    revocation all apply unchanged. No refresh token and no second credential
+    store.
+  - **Consent needs a signed-in session and a fresh step-up proof.** The grant
+    spends a `PAT_CREATE` proof after the request, eligibility and cap checks
+    pass, so a refusal for any other reason leaves the proof usable; a token
+    cannot reach the consent routes (`PAT_NOT_ALLOWED`). The page shows the
+    client name and redirect host the server holds, never values from the link.
+  - **Clients and codes are stored durably.** Registrations (`oauth_client`, the
+    SHA-256 of the secret only), codes (`oauth_authorization_code`, the SHA-256
+    of the code, 5 minutes) and the link from a token to its client
+    (`oauth_issued_token`) live in the database, so every instance and every
+    restart agrees. A code is redeemed by one conditional `UPDATE`; a replay
+    revokes the token its first redemption produced.
+  - **Redirect URI policy.** Registration takes 1-5 absolute URIs without
+    fragment or user information: `https` anywhere, `http` only on `localhost`,
+    `127.0.0.1` or `[::1]`. Matching is exact, except that the port of a
+    registered loopback `http` URI is ignored (RFC 8252). An unregistered
+    redirect URI is refused before anything is redirected.
+  - **Revocation is scoped to the issuing client.** `POST /api/v1/oauth/revoke`
+    authenticates the client and revokes a token only when this flow issued it
+    to that client; every other authenticated request answers 200 and changes
+    nothing.
+  - **A switch, off by default.** `flowcortex.auth.mcp-oauth.enabled` answers
+    503 on every route and the metadata document while off; turning it on
+    without personal access tokens or `flowcortex.app.public-url` stops startup.
+    Registration, and token and revocation requests, are limited per client IP
+    on the shared registry.
+- **Consequences:**
+  - **Open dynamic registration** lets anyone create client rows; the per-IP
+    limit and the purge of unused clients after 30 days bound it, and a client
+    name shown on the consent page is the registered one, not a link value.
+  - **A wrong verifier burns the code**, so a client that sends one restarts the
+    consent; this stops verifier guessing.
+  - **An admin credential reaches an outside client** after one consent: the
+    step-up proof, the auth events (`OAUTH_CONSENT_GRANTED`, `PAT_CREATED`,
+    `OAUTH_CODE_REPLAYED`, `PAT_REVOKED`) and revocation on the profile page are
+    the controls.
+  - **Resource indicators are accepted and ignored**; the token is valid on the
+    whole Nodi API within the allowlist, not bound to an MCP server.
+
+---
+
+## ADR-0032 — A step may fan out child steps within its run
+
+The number is provisional: it is the next free one on the base when this was
+written, and whichever change merges first takes it.
+
+- **Context:** ADR-0007's run engine runs a workflow's steps in order, one at a
+  time, and ADR-0024 lets a step wait on a whole child run. Neither can run the
+  same step once per item of a list, with a bounded number in flight, inside one
+  run. An `iterate` step does: it reads a list and runs one child step of a
+  configured type per item. A child run per item (the `workflow.call` route)
+  would need a workflow to be a run of, would make run history and run lists
+  count N runs per iterate, and would make each child pay the run start guards.
+  An executor that calls the child executors itself on a thread pool would give
+  the children no claim, charge, lease or reaper, hold a thread for the step's
+  whole runtime, and lose every in-flight child on a crash.
+- **Decision:**
+  - **Children are run steps of the same run.** One `run_step` row per item,
+    with `parent_step_id`, `parent_attempt` and `item_index`, run by the
+    existing claim, executors, lease, reaper and credit ledger. The child has
+    the parent's `step_order`, so output prefixes and the output URL route are
+    unchanged; a child file is named `item-<index>-<attempt>-<name>` and lands
+    under the iterate step's prefix.
+  - **A fourth step mode, `FANOUT`.** `NESTED` means "finish on a child run's
+    signal" with a fixed deadline; an iterate step finishes from its own rows,
+    with a deadline derived from its item count. The parent's progress runs
+    inside the run's advance on every advance: an ordered decision table over
+    the children's states (an unpaid child, a failed child under fail-fast,
+    every child terminal, dispatch up to the free slots, wait). No thread polls.
+  - **The concurrency cap is enforced by the claim statement.** The claim of a
+    child counts the running children of its parent attempt inside its own
+    `UPDATE ... WHERE`, after the run's row lock serialises the claims of one
+    run, so two advances cannot both claim past the cap. A regenerate carries
+    the same predicate. Children of a type that runs on the shared provider pool
+    run at a lower effective concurrency, so one iterate step cannot overflow it.
+  - **The stalled sweep counts an idle iterate step as stalled.** A run whose
+    advance was lost after a child ended still has a running step, which the
+    sweep would skip until the deadline; the sweep ignores a running `iterate`
+    row with no running child of its current attempt.
+  - **Soft stop.** A stop or a fail-fast lets the children in flight finish and
+    skips the pending ones; the parent then fails `iterate_cancelled` (stop) or
+    with the failed item's error (fail-fast). An inline thread or a provider
+    call cannot be recalled, and its result would land on a failed row.
+  - **The child list is closed.** The children's types are a fixed list
+    intersected with the registered types, all inline with resolved input.
+    A type joins the list only in a change that also routes its start and
+    authoring guards (credit estimate, availability, owner and authoring checks)
+    through the expansion of an iterate step to its child type, because a guard
+    that reads only the top-level type would let an iterate step run an
+    author-chosen request, with a child type's credentials, that the guard
+    exists to forbid. Remote and parked types are out of scope: N media jobs
+    would share one output prefix, and a parked child has no signal path into a
+    fan-out.
+  - **Step lists stay top-level only.** `findByRunIdOrderByStepOrderAsc` keeps
+    its name and returns rows with no parent; children are read through their
+    own queries (`findCurrentChildren`, `findChildStates`, ...). The step
+    ladder, run retry, step retry, request keys and nested-run results keep
+    meaning "the run's steps" with no change.
+- **Consequences:**
+  - `run_step` gains `parent_step_id`, `parent_attempt` and `item_index`; the
+    migration is additive; two-way only while no child row or iterate step
+    exists, one-way after (rollback path in the V2026.11.15.220 header).
+    `uq_run_step_order` is replaced by two
+    partial unique indexes, one for top-level rows and one per child, built
+    before the old key is dropped so top-level uniqueness never lapses.
+  - **A new step reader must decide whether it wants children.** The default
+    query hides them; a reader that needs every row of a run must say so.
+  - **A child's end calls `childClosed` under the run lock.** It covers these
+    transitions: a child completes (the completed parent's output is regathered
+    when the child was regenerated); a child fails (the parent keeps its earlier
+    result; a running parent in a `cancelling` run with no running sibling fails
+    `iterate_cancelled`, which settles the run); the iterate step fails (its
+    pending children are skipped); a stop settles at once or from the last
+    child's end (every idle iterate parent fails `iterate_cancelled` first). A
+    new terminal transition of a child or of the parent must go through the
+    same call, or the parent waits for its deadline and then fails `run_timeout`.
+  - A child that fails refunds its own charge and does not mark the run; only a
+    top-level failure halts the run. A child that fails `INSUFFICIENT_CREDITS`
+    fails the parent whatever the item-error mode, because every later child
+    would fail the same way.
+  - A retried iterate step reuses the completed children of the earlier attempt
+    on the same input with no claim and no charge, so a fail-fast step over
+    fifty paid items failing at item forty does not charge forty again.
+  - `iterate` is priced `free`; the children are charged by their own rows at
+    their own claims, and the credit estimate counts the item cap times the
+    child price.
+  - A lost signal costs at most the wait up to the sweep or the parent's
+    deadline.

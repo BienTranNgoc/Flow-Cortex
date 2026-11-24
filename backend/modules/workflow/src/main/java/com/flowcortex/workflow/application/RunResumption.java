@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaAssetInput;
+import com.flowcortex.media.api.MediaError;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.MediaOutput;
@@ -34,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,12 +147,26 @@ public class RunResumption {
         // A claim overwrites a step's stored input with the resolved one, so it is rebuilt, never kept.
         String restoredInput = snapshotsUpload(steps, step) ? RunInputShape.storedInput(bound) : null;
         short attempt = step.getAttempt();
+        Optional<RunStep> companion = parallelClipCompanion(operation, run, steps, step);
 
         transactionTemplate.executeWithoutResult(status -> {
             workflowRunRepository.lockById(runId);
+            // A fail-fast or timed-out iterate step leaves its running items to finish; a new attempt that
+            // started beside them would pay for and run those items again. No item can start once the step
+            // has failed, so under the run's lock this count only falls.
+            if (operation != Operation.EXECUTE && runStepRepository.countRunningChildrenOfAnyAttempt(stepId) > 0) {
+                logRefusal(operation, "items_running", runId, stepId, attempt);
+                throw new ConflictException(new LocalizedMessage("workflow.runStep.itemsRunning"));
+            }
             if (operation != Operation.EXECUTE
                     && runStepRepository.reArm(stepId, runId, attempt, restoredInput) == 0) {
                 logRefusal(operation, "step_not_failed", runId, stepId, attempt);
+                throw new ConflictException(new LocalizedMessage("workflow.runStep.notFailed"));
+            }
+            if (companion.isPresent() && runStepRepository.reArm(companion.get().getId(), runId,
+                    companion.get().getAttempt(), restoredInput) == 0) {
+                logRefusal(operation, "companion_not_failed", runId, companion.get().getId(),
+                        companion.get().getAttempt());
                 throw new ConflictException(new LocalizedMessage("workflow.runStep.notFailed"));
             }
             boolean reopen = operation == Operation.RETRY
@@ -169,6 +185,29 @@ public class RunResumption {
         LOG.info("Run resume: op={} outcome=resumed runId={} stepId={} attempt={}", operation.logName, runId, stepId,
                 operation == Operation.EXECUTE ? attempt : attempt + 1);
         return currentView(callerId, runId);
+    }
+
+    /**
+     * Product Video's parallel clips cancel each other: when one fails, the other ends in error with
+     * {@code sibling_failed} without ever failing itself. Such a clip is re-armed together with the clip
+     * being resumed, as its own next attempt (its earlier charge was refunded), or the run would be
+     * re-opened with a clip the arbiter halts on. A clip that failed for its own reason is the member's
+     * to reset, so resuming the other clip is refused rather than re-arming it unasked.
+     */
+    private Optional<RunStep> parallelClipCompanion(Operation operation, WorkflowRun run, List<RunStep> steps,
+            RunStep step) {
+        Optional<RunStep> sibling = ProductVideoClipPair.match(run.getWorkflowId(), steps)
+                .flatMap(pair -> pair.siblingOf(step.getId()))
+                .filter(clip -> clip.getStatus() == RunStepStatus.ERROR);
+        if (sibling.isEmpty() || MediaError.Code.SIBLING_FAILED.value().equals(sibling.get().getErrorCode())) {
+            return sibling;
+        }
+        if (operation == Operation.RESET) {
+            return Optional.empty();
+        }
+        LOG.info("Run resume: op={} outcome=refused kind=sibling_clip_failed runId={} stepId={}",
+                operation.logName, run.getId(), step.getId());
+        throw new ConflictException(new LocalizedMessage("workflow.runStep.siblingClipFailed"));
     }
 
     /**
@@ -260,7 +299,7 @@ public class RunResumption {
             }
             runUpdates.touched(newRunId);
             events.publishEvent(new WorkflowRunStartedEvent(newRunId));
-            return WorkflowMapper.toRunView(created, saved, registry::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(created, saved, List.of(), registry::isRemote, mediaJobs::isDownloadable);
         });
         LOG.info("Run resume: op=retryRun outcome=created runId={} newRunId={} fromStepOrder={}", runId, newRunId, from);
         return view;
@@ -331,7 +370,7 @@ public class RunResumption {
         if (remaining.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (remaining.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
+        if (remaining.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
             throw new DubDisabledException();
         }
     }
@@ -368,6 +407,6 @@ public class RunResumption {
     private RunView currentView(UUID callerId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, callerId).orElseThrow();
         return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                registry::isRemote, mediaJobs::isDownloadable);
+                runStepRepository.findCurrentChildren(runId), registry::isRemote, mediaJobs::isDownloadable);
     }
 }

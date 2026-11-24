@@ -104,7 +104,9 @@ describe('StoredOutputDownload for a video', () => {
     await screen.findByRole('button', { name: 'Hide video' });
 
     expect(urlRequests(calls)).toBe(2);
-    expect(screen.getByRole('alert')).toHaveTextContent('Could not play the video. Download it instead.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not play the video. Download it instead.',
+    );
   });
 
   it('keeps the player closed when the member hides it while a fresh link is on its way', async () => {
@@ -137,7 +139,9 @@ describe('StoredOutputDownload for a video', () => {
     await user.click(screen.getByRole('button', { name: 'Hide video' }));
     release();
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Watch video' })).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Watch video' })).toBeInTheDocument(),
+    );
     expect(document.querySelector('video')).toBeNull();
   });
 
@@ -147,5 +151,63 @@ describe('StoredOutputDownload for a video', () => {
 
     expect(screen.getByText('Ad video (final.mp4)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Watch video' })).toBeInTheDocument();
+  });
+
+  it('plays intermediate audio and video clips inline without any download button when allowDownload is false', async () => {
+    const user = userEvent.setup();
+    stubApi({
+      'GET /api/v1/runs/r1/steps/4/outputs/speech.wav/url': {
+        status: 200,
+        body: {
+          url: 'http://localhost:9000/flowcortex-media/speech.wav?sig=1',
+          expiresAt: '2026-10-01T10:15:00Z',
+        },
+      },
+      'GET /api/v1/runs/r1/steps/5/outputs/clip.mp4/url': {
+        status: 200,
+        body: {
+          url: 'http://localhost:9000/flowcortex-media/clip.mp4?sig=1',
+          expiresAt: '2026-10-01T10:15:00Z',
+        },
+      },
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StoredOutputDownload
+          runId="r1"
+          stepOrder={4}
+          output={{ name: 'speech.wav', mime: 'audio/wav', bytes: 12_000 }}
+          allowDownload={false}
+        />
+        <StoredOutputDownload
+          runId="r1"
+          stepOrder={5}
+          output={{ name: 'clip.mp4', mime: 'video/mp4', bytes: 200_000 }}
+          allowDownload={false}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: /Download/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Listen to voice-over' }));
+    await waitFor(() =>
+      expect(document.querySelector('audio')).toHaveAttribute(
+        'src',
+        expect.stringContaining('speech.wav'),
+      ),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Preview clip' }));
+    await waitFor(() =>
+      expect(document.querySelector('video')).toHaveAttribute(
+        'src',
+        expect.stringContaining('clip.mp4'),
+      ),
+    );
+    expect(screen.queryByRole('button', { name: /Download/i })).not.toBeInTheDocument();
   });
 });
