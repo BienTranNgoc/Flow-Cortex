@@ -7,6 +7,7 @@ import com.flowcortex.user.accountdeletion.AccountDeletionRequestRepository.Proj
 import com.flowcortex.user.accountdeletion.DeletionEligibility.Eligibility;
 import com.flowcortex.user.api.StepUpProofs;
 import com.flowcortex.user.api.StepUpPurpose;
+import com.flowcortex.user.api.StepUpRequiredException;
 import com.flowcortex.user.application.AccountCredentials;
 import com.flowcortex.user.application.AuditEventWriter;
 import com.flowcortex.user.application.AuthEventType;
@@ -96,7 +97,8 @@ class AccountDeletionService {
     /**
      * Refuses in a fixed order: switch off (503), a role that is not an end user (409), a proof that
      * is missing or spent (403), an account with unfinished activity (409 or 503). An account that
-     * already has a request gets that request back before the proof is read.
+     * already has a request gets that request back before the proof is read, and again when a refused
+     * proof is the revoked one of a twin that made the request in between.
      */
     Accepted request(UUID userId, String stepUpProof, String ip, String userAgent) {
         if (!enabled()) {
@@ -104,12 +106,18 @@ class AccountDeletionService {
         }
         requireEndUser(userId);
         Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        Projection projection = requests.projection(userId).orElseThrow(() -> userGone(userId));
-        if (AccountDeletionState.of(projection.requestedAt(), projection.scheduledAt(), now)
-                != AccountDeletionState.NONE) {
+        if (hasRequest(userId, now)) {
             return repeat(userId, now);
         }
-        stepUpProofs.consume(userId, StepUpPurpose.ACCOUNT_DELETION, stepUpProof);
+        try {
+            stepUpProofs.consume(userId, StepUpPurpose.ACCOUNT_DELETION, stepUpProof);
+        } catch (StepUpRequiredException refused) {
+            // A twin that committed after the check above revoked this caller's unspent proof with the account's credentials.
+            if (hasRequest(userId, now)) {
+                return repeat(userId, now);
+            }
+            throw refused;
+        }
         Eligibility result = eligibility(userId);
         if (!result.eligible()) {
             LOG.info("account.deletion outcome=blocked user={} reasons={}", userId, result.reasons().size());
@@ -176,6 +184,12 @@ class AccountDeletionService {
         credentials.revokeAllFor(userId);
         return new AccountDeletionRequest(requestId, userId, AccountDeletionRequest.State.PENDING, now, scheduledAt,
                 null);
+    }
+
+    private boolean hasRequest(UUID userId, Instant now) {
+        Projection projection = requests.projection(userId).orElseThrow(() -> userGone(userId));
+        return AccountDeletionState.of(projection.requestedAt(), projection.scheduledAt(), now)
+                != AccountDeletionState.NONE;
     }
 
     /** The account's existing request, answered as if it had just been made; nothing is written. */

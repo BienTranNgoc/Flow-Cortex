@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -346,6 +347,27 @@ class AccountDeletionIT extends AbstractUserModuleIT {
         assertThat(answers).extracting(ResponseEntity::getStatusCode).containsOnly(HttpStatus.ACCEPTED);
         assertThat(answers.get(0).getBody().requestId()).isEqualTo(answers.get(1).getBody().requestId());
         assertThat(answers.get(0).getBody().scheduledAt()).isEqualTo(answers.get(1).getBody().scheduledAt());
+        assertThat(requestRows(member.id())).isEqualTo(1);
+        assertThat(eventCount(member.id(), "ACCOUNT_DELETION_REQUESTED")).isEqualTo(1);
+    }
+
+    @Test
+    void twinThatCommitsBeforeTheLoserSpendsItsProofConverges() {
+        Member member = newMember("twin-first");
+        String first = proofFor(member);
+        String second = proofFor(member);
+        AcceptedView[] winner = new AcceptedView[1];
+        doAnswer(call -> {
+            winner[0] = request(member.token(), first, AcceptedView.class).getBody();
+            return call.callRealMethod();
+        }).when(stepUpProofs).consume(member.id(), StepUpPurpose.ACCOUNT_DELETION, second);
+
+        ResponseEntity<AcceptedView> loser = request(member.token(), second, AcceptedView.class);
+
+        assertThat(loser.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(winner[0]).isNotNull();
+        assertThat(loser.getBody().requestId()).isEqualTo(winner[0].requestId());
+        assertThat(loser.getBody().scheduledAt()).isEqualTo(winner[0].scheduledAt());
         assertThat(requestRows(member.id())).isEqualTo(1);
         assertThat(eventCount(member.id(), "ACCOUNT_DELETION_REQUESTED")).isEqualTo(1);
     }
