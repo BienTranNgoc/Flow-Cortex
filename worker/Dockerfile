@@ -239,7 +239,7 @@ ENTRYPOINT ["python", "-m", "flowcortex_worker"]
 # The same hash-pinned torch base as the audio image, then the transformers set (wheels only).
 FROM build AS trend-build
 COPY engines/requirements-torch-cpu.txt engines/requirements-trend.txt ./engines/
-RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps --only-binary :all: \
       --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple \
       --index-strategy unsafe-best-match -r engines/requirements-torch-cpu.txt \
  && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
@@ -254,12 +254,13 @@ ARG RTDETR_CONFIG_SHA256=2ed2a305c51eef46715eb755a02b2a266ecfb752936cc9574bb5714
 ARG RTDETR_PREPROCESSOR_SHA256=ffb4b9461a1dad746be8f0f9c8330ed7743a1ba5fba4f75c232cd281b3d4c64a
 ARG RTDETR_WEIGHTS_SHA256=5263d5521eff3e356f6cd8a371fd5dfb891725beda5f713674f79669115cdc64
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /models/trend/rtdetr_r50vd
 RUN set -eux; \
     for file in config.json preprocessor_config.json model.safetensors; do \
-      curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$file" \
+      curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors \
+        -o "$file" \
         "https://huggingface.co/PekingU/rtdetr_r50vd/resolve/$RTDETR_REVISION/$file"; \
     done; \
     printf '%s  %s\n' \

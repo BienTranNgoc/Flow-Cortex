@@ -24,6 +24,23 @@ def _violation(position: int, detail: str) -> PermanentError:
     return PermanentError("contract_violation", f"scene {position}: {detail}")
 
 
+def _scene_at(position: int, item: Any, expect_start: int) -> Scene:
+    if not isinstance(item, dict):
+        raise _violation(position, "must be an object")
+    index, start, end = (item.get(key) for key in ("index", "startFrame", "endFrame"))
+    if type(index) is not int or type(start) is not int or type(end) is not int:
+        raise _violation(position, "index, startFrame and endFrame must be whole numbers")
+    if index != position:
+        raise _violation(position, f"index must be {position}, got {index}")
+    if start != expect_start:
+        raise _violation(position, f"startFrame must be {expect_start}, got {start}")
+    if end <= start:
+        raise _violation(position, f"endFrame {end} must be after startFrame {start}")
+    if end > MAX_END_FRAME:
+        raise _violation(position, f"endFrame {end} is past frame {MAX_END_FRAME}")
+    return Scene(index, start, end)
+
+
 def validate_scenes(raw: Any) -> list[Scene]:
     """Contiguous scenes from frame 0, indexed from 0, `endFrame` exclusive, within the ceilings.
 
@@ -38,21 +55,9 @@ def validate_scenes(raw: Any) -> list[Scene]:
     scenes: list[Scene] = []
     expect_start = 0
     for position, item in enumerate(raw):
-        if not isinstance(item, dict):
-            raise _violation(position, "must be an object")
-        index, start, end = (item.get(key) for key in ("index", "startFrame", "endFrame"))
-        if type(index) is not int or type(start) is not int or type(end) is not int:
-            raise _violation(position, "index, startFrame and endFrame must be whole numbers")
-        if index != position:
-            raise _violation(position, f"index must be {position}, got {index}")
-        if start != expect_start:
-            raise _violation(position, f"startFrame must be {expect_start}, got {start}")
-        if end <= start:
-            raise _violation(position, f"endFrame {end} must be after startFrame {start}")
-        if end > MAX_END_FRAME:
-            raise _violation(position, f"endFrame {end} is past frame {MAX_END_FRAME}")
-        scenes.append(Scene(index, start, end))
-        expect_start = end
+        scene = _scene_at(position, item, expect_start)
+        scenes.append(scene)
+        expect_start = scene.end_frame
     return scenes
 
 

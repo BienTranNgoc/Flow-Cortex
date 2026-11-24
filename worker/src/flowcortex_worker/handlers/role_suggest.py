@@ -111,7 +111,16 @@ def _run_detector(frames: list[Path], processes: ProcessRunner, work: Path) -> P
     """Runs the detector child once for every frame; returns the report it wrote."""
     report = work / _REPORT_NAME
     completed = processes.run(
-        [sys.executable, "-m", ENGINE_MODULE, "--output", str(report), *map(str, frames)]
+        [
+            sys.executable,
+            "-m",
+            ENGINE_MODULE,
+            "--work-dir",
+            str(work),
+            "--output",
+            str(report),
+            *map(str, frames),
+        ]
     )
     code = completed.returncode
     if code == 0:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,7 @@ def run_detector(
             sys.executable,
             *("-m", "flowcortex_worker.engines.role_suggest"),
             *args,
+            *("--work-dir", str(output.parent)),
             *("--output", str(output)),
             *map(str, frames),
         ],
@@ -107,7 +109,8 @@ def test_a_model_directory_without_the_model_is_unloadable(tmp_path: Path) -> No
 
 
 def test_a_photo_of_one_person_yields_a_box_around_them(tmp_path: Path) -> None:
-    photo = FIXTURES / "one_person.jpg"
+    photo = tmp_path / "one_person.jpg"
+    shutil.copy(FIXTURES / "one_person.jpg", photo)
     output = tmp_path / "boxes.json"
 
     done = run_detector(output, photo)

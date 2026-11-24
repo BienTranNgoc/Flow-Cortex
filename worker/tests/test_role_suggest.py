@@ -146,18 +146,19 @@ def clip(colour_clip: Path, tmp_path: Path) -> Path:
 
 
 def refused(runner: ProcessRunner, source: Path, **params: Any) -> PermanentError:
+    job = make_job(**params)
     with pytest.raises(PermanentError) as caught:
-        role_suggest.handle(make_job(**params), {"video": source}, runner)
+        role_suggest.handle(job, {"video": source}, runner)
     return caught.value
 
 
 @pytest.mark.parametrize("keys", [{"media"}, {"video", "frames"}])
 def test_the_inputs_are_exactly_video(keys: set[str]) -> None:
     runner = ScriptedRunner()
+    job = make_job(scenes=SCENES)
+    inputs = {key: Path("/nonexistent") for key in keys}
     with pytest.raises(PermanentError) as caught:
-        role_suggest.handle(
-            make_job(scenes=SCENES), {key: Path("/nonexistent") for key in keys}, runner
-        )
+        role_suggest.handle(job, inputs, runner)
     assert caught.value.code == "contract_violation"
     assert "video" in caught.value.message
     assert runner.argvs == []
@@ -327,10 +328,10 @@ def test_a_detector_crash_is_provider_request_failed_with_its_last_line_and_no_p
 
 
 def test_a_detector_ended_by_a_foreign_signal_is_transient(clip: Path) -> None:
+    job = make_job(scenes=SCENES)
+    runner = ScriptedRunner(engine=exits(-9))
     with pytest.raises(TransientError):
-        role_suggest.handle(
-            make_job(scenes=SCENES), {"video": clip}, ScriptedRunner(engine=exits(-9))
-        )
+        role_suggest.handle(job, {"video": clip}, runner)
 
 
 def test_a_detector_that_exits_zero_without_a_report_is_provider_response_invalid(
@@ -384,5 +385,7 @@ def test_a_kill_during_detection_propagates_and_is_never_an_error_result(clip: P
     def killed(argv: list[str]) -> subprocess.CompletedProcess[bytes]:
         raise ProcessKilled("watchdog")
 
+    job = make_job(scenes=SCENES)
+    runner = ScriptedRunner(engine=killed)
     with pytest.raises(ProcessKilled):
-        role_suggest.handle(make_job(scenes=SCENES), {"video": clip}, ScriptedRunner(engine=killed))
+        role_suggest.handle(job, {"video": clip}, runner)

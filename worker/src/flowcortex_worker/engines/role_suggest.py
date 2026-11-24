@@ -3,6 +3,9 @@
 Writes `[{"width": w, "height": h, "boxes": [[x0, y0, x1, y1, score], ...]}, ...]`, one item per
 frame path in the order given, with pixel boxes of the `person` label only. The model loads once
 for all frames, from a local directory, never from the network.
+
+Every path argument is confined on its fully resolved form: frames and the output must lie inside
+`--work-dir`, the model directory inside `--work-dir` or `MODEL_ROOT`.
 """
 
 from __future__ import annotations
@@ -17,7 +20,8 @@ from typing import Any
 
 from . import EXIT_UNLOADABLE
 
-MODEL_DIR = Path("/app/models/trend/rtdetr_r50vd")
+MODEL_ROOT = Path("/app/models")
+MODEL_DIR = MODEL_ROOT / "trend" / "rtdetr_r50vd"
 THRESHOLD = 0.5
 PERSON_LABEL = "person"
 
@@ -26,12 +30,31 @@ def person_ids(config: Any) -> set[int]:
     return {int(index) for index, name in config.id2label.items() if name == PERSON_LABEL}
 
 
+def confine(path: Path, *roots: Path) -> Path:
+    """`path` resolved (symlinks followed) and proven to lie inside one of `roots`."""
+    if ".." in path.parts:
+        raise ValueError(f"{str(path)!r} must not contain '..'")
+    resolved = path.resolve()
+    if not any(resolved.is_relative_to(root.resolve()) for root in roots):
+        raise ValueError(f"{str(path)!r} lies outside the allowed directories")
+    return resolved
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="role_suggest")
     parser.add_argument("--model-dir", type=Path, default=MODEL_DIR)
+    parser.add_argument("--work-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("frames", nargs="+", type=Path)
     args = parser.parse_args(argv)
+
+    try:
+        work_dir = args.work_dir.resolve()
+        model_dir = confine(args.model_dir, work_dir, MODEL_ROOT)
+        output = confine(args.output, work_dir)
+        frames = [confine(frame, work_dir) for frame in args.frames]
+    except ValueError as refused:
+        parser.error(str(refused))
 
     started = time.perf_counter()
     try:
@@ -41,8 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         from PIL import Image
         from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 
-        processor = RTDetrImageProcessor.from_pretrained(args.model_dir, local_files_only=True)
-        model = RTDetrForObjectDetection.from_pretrained(args.model_dir, local_files_only=True)
+        processor = RTDetrImageProcessor.from_pretrained(model_dir, local_files_only=True)
+        model = RTDetrForObjectDetection.from_pretrained(model_dir, local_files_only=True)
         model.eval()
     except (ImportError, OSError) as failed:
         print(f"RT-DETR cannot be loaded: {failed!r}", file=sys.stderr)
@@ -50,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
 
     people = person_ids(model.config)
     if not people:
-        print(f"RT-DETR in {args.model_dir} has no {PERSON_LABEL!r} label", file=sys.stderr)
+        print(f"RT-DETR in {model_dir} has no {PERSON_LABEL!r} label", file=sys.stderr)
         return EXIT_UNLOADABLE
     print(
         f"trend-engine: load={time.perf_counter() - started:.2f} threads={torch.get_num_threads()}",
@@ -58,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     report: list[dict[str, Any]] = []
-    for path in args.frames:
+    for path in frames:
         with Image.open(path) as opened:
             image = opened.convert("RGB")
         width, height = image.size
@@ -80,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         ]
         report.append({"width": width, "height": height, "boxes": boxes})
 
-    args.output.write_text(json.dumps(report), encoding="utf-8")
+    output.write_text(json.dumps(report), encoding="utf-8")
     return 0
 
 
