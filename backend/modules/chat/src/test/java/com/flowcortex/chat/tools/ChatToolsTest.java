@@ -246,7 +246,7 @@ class ChatToolsTest {
         UUID runId = UUID.randomUUID();
         UUID foreign = UUID.randomUUID();
         RunStepView step = new RunStepView(UUID.randomUUID(), 1, "echo", "running", null, null, null, null, null, 40,
-                1, null, 1, null, List.of(), "inline");
+                1, null, 1, null, List.of(), "inline", null);
         when(runs.getRun(owner, runId)).thenReturn(new RunView(runId, textFlow.id(), owner, "running", "hi", null,
                 Instant.now(), null, List.of(step)));
         when(runs.getRun(owner, foreign)).thenThrow(new NotFoundException(new LocalizedMessage("run.notFound",

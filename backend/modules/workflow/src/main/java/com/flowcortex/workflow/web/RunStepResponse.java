@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.workflow.api.RunStepFailure;
 import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -10,7 +11,8 @@ import java.util.UUID;
 
 /**
  * {@code status} is the exact lowercase wire value: pending/running/completed/error. A running
- * step with no {@code pickedUpAt} is still waiting to start.
+ * step with no {@code pickedUpAt} is still waiting to start. {@code failure} is {@code null} unless
+ * the step is in {@code error}.
  */
 record RunStepResponse(
         UUID id, int stepOrder, String type, String status, String input, String output, String errorMessage,
@@ -18,13 +20,32 @@ record RunStepResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) int attempt, String errorCode,
         @Schema(requiredMode = RequiredMode.REQUIRED) int deliveryCount, Instant pickedUpAt,
         @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepOutputResponse> outputs,
-        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode) {
+        @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode,
+        RunStepFailureResponse failure) {
 
     static RunStepResponse from(RunStepView view) {
         return new RunStepResponse(view.id(), view.stepOrder(), view.type(), view.status(), view.input(),
                 view.output(), view.errorMessage(), view.startedAt(), view.finishedAt(), view.progressPercent(),
                 view.attempt(), view.errorCode(), view.deliveryCount(), view.pickedUpAt(),
-                view.outputs().stream().map(RunStepOutputResponse::from).toList(), view.mode());
+                view.outputs().stream().map(RunStepOutputResponse::from).toList(), view.mode(),
+                view.failure() == null ? null : RunStepFailureResponse.from(view.failure()));
+    }
+
+    /** Enum values only, never the step's message; the allowed values are the wire values of the failure table. */
+    record RunStepFailureResponse(
+            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"validation", "handoff",
+                    "configuration", "contract", "review_rejected", "insufficient_credits", "timeout",
+                    "provider_error", "quota_exceeded", "unavailable", "processing", "internal"}) String category,
+            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"user", "provider", "system"})
+            String source,
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean retryable,
+            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"retry", "top_up", "change_input",
+                    "edit_workflow", "none"}) String recovery) {
+
+        static RunStepFailureResponse from(RunStepFailure failure) {
+            return new RunStepFailureResponse(failure.category(), failure.source(), failure.retryable(),
+                    failure.recovery());
+        }
     }
 
     /** An object the step produced, by name; bucket and object key never leave the server. */

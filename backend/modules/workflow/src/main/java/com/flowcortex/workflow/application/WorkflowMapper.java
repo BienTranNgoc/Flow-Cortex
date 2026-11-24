@@ -13,6 +13,7 @@ import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
 import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
@@ -110,7 +111,8 @@ final class WorkflowMapper {
                 isRemoteType.test(step.getType()) ? null : step.getInput(), step.getOutput(), step.getErrorMessage(),
                 step.getStartedAt(), step.getFinishedAt(), percent == null ? null : percent.intValue(),
                 step.getAttempt(), step.getErrorCode(), step.getDeliveryCount(), step.getPickedUpAt(),
-                outputs(step, isDownloadable), mode(step.getType(), isRemoteType));
+                outputs(step, isDownloadable), mode(step.getType(), isRemoteType),
+                step.getStatus() == RunStepStatus.ERROR ? StepFailureTaxonomy.recordFor(step.getErrorCode()) : null);
     }
 
     static AdminRunView toAdminRunView(WorkflowRun run, String workflowName, String ownerEmail,
