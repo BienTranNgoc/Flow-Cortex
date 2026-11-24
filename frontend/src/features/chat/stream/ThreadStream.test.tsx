@@ -17,7 +17,11 @@ interface Hub {
 }
 
 /** A fetch that serves the thread and holds the hub stream open for the test to feed. */
-function stubHub(initial: unknown[], streamStatus = 200): Hub {
+function stubHub(
+  initial: unknown[],
+  streamStatus = 200,
+  extraRoutes: Record<string, () => Response> = {},
+): Hub {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const hub: Hub = {
     push: (event, data) =>
@@ -37,6 +41,8 @@ function stubHub(initial: unknown[], streamStatus = 200): Hub {
     vi.fn(async (input: string, init?: RequestInit) => {
       const [path = '', query = ''] = input.split('?');
       const method = init?.method ?? 'GET';
+      const extra = extraRoutes[`${method} ${path}`];
+      if (extra) return extra();
       if (path === '/api/v1/realtime/stream') {
         hub.topics = new URLSearchParams(query).getAll('topic');
         if (streamStatus !== 200) return new Response(null, { status: streamStatus });
@@ -181,5 +187,72 @@ describe('ThreadPane stream', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('keeps subscribing to an errored run card while a sibling clip is still running and updates to Stopped', async () => {
+    let runBody = {
+      id: 'run-err',
+      workflowId: 'w-pv',
+      status: 'error',
+      steps: [
+        {
+          id: 's5',
+          stepOrder: 5,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'running',
+          pickedUpAt: '2026-11-18T10:00:00Z',
+          outputs: [],
+        },
+        {
+          id: 's6',
+          stepOrder: 6,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'error',
+          errorCode: 'provider_request_failed',
+          outputs: [],
+        },
+      ],
+    };
+    const cardMsg = {
+      id: 'c-msg',
+      seq: 2,
+      role: 'assistant',
+      kind: 'run',
+      body: '',
+      payload: { runId: 'run-err' },
+      status: 'done',
+    };
+    const hub = stubHub([USER, cardMsg], 200, {
+      'GET /api/v1/runs/run-err': () => new Response(JSON.stringify(runBody), { status: 200 }),
+    });
+    renderThread();
+
+    await screen.findByText(/Video clip 1: Running/);
+    await screen.findByText(/Video clip 2: Error/);
+    await waitFor(() => expect(hub.topics).toEqual(['chat:c1', 'run:run-err']));
+
+    runBody = {
+      ...runBody,
+      steps: [
+        {
+          id: 's5',
+          stepOrder: 5,
+          type: 'generate_video',
+          mode: 'remote',
+          status: 'error',
+          errorCode: 'sibling_failed',
+          outputs: [],
+        },
+        runBody.steps[1]!,
+      ],
+    };
+    await act(async () => {
+      hub.push('run.updated', { runId: 'run-err' });
+    });
+
+    await screen.findByText(/Video clip 1: Stopped/);
+    await waitFor(() => expect(hub.topics).toEqual(['chat:c1']));
   });
 });

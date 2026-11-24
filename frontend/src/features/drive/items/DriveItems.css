@@ -1,0 +1,343 @@
+.drive-items__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.drive-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.drive-subtab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-h);
+  min-width: var(--control-h);
+  margin: 0;
+  padding: 0 1rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  background: var(--btn-bg);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--dur-quick) var(--ease-standard);
+}
+
+.drive-subtab:hover {
+  background: var(--btn-bg-hover);
+}
+
+.drive-subtab:active {
+  transform: scale(0.98);
+}
+
+.drive-subtab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.drive-subtab[aria-selected='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  font-weight: 600;
+}
+
+.drive-items__panel:focus {
+  outline: none;
+}
+
+.drive-items__notice {
+  display: block;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+}
+
+.drive-items__notice:empty {
+  display: none;
+}
+
+.drive-items__total {
+  margin: 0 0 0.75rem;
+  color: var(--ink-3);
+}
+
+.drive-items__empty {
+  margin: 0;
+  color: var(--ink-3);
+}
+
+.drive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drive-grid[aria-busy='true'] {
+  cursor: progress;
+}
+
+.drive-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-2);
+}
+
+.drive-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-3);
+}
+
+.drive-card__icon {
+  flex: none;
+  font-size: 1.25rem;
+}
+
+.drive-card__kind {
+  font-weight: 600;
+}
+
+.drive-card__title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.drive-card__meta {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.drive-card__text {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.drive-card__media {
+  width: 100%;
+  max-height: 12rem;
+  object-fit: cover;
+}
+
+.drive-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.25rem;
+}
+
+.drive-card__state {
+  margin: 0;
+  color: var(--ink-3);
+}
+
+.drive-suggestions {
+  margin-top: 2rem;
+}
+
+.drive-section__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.drive-section__hint {
+  margin: 0 0 1rem;
+  color: var(--ink-3);
+}
+
+.drive-dialog--form {
+  max-width: min(36rem, calc(100vw - 2rem));
+}
+
+.drive-dialog--form .drive-dialog__title:focus {
+  outline: none;
+}
+
+.drive-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.drive-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.drive-field label {
+  font-weight: 600;
+}
+
+.drive-field input[type='text'],
+.drive-field input[type='file'],
+.drive-field select,
+.drive-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: inherit;
+}
+
+.drive-field textarea {
+  resize: vertical;
+}
+
+.drive-field input:hover:not(:disabled),
+.drive-field select:hover:not(:disabled),
+.drive-field textarea:hover:not(:disabled) {
+  border-color: var(--input-border-hover);
+}
+
+.drive-field input:focus-visible,
+.drive-field select:focus-visible,
+.drive-field textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.drive-field input:disabled,
+.drive-field select:disabled,
+.drive-field textarea:disabled {
+  border-color: var(--paper-3);
+  background: var(--paper-3);
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+
+.drive-field [aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.drive-field__error {
+  margin: 0;
+  color: var(--red);
+}
+
+.drive-field__counter {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  text-align: end;
+}
+
+.drive-field__counter--over {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.drive-form__messages {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--red);
+  border-radius: var(--radius-md);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.drive-form__messages p {
+  margin: 0;
+}
+
+.drive-form__messages p + p {
+  margin-top: 0.25rem;
+}
+
+.drive-readonly {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.drive-readonly dt {
+  color: var(--ink-3);
+  font-size: 0.875rem;
+}
+
+.drive-readonly dd {
+  margin: 0;
+}
+
+.drive-readonly__file {
+  overflow-wrap: anywhere;
+}
+
+.drive-upload__phase {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.drive-upload__label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.drive-upload__progress {
+  width: 100%;
+  height: 0.75rem;
+  accent-color: var(--primary);
+}
+
+@media (pointer: coarse), (max-width: 1023px) {
+  .drive-items .drive-button,
+  .drive-items .drive-subtab,
+  .drive-items .drive-field input[type='text'],
+  .drive-items .drive-field input[type='file'],
+  .drive-items .drive-field select {
+    min-height: var(--hit-min);
+  }
+}
+
+@media (max-width: 479px) {
+  .drive-card__actions .drive-button {
+    flex: 1 1 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drive-subtab {
+    transition: none;
+  }
+
+  .drive-subtab:active {
+    transform: none;
+  }
+}

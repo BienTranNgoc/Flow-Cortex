@@ -151,6 +151,12 @@ class WorkflowCallRulesTest {
     }
 
     @Test
+    void aChildWithAQaReviewStepIsRefused() {
+        assertThat(code(valid().withTypes(List.of("echo", "qa.review"))))
+                .isEqualTo("workflow_call_has_checkpoint");
+    }
+
+    @Test
     void workflowsSwitchedOffIsUnavailable() {
         assertThat(code(valid().withWorkflowsEnabled(false))).isEqualTo("workflow_call_unavailable");
     }

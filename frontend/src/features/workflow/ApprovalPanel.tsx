@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { ApiError } from '@flow-cortex/api-client';
 import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/api-client';
+import { activeLocale } from '../../lib/i18n';
+import { formatDateTime } from '../../lib/format';
 import {
   useApproveTaskMutation,
+  useDecisionKey,
   useRejectTaskMutation,
   useReviewTasksQuery,
   useRevisionsQuery,
 } from './useWorkflows';
 import { isLostRace } from './lostRace';
+import { PickList, type PickChoice } from './PickList';
+import { QaReviewForm } from './QaReviewForm';
+import { decisionRefusal, fieldMessage, ownSentence } from './reviewRefusal';
 import { ScriptEditor } from './ScriptEditor';
 
 interface ReviewFormProps {
@@ -22,20 +27,29 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
   const { t } = useTranslation();
   const original = originalPayload ?? '';
   const scripted = Boolean(task.currentRevisionId);
+  const pickOptions = scripted || !task.pickOptions?.length ? undefined : task.pickOptions;
+  const key = useDecisionKey();
   const [draft, setDraft] = useState(original);
+  const [choice, setChoice] = useState<PickChoice>(undefined);
+  const [own, setOwn] = useState('');
   const [scriptApprovalBlocked, setScriptApprovalBlocked] = useState(scripted);
   const [blankDraft, setBlankDraft] = useState(false);
-  const approve = useApproveTaskMutation(runId, task.id ?? '');
-  const reject = useRejectTaskMutation(runId, task.id ?? '');
+  const approve = useApproveTaskMutation(runId, task.id ?? '', key);
+  const reject = useRejectTaskMutation(runId, task.id ?? '', key);
   const busy = approve.isPending || reject.isPending;
   const approveBlocked = busy || scriptApprovalBlocked;
-  const serverFieldError = scripted ? undefined : payloadFieldError(approve.error);
+  const nothingChosen = pickOptions !== undefined && choice === undefined;
+  const serverFieldError = scripted ? undefined : fieldMessage(approve.error, 'reviewedPayload');
   const contentError = blankDraft ? t('workflow.approval.contentEmpty') : serverFieldError;
 
   // Busy rather than disabled, so focus stays on the button while the decision is sent.
   const onApprove = () => {
-    if (approveBlocked) return;
+    if (approveBlocked || nothingChosen) return;
     reject.reset();
+    if (pickOptions) {
+      approvePick();
+      return;
+    }
     if (!scripted && draft !== original && draft.trim() === '') {
       approve.reset();
       setBlankDraft(true);
@@ -46,6 +60,16 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
         ? { revisionId: task.currentRevisionId, expectedVersion: task.version }
         : { reviewedPayload: draft === original ? undefined : draft },
     );
+  };
+  const approvePick = () => {
+    if (choice !== 'own') {
+      approve.mutate({ pickedOption: choice });
+    } else if (own.trim() === '') {
+      approve.reset();
+      setBlankDraft(true);
+    } else {
+      approve.mutate({ reviewedPayload: own });
+    }
   };
   const onReject = () => {
     if (busy) return;
@@ -60,6 +84,23 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
           task={task}
           runId={runId}
           onApprovalBlockedChange={setScriptApprovalBlocked}
+        />
+      ) : pickOptions ? (
+        <PickList
+          name={`pick-${task.id}`}
+          options={pickOptions}
+          choice={choice}
+          onChoice={(next) => {
+            setChoice(next);
+            setBlankDraft(false);
+          }}
+          own={own}
+          onOwn={(text) => {
+            setOwn(text);
+            setBlankDraft(false);
+            if (serverFieldError) approve.reset();
+          }}
+          ownError={contentError}
         />
       ) : (
         <div className="field">
@@ -87,6 +128,7 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
         <button
           type="button"
           onClick={onApprove}
+          disabled={nothingChosen}
           aria-disabled={approveBlocked}
           aria-busy={approve.isPending}
         >
@@ -103,7 +145,7 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
       )}
       {reject.isError && (
         <p role="alert" className="approval-error">
-          {refusalReason(reject.error) ?? t('workflow.approval.rejectFailed')}
+          {decisionRefusal(reject.error, t) ?? t('workflow.approval.rejectFailed')}
         </p>
       )}
     </section>
@@ -112,26 +154,19 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
 
 /**
  * A 409 on a script checkpoint means the revision moved on, so the reviewer is told to reload
- * rather than shown the server's generic conflict sentence.
+ * rather than shown the server's generic conflict sentence; an ended review has its own wording.
  */
 function approveError(error: unknown, scripted: boolean, t: TFunction): string {
+  const own = ownSentence(error, t);
+  if (own) return own;
   if (scripted && isLostRace(error)) {
     return t('workflow.approval.scriptMovedOn');
   }
-  return refusalReason(error) ?? t('workflow.approval.approveFailed');
-}
-
-/**
- * A refused decision (403, 409, 422…) carries a sentence written for the member; a 5xx detail
- * does not, so the caller falls back to its own wording.
- */
-function refusalReason(error: unknown): string | undefined {
-  if (!(error instanceof ApiError) || error.status >= 500) return undefined;
-  return error.problem?.detail;
-}
-
-function payloadFieldError(error: unknown): string | undefined {
-  return error instanceof ApiError ? error.problem?.errors?.reviewedPayload : undefined;
+  return (
+    fieldMessage(error, 'pickedOption') ??
+    decisionRefusal(error, t) ??
+    t('workflow.approval.approveFailed')
+  );
 }
 
 /**
@@ -167,7 +202,24 @@ function ScriptReview({
   );
 }
 
-/** The pending review of a paused run: the content can be edited before it is approved. */
+/** The time limit of the review, in the reader's language; nothing when the server sent none. */
+function DecideBy({ expiresAt }: Readonly<{ expiresAt: string | undefined }>) {
+  const { t } = useTranslation();
+  if (!expiresAt || Number.isNaN(Date.parse(expiresAt))) {
+    return null;
+  }
+  const when = formatDateTime(expiresAt, activeLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+  return (
+    <p className="approval-decide-by">
+      <time dateTime={expiresAt}>{t('workflow.approval.decideBy', { when })}</time>
+    </p>
+  );
+}
+
+/**
+ * The pending review of a paused run: a checkpoint's content can be edited before it is approved,
+ * its options picked from, or a QA review's questions answered.
+ */
 export function ApprovalPanel({ runId }: Readonly<{ runId: string }>) {
   const { t } = useTranslation();
   const tasksQuery = useReviewTasksQuery(runId);
@@ -182,7 +234,16 @@ export function ApprovalPanel({ runId }: Readonly<{ runId: string }>) {
   if (!task?.id) {
     return null;
   }
+  // With options the pick list stands in for the questions, so a QA task with them is a plain form.
+  const asking = task.reviewType === 'QA_REVIEW' && !task.pickOptions?.length;
   return (
-    <ReviewForm key={task.id} runId={runId} task={task} originalPayload={task.originalPayload} />
+    <div key={task.id} className="approval-review">
+      <DecideBy expiresAt={task.expiresAt} />
+      {asking ? (
+        <QaReviewForm runId={runId} task={task} />
+      ) : (
+        <ReviewForm runId={runId} task={task} originalPayload={task.originalPayload} />
+      )}
+    </div>
   );
 }
