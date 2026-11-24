@@ -62,6 +62,18 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
     bounds ??
     (failure ? (refusal(failure) ?? t('settings.saveFailed')) : null);
 
+  const save = (value: number | boolean) => {
+    reset.reset();
+    update.mutate(value);
+  };
+
+  /** Runs `send` now, or holds it behind the confirmation when `next` would lower the value. */
+  const release = (next: unknown, opener: HTMLButtonElement | null, send: () => void) => {
+    const lowering = loweringToConfirm(setting.key, setting.value, next);
+    if (lowering) setHeld({ lowering, run: send, opener });
+    else send();
+  };
+
   const submitNumber = (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -72,25 +84,16 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
     }
     setBounds(null);
     const value = parsed.value;
-    const send = () => {
-      reset.reset();
-      update.mutate(value);
-    };
-    const lowering = loweringToConfirm(setting.key, setting.value, value);
-    if (lowering) setHeld({ lowering, run: send, opener: saveButton.current });
-    else send();
+    release(value, saveButton.current, () => save(value));
   };
 
   const resetToConfigured = () => {
     if (busy) return;
-    const send = () => {
+    release(setting.configuredValue, resetButton.current, () => {
       update.reset();
       setBounds(null);
       reset.mutate();
-    };
-    const lowering = loweringToConfirm(setting.key, setting.value, setting.configuredValue);
-    if (lowering) setHeld({ lowering, run: send, opener: resetButton.current });
-    else send();
+    });
   };
 
   const closeDialog = (change: HeldChange) => {
@@ -100,8 +103,7 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
 
   const toggle = (value: boolean) => {
     if (busy) return;
-    reset.reset();
-    update.mutate(value);
+    save(value);
   };
 
   const change = setting.updatedAt
