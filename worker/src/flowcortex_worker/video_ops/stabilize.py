@@ -66,7 +66,7 @@ def parse_zoom_pct(log: str) -> int:
 
 def not_steadier(source_motion: float, output_motion: float) -> bool:
     """True unless the output's motion is below the source's by more than the measurement noise."""
-    return not output_motion < source_motion - MIN_GAIN_PX
+    return output_motion >= source_motion - MIN_GAIN_PX
 
 
 def intra_bytes(width: int, height: int, fps: float, seconds: float) -> int:

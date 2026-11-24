@@ -29,6 +29,8 @@ TRANSFORM_FILE = "stab.trf"
 _FFMPEG = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
 _FFMPEG_VERBOSE = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "verbose", "-y"]
 _FILE_ONLY = ["-protocol_whitelist", "file"]
+_CLEAR_ROTATION = ["-metadata:s:v:0", "rotate=0"]
+_FASTSTART = ["-movflags", "+faststart"]
 
 
 @dataclass(frozen=True)
@@ -70,9 +72,9 @@ def _encode_argv(request: Request, video_filter: str | None, length: float | Non
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
         # The input's rotation is applied to the pixels while decoding; the tag is cleared so a
         # player does not turn the picture a second time.
-        "-metadata:s:v:0", "rotate=0",
+        *_CLEAR_ROTATION,
         *audio,
-        "-movflags", "+faststart",
+        *_FASTSTART,
         str(request.output),
     ]  # fmt: skip
 
@@ -214,8 +216,8 @@ def _prepare_stabilize(op_params: Mapping[str, Any]) -> Render:
                     "-vf",
                     f"vidstabtransform=input={transform}:smoothing={smoothing}:optzoom={optzoom}",
                     "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-                    "-metadata:s:v:0", "rotate=0", *_limit(request),
-                    *_audio_codec(request), "-movflags", "+faststart", str(output),
+                    *_CLEAR_ROTATION, *_limit(request),
+                    *_audio_codec(request), *_FASTSTART, str(output),
                 ],
                 "stabilise",
             )  # fmt: skip
@@ -330,8 +332,8 @@ def _prepare_reframe(op_params: Mapping[str, Any]) -> Render:
                     f"{timing},sendcmd=f={commands},"
                     f"crop={win}:{stream.height // 2 * 2}:{path[0]}:0",
                     "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-                    "-metadata:s:v:0", "rotate=0", *_audio_codec(request),
-                    "-movflags", "+faststart", str(request.output),
+                    *_CLEAR_ROTATION, *_audio_codec(request),
+                    *_FASTSTART, str(request.output),
                 ],
                 "reframe the window of",
             )  # fmt: skip

@@ -132,6 +132,10 @@ def sheet_null_frames(reply: Any, layout: Mapping[str, Any]) -> set[int]:
     return absent
 
 
+def _nearest(times: Sequence[int], at: float) -> int:
+    return min(times, key=lambda u: abs(u - at))
+
+
 def product_per_frame(
     answers: Mapping[int, Sequence[float] | None],
     cuts: Sequence[int],
@@ -159,7 +163,7 @@ def product_per_frame(
         if not same:
             products.append(None)
             continue
-        box = answers[min(same, key=lambda u: abs(u - at))]
+        box = answers[_nearest(same, at)]
         if box is None:
             products.append(None)
         else:

@@ -40,8 +40,12 @@ def test_shake_scales_up_by_two_percent_and_crops_the_original_size_back() -> No
     assert "crop=640:360" in shake
 
 
-def test_shake_is_the_same_graph_on_every_call() -> None:
-    assert graph("shake") == graph("shake")
+def test_shake_offsets_depend_on_the_frame_number_alone() -> None:
+    shake = graph("shake")
+
+    assert "sin(n*12.9898+78.233)" in shake
+    assert "sin(n*39.3468+11.135)" in shake
+    assert "random(" not in shake
 
 
 def test_glitch_shifts_red_and_blue_on_three_of_every_ten_frames() -> None:

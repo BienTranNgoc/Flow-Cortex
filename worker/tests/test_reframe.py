@@ -320,7 +320,8 @@ def test_a_landscape_clip_is_fitted_over_a_blurred_background(tmp_path: Path) ->
     assert set(outcome.data) == {"width", "height", "durationMs", "method"}
     [encode] = runner.encodes
     assert encode[encode.index("-protocol_whitelist") + 1] == "file"
-    assert "-ss" not in encode and "-t" not in encode
+    assert "-ss" not in encode
+    assert "-t" not in encode
     assert encode[encode.index("-c:a") + 1 :][:3] == ["aac", "-b:a", "128k"]
     assert runner.child_calls == []
 
@@ -571,7 +572,9 @@ def test_a_kill_during_the_encode_propagates_and_leaves_no_work_dir(tmp_path: Pa
                 raise ProcessKilled("watchdog")
             return super().run(argv, cwd)
 
+    runner = Killed()
+
     with pytest.raises(ProcessKilled):
-        run_reframe(clip, Killed(), cropMode="crop")
+        run_reframe(clip, runner, cropMode="crop")
 
     assert not (tmp_path / "vision").exists()

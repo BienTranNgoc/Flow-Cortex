@@ -429,5 +429,8 @@ def test_a_kill_during_the_encode_propagates(tmp_path: Path) -> None:
                 raise ProcessKilled("run_timeout")
             return super().run(argv, cwd)
 
+    runner = Killed()
+    request = job(durationSec=1)
+
     with pytest.raises(ProcessKilled):
-        still_handler.handle(job(durationSec=1), {"image": image}, Killed())
+        still_handler.handle(request, {"image": image}, runner)

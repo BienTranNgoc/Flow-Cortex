@@ -55,7 +55,8 @@ def test_no_target_leaves_every_channel_alone() -> None:
 def test_the_bounds_of_the_range_are_accepted() -> None:
     target_in, _ = grade.read_targets({"targetIn": {"y": 0, "u": 255.0}})
 
-    assert target_in["Y"] == 0.0 and target_in["U"] == 255.0
+    assert target_in["Y"] == 0.0
+    assert target_in["U"] == 255.0
 
 
 @pytest.mark.parametrize(
@@ -97,7 +98,8 @@ def test_a_shortfall_over_500_ms_is_input_rejected_naming_both_lengths() -> None
     error = refused(lambda: grade.shortfall(2000, 2600))
 
     assert error.code == "input_rejected"
-    assert "2600" in error.message and "2000" in error.message
+    assert "2600" in error.message
+    assert "2000" in error.message
 
 
 # --- measuring -----------------------------------------------------------------------------------

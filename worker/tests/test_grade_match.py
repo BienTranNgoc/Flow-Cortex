@@ -124,7 +124,8 @@ def test_a_shortfall_of_600_ms_is_input_rejected_before_any_decode(tmp_path: Pat
     error = refused(lambda: run_grade({"shot_1": shot}, runner, trimMs=2600))
 
     assert error.code == "input_rejected"
-    assert "2600" in error.message and "2000" in error.message
+    assert "2600" in error.message
+    assert "2000" in error.message
     assert runner.encodes == []
 
 
@@ -156,7 +157,8 @@ def test_a_grey_shot_is_lifted_onto_each_target(tmp_path: Path) -> None:
     grade = outcome.data["grade"]
     assert grade["in"]["dy"] == pytest.approx(10, abs=0.5)
     assert grade["out"]["dy"] == pytest.approx(20, abs=0.5)
-    assert grade["in"]["du"] == 0 and grade["out"]["dv"] == 0
+    assert grade["in"]["du"] == 0
+    assert grade["out"]["dv"] == 0
 
 
 @needs_ffmpeg
@@ -285,8 +287,10 @@ def test_the_files_are_h264_crf17_bt709_tv_with_aac_audio(tmp_path: Path) -> Non
     run_grade({"shot_1": shot}, runner, trimMs=2000)
 
     [argv] = [a for a in runner.encodes if "libx264" in a]
-    assert argv.count("-crf") == 2 and argv[argv.index("-crf") + 1] == "17"
-    assert argv.count("bt709") >= 2 and argv.count("tv") >= 2
+    assert argv.count("-crf") == 2
+    assert argv[argv.index("-crf") + 1] == "17"
+    assert argv.count("bt709") >= 2
+    assert argv.count("tv") >= 2
     assert argv.count("-protocol_whitelist") == 1
     for name in ("graded.mp4", "ungraded.mp4"):
         info = subprocess.run(

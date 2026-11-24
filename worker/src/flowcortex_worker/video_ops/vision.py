@@ -161,37 +161,54 @@ def measure_motion(path: Path) -> float:
             more, frame = capture.read()
             if not more:
                 break
-            height, width = frame.shape[:2]
-            scale = min(1.0, MOTION_WIDTH / width)
-            grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            if scale < 1.0:
-                size = (round(width * scale), round(height * scale))
-                grey = cv2.resize(grey, size, interpolation=cv2.INTER_AREA)
-            grey = grey.astype("float32")
+            grey, scale = _motion_grey(cv2, frame)
             if hann is None:
                 grid = MOTION_GRID if min(grey.shape) // MOTION_GRID >= MIN_TILE else 1
                 hann = cv2.createHanningWindow(
                     (grey.shape[1] // grid, grey.shape[0] // grid), cv2.CV_32F
                 )
-            tile_h, tile_w = grey.shape[0] // grid, grey.shape[1] // grid
             if previous is not None:
-                tiles = [
-                    cv2.phaseCorrelate(
-                        previous[r * tile_h : (r + 1) * tile_h, c * tile_w : (c + 1) * tile_w],
-                        grey[r * tile_h : (r + 1) * tile_h, c * tile_w : (c + 1) * tile_w],
-                        hann,
-                    )
-                    for r in range(grid)
-                    for c in range(grid)
-                ]
-                if float(np.median([t[1] for t in tiles])) >= MIN_RESPONSE:
-                    dx = float(np.median([t[0][0] for t in tiles]))
-                    dy = float(np.median([t[0][1] for t in tiles]))
-                    steps.append((dx * dx + dy * dy) ** 0.5 / scale)
+                step = _tile_shift(cv2, np, (previous, grey), hann, grid, scale)
+                if step is not None:
+                    steps.append(step)
             previous = grey
     finally:
         capture.release()
     return sum(steps) / len(steps) if steps else 0.0
+
+
+def _motion_grey(cv2: Any, frame: Any) -> tuple[Any, float]:
+    """The frame as float32 grey at most `MOTION_WIDTH` wide, and the scale it was shrunk by."""
+    height, width = frame.shape[:2]
+    scale = min(1.0, MOTION_WIDTH / width)
+    grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    if scale < 1.0:
+        size = (round(width * scale), round(height * scale))
+        grey = cv2.resize(grey, size, interpolation=cv2.INTER_AREA)
+    return grey.astype("float32"), scale
+
+
+def _tile_shift(
+    cv2: Any, np: Any, pair: tuple[Any, Any], hann: Any, grid: int, scale: float
+) -> float | None:
+    """Median shift in source pixels between two grey frames, None when the tiles do not agree
+    on one shot (median response under `MIN_RESPONSE`)."""
+    previous, grey = pair
+    tile_h, tile_w = grey.shape[0] // grid, grey.shape[1] // grid
+    tiles = [
+        cv2.phaseCorrelate(
+            previous[r * tile_h : (r + 1) * tile_h, c * tile_w : (c + 1) * tile_w],
+            grey[r * tile_h : (r + 1) * tile_h, c * tile_w : (c + 1) * tile_w],
+            hann,
+        )
+        for r in range(grid)
+        for c in range(grid)
+    ]
+    if float(np.median([t[1] for t in tiles])) >= MIN_RESPONSE:
+        dx = float(np.median([t[0][0] for t in tiles]))
+        dy = float(np.median([t[0][1] for t in tiles]))
+        return float((dx * dx + dy * dy) ** 0.5 / scale)
+    return None
 
 
 def run_motion(work: Path) -> dict[str, Any]:

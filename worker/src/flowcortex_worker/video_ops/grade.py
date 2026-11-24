@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import PermanentError
-from ..video_analysis.streams import tool_failure
+from ..video_analysis.streams import VideoStream, tool_failure
 from .media import Clip
 
 LUMA_RANGE = (16, 235)
@@ -113,7 +113,7 @@ def offsets(
     target_in: Targets, target_out: Targets, opening: Offsets, ending: Offsets
 ) -> tuple[Offsets, Offsets]:
     """The offset moving each edge onto its target; a channel with no target is not moved."""
-    d_in = {ch: 0.0 for ch in CHANNELS}
+    d_in = dict.fromkeys(CHANNELS, 0.0)
     d_out = dict(d_in)
     for ch in CHANNELS:
         goal_in, goal_out = target_in[ch], target_out[ch]
@@ -184,7 +184,22 @@ def join_graph(shots: Sequence[tuple[Path, Clip]], trim_s: float, pad_s: float) 
         raise ValueError("the frame rate was not read; probe with require_rate=True")
     rate = f"{first.rate[0]}/{first.rate[1]}"
     any_audio = any(clip.has_audio for _, clip in shots)
+    inputs, silence = _input_args(shots, any_audio)
 
+    parts: list[str] = []
+    for n, (_, clip) in enumerate(shots):
+        parts.append(_video_part(n, clip, first, rate))
+        if any_audio:
+            source = f"{n}:a" if clip.has_audio else f"{silence[n]}:a"
+            parts.append(f"[{source}]aresample=48000,aformat=channel_layouts=stereo[a{n}]")
+    parts += _concat_parts(len(shots), any_audio, trim_s, pad_s)
+    return Join(inputs, parts, any_audio)
+
+
+def _input_args(
+    shots: Sequence[tuple[Path, Clip]], any_audio: bool
+) -> tuple[list[str], dict[int, int]]:
+    """The `-i` arguments, and the input index of the silent source of each shot with no audio."""
     inputs: list[str] = []
     for path, _ in shots:
         inputs += ["-protocol_whitelist", "file", "-i", str(path)]
@@ -197,28 +212,27 @@ def join_graph(shots: Sequence[tuple[Path, Clip]], trim_s: float, pad_s: float) 
                     "-i", "anullsrc=r=48000:cl=stereo",
                 ]  # fmt: skip
                 silence[n] = len(shots) + len(silence)
+    return inputs, silence
 
-    parts: list[str] = []
-    for n, (_, clip) in enumerate(shots):
-        # An untagged shot is read as BT.709: ffmpeg otherwise assumes BT.601 and the conversion
-        # shifts luma by about 2 before the means are measured.
-        matrix = "" if clip.color_tagged else ":in_color_matrix=bt709"
-        parts.append(
-            f"[{n}:v]scale={first.width}:{first.height}:force_original_aspect_ratio=increase"
-            f"{matrix}:out_color_matrix=bt709:out_range=tv,"
-            f"crop={first.width}:{first.height},setsar=1,fps={rate},format=yuv420p[v{n}]"
-        )
-        if any_audio:
-            source = f"{n}:a" if clip.has_audio else f"{silence[n]}:a"
-            parts.append(f"[{source}]aresample=48000,aformat=channel_layouts=stereo[a{n}]")
-    pairs = "".join(f"[v{n}]" + (f"[a{n}]" if any_audio else "") for n in range(len(shots)))
-    parts.append(
-        f"{pairs}concat=n={len(shots)}:v=1:a={1 if any_audio else 0}"
-        + ("[vc][ac]" if any_audio else "[vc]")
+
+def _video_part(n: int, clip: Clip, first: VideoStream, rate: str) -> str:
+    # An untagged shot is read as BT.709: ffmpeg otherwise assumes BT.601 and the conversion
+    # shifts luma by about 2 before the means are measured.
+    matrix = "" if clip.color_tagged else ":in_color_matrix=bt709"
+    return (
+        f"[{n}:v]scale={first.width}:{first.height}:force_original_aspect_ratio=increase"
+        f"{matrix}:out_color_matrix=bt709:out_range=tv,"
+        f"crop={first.width}:{first.height},setsar=1,fps={rate},format=yuv420p[v{n}]"
     )
-    parts.append(
-        f"[vc]tpad=stop_mode=clone:stop_duration={pad_s:.3f}[v]" if pad_s > 0 else "[vc]null[v]"
-    )
+
+
+def _concat_parts(count: int, any_audio: bool, trim_s: float, pad_s: float) -> list[str]:
+    pairs = "".join(f"[v{n}]" + (f"[a{n}]" if any_audio else "") for n in range(count))
+    parts = [
+        f"{pairs}concat=n={count}:v=1:a={1 if any_audio else 0}"
+        + ("[vc][ac]" if any_audio else "[vc]"),
+        f"[vc]tpad=stop_mode=clone:stop_duration={pad_s:.3f}[v]" if pad_s > 0 else "[vc]null[v]",
+    ]
     if any_audio:
         parts.append(f"[ac]apad=whole_dur={trim_s:.3f}[a]" if pad_s > 0 else "[ac]anull[a]")
-    return Join(inputs, parts, any_audio)
+    return parts

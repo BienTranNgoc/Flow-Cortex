@@ -125,7 +125,7 @@ def handle(
     join = grade.join_graph(shots, trim_s, pad_s)
     work = shots[0][0].parent
 
-    d_in = {ch: 0.0 for ch in grade.CHANNELS}
+    d_in = dict.fromkeys(grade.CHANNELS, 0.0)
     d_out = dict(d_in)
     if grade.has_target(target_in, target_out):
         opening, ending = _measure(join, work, trim_s, shots[0][1].video.fps, processes)

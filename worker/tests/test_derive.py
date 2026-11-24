@@ -375,5 +375,7 @@ def test_a_kill_during_the_encode_propagates(tmp_path: Path) -> None:
                 raise ProcessKilled("run_timeout")
             return super().run(argv, cwd)
 
+    runner = Killed()
+
     with pytest.raises(ProcessKilled):
-        run_derive(clip, Killed(), op="cut")
+        run_derive(clip, runner, op="cut")

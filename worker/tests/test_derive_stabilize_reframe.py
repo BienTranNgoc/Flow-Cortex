@@ -159,13 +159,16 @@ def test_stabilize_returns_the_window_with_its_zoom_and_steadier_verdict(tmp_pat
     [stored] = outcome.files
     assert stored.name == "derive.mp4"
     extras = outcome.data["extras"]
-    assert isinstance(extras["zoomPct"], int) and extras["zoomPct"] >= 0
+    assert isinstance(extras["zoomPct"], int)
+    assert extras["zoomPct"] >= 0
     assert isinstance(extras["notSteadier"], bool)
     assert outcome.data["hasAudio"] is True
-    assert outcome.data["width"] == 300 and outcome.data["height"] == 160
+    assert outcome.data["width"] == 300
+    assert outcome.data["height"] == 160
     assert not (tmp_path / "vision").exists()
     streams = describe(stored.body)["streams"]
-    assert "audio" in streams and "rotate" not in streams["video"].get("tags", {})
+    assert "audio" in streams
+    assert "rotate" not in streams["video"].get("tags", {})
 
 
 @needs_vidstab
@@ -193,7 +196,8 @@ def test_the_window_is_cut_once_to_an_intra_copy_that_both_vidstab_passes_read(
     assert cut[cut.index("-g") : cut.index("-g") + 4] == ["-g", "1", "-crf", "10"]
     assert any(a.startswith("vidstabdetect=result=") for a in detect)
     window = next(a for a in cut if a.endswith("window.mkv"))
-    assert window in detect and window in transform
+    assert window in detect
+    assert window in transform
     assert transform.count("-i") == 1  # no audio input when keepAudio is false
     assert "-an" in transform
     assert any("optzoom=1" in a and "smoothing=10" in a for a in transform)
@@ -245,8 +249,10 @@ def test_a_kill_during_the_transform_propagates_and_leaves_no_work_dir(tmp_path:
                 raise ProcessKilled("job cancelled")
             return super().run(argv, cwd)
 
+    runner = Killed()
+
     with pytest.raises(ProcessKilled):
-        run_derive(clip, Killed(), op="stabilize")
+        run_derive(clip, runner, op="stabilize")
 
     assert not (tmp_path / "vision").exists()
 
