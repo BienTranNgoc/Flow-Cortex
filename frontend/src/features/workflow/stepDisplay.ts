@@ -49,7 +49,9 @@ const LABEL_KEYS: Record<string, string> = {
   generate_script: 'workflow.step.label.generate_script',
   generate_storyboard: 'workflow.step.label.generate_storyboard',
   generate_speech: 'workflow.step.label.generate_speech',
+  generate_keyframe: 'workflow.step.label.generate_keyframe',
   generate_video: 'workflow.step.label.generate_video',
+  lipsync_video: 'workflow.step.label.lipsync_video',
   render_video: 'workflow.step.label.render_video',
 };
 
@@ -66,6 +68,13 @@ export function stepLabel(
   isProductVideo = false,
 ): string {
   if (step.type === CHECKPOINT && isProductVideo) {
+    const prev =
+      steps && step.stepOrder !== undefined
+        ? steps.find((s) => s.stepOrder === step.stepOrder! - 1)
+        : undefined;
+    if (prev?.type === 'generate_keyframe') {
+      return t('workflow.step.label.reviewKeyframe');
+    }
     return t('workflow.step.label.reviewScript');
   }
   if (step.type === 'generate_video' && steps) {

@@ -1,6 +1,8 @@
 import type { RunResponse, RunStepOutputResponse, RunStepResponse } from '@flow-cortex/api-client';
 import { z } from 'zod';
 
+export const PRODUCT_VIDEO_MC_WORKFLOW_ID = '9aa35334-b672-4b6c-93e8-1a4c2cc14302';
+
 export const ProductBriefSchema = z.object({
   productName: z.string().trim().min(1),
   description: z.string().trim().min(1),
@@ -96,7 +98,17 @@ export function isProductVideoRun(
   run: Pick<RunResponse, 'workflowId'> | undefined,
   productVideoWorkflowId: string | undefined,
 ): boolean {
-  return productVideoWorkflowId !== undefined && run?.workflowId === productVideoWorkflowId;
+  if (!run?.workflowId) return false;
+  return (
+    run.workflowId === PRODUCT_VIDEO_MC_WORKFLOW_ID ||
+    (productVideoWorkflowId !== undefined && run.workflowId === productVideoWorkflowId)
+  );
+}
+
+export function isMcProductVideoRun(
+  run: Pick<RunResponse, 'workflowId'> | undefined,
+): boolean {
+  return run?.workflowId === PRODUCT_VIDEO_MC_WORKFLOW_ID;
 }
 
 /** Returns the completed `render_video` step and its downloadable final MP4 artifact, if ready. */

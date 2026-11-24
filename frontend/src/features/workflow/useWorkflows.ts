@@ -16,6 +16,7 @@ import {
   getWorkflow,
   listWorkflowExamples,
   listWorkflows,
+  regenerateKeyframe,
   rejectTask,
   requestUpload,
   saveRevision,
@@ -28,6 +29,7 @@ import type {
   ApproveReviewTaskRequest,
   GetRunLogLevel,
   ProductVideoRunRequest,
+  RegenerateKeyframeRequest,
   RunInputResponse,
   StartRunRequest,
   UploadRequest,
@@ -238,6 +240,19 @@ export function useSaveRevisionMutation(runId: string, taskId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['review-tasks', taskId, 'revisions'] });
       queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+    },
+  });
+}
+
+export function useRegenerateKeyframeMutation(runId: string) {
+  const queryClient = useQueryClient();
+  const runKey = ['runs', runId];
+  return useMutation({
+    mutationFn: (body: RegenerateKeyframeRequest) =>
+      unwrap(regenerateKeyframe(runId, body, authHeaders())),
+    onSuccess: (run) => {
+      queryClient.setQueryData(runKey, run);
+      queryClient.invalidateQueries({ queryKey: ['runs', runId, 'review-tasks'] });
     },
   });
 }

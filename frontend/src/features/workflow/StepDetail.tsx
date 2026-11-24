@@ -46,6 +46,8 @@ interface StepDetailProps {
   needsYou: boolean;
   fileName: string | undefined;
   isProductVideo?: boolean | undefined;
+  isMcTemplate?: boolean | undefined;
+  keyframeStep?: RunStepResponse | undefined;
   stepTitle?: string | undefined;
   productName?: string | undefined;
 }
@@ -54,7 +56,7 @@ function visibleProductVideoArtifacts(
   stepType: string | undefined,
   artifacts: readonly NonNullable<RunStepResponse['outputs']>[number][],
 ) {
-  if (stepType === 'render_video') {
+  if (stepType === 'render_video' || stepType === 'generate_video' || stepType === 'lipsync_video') {
     return artifacts.filter((a) => a.mime?.startsWith('video/') || a.name.endsWith('.mp4'));
   }
   if (stepType === 'generate_speech') {
@@ -62,8 +64,10 @@ function visibleProductVideoArtifacts(
       (a) => a.mime?.startsWith('audio/') || a.name.endsWith('.wav') || a.name.endsWith('.mp3'),
     );
   }
-  if (stepType === 'generate_video') {
-    return artifacts.filter((a) => a.mime?.startsWith('video/') || a.name.endsWith('.mp4'));
+  if (stepType === 'generate_keyframe') {
+    return artifacts.filter(
+      (a) => a.mime?.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(a.name),
+    );
   }
   return [];
 }
@@ -78,6 +82,8 @@ export function StepDetail({
   needsYou,
   fileName,
   isProductVideo = false,
+  isMcTemplate = false,
+  keyframeStep,
   stepTitle,
   productName,
 }: Readonly<StepDetailProps>) {
@@ -131,7 +137,7 @@ export function StepDetail({
       {awaitingApproval && (
         // Stays mounted while another step is shown, so an unsaved edit is still there on return.
         <div className="step-detail-body" hidden={!needsYou}>
-          <ApprovalPanel runId={runId} />
+          <ApprovalPanel runId={runId} isMcTemplate={isMcTemplate} keyframeStep={keyframeStep} />
         </div>
       )}
       <div key={stepKey(step)} className="step-detail-body">

@@ -14,6 +14,7 @@ import { ProductVideoRunHeader } from './ProductVideoRunHeader';
 import { ProductVideoShowcaseCard } from './ProductVideoShowcaseCard';
 import {
   findFinalVideoArtifact,
+  isMcProductVideoRun,
   isProductVideoRun,
   parseProductBrief,
 } from './productVideoSchemas';
@@ -188,6 +189,14 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
 
   const capabilitiesQuery = useCapabilitiesQuery();
   const isProductVideo = isProductVideoRun(run, capabilitiesQuery.data?.productVideoWorkflowId);
+  const isMcTemplate = isMcProductVideoRun(run);
+  const waitingStep = needsYouStep(steps, run.status);
+  const keyframeStep =
+    isMcTemplate && waitingStep?.type === 'APPROVAL_CHECKPOINT' && waitingStep.stepOrder !== undefined
+      ? steps.find(
+          (s) => s.stepOrder === waitingStep.stepOrder! - 1 && s.type === 'generate_keyframe',
+        )
+      : undefined;
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
     selected && selectedState
@@ -304,10 +313,12 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
               panelRef={panelRef}
               runId={runId}
               step={selected}
-              awaitingApproval={needsYouStep(steps, run.status) !== undefined}
+              awaitingApproval={waitingStep !== undefined}
               needsYou={selectedState === 'needs-you'}
               fileName={fileName}
               isProductVideo={isProductVideo}
+              isMcTemplate={isMcTemplate}
+              keyframeStep={keyframeStep}
               stepTitle={stepLabel(selected, t, steps, isProductVideo)}
               productName={brief?.productName}
             />
