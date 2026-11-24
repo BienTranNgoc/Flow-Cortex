@@ -81,11 +81,12 @@ public class TrashItemActions {
         return items.stream().map(item -> restore(ownerId, item)).toList();
     }
 
-    /** Processed by purge rank, then request position; results in the order of {@code items}. */
+    /** Processed by purge rank, then type key, then request position; results in the order of {@code items}. */
     public List<Result> purgeMany(UUID ownerId, List<ItemRef> items) {
         Map<String, Integer> ranks = providers.rankByType();
         List<Integer> processing = PurgeOrder.byRank(IntStream.range(0, items.size()).boxed().toList(),
-                position -> ranks.getOrDefault(items.get(position).type(), Integer.MAX_VALUE));
+                position -> ranks.getOrDefault(items.get(position).type(), Integer.MAX_VALUE),
+                position -> items.get(position).type());
         Result[] results = new Result[items.size()];
         for (int position : processing) {
             results[position] = purge(ownerId, items.get(position));
