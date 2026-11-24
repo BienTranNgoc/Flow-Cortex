@@ -45,6 +45,7 @@ from .contracts.provider_job import (
 )
 from .contracts.provider_speech_result import ProviderSpeechData
 from .control import ControlClient, JobControlSession, SiblingFailedSignal
+from .edge_adapter import resolve_edge_voice
 from .seedance_adapter import PROVIDER_SEEDANCE
 from .vendor_jobs import (
     ProbeRegistry,
@@ -160,6 +161,24 @@ def _generate_script(
     )
 
 
+def _resolve_speech_identity(base: SpeechIdentity, request: SpeechRequest) -> SpeechIdentity:
+    if base.provider not in {"azure", "edge"}:
+        return base
+    resolved_voice = resolve_edge_voice(request, base.voice)
+    return SpeechIdentity(base.provider, resolved_voice, base.speed, base.sample_rate)
+
+
+def _fallback_speech_identity(adapter: SpeechAdapter) -> SpeechIdentity | None:
+    getter = getattr(adapter, "fallback_speech_identity", None)
+    if callable(getter):
+        return cast(SpeechIdentity, getter())
+    inner = getattr(adapter, "speech_adapter", None)
+    inner_getter = getattr(inner, "fallback_speech_identity", None) if inner is not None else None
+    if callable(inner_getter):
+        return cast(SpeechIdentity, inner_getter())
+    return None
+
+
 def _generate_speech(
     job: GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
     adapter: SpeechAdapter,
@@ -176,40 +195,33 @@ def _generate_speech(
         mc_hook_script=payload.mcHookScript,
         product_close_script=payload.productCloseScript,
     )
-    base_identity = adapter.speech_identity()
-    requested_voice = payload.voice or (
-        "vi-VN-HoaiMyNeural"
-        if payload.voiceGender == "female"
-        else "vi-VN-NamMinhNeural"
-        if payload.voiceGender == "male"
-        else base_identity.voice
-    )
-    identity = (
-        SpeechIdentity(
-            base_identity.provider, requested_voice, base_identity.speed, base_identity.sample_rate
-        )
-        if base_identity.provider in {"azure", "edge"}
-        else base_identity
+    identity = _resolve_speech_identity(adapter.speech_identity(), request)
+    fallback_base = _fallback_speech_identity(adapter)
+    fallback_identity = (
+        _resolve_speech_identity(fallback_base, request)
+        if fallback_base is not None
+        else None
     )
     reused = _reuse_existing_artifact(context, request, identity)
+    if reused is None and fallback_identity is not None:
+        reused = _reuse_existing_artifact(context, request, fallback_identity)
     if reused is not None:
         return reused
     speech = adapter.generate_speech(request, context.abort)
-    fallback_used = identity.provider == "azure" and speech.provider == "edge"
-    if fallback_used:
-        if speech.voice != identity.voice:
-            raise ValueError("speech fallback adapter returned an unexpected voice")
-        effective_identity = SpeechIdentity(
-            speech.provider, speech.voice, speech.speed, identity.sample_rate
-        )
-    elif (speech.provider, speech.voice, speech.speed) != (
+    if (speech.provider, speech.voice, speech.speed) == (
         identity.provider,
         identity.voice,
         identity.speed,
     ):
-        raise ValueError("speech adapter returned an identity different from its configuration")
-    else:
         effective_identity = identity
+    elif fallback_identity is not None and (speech.provider, speech.voice, speech.speed) == (
+        fallback_identity.provider,
+        fallback_identity.voice,
+        fallback_identity.speed,
+    ):
+        effective_identity = fallback_identity
+    else:
+        raise ValueError("speech adapter returned an identity different from its configuration")
     data = {
         "profile": request.profile,
         "durationMs": speech.duration_ms,

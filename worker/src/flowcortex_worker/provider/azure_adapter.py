@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import http.client
+import io
 import logging
+import math
 import os
 import re
 import urllib.error
 import urllib.request
+import wave
 from dataclasses import dataclass
 from xml.sax.saxutils import escape, quoteattr
 
@@ -131,6 +135,8 @@ class AzureSpeechAdapter:
         try:
             with urllib.request.urlopen(req, timeout=self.config.timeout_seconds) as resp:
                 body = resp.read(_MAX_WAV_BYTES + 1)
+                headers = getattr(resp, "headers", None)
+                raw_len = headers.get("Content-Length") if headers is not None else None
         except urllib.error.HTTPError as exc:
             if exc.code in (408, 429) or 500 <= exc.code < 600:
                 raise TransientError(f"Azure Speech HTTP {exc.code}") from exc
@@ -143,12 +149,36 @@ class AzureSpeechAdapter:
                 "provider_request_failed",
                 f"Azure Speech rejected request with HTTP {exc.code}",
             ) from exc
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError) as exc:
             raise TransientError(f"Azure Speech connection failed: {type(exc).__name__}") from exc
         abort.check()
+        if raw_len is not None:
+            try:
+                expected_len = int(raw_len)
+            except ValueError:
+                expected_len = None
+            if expected_len is not None and len(body) < expected_len:
+                raise TransientError(
+                    f"Azure Speech response truncated ({len(body)}/{expected_len} bytes)"
+                )
         if not body or len(body) > _MAX_WAV_BYTES:
             raise TransientError("Azure Speech returned an empty or oversized audio response")
+        _verify_complete_wav(body)
         return bytes(body)
+
+
+def _verify_complete_wav(body: bytes) -> None:
+    try:
+        with wave.open(io.BytesIO(body), "rb") as audio:
+            frames = audio.getnframes()
+            expected_pcm = frames * audio.getnchannels() * audio.getsampwidth()
+            actual_pcm = len(audio.readframes(frames))
+    except (EOFError, wave.Error) as exc:
+        raise TransientError("Azure Speech returned a corrupt or incomplete WAV response") from exc
+    if frames <= 0 or actual_pcm < expected_pcm:
+        raise TransientError(
+            f"Azure Speech returned truncated WAV PCM ({actual_pcm}/{expected_pcm} bytes)"
+        )
 
 
 @dataclass(frozen=True)
@@ -160,6 +190,9 @@ class FallbackSpeechAdapter:
 
     def speech_identity(self) -> SpeechIdentity:
         return self.primary.speech_identity()
+
+    def fallback_speech_identity(self) -> SpeechIdentity:
+        return self.fallback.speech_identity()
 
     def generate_speech(self, request: SpeechRequest, abort: Abort) -> SpeechArtifact:
         try:
@@ -182,7 +215,7 @@ def build_ssml(text: str, voice: str, rate: str) -> str:
     safe_rate = quoteattr(rate)
     safe_text = escape(text)
     return (
-        "<speak version='1.0' xml:lang='vi-VN'>"
+        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='vi-VN'>"
         f"<voice xml:lang='vi-VN' name={safe_voice}>"
         f"<prosody rate={safe_rate}>{safe_text}</prosody>"
         "</voice></speak>"
@@ -213,8 +246,8 @@ def azure_config_from_env() -> AzureSpeechConfig:
         raise RuntimeError("AZURE_SPEECH_VOICE must not be blank")
     if not _valid_rate(rate):
         raise RuntimeError("AZURE_SPEECH_RATE must match +N% or -N%")
-    if timeout_seconds <= 0:
-        raise RuntimeError("FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS must be positive")
+    if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+        raise RuntimeError("FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS must be a finite positive number")
     return AzureSpeechConfig(
         api_key=api_key,
         region=region,

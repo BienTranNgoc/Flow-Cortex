@@ -59,6 +59,7 @@ class _NoAbort:
 
 def test_build_ssml_escapes_xml_and_sets_voice() -> None:
     ssml = build_ssml("Giảm <50%> & tặng quà!", "vi-VN-HoaiMyNeural", "+10%")
+    assert "xmlns='http://www.w3.org/2001/10/synthesis'" in ssml
     assert 'name="vi-VN-HoaiMyNeural"' in ssml
     assert 'rate="+10%"' in ssml
     assert "Giảm &lt;50%&gt; &amp; tặng quà!" in ssml
@@ -254,3 +255,195 @@ def test_build_speech_adapter_azure_with_and_without_fallback(
 
     cfg = azure_config_from_env()
     assert cfg.endpoint == "https://japaneast.tts.speech.microsoft.com/cognitiveservices/v1"
+
+
+def test_fallback_distinct_default_voice_and_redelivery_reuse_and_incomplete_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import http.client
+
+    wav_3s = _make_wav(3_000)
+    edge_calls = 0
+
+    class _StatefulStorage:
+        def __init__(self) -> None:
+            self.blobs: dict[str, bytes] = {}
+
+        def head_object(self, bucket: str, key: str) -> dict[str, str] | None:
+            return {"ok": "1"} if key in self.blobs else None
+
+        def fetch_bytes(self, bucket: str, key: str, abort: object) -> bytes:
+            return self.blobs[key]
+
+        def put(self, key: str, body: bytes, mime: str, abort: object) -> int:
+            self.blobs[key] = body
+            return len(body)
+
+        def presigned_get_url(self, bucket: str, key: str, *, expires_seconds: int = 300) -> str:
+            return f"https://example.test/{key}"
+
+    class _EdgeDifferentDefault:
+        def speech_identity(self) -> SpeechIdentity:
+            return SpeechIdentity("edge", "vi-VN-NamMinhNeural", "+10%", 24_000)
+
+        def generate_speech(self, request: SpeechRequest, abort: object) -> SpeechArtifact:
+            nonlocal edge_calls
+            edge_calls += 1
+            return SpeechArtifact(wav_3s, 3_000, "edge", "vi-VN-NamMinhNeural", "+10%")
+
+    class _IncompleteResp:
+        def read(self, _n: int = -1) -> bytes:
+            raise http.client.IncompleteRead(b"part")
+
+        def __enter__(self) -> _IncompleteResp:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _IncompleteResp())
+    # Azure defaults to female, Edge defaults to male, payload specifies neither
+    wrapper = FallbackSpeechAdapter(
+        primary=AzureSpeechAdapter(
+            AzureSpeechConfig(api_key="az-key", voice="vi-VN-HoaiMyNeural")
+        ),
+        fallback=_EdgeDifferentDefault(),  # type: ignore[arg-type]
+    )
+    prefix = f"runs/{REV_ID}/steps/3/attempts/1/"
+    job = ProviderJob.model_validate(
+        {
+            "schemaVersion": "1",
+            "jobId": str(REV_ID),
+            "runId": str(REV_ID),
+            "correlationId": str(REV_ID),
+            "stepOrder": 3,
+            "capability": "generate_speech",
+            "params": {
+                "profile": "vi_voice_v1",
+                "payload": {
+                    "script": "Sản phẩm siêu đẹp!",
+                    "sourceRevisionId": str(REV_ID),
+                },
+            },
+            "outputPrefix": prefix,
+            "attempt": 1,
+            "maxRuntimeSeconds": 60,
+            "issuedAt": "2026-11-23T00:00:00Z",
+        }
+    )
+    storage = _StatefulStorage()
+    ctx = ExecutionContext(storage=storage, bucket="b", output_prefix=prefix, abort=_NoAbort())
+
+    first = execute(job, wrapper, ctx)
+    assert first.data["provider"] == "edge"
+    assert first.data["voice"] == "vi-VN-NamMinhNeural"
+    assert edge_calls == 1
+
+    # Persist output files like the worker consumer does, then redeliver same job
+    for f in first.files:
+        storage.put(f"{prefix}{f.name}", f.body, f.mime, _NoAbort())
+    second = execute(job, wrapper, ctx)
+    assert second.data["provider"] == "edge"
+    assert edge_calls == 1
+
+
+def test_whitespace_voice_and_truncated_content_length_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    wav_3s = _make_wav(3_000)
+
+    class _TruncatedResp:
+        def __init__(self) -> None:
+            self.headers = {"Content-Length": str(len(wav_3s) + 500)}
+
+        def read(self, _n: int = -1) -> bytes:
+            return wav_3s
+
+        def __enter__(self) -> _TruncatedResp:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    class _FakeEdge:
+        def speech_identity(self) -> SpeechIdentity:
+            return SpeechIdentity("edge", "vi-VN-NamMinhNeural", "+10%", 24_000)
+
+        def generate_speech(self, request: SpeechRequest, abort: object) -> SpeechArtifact:
+            return SpeechArtifact(wav_3s, 3_000, "edge", "vi-VN-NamMinhNeural", "+10%")
+
+    class _EmptyStorage:
+        def head_object(self, bucket: str, key: str) -> None:
+            return None
+
+        def fetch_bytes(self, bucket: str, key: str, abort: object) -> bytes:
+            return b""
+
+        def put(self, key: str, body: bytes, mime: str, abort: object) -> int:
+            return len(body)
+
+        def presigned_get_url(self, bucket: str, key: str, *, expires_seconds: int = 300) -> str:
+            return f"https://example.test/{key}"
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _TruncatedResp())
+    wrapper = FallbackSpeechAdapter(
+        primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
+        fallback=_FakeEdge(),  # type: ignore[arg-type]
+    )
+    prefix = f"runs/{REV_ID}/steps/3/attempts/1/"
+    job = ProviderJob.model_validate(
+        {
+            "schemaVersion": "1",
+            "jobId": str(REV_ID),
+            "runId": str(REV_ID),
+            "correlationId": str(REV_ID),
+            "stepOrder": 3,
+            "capability": "generate_speech",
+            "params": {
+                "profile": "vi_voice_v1",
+                "payload": {
+                    "script": "Sản phẩm siêu đẹp!",
+                    "sourceRevisionId": str(REV_ID),
+                    "voice": " vi-VN-NamMinhNeural ",
+                },
+            },
+            "outputPrefix": prefix,
+            "attempt": 1,
+            "maxRuntimeSeconds": 60,
+            "issuedAt": "2026-11-23T00:00:00Z",
+        }
+    )
+    ctx = ExecutionContext(
+        storage=_EmptyStorage(), bucket="b", output_prefix=prefix, abort=_NoAbort()
+    )
+    out = execute(job, wrapper, ctx)
+    assert out.data["provider"] == "edge"
+    assert out.data["voice"] == "vi-VN-NamMinhNeural"
+
+
+def test_truncated_wav_without_content_length_and_non_finite_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    full_wav = _make_wav(3_000)
+    truncated_wav = full_wav[:-2000]  # header intact, PCM payload cut off, no Content-Length
+
+    class _FakeEdge:
+        def speech_identity(self) -> SpeechIdentity:
+            return SpeechIdentity("edge", "vi-VN-NamMinhNeural", "+10%", 24_000)
+
+        def generate_speech(self, request: SpeechRequest, abort: object) -> SpeechArtifact:
+            return SpeechArtifact(full_wav, 3_000, "edge", "vi-VN-NamMinhNeural", "+10%")
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _FakeResp(truncated_wav))
+    wrapper = FallbackSpeechAdapter(
+        primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
+        fallback=_FakeEdge(),  # type: ignore[arg-type]
+    )
+    out = wrapper.generate_speech(SpeechRequest("Xin chào", REV_ID), _NoAbort())  # type: ignore[arg-type]
+    assert out.provider == "edge"
+
+    monkeypatch.setenv("AZURE_SPEECH_KEY", "az-key")
+    for bad in ("nan", "inf", "-inf"):
+        monkeypatch.setenv("FLOWCORTEX_PROVIDER_TIMEOUT_SECONDS", bad)
+        with pytest.raises(RuntimeError, match="finite positive"):
+            azure_config_from_env()
