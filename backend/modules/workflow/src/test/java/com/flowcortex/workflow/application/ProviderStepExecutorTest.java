@@ -284,6 +284,42 @@ class ProviderStepExecutorTest {
                 new ProviderInput("image_3", "media", "runs/" + runId + "/inputs/image_3"));
     }
 
+    @Test
+    void reservesFirstFrameKeyBeforeApplyingReferenceImageCap() {
+        when(jobs.providerLimits("generate_video"))
+                .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));
+        UUID runId = UUID.randomUUID();
+        StepContext ctx = new StepContext(runId, UUID.randomUUID(), 7, "generate_video", (short) 1,
+                "{\"scene1Prompt\":\"MC holds product\",\"sourceRevisionId\":\"%s\"}".formatted(UUID.randomUUID()),
+                "{\"profile\":\"vertical_ad_clip_v2\",\"referenceImages\":\"all\","
+                        + "\"payloadDefaults\":{\"firstFrameKey\":\"keyframe\",\"resolution\":\"480p\"},"
+                        + "\"payloadFields\":{\"prompt\":\"scene1Prompt\",\"sourceRevisionId\":\"sourceRevisionId\"}}",
+                storedImages(runId, "image_1", "image_2", "image_3", "mc", "keyframe"));
+
+        new ProviderStepExecutor("generate_video", "vertical_ad_clip_v2", jobs, clock).execute(ctx);
+
+        ArgumentCaptor<ProviderJob> sent = ArgumentCaptor.forClass(ProviderJob.class);
+        verify(jobs).enqueueProvider(sent.capture());
+        assertThat(sent.getValue().inputs()).hasSize(4);
+        assertThat(sent.getValue().inputs().getFirst())
+                .isEqualTo(new ProviderInput("keyframe", "media", "runs/" + runId + "/inputs/keyframe"));
+    }
+
+    @Test
+    void failsWhenRequiredFirstFrameKeyIsMissing() {
+        UUID runId = UUID.randomUUID();
+        StepContext ctx = new StepContext(runId, UUID.randomUUID(), 7, "generate_video", (short) 1,
+                "{\"scene1Prompt\":\"MC holds product\"}",
+                "{\"profile\":\"vertical_ad_clip_v2\",\"referenceImages\":\"all\","
+                        + "\"payloadDefaults\":{\"firstFrameKey\":\"keyframe\"},"
+                        + "\"payloadFields\":{\"prompt\":\"scene1Prompt\"}}",
+                storedImages(runId, "image_1", "mc"));
+
+        assertThatThrownBy(() -> new ProviderStepExecutor("generate_video", "vertical_ad_clip_v2", jobs, clock)
+                .execute(ctx))
+                .isInstanceOf(StepFailedException.class);
+    }
+
     private ProviderStepExecutor ledgerExecutor(String capability, VendorJobLedger ledger, boolean resume) {
         when(jobs.providerLimits(capability))
                 .thenReturn(new MediaLimits(Duration.ofMinutes(5), Duration.ofMinutes(2), 1000L));

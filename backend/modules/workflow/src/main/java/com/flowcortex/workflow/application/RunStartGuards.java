@@ -42,4 +42,21 @@ class RunStartGuards {
             guard.check(ownerId, workflowId, defs, context);
         }
     }
+
+    /**
+     * Validates structural readiness against the full workflow while charging/checking per-step guards
+     * only for the single step being regenerated.
+     */
+    void checkSingleStep(UUID ownerId, UUID workflowId, List<WorkflowStep> allSteps, WorkflowStep targetStep,
+            StartContext context) {
+        List<StepDef> allDefs = allSteps.stream()
+                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
+                        step.getInputRef()))
+                .toList();
+        List<StepDef> singleDef = List.of(new StepDef(targetStep.getStepOrder(), targetStep.getName(),
+                targetStep.getType(), targetStep.getConfig(), targetStep.getInputRef()));
+        for (RunStartGuard guard : guards) {
+            guard.check(ownerId, workflowId, guard instanceof WorkflowReadinessGuard ? allDefs : singleDef, context);
+        }
+    }
 }

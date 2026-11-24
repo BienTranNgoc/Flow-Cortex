@@ -7,6 +7,12 @@ public final class ProductVideoWorkflow {
 
     public static final UUID ID = UUID.fromString("9aa35334-b672-4b6c-93e8-1a4c2cc14301");
 
+    public static final UUID MC_ID = UUID.fromString("9aa35334-b672-4b6c-93e8-1a4c2cc14302");
+
+    public static boolean isProductVideo(UUID workflowId) {
+        return ID.equals(workflowId) || MC_ID.equals(workflowId);
+    }
+
     /** Length of the rendered video; speech longer than this would be cut off. Mirrors
      * {@code productVideoDurationSeconds} in contracts/limits.json. */
     public static final int VIDEO_DURATION_SECONDS = 10;

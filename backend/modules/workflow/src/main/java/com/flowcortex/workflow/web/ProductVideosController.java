@@ -68,4 +68,17 @@ class ProductVideosController {
                 request.mcUploadId(), request.backgroundUploadId(),
                 Boolean.TRUE.equals(request.acknowledgeCost()), null), creditAccounts));
     }
+
+    @PostMapping(value = "/runs/{runId}/keyframes/regenerate", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<RunResponse> regenerateKeyframe(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID runId,
+            @Valid @RequestBody(required = false) RegenerateKeyframeRequest request) {
+        UUID ownerId = currentUserResolver.require(jwt);
+        String backgroundPresetId = request != null ? request.backgroundPresetId() : null;
+        String sceneNote = request != null ? request.sceneNote() : null;
+        boolean acknowledgeCost = request != null && Boolean.TRUE.equals(request.acknowledgeCost());
+        return ResponseEntity.ok(RunResponse.from(productVideos.regenerateKeyframe(
+                runId, ownerId, backgroundPresetId, sceneNote, acknowledgeCost), creditAccounts));
+    }
 }

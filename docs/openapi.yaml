@@ -3161,6 +3161,42 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/product-videos/runs/{runId}/keyframes/regenerate:
+    post:
+      tags:
+      - product-videos-controller
+      operationId: regenerateKeyframe
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegenerateKeyframeRequest"
+      responses:
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/onboarding/reset:
     post:
       tags:
@@ -11556,6 +11592,19 @@ components:
           pattern: 9:16
       required:
       - aspectRatio
+    RegenerateKeyframeRequest:
+      type: object
+      properties:
+        backgroundPresetId:
+          type: string
+          maxLength: 64
+          minLength: 0
+        sceneNote:
+          type: string
+          maxLength: 500
+          minLength: 0
+        acknowledgeCost:
+          type: boolean
     OnboardingResetResponse:
       type: object
       properties:

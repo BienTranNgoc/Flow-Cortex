@@ -13,21 +13,28 @@ import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadPurpose;
+import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.workflow.api.ProductVideoDraft;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard;
 import com.flowcortex.workflow.domain.ProductVideoInput;
+import com.flowcortex.workflow.domain.ReviewTask;
+import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.ProductVideoInputRepository;
+import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.tracing.Tracer;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +53,7 @@ class ProductVideoServiceTest {
     private final WorkflowRunRepository runs = mock(WorkflowRunRepository.class);
     private final RunStepRepository runSteps = mock(RunStepRepository.class);
     private final ProductVideoInputRepository inputs = mock(ProductVideoInputRepository.class);
+    private final ReviewTaskRepository reviewTasks = mock(ReviewTaskRepository.class);
     private final MediaJobs media = mock(MediaJobs.class);
     private final StepExecutorRegistry registry = new StepExecutorRegistry(media, Clock.systemUTC());
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
@@ -165,10 +173,10 @@ class ProductVideoServiceTest {
     void refusesMcTemplateWhenWorkflowLacksMcStepsEvenIfFlagEnabled() {
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = mock(Workflow.class);
-        when(workflow.getId()).thenReturn(ProductVideoWorkflow.ID);
+        when(workflow.getId()).thenReturn(ProductVideoWorkflow.MC_ID);
         when(media.isEnabled()).thenReturn(true);
-        when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
-        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID))
+        when(workflows.findVisibleTo(ProductVideoWorkflow.MC_ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID))
                 .thenReturn(List.of(step(1, "generate_script"), step(2, "generate_video")));
         ProductVideoDraft mcDraft = ProductVideoDraft.of("Đồng hồ", "Chống nước", null, null, null, "9:16",
                 "mc-v1", "female", "mc-nu-tre", null, null);
@@ -176,7 +184,29 @@ class ProductVideoServiceTest {
                 media, registry, events, runUpdates, transactions, new RunStartGuards(List.of()), Tracer.NOOP,
                 true, true, true);
         assertThatThrownBy(() -> mcEnabledService.start(ownerId, mcDraft, List.of(UUID.randomUUID())))
-                .isInstanceOf(com.flowcortex.shared.web.LocalizedStatusException.class);
+                .isInstanceOf(LocalizedStatusException.class);
+    }
+
+    @Test
+    void refusesMcTemplateWithoutMcSourceOrWithInvalidPreset() {
+        UUID ownerId = UUID.randomUUID();
+        when(media.isEnabled()).thenReturn(true);
+        ProductVideoService mcEnabledService = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs,
+                media, registry, events, runUpdates, transactions, new RunStartGuards(List.of()), Tracer.NOOP,
+                true, true, true);
+        ProductVideoDraft noMc = ProductVideoDraft.of("Đồng hồ", "Chống nước", null, null, null, "9:16",
+                "mc-v1", "female", null, null, null);
+        assertThatThrownBy(() -> mcEnabledService.start(ownerId, noMc, List.of(UUID.randomUUID())))
+                .isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
+
+        ProductVideoDraft badPreset = ProductVideoDraft.of("Đồng hồ", "Chống nước", null, null, null, "9:16",
+                "mc-v1", "female", "mc-khong-ton-tai", null, null);
+        assertThatThrownBy(() -> mcEnabledService.start(ownerId, badPreset, List.of(UUID.randomUUID())))
+                .isInstanceOf(LocalizedStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value())
+                        .isEqualTo(400));
     }
 
     @Test
@@ -186,12 +216,14 @@ class ProductVideoServiceTest {
         UUID mcUpload = UUID.randomUUID();
         UUID bgUpload = UUID.randomUUID();
         Workflow workflow = mock(Workflow.class);
-        when(workflow.getId()).thenReturn(ProductVideoWorkflow.ID);
+        when(workflow.getId()).thenReturn(ProductVideoWorkflow.MC_ID);
         List<WorkflowStep> definitions = List.of(
                 step(1, "generate_script"),
                 configured(2, "generate_storyboard", "{\"profile\":\"product_ad_storyboard_v1\"}", "{step:1}"),
                 configured(3, "generate_speech", "{\"profile\":\"vi_voice_v1\"}", "{step:1}"),
-                step(4, "generate_keyframe"),
+                configured(4, "generate_keyframe",
+                        "{\"profile\":\"vertical_ad_keyframe_v1\",\"referenceImages\":[\"mc\",\"image_1\",\"background\"]}",
+                        "{step:2}"),
                 step(5, "lipsync_video"),
                 step(6, "render_video"));
         MediaAssetInput pAsset = new MediaAssetInput(productUpload, new MediaJobInput("image_1", "uploads", "p1"));
@@ -200,8 +232,8 @@ class ProductVideoServiceTest {
         MediaAssetInput mcRekeyed = new MediaAssetInput(mcUpload, new MediaJobInput("mc", "uploads", "mc"));
         MediaAssetInput bgRekeyed = new MediaAssetInput(bgUpload, new MediaJobInput("background", "uploads", "bg"));
         when(media.isEnabled()).thenReturn(true);
-        when(workflows.findVisibleTo(ProductVideoWorkflow.ID, ownerId)).thenReturn(Optional.of(workflow));
-        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID)).thenReturn(definitions);
+        when(workflows.findVisibleTo(ProductVideoWorkflow.MC_ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID)).thenReturn(definitions);
         when(media.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, List.of(productUpload)))
                 .thenReturn(List.of(pAsset));
         when(media.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, List.of(mcUpload)))
@@ -222,6 +254,7 @@ class ProductVideoServiceTest {
 
         ArgumentCaptor<WorkflowRun> run = ArgumentCaptor.forClass(WorkflowRun.class);
         verify(runs).save(run.capture());
+        assertThat(run.getValue().getWorkflowId()).isEqualTo(ProductVideoWorkflow.MC_ID);
         assertThat(run.getValue().getInput())
                 .contains("\"templateId\":\"mc-v1\"")
                 .contains("\"sceneNote\":\"Quầy gỗ ánh nắng\"")
@@ -232,7 +265,144 @@ class ProductVideoServiceTest {
         verify(runSteps).saveAll(steps.capture());
         assertThat(steps.getValue().get(1).getConfig()).contains("\"templateId\":\"mc-v1\"").contains("\"sceneNote\"");
         assertThat(steps.getValue().get(2).getConfig()).contains("\"voiceGender\":\"female\"");
+        assertThat(steps.getValue().get(3).getConfig()).contains("\"sceneNote\":\"Quầy gỗ ánh nắng\"");
         assertThat(steps.getValue().get(5).getInput()).contains("image_1").doesNotContain("background");
+    }
+
+    @Test
+    void storesBuiltInPresetImagesForMcTemplate() {
+        UUID ownerId = UUID.randomUUID();
+        UUID productUpload = UUID.randomUUID();
+        Workflow workflow = mock(Workflow.class);
+        when(workflow.getId()).thenReturn(ProductVideoWorkflow.MC_ID);
+        List<WorkflowStep> definitions = List.of(
+                step(1, "generate_script"),
+                configured(2, "generate_keyframe",
+                        "{\"profile\":\"vertical_ad_keyframe_v1\",\"referenceImages\":[\"mc\",\"image_1\",\"background\"]}",
+                        "{step:1}"),
+                step(3, "lipsync_video"));
+        MediaAssetInput pAsset = new MediaAssetInput(productUpload, new MediaJobInput("image_1", "uploads", "p1"));
+        MediaAssetInput pCopy = new MediaAssetInput(productUpload, new MediaJobInput("image_1", "media", "runs/r/inputs/image_1"));
+        MediaAssetInput mcStored = new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("mc", "media", "runs/r/inputs/mc"));
+        MediaAssetInput bgStored = new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("background", "media", "runs/r/inputs/background"));
+        when(media.isEnabled()).thenReturn(true);
+        when(workflows.findVisibleTo(ProductVideoWorkflow.MC_ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID)).thenReturn(definitions);
+        when(media.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, List.of(productUpload)))
+                .thenReturn(List.of(pAsset));
+        when(media.copyRunInputs(any(), eq(List.of(pAsset)))).thenReturn(List.of(pCopy));
+        when(media.storeRunInputImage(any(), eq(ownerId), eq("mc"), any())).thenReturn(mcStored);
+        when(media.storeRunInputImage(any(), eq(ownerId), eq("background"), any())).thenReturn(bgStored);
+        when(runs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runSteps.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductVideoDraft mcDraft = ProductVideoDraft.of("Đồng hồ", "Chống nước", null, null, null, "9:16",
+                "mc-v1", "female", "mc-nu-tre", "bg-studio-minimal", "Ánh sáng mềm");
+        ProductVideoPresetCatalog stubCatalog = stubPresetCatalog();
+        ProductVideoService mcEnabledService = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs,
+                reviewTasks, stubCatalog, media, registry, events, runUpdates, transactions,
+                new RunStartGuards(List.of()), Tracer.NOOP, true, true, true);
+        mcEnabledService.start(ownerId, mcDraft, List.of(productUpload), null, null, false, null);
+
+        verify(media).storeRunInputImage(any(), eq(ownerId), eq("mc"), any());
+        verify(media).storeRunInputImage(any(), eq(ownerId), eq("background"), any());
+        ArgumentCaptor<List<RunStep>> steps = ArgumentCaptor.forClass(List.class);
+        verify(runSteps).saveAll(steps.capture());
+        assertThat(steps.getValue().get(1).getInput())
+                .contains("\"key\":\"mc\"")
+                .contains("\"key\":\"background\"")
+                .contains("\"key\":\"image_1\"");
+        assertThat(steps.getValue().get(1).getConfig())
+                .contains("\"scenePreset\":\"bg-studio-minimal\"")
+                .contains("\"sceneNote\":\"Ánh sáng mềm\"");
+    }
+
+    @Test
+    void regeneratesKeyframeAtCheckpoint2AndResumesRun() {
+        UUID ownerId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        Instant now = Instant.now();
+        WorkflowRun run = new WorkflowRun(runId, ProductVideoWorkflow.MC_ID, ownerId, "{}", now);
+        run.markWaitingApproval();
+
+        RunStep keyframeStep = new RunStep(UUID.randomUUID(), runId, (short) 5, "generate_keyframe",
+                "[{\"key\":\"mc\",\"bucket\":\"media\",\"objectKey\":\"runs/r/inputs/mc\"}]",
+                "{\"profile\":\"vertical_ad_keyframe_v1\",\"referenceImages\":[\"mc\",\"image_1\",\"background\"]}",
+                "{step:4}");
+        keyframeStep.markRunning(now);
+        // Simulate RunAdvancer overwriting RunStep.input with the resolved storyboard JSON on attempt 1.
+        keyframeStep.markCompleted("{\"scenes\":[{\"index\":1,\"visualPrompt\":\"MC holds product\"}]}",
+                "{\"keyframe\":\"old\"}", now);
+
+        RunStep checkpointStep = new RunStep(UUID.randomUUID(), runId, (short) 6, HumanSteps.APPROVAL_CHECKPOINT,
+                null, "{\"kind\":\"keyframe_review\"}", "{step:5}");
+        ReviewTask pendingTask = new ReviewTask(UUID.randomUUID(), runId, checkpointStep.getId(),
+                "approval", "{\"keyframe\":\"old\"}", now, now.plusSeconds(3600), null);
+
+        WorkflowStep storyboardDef = configured(4, "generate_storyboard", "{\"profile\":\"product_ad_storyboard_v1\"}",
+                null);
+        WorkflowStep keyframeDef = configured(5, "generate_keyframe", keyframeStep.getConfig(), "{step:4}");
+        List<String> guardedStepTypes = new ArrayList<>();
+        RunStartGuard costGuard = (owner, wfId, defs, ctx) -> defs.forEach(d -> guardedStepTypes.add(d.type()));
+
+        when(media.isEnabled()).thenReturn(true);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
+        when(runSteps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of(keyframeStep, checkpointStep));
+        when(reviewTasks.findByRunStepId(checkpointStep.getId())).thenReturn(Optional.of(pendingTask));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID))
+                .thenReturn(List.of(storyboardDef, keyframeDef));
+        when(media.boundRunInputs(runId)).thenReturn(List.of(
+                new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("image_1", "media", "runs/" + runId + "/inputs/image_1")),
+                new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("mc", "media", "runs/" + runId + "/inputs/mc")),
+                new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("background", "media", "runs/" + runId + "/inputs/background"))));
+        MediaJobInput newBgObject = new MediaJobInput("background", "media", "runs/" + runId + "/inputs/background-v2");
+        when(media.putRunInputImageObject(eq(runId), eq("background"), eq(2), any())).thenReturn(newBgObject);
+        when(media.replaceRunInputBinding(eq(runId), eq(ownerId), eq(newBgObject), eq(4L)))
+                .thenReturn(new MediaAssetInput(UUID.randomUUID(), newBgObject));
+        when(runs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runSteps.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs,
+                reviewTasks, stubPresetCatalog(), media, registry, events, runUpdates,
+                transactions, new RunStartGuards(List.of(new WorkflowReadinessGuard(), costGuard)), Tracer.NOOP,
+                true, true, true);
+
+        service.regenerateKeyframe(runId, ownerId, "bg-warm-wood", "Đổi sang ánh nắng ấm", true);
+
+        assertThat(guardedStepTypes).containsExactly("generate_keyframe");
+        verify(media).replaceRunInputBinding(runId, ownerId, newBgObject, 4L);
+        verify(reviewTasks).delete(pendingTask);
+        verify(reviewTasks).flush();
+        assertThat(keyframeStep.getStatus()).isEqualTo(RunStepStatus.PENDING);
+        assertThat(keyframeStep.getAttempt()).isEqualTo((short) 2);
+        assertThat(keyframeStep.getConfig())
+                .contains("\"scenePreset\":\"bg-warm-wood\"")
+                .contains("\"sceneNote\":\"Đổi sang ánh nắng ấm\"");
+        assertThat(keyframeStep.getInput())
+                .contains("runs/" + runId + "/inputs/image_1")
+                .contains("runs/" + runId + "/inputs/mc")
+                .contains("runs/" + runId + "/inputs/background-v2")
+                .doesNotContain("runs/" + runId + "/inputs/background\"");
+        assertThat(run.getStatus()).isEqualTo(RunStatus.RUNNING);
+        verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
+        verify(runUpdates).touched(runId);
+    }
+
+    @Test
+    void refusesRegenerateKeyframeWhenNotPausedAtKeyframeCheckpoint() {
+        UUID ownerId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        WorkflowRun runningRun = new WorkflowRun(runId, ProductVideoWorkflow.MC_ID, ownerId, "{}", Instant.now());
+        when(media.isEnabled()).thenReturn(true);
+        when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(runningRun));
+
+        ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs,
+                reviewTasks, new ProductVideoPresetCatalog(true, workflowSteps), media, registry, events, runUpdates,
+                transactions, new RunStartGuards(List.of()), Tracer.NOOP, true, true, true);
+
+        assertThatThrownBy(() -> service.regenerateKeyframe(runId, ownerId, null, "Thử lại", false))
+                .isInstanceOf(ConflictException.class);
+        verify(reviewTasks, never()).delete(any());
     }
 
     private static WorkflowStep step(int order, String type) {
@@ -248,6 +418,15 @@ class ProductVideoServiceTest {
         when(definition.getConfig()).thenReturn(config);
         when(definition.getInputRef()).thenReturn(inputRef);
         return definition;
+    }
+
+    private ProductVideoPresetCatalog stubPresetCatalog() {
+        return new ProductVideoPresetCatalog(true, workflowSteps) {
+            @Override
+            public byte[] loadPresetImage(String category, String id) {
+                return new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00 };
+            }
+        };
     }
 
     private static ProductVideoDraft draft() {

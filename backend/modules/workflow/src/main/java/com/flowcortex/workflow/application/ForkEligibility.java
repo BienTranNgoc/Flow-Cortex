@@ -26,7 +26,7 @@ final class ForkEligibility {
 
     private static final List<Rule> RULES = List.of(
             new Rule(subject -> subject.sourceOwnerId().equals(subject.callerId()), Refusal.OWN),
-            new Rule(subject -> ProductVideoWorkflow.ID.equals(subject.sourceId()), Refusal.FIXED),
+            new Rule(subject -> ProductVideoWorkflow.isProductVideo(subject.sourceId()), Refusal.FIXED),
             new Rule(subject -> !subject.allowFork(), Refusal.NOT_ALLOWED),
             new Rule(Subject::holdsConnectorCall, Refusal.CONNECTOR_STEP));
 

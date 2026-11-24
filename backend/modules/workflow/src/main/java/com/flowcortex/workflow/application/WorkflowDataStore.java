@@ -82,7 +82,7 @@ public class WorkflowDataStore {
 
     /** The fixed Product Video workflow is shared, so a member would meet the owner refusal first; it is a 409 for all. */
     private void lockForWrite(Caller caller, UUID workflowId) {
-        if (ProductVideoWorkflow.ID.equals(workflowId)) {
+        if (ProductVideoWorkflow.isProductVideo(workflowId)) {
             throw new ConflictException(new LocalizedMessage("workflow.system.readOnly"));
         }
         writeAccess.lockForWrite(caller, workflowId);

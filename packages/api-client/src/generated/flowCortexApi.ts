@@ -1445,6 +1445,20 @@ export interface ProductVideoRunRequest {
   sceneNote?: string;
 }
 
+export interface RegenerateKeyframeRequest {
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  backgroundPresetId?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  sceneNote?: string;
+  acknowledgeCost?: boolean;
+}
+
 export interface OnboardingResetResponse {
   completed: boolean;
 }
@@ -9986,6 +10000,82 @@ export const startProductVideoRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(productVideoRunRequest),
+  });
+};
+
+export type regenerateKeyframeResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type regenerateKeyframeResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type regenerateKeyframeResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type regenerateKeyframeResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateKeyframeResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type regenerateKeyframeResponseSuccess = regenerateKeyframeResponse200 & {
+  headers: Headers;
+};
+export type regenerateKeyframeResponseError = (
+  | regenerateKeyframeResponse400
+  | regenerateKeyframeResponse409
+  | regenerateKeyframeResponse422
+  | regenerateKeyframeResponse429
+) & {
+  headers: Headers;
+};
+
+export type regenerateKeyframeResponse =
+  regenerateKeyframeResponseSuccess | regenerateKeyframeResponseError;
+
+export const getRegenerateKeyframeUrl = (runId: string) => {
+  return `/api/v1/product-videos/runs/${runId}/keyframes/regenerate`;
+};
+
+export const regenerateKeyframe = async (
+  runId: string,
+  regenerateKeyframeRequest?: RegenerateKeyframeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<regenerateKeyframeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<regenerateKeyframeResponse>(getRegenerateKeyframeUrl(runId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(regenerateKeyframeRequest),
   });
 };
 

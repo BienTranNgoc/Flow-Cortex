@@ -86,7 +86,7 @@ public class RunStep {
     private short deliveryCount;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "config", updatable = false)
+    @Column(name = "config")
     private String config;
 
     @Column(name = "input_ref", updatable = false)
@@ -362,6 +362,29 @@ public class RunStep {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.finishedAt = now;
+    }
+
+    /** Resets a completed step (e.g. {@code generate_keyframe}) to run a new attempt with updated config/inputs. */
+    public void resetForRegeneration(String updatedConfig, String updatedInput) {
+        requireStatus(RunStepStatus.COMPLETED, RunStepStatus.PENDING);
+        this.status = RunStepStatus.PENDING;
+        this.attempt = (short) (this.attempt + 1);
+        this.config = updatedConfig;
+        if (updatedInput != null) {
+            this.input = updatedInput;
+        }
+        this.output = null;
+        this.outputs = null;
+        this.errorCode = null;
+        this.errorMessage = null;
+        this.startedAt = null;
+        this.finishedAt = null;
+        this.pickedUpAt = null;
+        this.leaseUntil = null;
+        this.queueDeadline = null;
+        this.runDeadline = null;
+        this.progressPercent = null;
+        this.deliveryCount = 0;
     }
 
     private static Instant later(Instant current, Instant candidate) {

@@ -135,18 +135,24 @@ public class ProductVideoPresetCatalog {
     }
 
     public List<TemplateSpec> templates(CreditAccounts credits) {
-        List<WorkflowStep> definitions = workflowSteps != null
+        List<WorkflowStep> showroomDefinitions = workflowSteps != null
                 ? workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.ID)
                 : List.of();
-        boolean mcAvailable = mcEnabled && ProductVideoService.hasMcSteps(definitions);
+        List<WorkflowStep> mcDefinitions = workflowSteps != null
+                ? workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID)
+                : List.of();
+        boolean mcAvailable = mcEnabled && ProductVideoService.hasMcSteps(mcDefinitions);
         Long showroomCredits = null;
         Long mcCredits = null;
         if (credits != null && credits.enabled()) {
-            List<String> showroomSteps = definitions.isEmpty()
+            List<String> showroomSteps = showroomDefinitions.isEmpty()
                     ? SHOWROOM_DEFAULT_STEPS
-                    : definitions.stream().map(WorkflowStep::getType).toList();
+                    : showroomDefinitions.stream().map(WorkflowStep::getType).toList();
+            List<String> mcSteps = mcDefinitions.isEmpty()
+                    ? MC_DEFAULT_STEPS
+                    : mcDefinitions.stream().map(WorkflowStep::getType).toList();
             showroomCredits = credits.estimate(showroomSteps);
-            mcCredits = credits.estimate(MC_DEFAULT_STEPS);
+            mcCredits = credits.estimate(mcSteps);
         }
         return buildTemplates(mcAvailable, showroomCredits, mcCredits);
     }

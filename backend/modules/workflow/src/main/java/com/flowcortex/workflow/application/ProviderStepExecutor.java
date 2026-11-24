@@ -91,7 +91,7 @@ class ProviderStepExecutor implements StepExecutor {
         params.put("profile", jobProfile);
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
-                context.stepOrder(), capability, params, providerInputs(context),
+                context.stepOrder(), capability, params, providerInputs(context, payload),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
                 (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant(),
                 vendorLedger(context, jobProfile, payload));
@@ -132,7 +132,7 @@ class ProviderStepExecutor implements StepExecutor {
      * image from the run's inputs is sent. Otherwise, for capabilities binding run inputs (script,
      * storyboard), the first snapshotted product image is sent as visual ground truth.
      */
-    private List<ProviderInput> providerInputs(StepContext context) {
+    private List<ProviderInput> providerInputs(StepContext context, Map<String, Object> payload) {
         if ("lipsync_video".equals(capability)) {
             return resolveLipsyncInputs(context);
         }
@@ -148,7 +148,9 @@ class ProviderStepExecutor implements StepExecutor {
             }
             JsonNode references = tree.get("referenceImages");
             if (references != null && !references.isNull()) {
-                return resolveMultipleReferences(context, references);
+                Object rawFirstFrame = payload != null ? payload.get("firstFrameKey") : null;
+                String firstFrameKey = rawFirstFrame instanceof String s && !s.isBlank() ? s : null;
+                return resolveMultipleReferences(context, references, firstFrameKey);
             }
             JsonNode reference = tree.get("referenceImage");
             if (reference != null && !reference.isNull()) {
@@ -188,7 +190,8 @@ class ProviderStepExecutor implements StepExecutor {
         return List.of();
     }
 
-    private List<ProviderInput> resolveMultipleReferences(StepContext context, JsonNode references) {
+    private List<ProviderInput> resolveMultipleReferences(StepContext context, JsonNode references,
+            String firstFrameKey) {
         String runScope = "runs/" + context.runId() + "/";
         List<MediaJobInput> available = storedInputs(context.storedInput(), "referenceImages").stream()
                 .filter(input -> input.bucket() != null && !input.bucket().isBlank()
@@ -198,10 +201,27 @@ class ProviderStepExecutor implements StepExecutor {
                 ? 5
                 : "generate_video".equals(capability) ? 4 : 3;
         if (references.isTextual() && "all".equals(references.textValue())) {
-            List<ProviderInput> resolved = available.stream()
-                    .limit(maxRefs)
-                    .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
-                    .toList();
+            List<ProviderInput> resolved;
+            if (firstFrameKey != null) {
+                ProviderInput requiredFirst = available.stream()
+                        .filter(input -> firstFrameKey.equals(input.key()))
+                        .findFirst()
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .orElseThrow(() -> missingImage(firstFrameKey, null));
+                List<ProviderInput> combined = new java.util.ArrayList<>(maxRefs);
+                combined.add(requiredFirst);
+                available.stream()
+                        .filter(input -> !firstFrameKey.equals(input.key()))
+                        .limit(Math.max(0, maxRefs - 1))
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .forEach(combined::add);
+                resolved = List.copyOf(combined);
+            } else {
+                resolved = available.stream()
+                        .limit(maxRefs)
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .toList();
+            }
             if (resolved.isEmpty()) {
                 throw missingImage("referenceImages", null);
             }

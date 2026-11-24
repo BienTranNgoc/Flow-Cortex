@@ -155,7 +155,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     new LocalizedMessage("workflow.disabled"));
         }
-        if (ProductVideoWorkflow.ID.equals(workflowId)) {
+        if (ProductVideoWorkflow.isProductVideo(workflowId)) {
             throw new LocalizedStatusException(HttpStatus.BAD_REQUEST,
                     new LocalizedMessage("workflow.productVideo.startElsewhere"));
         }

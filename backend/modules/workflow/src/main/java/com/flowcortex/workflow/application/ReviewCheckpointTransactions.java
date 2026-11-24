@@ -72,7 +72,8 @@ class ReviewCheckpointTransactions {
         if (!run.markWaitingApproval()) {
             return false;
         }
-        String reviewPayload = isProductVideo(run) ? scriptFrom(payload) : payload;
+        boolean scriptReview = isScriptReviewCheckpoint(run, step);
+        String reviewPayload = scriptReview ? scriptFrom(payload) : payload;
         boolean qa = HumanSteps.QA_REVIEW.equals(step.getType());
         boolean writeQuestions = qa && settings.aiQuestionsEnabled();
         String questionsState = !qa ? null
@@ -84,7 +85,7 @@ class ReviewCheckpointTransactions {
         if (writeQuestions) {
             events.publishEvent(new QaReviewOpenedEvent(task.getId()));
         }
-        if (isProductVideo(run)) {
+        if (scriptReview) {
             ScriptRevision revision = scriptRevisionRepository.save(new ScriptRevision(UUID.randomUUID(), run.getId(),
                     task.getId(), 1, reviewPayload, null, now));
             task.attachRevision(revision.getId(), task.getVersion() == null ? 0L : task.getVersion());
@@ -95,8 +96,20 @@ class ReviewCheckpointTransactions {
         return true;
     }
 
-    private static boolean isProductVideo(WorkflowRun run) {
-        return ProductVideoWorkflow.ID.equals(run.getWorkflowId());
+    private boolean isScriptReviewCheckpoint(WorkflowRun run, RunStep step) {
+        return ProductVideoWorkflow.isProductVideo(run.getWorkflowId()) && !isKeyframeReview(step);
+    }
+
+    private boolean isKeyframeReview(RunStep step) {
+        if (step == null || step.getConfig() == null || step.getConfig().isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode kind = json.readTree(step.getConfig()).get("kind");
+            return kind != null && "keyframe_review".equals(kind.asText());
+        } catch (JsonProcessingException e) {
+            return false;
+        }
     }
 
     private String scriptFrom(String payload) {
@@ -122,11 +135,13 @@ class ReviewCheckpointTransactions {
         if (run == null || run.getStatus() != RunStatus.WAITING_APPROVAL) {
             return false;
         }
-        if (isProductVideo(run) && !Objects.equals(task.getApprovedRevisionId(), event.revisionId())) {
+        RunStep step = runStepRepository.findById(task.getRunStepId()).orElse(null);
+        boolean scriptReview = isScriptReviewCheckpoint(run, step);
+        if (scriptReview && !Objects.equals(task.getApprovedRevisionId(), event.revisionId())) {
             return false;
         }
         if (runStepRepository.completePendingApproval(task.getRunStepId(), run.getId(),
-                stepOutput(run, event.payload(), event.revisionId()), now) != 1) {
+                stepOutput(scriptReview, event.payload(), event.revisionId()), now) != 1) {
             return false;
         }
         run.resume();
@@ -140,8 +155,8 @@ class ReviewCheckpointTransactions {
      * the whole checkpoint output so speech provenance remains tied to the exact approved revision.
      * Every other checkpoint keeps the payload as reviewed.
      */
-    private String stepOutput(WorkflowRun run, String payload, UUID revisionId) {
-        if (!isProductVideo(run)) {
+    private String stepOutput(boolean scriptReview, String payload, UUID revisionId) {
+        if (!scriptReview) {
             return payload;
         }
         if (revisionId == null) {
