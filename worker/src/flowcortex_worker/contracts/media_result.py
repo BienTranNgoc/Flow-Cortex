@@ -51,6 +51,10 @@ class MediaError(BaseModel):
             "diarization_failed",
             "beat_detection_failed",
             "no_beats_detected",
+            "compose_failed",
+            "audio_mix_failed",
+            "video_concat_failed",
+            "too_many_segments_dropped",
         ],
         Field(title="MediaErrorCode"),
     ]

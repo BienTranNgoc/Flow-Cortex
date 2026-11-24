@@ -597,6 +597,7 @@ flowcortex:
       render_video: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:5m}
       separate_audio: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO:15m}
       fetch_video: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO:10m}
+      compose_dub: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_COMPOSE_DUB:15m}
     # The broker's per-delivery ack deadline; must outlast every max run time.
     consumer-timeout: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:20m}
     # The provider runtime runs on the same ack deadline, so its ceilings are checked against

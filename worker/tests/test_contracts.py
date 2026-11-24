@@ -247,7 +247,11 @@ def test_separate_audio_capability_validates() -> None:
     MediaJob.model_validate(job() | {"capability": "separate_audio"})
 
 
-@pytest.mark.parametrize("capability", ["transcribe", "compose_dub"])
+def test_compose_dub_capability_validates() -> None:
+    MediaJob.model_validate(job() | {"capability": "compose_dub"})
+
+
+@pytest.mark.parametrize("capability", ["transcribe"])
 def test_removed_capabilities_are_rejected(capability: str) -> None:
     with pytest.raises(ValidationError):
         MediaJob.model_validate(job() | {"capability": capability})
@@ -260,7 +264,7 @@ def test_removed_error_code_is_rejected() -> None:
             | {
                 "status": "error",
                 "outputs": [],
-                "error": {"code": "compose_failed", "message": "x", "retryable": False},
+                "error": {"code": "voice_alignment_failed", "message": "x", "retryable": False},
             }
         )
 
@@ -278,6 +282,10 @@ def test_the_worker_error_codes_are_exactly_the_schemas() -> None:
         "diarization_failed",
         "beat_detection_failed",
         "no_beats_detected",
+        "compose_failed",
+        "audio_mix_failed",
+        "video_concat_failed",
+        "too_many_segments_dropped",
     ],
 )
 def test_dub_error_codes_validate(code: str) -> None:

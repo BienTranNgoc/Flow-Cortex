@@ -97,7 +97,7 @@ class MediaTopologyConfigTest {
         for (MediaCapability capability : MediaCapability.values()) {
             String expected = switch (capability) {
                 case SEPARATE_AUDIO -> "audio.job";
-                case RENDER_VIDEO -> "render.job";
+                case RENDER_VIDEO, COMPOSE_DUB -> "render.job";
                 case FETCH_VIDEO -> "fetch.job";
                 default -> "job";
             };
