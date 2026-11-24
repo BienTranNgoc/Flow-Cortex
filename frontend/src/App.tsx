@@ -21,8 +21,11 @@ import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
+import { DriveFeatureGate } from './features/drive/DriveFeatureGate';
+import { DrivePage } from './features/drive/DrivePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { OAuthConsentRoute } from './features/auth/OAuthConsentPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
 import { PhoneGate } from './features/auth/PhoneGate';
 import { RegisterPage } from './features/auth/RegisterPage';
@@ -109,6 +112,8 @@ export function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
+            {/* Signs in through RequireAuth, yet stays outside PasswordSetupGate and the app Layout. */}
+            <Route path="/oauth/authorize" element={<OAuthConsentRoute />} />
             <Route
               element={
                 <RequireAuth>
@@ -152,6 +157,14 @@ export function App() {
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
               <Route path="chat" element={chatPage} />
               <Route path="chat/:conversationId" element={chatPage} />
+              <Route
+                path="drive"
+                element={
+                  <DriveFeatureGate>
+                    <DrivePage />
+                  </DriveFeatureGate>
+                }
+              />
               <Route path="docs" element={<DocsPage />} />
               <Route path="docs/api" element={<DocsPage initialTab="api" />} />
               <Route path="docs/guides" element={<DocsPage initialTab="guides" />} />
