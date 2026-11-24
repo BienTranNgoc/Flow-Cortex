@@ -217,18 +217,22 @@ public class ProductVideoService implements ProductVideoRuns {
         String productJson = productJson(draft);
         // Copied before the run's transaction opens, so no database transaction waits on the object store.
         UUID runId = UUID.randomUUID();
-        List<MediaAssetInput> copies = new ArrayList<>(mediaJobs.copyRunInputs(runId, assets));
+        List<MediaAssetInput> copies = mediaJobs.copyRunInputs(runId, assets);
+        List<StagedPresetImage> stagedPresets = new ArrayList<>();
         if (mcUploadId == null && draft.mcPresetId() != null) {
             byte[] mcBytes = presetCatalog.loadPresetImage("mc", draft.mcPresetId());
-            copies.add(mediaJobs.storeRunInputImage(runId, ownerId, "mc", mcBytes));
+            stagedPresets.add(new StagedPresetImage(
+                    mediaJobs.putRunInputImageObject(runId, "mc", mcBytes), mcBytes.length));
         }
         if (backgroundUploadId == null && draft.backgroundPresetId() != null) {
             byte[] bgBytes = presetCatalog.loadPresetImage("backgrounds", draft.backgroundPresetId());
-            copies.add(mediaJobs.storeRunInputImage(runId, ownerId, "background", bgBytes));
+            stagedPresets.add(new StagedPresetImage(
+                    mediaJobs.putRunInputImageObject(runId, "background", bgBytes), bgBytes.length));
         }
-        String assetJson = json(copies.stream().map(MediaAssetInput::input).toList());
-        String productAssetJson = json(copies.stream()
-                .map(MediaAssetInput::input)
+        List<MediaJobInput> allInputs = new ArrayList<>(copies.stream().map(MediaAssetInput::input).toList());
+        stagedPresets.forEach(p -> allInputs.add(p.input()));
+        String assetJson = json(allInputs);
+        String productAssetJson = json(allInputs.stream()
                 .filter(input -> input.key() != null && input.key().startsWith("image_"))
                 .toList());
         Instant now = Instant.now();
@@ -242,6 +246,9 @@ public class ProductVideoService implements ProductVideoRuns {
                     draft.templateId(), 1, draft.voiceGender() != null ? draft.voiceGender() : "male",
                     draft.mcPresetId(), draft.backgroundPresetId(), draft.sceneNote(), now));
             mediaJobs.bindRunInputs(run.getId(), copies);
+            for (StagedPresetImage preset : stagedPresets) {
+                mediaJobs.replaceRunInputBinding(run.getId(), ownerId, preset.input(), preset.bytes());
+            }
             List<RunStep> steps = new ArrayList<>();
             for (WorkflowStep definition : definitions) {
                 String storedInput = null;
@@ -325,12 +332,24 @@ public class ProductVideoService implements ProductVideoRuns {
             run.resume();
 
             runSteps.save(locked.keyframeStep());
+            if (storedBackground != null) {
+                for (RunStep step : locked.allSteps()) {
+                    if (step.getStatus() == RunStepStatus.PENDING && "generate_video".equals(step.getType())
+                            && step.getInput() != null) {
+                        step.replacePendingInput(updatedInput);
+                        runSteps.save(step);
+                    }
+                }
+            }
             runs.save(run);
             runUpdates.touched(runId);
             events.publishEvent(new WorkflowRunStartedEvent(runId));
             return WorkflowMapper.toRunView(run, locked.allSteps(), List.of(),
                     registry::isRemote, mediaJobs::isDownloadable);
         });
+    }
+
+    private record StagedPresetImage(MediaJobInput input, long bytes) {
     }
 
     private record KeyframeReviewContext(List<RunStep> allSteps, RunStep keyframeStep, RunStep checkpointStep,

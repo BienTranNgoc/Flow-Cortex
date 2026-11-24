@@ -283,16 +283,16 @@ class ProductVideoServiceTest {
                 step(3, "lipsync_video"));
         MediaAssetInput pAsset = new MediaAssetInput(productUpload, new MediaJobInput("image_1", "uploads", "p1"));
         MediaAssetInput pCopy = new MediaAssetInput(productUpload, new MediaJobInput("image_1", "media", "runs/r/inputs/image_1"));
-        MediaAssetInput mcStored = new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("mc", "media", "runs/r/inputs/mc"));
-        MediaAssetInput bgStored = new MediaAssetInput(UUID.randomUUID(), new MediaJobInput("background", "media", "runs/r/inputs/background"));
+        MediaJobInput mcObj = new MediaJobInput("mc", "media", "runs/r/inputs/mc");
+        MediaJobInput bgObj = new MediaJobInput("background", "media", "runs/r/inputs/background");
         when(media.isEnabled()).thenReturn(true);
         when(workflows.findVisibleTo(ProductVideoWorkflow.MC_ID, ownerId)).thenReturn(Optional.of(workflow));
         when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID)).thenReturn(definitions);
         when(media.resolveImageUploads(UploadPurpose.RUN_INPUT, ownerId, List.of(productUpload)))
                 .thenReturn(List.of(pAsset));
         when(media.copyRunInputs(any(), eq(List.of(pAsset)))).thenReturn(List.of(pCopy));
-        when(media.storeRunInputImage(any(), eq(ownerId), eq("mc"), any())).thenReturn(mcStored);
-        when(media.storeRunInputImage(any(), eq(ownerId), eq("background"), any())).thenReturn(bgStored);
+        when(media.putRunInputImageObject(any(), eq("mc"), any())).thenReturn(mcObj);
+        when(media.putRunInputImageObject(any(), eq("background"), any())).thenReturn(bgObj);
         when(runs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(runSteps.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -304,8 +304,10 @@ class ProductVideoServiceTest {
                 new RunStartGuards(List.of()), Tracer.NOOP, true, true, true);
         mcEnabledService.start(ownerId, mcDraft, List.of(productUpload), null, null, false, null);
 
-        verify(media).storeRunInputImage(any(), eq(ownerId), eq("mc"), any());
-        verify(media).storeRunInputImage(any(), eq(ownerId), eq("background"), any());
+        verify(media).putRunInputImageObject(any(), eq("mc"), any());
+        verify(media).putRunInputImageObject(any(), eq("background"), any());
+        verify(media).replaceRunInputBinding(any(), eq(ownerId), eq(mcObj), eq(4L));
+        verify(media).replaceRunInputBinding(any(), eq(ownerId), eq(bgObj), eq(4L));
         ArgumentCaptor<List<RunStep>> steps = ArgumentCaptor.forClass(List.class);
         verify(runSteps).saveAll(steps.capture());
         assertThat(steps.getValue().get(1).getInput())
@@ -336,6 +338,10 @@ class ProductVideoServiceTest {
 
         RunStep checkpointStep = new RunStep(UUID.randomUUID(), runId, (short) 6, HumanSteps.APPROVAL_CHECKPOINT,
                 null, "{\"kind\":\"keyframe_review\"}", "{step:5}");
+        RunStep clip1Step = new RunStep(UUID.randomUUID(), runId, (short) 7, "generate_video",
+                "[{\"key\":\"image_1\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId + "/inputs/image_1\"},"
+                        + "{\"key\":\"background\",\"bucket\":\"media\",\"objectKey\":\"runs/" + runId + "/inputs/background\"}]",
+                "{\"profile\":\"vertical_ad_clip_v2\",\"referenceImages\":\"all\"}", "{step:6}");
         ReviewTask pendingTask = new ReviewTask(UUID.randomUUID(), runId, checkpointStep.getId(),
                 "approval", "{\"keyframe\":\"old\"}", now, now.plusSeconds(3600), null);
 
@@ -347,7 +353,7 @@ class ProductVideoServiceTest {
 
         when(media.isEnabled()).thenReturn(true);
         when(runs.findByIdAndOwnerId(runId, ownerId)).thenReturn(Optional.of(run));
-        when(runSteps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of(keyframeStep, checkpointStep));
+        when(runSteps.findByRunIdOrderByStepOrderAsc(runId)).thenReturn(List.of(keyframeStep, checkpointStep, clip1Step));
         when(reviewTasks.findByRunStepId(checkpointStep.getId())).thenReturn(Optional.of(pendingTask));
         when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID))
                 .thenReturn(List.of(storyboardDef, keyframeDef));
@@ -381,6 +387,9 @@ class ProductVideoServiceTest {
         assertThat(keyframeStep.getInput())
                 .contains("runs/" + runId + "/inputs/image_1")
                 .contains("runs/" + runId + "/inputs/mc")
+                .contains("runs/" + runId + "/inputs/background-v2")
+                .doesNotContain("runs/" + runId + "/inputs/background\"");
+        assertThat(clip1Step.getInput())
                 .contains("runs/" + runId + "/inputs/background-v2")
                 .doesNotContain("runs/" + runId + "/inputs/background\"");
         assertThat(run.getStatus()).isEqualTo(RunStatus.RUNNING);

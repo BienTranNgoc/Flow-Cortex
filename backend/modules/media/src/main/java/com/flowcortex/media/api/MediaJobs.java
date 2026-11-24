@@ -78,10 +78,14 @@ public interface MediaJobs {
     List<MediaAssetInput> copyRunInputs(UUID runId, List<MediaAssetInput> inputs);
 
     /**
-     * Stores a built-in server-side preset image (JPEG) directly under {@code runs/<runId>/inputs/<bindingKey>}
-     * in the media bucket and registers it as an image asset owned by {@code ownerId}. Call outside any transaction.
+     * Uploads a built-in server-side preset image (JPEG) under {@code runs/<runId>/inputs/<bindingKey>} with
+     * run-input retention, without writing any database rows yet. Call outside any transaction; register it
+     * via {@link #replaceRunInputBinding} inside the committing transaction so failed/raced starts leave no
+     * orphan asset rows.
      */
-    MediaAssetInput storeRunInputImage(UUID runId, UUID ownerId, String bindingKey, byte[] jpegBytes);
+    default MediaJobInput putRunInputImageObject(UUID runId, String bindingKey, byte[] jpegBytes) {
+        throw new UnsupportedOperationException("putRunInputImageObject is not implemented");
+    }
 
     /**
      * Uploads a versioned JPEG run input object under a unique key below {@code runs/<runId>/inputs/} with

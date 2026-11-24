@@ -286,15 +286,12 @@ class MediaJobsImpl implements MediaJobs {
 
     @Override
     @Transactional(propagation = Propagation.NEVER)
-    public MediaAssetInput storeRunInputImage(UUID runId, UUID ownerId, String bindingKey, byte[] jpegBytes) {
+    public MediaJobInput putRunInputImageObject(UUID runId, String bindingKey, byte[] jpegBytes) {
         validatePresetJpeg(bindingKey, jpegBytes);
         String bucket = properties.s3().bucket();
         String targetKey = runInputKey(runId, bindingKey);
         store.put(bucket, targetKey, "image/jpeg", jpegBytes, S3MediaStore.RUN_INPUT_RETENTION);
-        UUID assetId = UUID.randomUUID();
-        assets.save(new MediaAsset(assetId, ownerId, personalSpaces.personalSpaceOf(ownerId), "image",
-                bucket, targetKey, "image/jpeg", jpegBytes.length, null, Instant.now()));
-        return new MediaAssetInput(assetId, new MediaJobInput(bindingKey, bucket, targetKey));
+        return new MediaJobInput(bindingKey, bucket, targetKey);
     }
 
     @Override

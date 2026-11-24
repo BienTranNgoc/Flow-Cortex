@@ -387,6 +387,12 @@ public class RunStep {
         this.deliveryCount = 0;
     }
 
+    /** Updates the snapshotted input of a still-pending downstream step (e.g. after a keyframe background change). */
+    public void replacePendingInput(String updatedInput) {
+        requireStatus(RunStepStatus.PENDING, RunStepStatus.PENDING);
+        this.input = updatedInput;
+    }
+
     private static Instant later(Instant current, Instant candidate) {
         return current == null || candidate.isAfter(current) ? candidate : current;
     }
