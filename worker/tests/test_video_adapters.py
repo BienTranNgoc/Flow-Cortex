@@ -13,6 +13,7 @@ import io
 import json
 import shutil
 import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -27,6 +28,7 @@ from pydantic import ValidationError
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.provider import seedance_adapter, veo_adapter
 from flowcortex_worker.provider.adapter import (
+    CancelResult,
     FixtureProviderAdapter,
     VendorProbe,
     VideoAbort,
@@ -38,6 +40,7 @@ from flowcortex_worker.provider.capabilities import ExecutionContext, execute
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
 from flowcortex_worker.provider.contracts.provider_video_result import ProviderVideoData
 from flowcortex_worker.provider.vendor_jobs import (
+    WORKER_USER_AGENT,
     VendorJobEnded,
     VendorJobTimeout,
     VendorResultGone,
@@ -91,7 +94,7 @@ def _valid_mp4(size: int = 4096) -> bytes:
     return header + b"\0" * max(0, size - len(header))
 
 
-def _decodable_mp4() -> bytes:
+def _decodable_mp4(size: str = "180x320", duration: int = 1) -> bytes:
     completed = subprocess.run(
         [
             "ffmpeg",
@@ -102,7 +105,7 @@ def _decodable_mp4() -> bytes:
             "-f",
             "lavfi",
             "-i",
-            "color=c=black:s=180x320:d=1",
+            f"color=c=black:s={size}:d={duration}",
             "-an",
             "-c:v",
             "libx264",
@@ -118,6 +121,37 @@ def _decodable_mp4() -> bytes:
         capture_output=True,
     )
     return completed.stdout
+
+
+def _assert_normalized_clip(body: bytes) -> float:
+    with tempfile.TemporaryDirectory(prefix="flowcortex-probe-") as directory:
+        path = Path(directory) / "clip.mp4"
+        path.write_bytes(body)
+        completed = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_type,codec_name,width,height",
+                "-of",
+                "json",
+                str(path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+    report = cast(dict[str, Any], json.loads(completed.stdout))
+    video_streams = [s for s in report["streams"] if s["codec_type"] == "video"]
+    audio_streams = [s for s in report["streams"] if s["codec_type"] == "audio"]
+    assert len(video_streams) == 1
+    assert audio_streams == []
+    assert (
+        video_streams[0]["codec_name"],
+        video_streams[0]["width"],
+        video_streams[0]["height"],
+    ) == ("h264", 480, 854)
+    return float(report["format"]["duration"])
 
 
 class _Abort:
@@ -140,6 +174,9 @@ class _NoLedgerAdapter:
 
     def vendor_scope(self) -> dict[str, str]:
         raise AssertionError("a job without a ledger has no fingerprint")
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=False, reason="not implemented")
 
 
 # ---------------------------------------------------------------------------
@@ -466,8 +503,30 @@ def test_video_capability_normalises_clip_to_five_seconds() -> None:
     assert data.providerTaskId == "seedance-task-1"
     clip, manifest = outcome.files
     assert clip.name == "clip.mp4"
+    _assert_normalized_clip(clip.body)
     assert manifest.name == "manifest.json"
     assert json.loads(manifest.body) == outcome.data
+
+
+@needs_ffmpeg
+def test_video_capability_normalises_and_pads_wan_clip_to_480x854_five_seconds() -> None:
+    """A 6s 480x832 input is padded to 480x854, trimmed to 5s, and stripped of audio."""
+
+    class _Adapter(_NoLedgerAdapter):
+        def video_identity(self) -> VideoIdentity:
+            return VideoIdentity("wan", "wan-video/wan-2.2-5b-fast", 5, "9:16", "480p", False)
+
+        def submit_video(self, request: VideoRequest) -> str:
+            return "wan-task-1"
+
+        def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
+            return VideoArtifact(_decodable_mp4(size="480x832", duration=6), task_id)
+
+    context = dataclasses.replace(_empty_context(), abort=_Abort())
+    outcome = execute(_video_job(), _Adapter(), context)
+    clip, _ = outcome.files
+    duration = _assert_normalized_clip(clip.body)
+    assert 4.9 <= duration <= 5.1
 
 
 def test_video_capability_uses_existing_checkpoint_without_resubmit(
@@ -567,7 +626,7 @@ def _make_storage_with_png(png_body: bytes | None = None) -> Any:
 
 def test_video_capability_rejects_non_image_reference() -> None:
     """A reference whose bytes are not a recognised image format is rejected at the boundary."""
-    from flowcortex_worker.provider.capabilities import _resolve_reference_image
+    from flowcortex_worker.provider.capabilities import _resolve_reference_images
     from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
 
     job = _video_job_dict()
@@ -581,31 +640,29 @@ def test_video_capability_rejects_non_image_reference() -> None:
     context.abort = MagicMock()
     context.storage = storage
     with pytest.raises(PermanentError) as raised:
-        _resolve_reference_image(parsed, context, by_url=True)
+        _resolve_reference_images(parsed, context, by_url=True)
     assert raised.value.code == "input_rejected"
     storage.presigned_get_url.assert_not_called()
 
 
-def test_video_capability_rejects_two_reference_images() -> None:
-    """The contract pins maxItems:1; a producer that wires two images fails fast at the boundary.
-
-    Schema validation runs before the executor; we assert both layers reject the contract
-    violation so neither is silent.
-    """
+def test_video_capability_rejects_more_than_three_reference_images() -> None:
+    """The contract pins maxItems:3; four reference images must fail fast at the boundary."""
     job = _video_job_dict()
     job["inputs"] = [
         {"key": "first", "bucket": "flowcortex-uploads", "objectKey": "a"},
         {"key": "second", "bucket": "flowcortex-uploads", "objectKey": "b"},
+        {"key": "third", "bucket": "flowcortex-uploads", "objectKey": "c"},
+        {"key": "fourth", "bucket": "flowcortex-uploads", "objectKey": "d"},
     ]
     with pytest.raises(ValidationError) as raised:
         ProviderJob.model_validate(job)
-    assert "at most 1 item" in str(raised.value) or "too_long" in str(raised.value)
+    assert "at most 3 items" in str(raised.value) or "too_long" in str(raised.value)
 
 
 @pytest.mark.parametrize("by_url", [True, False])
 def test_video_capability_signs_a_reference_url_only_for_a_url_provider(by_url: bool) -> None:
     """The bytes are always read (image check, idempotency); a URL is signed only on request."""
-    from flowcortex_worker.provider.capabilities import _resolve_reference_image
+    from flowcortex_worker.provider.capabilities import _resolve_reference_images
     from flowcortex_worker.provider.contracts.provider_job import GenerateVideoJob
 
     png = _png_header(b"reference-bytes")
@@ -619,14 +676,14 @@ def test_video_capability_signs_a_reference_url_only_for_a_url_provider(by_url: 
     context.bucket = BUCKET
     context.abort = MagicMock()
     context.storage = storage
-    image_bytes, image_url = _resolve_reference_image(parsed, context, by_url=by_url)
-    assert image_bytes == png
+    images, image_urls = _resolve_reference_images(parsed, context, by_url=by_url)
+    assert images == (png,)
     storage.fetch_bytes.assert_called_once_with("flowcortex-uploads", "refs/cap.png", context.abort)
     if by_url:
-        assert image_url == "https://signed.example/refs/cap.png"
+        assert image_urls == ("https://signed.example/refs/cap.png",)
         storage.presigned_get_url.assert_called_once_with("flowcortex-uploads", "refs/cap.png")
     else:
-        assert image_url is None
+        assert image_urls == ()
         storage.presigned_get_url.assert_not_called()
 
 
@@ -764,8 +821,13 @@ def test_wan_submit_with_reference_image_sends_image_url(monkeypatch: pytest.Mon
     )
     assert task_id == "wan-task-with-image"
     input_body = captured["calls"][0]["body"]["input"]
+    assert captured["calls"][0]["headers"]["User-agent"] == WORKER_USER_AGENT
     assert input_body["image"] == "https://signed.example/refs/cap.png"
     assert input_body["prompt"] == "A cap rotating."
+    assert input_body["resolution"] == "480p"
+    assert input_body["aspect_ratio"] == "9:16"
+    assert input_body["frames_per_second"] == 24
+    assert input_body["num_frames"] == 121
 
 
 def test_wan_submit_with_reference_image_bytes_sends_data_uri(
@@ -1029,14 +1091,36 @@ def test_wan_probe_maps_status(
 def test_wan_probe_succeeds_on_a_live_clip_and_reads_a_404_as_gone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _route_urlopen(
+    calls = _route_urlopen(
         monkeypatch,
         {("GET", WAN_TASK): {"status": "succeeded", "output": WAN_VIDEO}, ("HEAD", WAN_VIDEO): b""},
     )
     assert _wan().probe_video("w-1") == "succeeded"
+    assert calls[0][2]["User-agent"] == WORKER_USER_AGENT
+    assert calls[1][2]["User-agent"] == WORKER_USER_AGENT
 
     _route_urlopen(monkeypatch, {("GET", WAN_TASK): 404})
     assert _wan().probe_video("w-1") == "gone"
+
+
+def test_wan_await_sends_worker_user_agent_on_poll(monkeypatch: pytest.MonkeyPatch) -> None:
+    from flowcortex_worker.provider import wan_adapter
+
+    mp4 = _valid_mp4(1024)
+    calls = _route_urlopen(
+        monkeypatch,
+        {
+            ("GET", WAN_TASK): {"status": "succeeded", "output": WAN_VIDEO},
+            ("GET", WAN_VIDEO): mp4,
+        },
+    )
+    adapter = wan_adapter.WanAdapter(_fast_config(wan_adapter.WanConfig(api_key="wan-key")))
+
+    artifact = adapter.await_video("w-1", _Abort())
+
+    assert artifact.body == mp4
+    assert calls[0][2]["User-agent"] == WORKER_USER_AGENT
+    assert calls[1][2]["User-agent"] == WORKER_USER_AGENT
 
 
 def _probes() -> list[tuple[Any, str, str]]:

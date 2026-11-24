@@ -65,4 +65,26 @@ describe('uploadFile', () => {
 
     await expect(done).rejects.toBeInstanceOf(UploadFailedError);
   });
+
+  it('aborts the PUT when its signal aborts and rejects with no status', async () => {
+    const controller = new AbortController();
+    const abort = vi.spyOn(FakeXhr.prototype, 'abort');
+    const done = uploadFile(URL_, clip(), {}, () => {}, controller.signal);
+
+    expect(abort).not.toHaveBeenCalled();
+    controller.abort();
+
+    expect(abort).toHaveBeenCalledTimes(1);
+    await expect(done).rejects.toEqual(new UploadFailedError(null));
+    abort.mockRestore();
+  });
+
+  it('aborts at once when the signal is already aborted', async () => {
+    const abort = vi.spyOn(FakeXhr.prototype, 'abort');
+    const done = uploadFile(URL_, clip(), {}, () => {}, AbortSignal.abort());
+
+    expect(abort).toHaveBeenCalledTimes(1);
+    await expect(done).rejects.toEqual(new UploadFailedError(null));
+    abort.mockRestore();
+  });
 });

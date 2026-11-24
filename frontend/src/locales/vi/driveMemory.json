@@ -1,0 +1,89 @@
+{
+  "empty": {
+    "title": "Bộ nhớ của bạn chưa có kết quả nào",
+    "noMatchTitle": "Không có kết quả nào khớp",
+    "noMatchHint": "Hãy thử từ khóa khác hoặc bớt bộ lọc.",
+    "clear": "Xóa bộ lọc"
+  },
+  "toolbar": {
+    "label": "Tìm kiếm và lọc Bộ nhớ",
+    "search": "Tìm theo tiêu đề",
+    "filters": "Bộ lọc",
+    "filtersActive": "Bộ lọc ({{n}})",
+    "sort": "Sắp xếp theo"
+  },
+  "sort": {
+    "newest": "Mới nhất",
+    "oldest": "Cũ nhất",
+    "size_desc": "Lớn nhất",
+    "size_asc": "Nhỏ nhất"
+  },
+  "filters": {
+    "label": "Lọc kết quả",
+    "types": "Loại",
+    "time": "Thời gian",
+    "sizes": "Dung lượng",
+    "from": "Từ ngày",
+    "to": "Đến ngày",
+    "apply": "Áp dụng",
+    "reset": "Đặt lại",
+    "close": "Đóng",
+    "rangeNeedsDate": "Hãy chọn ít nhất một ngày cho khoảng tùy chọn.",
+    "rangeReversed": "Ngày bắt đầu không được sau ngày kết thúc."
+  },
+  "types": {
+    "text": "Văn bản",
+    "image": "Ảnh",
+    "video": "Video",
+    "audio": "Âm thanh"
+  },
+  "times": {
+    "all": "Mọi lúc",
+    "7d": "7 ngày qua",
+    "30d": "30 ngày qua",
+    "custom": "Chọn ngày"
+  },
+  "sizes": {
+    "lt1mb": "Dưới 1 MB",
+    "1to50mb": "Từ 1 đến 50 MB",
+    "gt50mb": "Trên 50 MB"
+  },
+  "results": {
+    "heading": "Kết quả",
+    "total_one": "{{n}} kết quả",
+    "total_other": "{{n}} kết quả",
+    "label": "Kết quả trong Bộ nhớ",
+    "updating": "Đang cập nhật…"
+  },
+  "pinned": {
+    "heading": "Đã ghim",
+    "note": "Các kết quả bạn ghim gần đây nhất.",
+    "showMore": "Xem thêm ({{n}})",
+    "showFewer": "Thu gọn"
+  },
+  "card": {
+    "open": "Mở",
+    "openLabel": "Mở {{title}}",
+    "pin": "Ghim",
+    "pinLabel": "Ghim {{title}}",
+    "hide": "Ẩn",
+    "hideLabel": "Ẩn {{title}}"
+  },
+  "hide": {
+    "title": "Ẩn kết quả này?",
+    "message": "“{{title}}” sẽ biến mất khỏi danh sách Bộ nhớ và các kết quả đã ghim. Lần chạy không bị thay đổi, và bạn không thể đưa kết quả này trở lại từ đây.",
+    "confirm": "Ẩn",
+    "busy": "Đang ẩn…"
+  },
+  "announce": {
+    "pinned": "Đã ghim “{{title}}”.",
+    "unpinned": "Đã bỏ ghim “{{title}}”.",
+    "hidden": "Đã ẩn “{{title}}”.",
+    "failed": "Chưa thực hiện được. Hãy thử lại."
+  },
+  "fullText": {
+    "loading": "Đang tải toàn văn…",
+    "gone": "Toàn văn không còn nữa.",
+    "failed": "Không tải được toàn văn."
+  }
+}

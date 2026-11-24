@@ -20,10 +20,10 @@
   "properties": {
     "profile": { "const": "vertical_ad_clip_v1" },
     "durationSeconds": { "const": 5 },
-    "provider": { "enum": ["seedance", "veo", "wan", "fixture"] },
+    "provider": { "enum": ["seedance", "veo", "wan", "minimax", "fixture"] },
     "model": { "type": "string", "minLength": 1, "maxLength": 200 },
     "aspectRatio": { "const": "9:16" },
-    "resolution": { "enum": ["480p", "720p"] },
+    "resolution": { "enum": ["480p", "720p", "768p"] },
     "sourceRevisionId": { "type": "string", "format": "uuid" },
     "idempotencyKey": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "providerTaskId": { "type": "string", "minLength": 1, "maxLength": 200 },

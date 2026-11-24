@@ -51,24 +51,33 @@ class LeaseReaper implements ClusterJob {
     private final Map<Reason, Counter> reapedRemote = new EnumMap<>(Reason.class);
     private final Clock clock;
     private final Duration interval;
+    private final boolean parallelClipsEnabled;
 
     @Autowired
     LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
             RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
-            MeterRegistry meters, @Value("${flowcortex.workflow.reaper-interval-ms:30000}") long intervalMs) {
+            MeterRegistry meters, @Value("${flowcortex.workflow.reaper-interval-ms:30000}") long intervalMs,
+            @Value("${flowcortex.product-video.parallel-clips-enabled:false}") boolean parallelClipsEnabled) {
         this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, Clock.systemUTC(),
-                intervalMs);
+                intervalMs, parallelClipsEnabled);
     }
 
     LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
             RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
             MeterRegistry meters, Clock clock) {
-        this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, clock, 30_000L);
+        this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, clock, 30_000L, false);
+    }
+
+    LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
+            RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
+            MeterRegistry meters, Clock clock, boolean parallelClipsEnabled) {
+        this(runStepRepository, workflowRunRepository, transactions, registry, advancer, meters, clock, 30_000L,
+                parallelClipsEnabled);
     }
 
     private LeaseReaper(RunStepRepository runStepRepository, WorkflowRunRepository workflowRunRepository,
             RunStepTransactions transactions, StepExecutorRegistry registry, RunAdvancer advancer,
-            MeterRegistry meters, Clock clock, long intervalMs) {
+            MeterRegistry meters, Clock clock, long intervalMs, boolean parallelClipsEnabled) {
         this.runStepRepository = runStepRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.transactions = transactions;
@@ -80,6 +89,7 @@ class LeaseReaper implements ClusterJob {
         }
         this.clock = clock;
         this.interval = Duration.ofMillis(intervalMs);
+        this.parallelClipsEnabled = parallelClipsEnabled;
     }
 
     @Override
@@ -122,7 +132,10 @@ class LeaseReaper implements ClusterJob {
                         step.getId(), e);
             }
         }
-        List<UUID> stalled = workflowRunRepository.findStalledRunIds(PageRequest.of(0, BATCH_SIZE));
+        PageRequest batch = PageRequest.of(0, BATCH_SIZE);
+        List<UUID> stalled = parallelClipsEnabled
+                ? workflowRunRepository.findStalledRunIdsWithParallelClips(batch)
+                : workflowRunRepository.findStalledRunIds(batch);
         if (!stalled.isEmpty()) {
             // Before advancing: a run whose advance throws or changes nothing still moves to the back.
             workflowRunRepository.markSwept(stalled, now);
@@ -142,12 +155,25 @@ class LeaseReaper implements ClusterJob {
             return;
         }
         Reason r = reason.get();
-        String message = r.message(registry.find(step.getType()).map(executor -> executor.maxRuntime().toSeconds()));
+        String message = r.message(runBoundSeconds(step));
         if (transactions.fail(step.getRunId(), step.getId(), step.getAttempt(), r.code, message, now)) {
             (registry.isRemote(step.getType()) ? reapedRemote : reapedInline).get(r).increment();
             LOG.warn("Step reaped: runId={} runStepId={} type={} attempt={} deliveryCount={} code={}", step.getRunId(),
                     step.getId(), step.getType(), step.getAttempt(), step.getDeliveryCount(), r.code);
         }
+    }
+
+    /**
+     * The run bound the step was held to. A fan-out step's bound depends on its item count and is
+     * recorded on the step at pickup, so the executor's own maximum says nothing about it.
+     */
+    private Optional<Long> runBoundSeconds(RunStep step) {
+        Optional<StepExecutor> executor = registry.find(step.getType());
+        if (executor.map(found -> found.mode() == StepExecutor.Mode.FANOUT).orElse(false)) {
+            return step.getPickedUpAt() == null || step.getRunDeadline() == null ? Optional.empty()
+                    : Optional.of(Duration.between(step.getPickedUpAt(), step.getRunDeadline()).toSeconds());
+        }
+        return executor.map(found -> found.maxRuntime().toSeconds());
     }
 
     /** Which bound a running step passed; when two have, the one that passed first. */

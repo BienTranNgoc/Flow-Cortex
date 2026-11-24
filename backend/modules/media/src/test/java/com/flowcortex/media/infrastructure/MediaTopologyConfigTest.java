@@ -153,10 +153,12 @@ class MediaTopologyConfigTest {
                         "provider.unrouted",
                         "provider.jobs",
                         "provider.video.jobs",
+                        "provider.control",
                         "provider.results",
                         "provider.progress",
                         "provider.jobs.dlq",
                         "provider.video.jobs.dlq",
+                        "provider.control.dlq",
                         "provider.results.dlq",
                         "provider.progress.dlq");
 
@@ -177,8 +179,10 @@ class MediaTopologyConfigTest {
                 .contains(
                         tuple("provider.jobs", "provider", "job"),
                         tuple("provider.video.jobs", "provider", "video.job"),
+                        tuple("provider.control", "provider", "control"),
                         tuple("provider.jobs.dlq", "provider.dlx", "job"),
-                        tuple("provider.video.jobs.dlq", "provider.dlx", "video.job"));
+                        tuple("provider.video.jobs.dlq", "provider.dlx", "video.job"),
+                        tuple("provider.control.dlq", "provider.dlx", "control"));
     }
 
     @Test

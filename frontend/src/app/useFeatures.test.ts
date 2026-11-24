@@ -16,6 +16,7 @@ const ALL_OFF = {
   personalAccessTokens: false,
   onboarding: false,
   chat: false,
+  drive: false,
 };
 
 function setup() {

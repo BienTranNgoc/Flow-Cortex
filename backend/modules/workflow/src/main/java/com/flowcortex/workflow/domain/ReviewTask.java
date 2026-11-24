@@ -9,6 +9,8 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "review_task")
@@ -16,6 +18,12 @@ public class ReviewTask {
 
     /** The refusal every losing or late decision on a task answers with. */
     public static final LocalizedMessage NOT_WAITING_FOR_REVIEW = new LocalizedMessage("reviewTask.notWaitingForReview");
+
+    /** {@code questionsState} of a QA review whose questions are still being written. */
+    public static final String QUESTIONS_GENERATING = "generating";
+
+    /** {@code questionsState} of a QA review whose questions (model's or the standard marker) are stored. */
+    public static final String QUESTIONS_READY = "ready";
 
     @Id
     private UUID id;
@@ -54,6 +62,27 @@ public class ReviewTask {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** The moment after which the task can no longer be decided; the sweep ends it then. */
+    @Column(name = "expires_at", nullable = false)
+    private Instant expiresAt;
+
+    /** A QA review's questions as JSON: the model's validated list or the standard marker. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "questions")
+    private String questions;
+
+    /** {@code null} for a task that is not a QA review, else {@link #QUESTIONS_GENERATING} or {@link #QUESTIONS_READY}. */
+    @Column(name = "questions_state", length = 20)
+    private String questionsState;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "answers")
+    private String answers;
+
+    /** The caller-supplied key of the decision that ended the task, so a repeat of it can be recognised. */
+    @Column(name = "decision_key", length = 80)
+    private String decisionKey;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -67,7 +96,24 @@ public class ReviewTask {
         UUID runStepId,
         String reviewType,
         String originalPayload,
-        Instant createdAt
+        Instant createdAt,
+        Instant expiresAt,
+        String questionsState
+    ) {
+        this(id, runId, runStepId, reviewType, originalPayload, createdAt, expiresAt, questionsState, null);
+    }
+
+    /** A QA review opened with its questions already stored (the standard marker), or {@code null} while they are written. */
+    public ReviewTask(
+        UUID id,
+        UUID runId,
+        UUID runStepId,
+        String reviewType,
+        String originalPayload,
+        Instant createdAt,
+        Instant expiresAt,
+        String questionsState,
+        String questions
     ) {
         this.id = id;
         this.runId = runId;
@@ -76,6 +122,9 @@ public class ReviewTask {
         this.status = ReviewTaskStatus.PENDING;
         this.originalPayload = originalPayload;
         this.createdAt = createdAt;
+        this.expiresAt = expiresAt;
+        this.questionsState = questionsState;
+        this.questions = questions;
     }
 
     public UUID getId() {
@@ -122,6 +171,26 @@ public class ReviewTask {
         return version;
     }
 
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public String getQuestions() {
+        return questions;
+    }
+
+    public String getQuestionsState() {
+        return questionsState;
+    }
+
+    public String getAnswers() {
+        return answers;
+    }
+
+    public String getDecisionKey() {
+        return decisionKey;
+    }
+
     public UUID getCurrentRevisionId() {
         return currentRevisionId;
     }
@@ -137,6 +206,11 @@ public class ReviewTask {
     }
 
     public void approveRevision(UUID reviewerId, UUID revisionId, long expectedVersion, Instant now) {
+        approveRevision(reviewerId, revisionId, expectedVersion, null, now);
+    }
+
+    public void approveRevision(UUID reviewerId, UUID revisionId, long expectedVersion, String decisionKey,
+            Instant now) {
         requirePending();
         requireVersion(expectedVersion);
         if (currentRevisionId == null || !currentRevisionId.equals(revisionId)) {
@@ -145,21 +219,43 @@ public class ReviewTask {
         this.status = ReviewTaskStatus.APPROVED;
         this.reviewedBy = reviewerId;
         this.approvedRevisionId = revisionId;
+        this.decisionKey = decisionKey;
         this.reviewedAt = now;
     }
 
     public void approve(UUID reviewerId, String updatedPayload, Instant now) {
+        approve(reviewerId, updatedPayload, null, now);
+    }
+
+    public void approve(UUID reviewerId, String updatedPayload, String decisionKey, Instant now) {
         requirePending();
         this.status = ReviewTaskStatus.APPROVED;
         this.reviewedBy = reviewerId;
         this.reviewedPayload = updatedPayload;
+        this.decisionKey = decisionKey;
+        this.reviewedAt = now;
+    }
+
+    /** Approves a QA review with the reviewer's answers (JSON) and the input they compile to. */
+    public void answer(UUID reviewerId, String answersJson, String compiledPayload, String decisionKey, Instant now) {
+        requirePending();
+        this.status = ReviewTaskStatus.APPROVED;
+        this.reviewedBy = reviewerId;
+        this.answers = answersJson;
+        this.reviewedPayload = compiledPayload;
+        this.decisionKey = decisionKey;
         this.reviewedAt = now;
     }
 
     public void reject(UUID reviewerId, Instant now) {
+        reject(reviewerId, null, now);
+    }
+
+    public void reject(UUID reviewerId, String decisionKey, Instant now) {
         requirePending();
         this.status = ReviewTaskStatus.REJECTED;
         this.reviewedBy = reviewerId;
+        this.decisionKey = decisionKey;
         this.reviewedAt = now;
     }
 

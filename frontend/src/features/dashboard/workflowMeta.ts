@@ -1,6 +1,7 @@
 import type { WorkflowResponse, WorkflowStepResponse } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
 import i18n from '../../lib/i18n';
+import { HUMAN_STEP_TYPES } from '../workflow/stepDisplay';
 
 export type StatusTone = 'ready' | 'experimental' | 'attention';
 export type StepKind = 'normal' | 'checkpoint' | 'failure';
@@ -19,7 +20,6 @@ export interface WorkflowMeta {
   readonly description: string;
 }
 
-const APPROVAL = 'APPROVAL_CHECKPOINT';
 const FAILING_TYPE = 'fail';
 
 const ETA_BY_NAME: Array<[RegExp, number]> = [
@@ -84,7 +84,7 @@ function statusFor(steps: readonly WorkflowStepResponse[]): {
   if (steps.some((step) => step.type === FAILING_TYPE)) {
     return { labelKey: 'dashboard.status.failureDemo', tone: 'attention' };
   }
-  if (steps.some((step) => step.type === APPROVAL)) {
+  if (steps.some((step) => HUMAN_STEP_TYPES.has(step.type ?? ''))) {
     return { labelKey: 'dashboard.status.reviewRequired', tone: 'experimental' };
   }
   return { labelKey: 'dashboard.status.ready', tone: 'ready' };
@@ -108,7 +108,7 @@ export function stepsFor(workflow: WorkflowResponse, t: TFunction = i18n.t): Ste
     const id = step.id ?? `${index}-${step.name}`;
     const label = step.name ?? t('dashboard.card.stepFallback', { order: step.stepOrder ?? index + 1 });
     let kind: StepKind = 'normal';
-    if (step.type === APPROVAL) kind = 'checkpoint';
+    if (HUMAN_STEP_TYPES.has(step.type ?? '')) kind = 'checkpoint';
     else if (step.type === FAILING_TYPE) kind = 'failure';
     return { id, label, kind };
   });

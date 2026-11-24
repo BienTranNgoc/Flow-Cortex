@@ -1,0 +1,356 @@
+.billing-page {
+  max-width: 64rem;
+  min-width: 0;
+}
+
+.billing-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.billing-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: var(--target-min);
+  color: var(--ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.billing-switch input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.billing-switch input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.billing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+/* Status chip: the word is always shown; the tone only supports it. */
+.billing-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--line);
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.billing-chip--pending {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.billing-chip--succeeded {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.billing-chip--failed,
+.billing-chip--disputed {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+/* ===== History table (cards below 768px) ================================= */
+
+.billing-table {
+  width: 100%;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.billing-table th {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.billing-table td {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+.billing-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.billing-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.billing-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.billing-table [data-column='date'] {
+  white-space: nowrap;
+}
+
+.billing-table [data-column='description'] {
+  overflow-wrap: anywhere;
+}
+
+.billing-table th[data-column='amount'],
+.billing-table td[data-column='amount'] {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .billing-row:hover td {
+    background: var(--chrome-hover);
+  }
+}
+
+.billing-row:active td {
+  background: var(--chrome-active);
+}
+
+.billing-row__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.billing-row__link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 767px) {
+  .billing-table,
+  .billing-table tbody {
+    display: block;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  /* Column headings stay for assistive technology; the card carries no header row. */
+  .billing-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .billing-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'description status'
+      'date amount'
+      'kind kind';
+    gap: 0.125rem 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem 1rem 0.75rem;
+    border: 1px solid var(--card-edge);
+    border-radius: var(--radius-lg);
+    background: var(--paper-2);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .billing-table td,
+  .billing-table tbody tr:last-child td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .billing-table td[data-column='description'] {
+    grid-area: description;
+  }
+
+  .billing-table td[data-column='status'] {
+    grid-area: status;
+    align-self: center;
+  }
+
+  .billing-table td[data-column='date'] {
+    grid-area: date;
+    color: var(--ink-3);
+    font-size: 0.875rem;
+  }
+
+  .billing-table td[data-column='amount'] {
+    grid-area: amount;
+    font-weight: 600;
+  }
+
+  .billing-table td[data-column='kind'] {
+    grid-area: kind;
+    color: var(--ink-3);
+    font-size: 0.875rem;
+  }
+
+  /* The whole card opens the payment, not just its title. */
+  .billing-row__link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-lg);
+  }
+
+  .billing-row__link:focus-visible {
+    outline: none;
+  }
+
+  .billing-row:has(.billing-row__link:focus-visible) {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) {
+    .billing-row:hover {
+      background: var(--chrome-hover);
+    }
+  }
+
+  .billing-row:active {
+    background: var(--chrome-active);
+  }
+}
+
+.billing-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.billing-pagination button {
+  margin: 0;
+}
+
+.billing-pagination__position {
+  color: var(--ink-3);
+}
+
+/* ===== Detail ============================================================ */
+
+.billing-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--line-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.billing-facts__item {
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  background: var(--paper-2);
+}
+
+.billing-facts__item dt {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.billing-facts__item dd {
+  margin: 0.125rem 0 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1024px) {
+  .billing-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .billing-facts__item:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+.billing-timeline__title {
+  margin: 0 0 0.75rem;
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.billing-timeline__empty {
+  margin: 0;
+  color: var(--ink-3);
+}
+
+.billing-timeline__list {
+  margin: 0;
+  padding: 0;
+  border-left: 2px solid var(--line-soft);
+  list-style: none;
+}
+
+.billing-timeline__item {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.125rem 0.75rem;
+  min-width: 0;
+  padding: 0.5rem 0 0.5rem 1rem;
+}
+
+.billing-timeline__item::before {
+  content: '';
+  position: absolute;
+  top: 0.9rem;
+  left: calc(-0.3125rem - 1px);
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+}
+
+.billing-timeline__label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.billing-timeline__code,
+.billing-timeline__time {
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
