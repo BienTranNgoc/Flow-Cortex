@@ -7144,15 +7144,17 @@ paths:
         in: query
         required: false
         schema:
-          type: string
-          default: "0"
+          type: integer
+          format: int32
+          default: 0
           minimum: 0
       - name: size
         in: query
         required: false
         schema:
-          type: string
-          default: "20"
+          type: integer
+          format: int32
+          default: 20
           maximum: 50
           minimum: 1
       responses:

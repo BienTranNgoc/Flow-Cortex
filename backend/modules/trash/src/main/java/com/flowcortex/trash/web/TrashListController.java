@@ -57,9 +57,10 @@ class TrashListController {
             @RequestParam(name = "q", required = false) String q,
             @Parameter(schema = @Schema(allowableValues = {"recent", "expiring"}, defaultValue = "recent"))
             @RequestParam(name = "sort", required = false) String sort,
-            @Parameter(schema = @Schema(minimum = "0", defaultValue = "0"))
+            @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "0", defaultValue = "0"))
             @RequestParam(name = "page", defaultValue = "0") int page,
-            @Parameter(schema = @Schema(minimum = "1", maximum = "50", defaultValue = "20"))
+            @Parameter(schema = @Schema(type = "integer", format = "int32", minimum = "1", maximum = "50",
+                    defaultValue = "20"))
             @RequestParam(name = "size", defaultValue = "20") int size,
             Locale locale) {
         UUID ownerId = caller.require(jwt);

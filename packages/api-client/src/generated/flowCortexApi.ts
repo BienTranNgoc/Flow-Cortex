@@ -4545,12 +4545,12 @@ export type ListTrashParams = {
   /**
    * @minimum 0
    */
-  page?: string;
+  page?: number;
   /**
    * @minimum 1
    * @maximum 50
    */
-  size?: string;
+  size?: number;
 };
 
 export type ListTrashSort = (typeof ListTrashSort)[keyof typeof ListTrashSort];
