@@ -215,9 +215,9 @@
         "params": { "$ref": "#/$defs/storyboardParams" },
         "inputs": {
           "type": "array",
-          "maxItems": 1,
+          "maxItems": 3,
           "items": { "$ref": "#/$defs/videoInput" },
-          "description": "Optional product image the worker forwards to the multimodal storyboard provider."
+          "description": "Optional product images (up to 3) the worker forwards to the multimodal storyboard provider."
         },
         "outputPrefix": {
           "type": "string",
@@ -260,9 +260,9 @@
         "params": { "$ref": "#/$defs/videoParams" },
         "inputs": {
           "type": "array",
-          "maxItems": 1,
+          "maxItems": 3,
           "items": { "$ref": "#/$defs/videoInput" },
-          "description": "Optional reference image; the worker fetches it and forwards it to the video provider as the first frame."
+          "description": "Optional reference images (up to 3); the worker fetches them and forwards them to the video provider."
         },
         "outputPrefix": {
           "type": "string",

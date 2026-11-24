@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.credit.api.CreditAccounts;
+import com.flowcortex.media.api.MediaDownload;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobs;
@@ -22,8 +23,10 @@ import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.RunStartGuard;
+import com.flowcortex.workflow.api.RunOutputUrlView;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
@@ -216,6 +219,43 @@ class WorkflowRunServiceImplTest {
         assertThatThrownBy(() -> service.startRun(ownerId, driveFirst.getId(), "hi"))
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getBody().getProperties())
                         .containsEntry("code", "connector_turned_off"));
+    }
+
+    @Test
+    void iterateWithUnavailableChildIsRefusedDubDisabled() {
+        StepExecutor iterate = mock(StepExecutor.class);
+        when(iterate.type()).thenReturn("iterate");
+        when(iterate.mode()).thenReturn(StepExecutor.Mode.FANOUT);
+        when(iterate.available()).thenReturn(true);
+        StepExecutor tts = mock(StepExecutor.class);
+        when(tts.type()).thenReturn("tts");
+        when(tts.mode()).thenReturn(StepExecutor.Mode.INLINE);
+        when(tts.available()).thenReturn(false);
+        when(tts.unavailableRefusal()).thenCallRealMethod();
+        RunStartGuard creditGuard = (owner, workflowId, steps, context) -> {
+            throw new IllegalStateException("the credit guard must not be consulted");
+        };
+        StepExecutorRegistry dubRegistry = new StepExecutorRegistry(List.of(iterate, tts));
+        WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
+                workflowRunRepository, runStepRepository, dubRegistry, mediaJobs, mock(UserDirectory.class),
+                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), mock(CreditAccounts.class), true);
+        UUID ownerId = UUID.randomUUID();
+        Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
+        when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "each", "iterate", null,
+                        "{\"child\":{\"type\":\"tts\"}}")));
+
+        assertThatThrownBy(() -> service.startRun(ownerId, workflow.getId(), "[\"a\"]"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> {
+                    ResponseStatusException status = (ResponseStatusException) e;
+                    assertThat(status.getStatusCode().value()).isEqualTo(503);
+                    assertThat(status.getBody().getProperties()).containsEntry("code", "dub_disabled");
+                });
+
+        verify(workflowRunRepository, never()).save(any());
+        verify(events, never()).publishEvent(any());
     }
 
     @Test
@@ -775,5 +815,82 @@ class WorkflowRunServiceImplTest {
 
         assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 7, "voice.wav"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /**
+     * An iterate step at order 3 in {@code parentStatus} with no stored outputs of its own and one current
+     * child that completed storing {@code fileName} in a downloadable bucket.
+     */
+    private WorkflowRun givenIterateWithAChildFile(UUID ownerId, RunStepStatus parentStatus, String fileName) {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), ownerId, "in", Instant.now());
+        RunStep parent = new RunStep(UUID.randomUUID(), run.getId(), (short) 3, "iterate");
+        parent.markRunning(Instant.now());
+        if (parentStatus == RunStepStatus.ERROR) {
+            parent.markError("[]", "iterate_item_failed", "item 1: boom", Instant.now());
+        }
+        RunStep child = RunStep.child(run.getId(), (short) 3, "tts", parent.getId(), (short) 1, (short) 0, "a");
+        child.markRunning(Instant.now());
+        child.markCompleted("a", "{}", Instant.now(), "[{\"name\":\"" + fileName + "\",\"bucket\":\"flowcortex-media\","
+                + "\"objectKey\":\"runs/" + run.getId() + "/steps/3/" + fileName
+                + "\",\"mime\":\"audio/wav\",\"bytes\":4}]");
+        when(workflowRunRepository.findByIdAndOwnerId(run.getId(), ownerId)).thenReturn(Optional.of(run));
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(run.getId())).thenReturn(List.of(parent));
+        when(runStepRepository.findCurrentChildren(run.getId())).thenReturn(List.of(child));
+        when(mediaJobs.isDownloadable("flowcortex-media")).thenReturn(true);
+        return run;
+    }
+
+    private void givenSigning(WorkflowRun run, String fileName) {
+        when(mediaJobs.presignedGet("flowcortex-media", "runs/" + run.getId() + "/steps/3/" + fileName, fileName))
+                .thenReturn(new MediaDownload("https://signed.example/" + fileName, Instant.parse("2026-11-20T10:00:00Z")));
+    }
+
+    @Test
+    void childFileOfARunningIterateIsSigned() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenIterateWithAChildFile(ownerId, RunStepStatus.RUNNING, "item-0-1-voice.wav");
+        givenSigning(run, "item-0-1-voice.wav");
+
+        RunOutputUrlView view = service.getOutputUrl(ownerId, run.getId(), 3, "item-0-1-voice.wav");
+
+        assertThat(view.url()).isEqualTo("https://signed.example/item-0-1-voice.wav");
+    }
+
+    @Test
+    void childFileOfAFailFastIterateIsSigned() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenIterateWithAChildFile(ownerId, RunStepStatus.ERROR, "item-0-1-voice.wav");
+        givenSigning(run, "item-0-1-voice.wav");
+
+        RunOutputUrlView view = service.getOutputUrl(ownerId, run.getId(), 3, "item-0-1-voice.wav");
+
+        assertThat(view.url()).isEqualTo("https://signed.example/item-0-1-voice.wav");
+    }
+
+    @Test
+    void childFileOfAnEarlierAttemptIsNotFound() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenIterateWithAChildFile(ownerId, RunStepStatus.RUNNING, "item-0-2-voice.wav");
+
+        assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 3, "item-0-1-voice.wav"))
+                .isInstanceOf(NotFoundException.class);
+        verify(mediaJobs, never()).presignedGet(any(), any(), any());
+    }
+
+    @Test
+    void aChildFileIsNotSignedUnderAnotherStepOrder() {
+        WorkflowRunServiceImpl service = newService(true);
+        UUID ownerId = UUID.randomUUID();
+        WorkflowRun run = givenIterateWithAChildFile(ownerId, RunStepStatus.RUNNING, "item-0-1-voice.wav");
+        RunStep parent = runStepRepository.findByRunIdOrderByStepOrderAsc(run.getId()).getFirst();
+        RunStep other = new RunStep(UUID.randomUUID(), run.getId(), (short) 4, "echo");
+        when(runStepRepository.findByRunIdOrderByStepOrderAsc(run.getId())).thenReturn(List.of(parent, other));
+
+        assertThatThrownBy(() -> service.getOutputUrl(ownerId, run.getId(), 4, "item-0-1-voice.wav"))
+                .isInstanceOf(NotFoundException.class);
+        verify(mediaJobs, never()).presignedGet(any(), any(), any());
     }
 }

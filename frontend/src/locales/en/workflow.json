@@ -2,14 +2,40 @@
   "stepError": {
     "input_rejected": "We couldn't use that uploaded file. Upload it again.",
     "probe_failed": "We couldn't read that file as audio or video. Upload a video or audio file (for example .mp4).",
+    "audio_extraction_failed": "We couldn't extract audio from that file. Check the file and try again.",
+    "audio_alignment_failed": "We couldn't align the audio for this video. Try running again.",
+    "audio_alignment_out_of_range": "The voice-over duration differs too much from the source video to align.",
+    "duration_exceeded": "This file exceeds the maximum allowed duration. Upload a shorter file.",
+    "no_audio_stream": "The uploaded file has no audio track. Choose a file with audio and try again.",
     "lease_expired": "The media engine stopped responding. Try running again.",
     "queue_timeout": "The media engine was too busy to start this in time. Try running again.",
     "run_timeout": "This file took too long to process and was stopped. Try a shorter file.",
     "media_disabled": "The media engine is switched off right now.",
     "contract_violation": "The media engine rejected this job. Try again later.",
     "speech_too_long": "The approved script is too long for the 10-second video. Start a new run with a shorter script.",
-    "provider_timeout": "The provider took too long. The job is kept, so a later try with identical content will not start it from scratch.",
+    "provider_capability_unavailable": "The AI capability for this step is currently unavailable. Try again later.",
+    "provider_request_failed": "The AI service is temporarily unavailable and could not finish this step. Try running again in a few minutes.",
+    "provider_response_invalid": "The AI service returned an unexpected result for this step. Try running again.",
+    "provider_timeout": "The AI service took too long on this step. Try running again in a few minutes.",
+    "provider_quota_exceeded": "The AI service has reached its rate limit right now. Try running again in a few minutes.",
+    "provider_unavailable": "The AI service is temporarily unreachable. Try running again in a few minutes.",
+    "provider_busy": "Too many videos are being processed right now. Try running again in a few minutes.",
+    "sibling_failed": "Stopped because the other video clip failed.",
     "APPROVAL_REJECTED": "You rejected this content, so the run stopped.",
+    "INSUFFICIENT_CREDITS": "You don't have enough credits to run this step. Top up your balance and try again.",
+    "dub_disabled": "Dubbing is currently switched off.",
+    "store_unavailable": "Couldn't save the step output because storage is temporarily unavailable. Try running again.",
+    "translation_invalid": "Couldn't produce a valid translation for this step. Try running again.",
+    "context": {
+      "ai": {
+        "run_timeout": "This step took too long and was stopped. Try running again.",
+        "queue_timeout": "The system was too busy to start this step in time. Try running again.",
+        "lease_expired": "The worker connection was interrupted before this step finished. Try running again.",
+        "contract_violation": "This step request could not be processed. Try again later.",
+        "media_disabled": "The processing service is switched off right now."
+      }
+    },
+    "REVIEW_EXPIRED": "No one decided in time, so the run stopped.",
     "load_template_invalid_input": "The input for this step must be JSON with a \"template\" field naming the template to load.",
     "load_template_not_found": "No template with that name exists in this workflow's data store.",
     "load_template_invalid_template": "The stored template is not valid. Check its data and inputs.",
@@ -25,6 +51,7 @@
       "running": "Running",
       "completed": "Completed",
       "error": "Error",
+      "stopped": "Stopped",
       "skipped": "Skipped",
       "needsYou": "Needs you"
     },
@@ -32,11 +59,36 @@
       "probe": "Inspect the file",
       "extract_audio": "Extract source audio",
       "review": "Review",
+      "reviewScript": "Review script",
+      "generate_script": "Write script",
+      "generate_storyboard": "Storyboard",
+      "generate_speech": "Voice-over",
+      "generate_video": "Video clip",
+      "generate_video_numbered": "Video clip {{n}}",
+      "render_video": "Final render",
+      "qaReview": "QA review",
       "load_template": "Load a template"
     },
     "fallback": "Step {{order}}",
     "progress": "Step {{order}} progress",
     "waitingToStart": "Waiting to start…",
+    "activity": {
+      "elapsed": "Elapsed {{time}}",
+      "waitingPickup": "Waiting to start…",
+      "running": {
+        "generate_script_named": "Writing script for \"{{name}}\"…",
+        "generate_script": "Writing script…",
+        "generate_storyboard": "Planning 2 vertical scenes…",
+        "generate_speech": "Generating voice-over…",
+        "generate_video": "Generating 9:16 video clip…",
+        "render_video": "Assembling clips and audio…",
+        "fallback": "Working on this step…"
+      },
+      "pending": {
+        "APPROVAL_CHECKPOINT": "Pauses here for script review.",
+        "default": "Waiting for previous step."
+      }
+    },
     "timing": {
       "timeTaken": "Time taken",
       "startTime": "Start time",
@@ -51,7 +103,12 @@
       "duration": "Duration",
       "dimensions": "Dimensions",
       "videoCodec": "Video codec",
-      "audioCodec": "Audio codec"
+      "audioCodec": "Audio codec",
+      "voice": "Voice",
+      "speechSpeed": "Speed",
+      "aspectRatio": "Aspect ratio",
+      "resolution": "Resolution",
+      "format": "Format"
     },
     "showRaw": "Show raw",
     "hideRaw": "Hide raw"
@@ -60,7 +117,24 @@
     "region": "Steps",
     "hint": "Select a step to see its result.",
     "retried": "Retried {{n}}×",
-    "notConfigured": "Not configured"
+    "notConfigured": "Not configured",
+    "headingCount": "{{done}}/{{total}}"
+  },
+  "canvas": {
+    "region": "Run diagram",
+    "input": "Input",
+    "runInput": "Run input",
+    "live": "Live",
+    "progress": "Step {{current}} of {{total}}",
+    "elapsed": "Running for {{time}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomLevel": "{{percent}}%",
+    "fit": "Fit diagram",
+    "expand": "Expand diagram",
+    "close": "Close",
+    "minimap": "Diagram overview",
+    "splitHandle": "Resize diagram and details"
   },
   "run": {
     "heading": {
@@ -73,6 +147,7 @@
       "cancelled": "Run cancelled"
     },
     "headingOther": "Run {{status}}",
+    "stepProgress": "Step {{current}} / {{total}}",
     "back": "Back to workflow",
     "noRun": "No run selected.",
     "loading": "Loading run…",
@@ -127,7 +202,30 @@
     "playFailed": "Could not play the video. Download it instead.",
     "hideVideo": "Hide video",
     "loadingVideo": "Loading the video…",
-    "watchVideo": "Watch video"
+    "watchVideo": "Watch video",
+    "generatedSpeechTitle": "Voice-over ({{name}})",
+    "listenPreview": "Listen to voice-over",
+    "hideAudio": "Hide audio",
+    "loadingAudio": "Loading audio…",
+    "audioFailed": "Could not play the audio preview.",
+    "cannotPlayAudio": "Your browser cannot play this audio file.",
+    "intermediateAudioNote": "Preview only — intermediate files are not downloaded.",
+    "watchClip": "Preview clip",
+    "hideClip": "Hide clip",
+    "intermediateClipNote": "Preview only — assembled into the final video.",
+    "finalShowcaseBadge": "Ready",
+    "finalShowcaseHeading": "Video is ready",
+    "specAspect": "Aspect ratio",
+    "specAspectVal": "{{ratio}} (Vertical)",
+    "specResolution": "Resolution",
+    "specResolutionVal": "{{width}} × {{height}} px",
+    "specDuration": "Duration",
+    "specDurationVal": "{{seconds}}s",
+    "specFormat": "Format",
+    "specFormatVal": "MP4 (H.264 / AAC)",
+    "downloadFinalVideo": "Download video (.mp4)",
+    "downloadFinalStepVideo": "Download video ({{name}})",
+    "createAnother": "Create another"
   },
   "approval": {
     "region": "Review before the run continues",
@@ -143,19 +241,49 @@
     "loadingScript": "Loading the script…",
     "scriptLoadError": "Could not load the script revisions.",
     "loadingTask": "Loading the step to review…",
-    "taskLoadError": "Could not load the step to review."
+    "taskLoadError": "Could not load the step to review.",
+    "decideBy": "Decide by {{when}}",
+    "expired": "This review expired, so the run stopped.",
+    "pick": {
+      "region": "Choose one option",
+      "option": "Option {{number}}",
+      "own": "My own direction",
+      "details": "Details"
+    }
+  },
+  "qa": {
+    "region": "Answer the review questions",
+    "preparing": "Preparing questions…",
+    "send": "Send answers",
+    "sending": "Sending…",
+    "approveAsIs": "Approve as is",
+    "notReady": "The questions are not ready yet. Try again in a moment.",
+    "sendFailed": "Could not send your answers"
   },
   "script": {
     "label": "Script to approve",
     "tooLong": "This script is likely longer than the 10-second video. Keep it to about {{max}} words — a voice-over longer than 10 seconds stops the run.",
+    "meter": "{{words}} / {{max}} words · Est. ~{{seconds}}s / 10s",
     "save": "Save revision",
     "saving": "Saving…",
     "unsaved": "Unsaved changes — save a revision before approving.",
     "saveFailed": "Could not save this revision",
     "leaveConfirm": "You have unsaved script changes. Leave this page?",
+    "replaceConfirm": "You have unsaved script changes. Replace them with this revision?",
     "history": "Script revisions",
     "revision": "Revision {{number}}",
-    "approved": "Approved"
+    "approved": "Approved",
+    "loadRevision": "Load revision {{number}} into editor",
+    "clickToLoadHint": "Select an earlier revision to restore its text."
+  },
+  "storyboard": {
+    "heading": "2-scene storyboard",
+    "scene1Title": "Scene 1 · Product hook (0s – 5s)",
+    "scene2Title": "Scene 2 · Feature & close (5s – 10s)",
+    "referenceImage": "Source product image",
+    "copyPrompt": "Copy scene prompt",
+    "copied": "Copied",
+    "copyFailed": "Could not copy the prompt. Select the text and copy it yourself."
   },
   "start": {
     "formLabel": "Start run",
@@ -186,7 +314,37 @@
     "image": "Product image (JPG/PNG/WebP, ≤ 10 MB) *",
     "imageSelected": "1 image selected: {{name}}",
     "uploadingImage": "Uploading image {{index}}",
-    "uploadsUnfinished": "One of the uploads didn't finish. Try again."
+    "uploadsUnfinished": "One of the uploads didn't finish. Try again.",
+    "aspectRatioBadge": "9:16 Vertical",
+    "durationBadge": "10s",
+    "voiceBadge": "Vietnamese voice",
+    "creditsBadge": "~{{amount}} credits",
+    "specAspectShort": "9:16",
+    "specDurationShort": "10s",
+    "specFormatShort": "MP4",
+    "productNamePlaceholder": "e.g. Insulated Tumbler 500ml",
+    "descriptionPlaceholder": "Key benefits or product highlights…",
+    "charCount": "{{count}} / {{max}} chars",
+    "dropzoneTitle": "Drag & drop 1–3 photos, or browse",
+    "dropzoneHint": "1–3 clear product photos · JPG, PNG, or WebP · up to 10 MB each",
+    "changeImage": "Replace photo",
+    "addMoreImages": "Add photo",
+    "clearAllImages": "Clear all",
+    "removeImage": "Remove",
+    "removeImageAt": "Remove {{name}}",
+    "imageCount": "{{count}} / {{max}} photos",
+    "fileReady": "Ready ({{size}})",
+    "imagePreviewAlt": "Selected product photo preview",
+    "previewHeading": "9:16 preview",
+    "previewBadge": "9:16",
+    "previewEmptyImage": "Product photo",
+    "previewPlaceholderTitle": "Product name",
+    "previewPlaceholderDesc": "~25–30 words for a 10s vertical video.",
+    "briefSummary": "Product brief",
+    "retryWithBrief": "Edit details & start new run",
+    "restoringImages": "Restoring the product photos from the previous run…",
+    "restoreFailed_one": "{{count}} photo from the previous run could not be restored. Add it again before you start.",
+    "restoreFailed_other": "{{count}} photos from the previous run could not be restored. Add them again before you start."
   },
   "validation": {
     "noFile": "Choose a video or audio file to upload",
@@ -194,7 +352,7 @@
     "fileType": "This file type can't be checked yet. Use .mp4, .mov, .webm, .mkv, .m4a, .mp3 or .wav.",
     "imageType": "Use .jpg, .jpeg, .png or .webp.",
     "noImage": "Add at least one product image",
-    "tooManyImages": "At most 1 image per run.",
+    "tooManyImages": "At most 3 images per run.",
     "creatorLink": "Paste a valid TikTok or Douyin link",
     "linkRequired": "Paste a link that starts with http:// or https://"
   },

@@ -125,13 +125,39 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     /**
      * Running runs with no step in flight: nothing will move them unless someone advances them
      * (a pending next step whose advance was lost, or all steps completed but the run not closed).
-     * Runs never swept come first, then the one swept longest ago, so a run that never moves
-     * cannot keep a newer one out of the batch.
+     * A running iterate step with no running item in its current attempt is not in flight either:
+     * it waits for the advance that follows an item's end. Runs never swept come first, then the
+     * one swept longest ago, so a run that never moves cannot keep a newer one out of the batch.
      */
     @Query(value = "SELECT r.id FROM workflow_run r WHERE r.status = 'running' AND NOT EXISTS "
-            + "(SELECT 1 FROM run_step s WHERE s.run_id = r.id AND s.status = 'running') "
+            + "(SELECT 1 FROM run_step s WHERE s.run_id = r.id AND s.status = 'running' "
+            + "AND NOT (s.type = 'iterate' AND s.parent_step_id IS NULL AND NOT EXISTS "
+            + "(SELECT 1 FROM run_step c WHERE c.parent_step_id = s.id AND c.parent_attempt = s.attempt "
+            + "AND c.status = 'running'))) "
             + "ORDER BY r.last_swept_at NULLS FIRST, r.started_at", nativeQuery = true)
     List<UUID> findStalledRunIds(Pageable page);
+
+    /**
+     * Running runs with no step in flight, plus Product Video runs whose clip pair (steps 5–6)
+     * was interrupted mid-dispatch so one clip is running while the sibling remains pending.
+     */
+    @Query(value = "SELECT r.id FROM workflow_run r WHERE r.status = 'running' AND ("
+            + "NOT EXISTS (SELECT 1 FROM run_step s WHERE s.run_id = r.id AND s.status = 'running') "
+            + "OR (r.workflow_id = '9aa35334-b672-4b6c-93e8-1a4c2cc14301' "
+            + "AND EXISTS (SELECT 1 FROM run_step s3 "
+            + "JOIN run_step s5 ON s5.run_id = r.id "
+            + "JOIN run_step s6 ON s6.run_id = r.id "
+            + "WHERE s3.run_id = r.id AND s3.step_order = 3 AND s3.type = 'generate_storyboard' "
+            + "AND s5.step_order = 5 AND s5.type = 'generate_video' "
+            + "AND (s5.input_ref = '{step:3}' OR s5.input_ref LIKE '{step:3.%') "
+            + "AND s6.step_order = 6 AND s6.type = 'generate_video' "
+            + "AND (s6.input_ref = '{step:3}' OR s6.input_ref LIKE '{step:3.%') "
+            + "AND ((s5.status = 'running' AND s6.status = 'pending') "
+            + "OR (s6.status = 'running' AND s5.status = 'pending'))) "
+            + "AND (SELECT COUNT(*) FROM run_step pre "
+            + "WHERE pre.run_id = r.id AND pre.step_order BETWEEN 1 AND 4 AND pre.status = 'completed') = 4)) "
+            + "ORDER BY r.last_swept_at NULLS FIRST, r.started_at", nativeQuery = true)
+    List<UUID> findStalledRunIdsWithParallelClips(Pageable page);
 
     /** Stamps the runs one sweep took; {@code last_swept_at} is not mapped, so saving a run never resets it. */
     @Modifying
