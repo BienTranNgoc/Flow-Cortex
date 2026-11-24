@@ -42,7 +42,8 @@ class ShippedGeminiSlotsTest {
     void theShippedSlotsBindAndPassTheirChecks() {
         assertThatCode(ShippedGeminiSlotsTest::bind).doesNotThrowAnyException();
 
-        assertThat(bind().slots()).containsOnlyKeys("dub-translate", "dub-speech", "support-assistant");
+        assertThat(bind().slots()).containsOnlyKeys("dub-translate", "dub-speech", "support-assistant",
+                "qa-questions");
     }
 
     @Test
