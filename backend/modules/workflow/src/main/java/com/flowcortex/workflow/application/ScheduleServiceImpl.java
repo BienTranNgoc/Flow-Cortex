@@ -190,8 +190,9 @@ class ScheduleServiceImpl implements ScheduleService {
 
     /**
      * The checks of the start path that decide whether a schedule could fire, on the steps the caller is served: the
-     * workflow is the caller's to run, its first step takes text (a fire has no upload to give), and, when
-     * {@code active}, the readiness guard accepts it.
+     * workflow is the caller's to run, its first step takes text or a link, not an upload (a fire has none to give;
+     * judged by the start path's own {@code snapshotsRunInputs}), and, when {@code active}, the readiness guard
+     * accepts it.
      */
     private void checkStartable(UUID callerId, UUID workflowId, boolean active) {
         if (ProductVideoWorkflow.ID.equals(workflowId)) {
@@ -201,7 +202,7 @@ class ScheduleServiceImpl implements ScheduleService {
         Workflow workflow = workflows.findVisibleTo(workflowId, callerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
         List<WorkflowStep> steps = servedDefinitions.stepsFor(workflow, callerId);
-        if (!steps.isEmpty() && registry.isRemote(steps.getFirst().getType())) {
+        if (!steps.isEmpty() && registry.snapshotsRunInputs(steps.getFirst().getType())) {
             throw new UnprocessableEntityException(new LocalizedMessage("workflow.schedule.textInputOnly"), null);
         }
         if (active) {

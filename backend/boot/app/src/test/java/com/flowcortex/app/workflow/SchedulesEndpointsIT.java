@@ -171,6 +171,19 @@ class SchedulesEndpointsIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void linkFirstWorkflowIsAcceptedBecauseItsRunStartsFromText() {
+        UserView member = newUser("sched-link");
+        UUID workflowId = newWorkflow(member.id(), false, new NewWorkflowStep("fetch", "fetch_video", null)).id();
+
+        ResponseEntity<Map> response = put(workflowId, loginAs(member),
+                Map.of("frequency", "daily", "time", "08:00", "input", "https://example.com/watch?v=1"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsEntry("status", "active");
+        assertThat(scheduleCount(workflowId)).isEqualTo(1);
+    }
+
+    @Test
     void incompleteWorkflowIs422WhenActiveAndAcceptedWhenPaused() {
         UserView member = newUser("sched-incomplete");
         UUID workflowId = newWorkflow(member.id(), false).id();
