@@ -3710,6 +3710,67 @@ export interface TransactionDetailResponse {
   timeline: TransactionTimelineEvent[];
 }
 
+export interface TopupPackageItem {
+  id: string;
+  name: string;
+  /** @nullable */
+  nameEn: string | null;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  descriptionEn: string | null;
+  /** @nullable */
+  eyebrow: string | null;
+  /** @nullable */
+  eyebrowEn: string | null;
+  priceVnd: number;
+  credits: number;
+  /** @nullable */
+  groupKey: string | null;
+  sortOrder: number;
+}
+
+export interface TopupPackageListResponse {
+  data: TopupPackageItem[];
+}
+
+export type PlanCycleBillingCycle =
+  (typeof PlanCycleBillingCycle)[keyof typeof PlanCycleBillingCycle];
+
+export const PlanCycleBillingCycle = {
+  monthly: 'monthly',
+  yearly: 'yearly',
+} as const;
+
+export interface PlanCycle {
+  billingCycle: PlanCycleBillingCycle;
+  priceVnd: number;
+  includedCreditsPerMonth: number;
+}
+
+export interface PlanMarketingFeatures {
+  vi: string[];
+  en: string[];
+}
+
+export interface PlanItem {
+  id: string;
+  name: string;
+  /** @nullable */
+  nameEn: string | null;
+  /** @nullable */
+  taglineVi: string | null;
+  /** @nullable */
+  taglineEn: string | null;
+  marketingFeatures: PlanMarketingFeatures;
+  isPopular: boolean;
+  cycles: PlanCycle[];
+}
+
+export interface PlanListResponse {
+  data: PlanItem[];
+}
+
 /**
  * @nullable
  */
@@ -17787,6 +17848,60 @@ export const getBillingTransactionByOrder = async (
       method: 'GET',
     },
   );
+};
+
+export type listTopupPackagesResponse200 = {
+  data: TopupPackageListResponse;
+  status: 200;
+};
+
+export type listTopupPackagesResponseSuccess = listTopupPackagesResponse200 & {
+  headers: Headers;
+};
+export type listTopupPackagesResponse = listTopupPackagesResponseSuccess;
+
+export const getListTopupPackagesUrl = () => {
+  return `/api/v1/billing/topup-packages`;
+};
+
+/**
+ * Anyone may read it. Packages by position, then price.
+ * @summary List the top-up packages on sale
+ */
+export const listTopupPackages = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listTopupPackagesResponse> => {
+  return customFetch<listTopupPackagesResponse>(getListTopupPackagesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listBillingPlansResponse200 = {
+  data: PlanListResponse;
+  status: 200;
+};
+
+export type listBillingPlansResponseSuccess = listBillingPlansResponse200 & {
+  headers: Headers;
+};
+export type listBillingPlansResponse = listBillingPlansResponseSuccess;
+
+export const getListBillingPlansUrl = () => {
+  return `/api/v1/billing/plans`;
+};
+
+/**
+ * Anyone may read it. Tiers by position, each with the cycles it is sold on.
+ * @summary List the plans on sale
+ */
+export const listBillingPlans = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBillingPlansResponse> => {
+  return customFetch<listBillingPlansResponse>(getListBillingPlansUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type getAccountPreferencesResponse200 = {
