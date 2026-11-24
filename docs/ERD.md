@@ -55,7 +55,7 @@ erDiagram
     uuid workflow_id FK
     smallint step_order "UNIQUE (workflow_id, step_order), contiguous from 1"
     varchar name
-    varchar type "inline, provider remote, media remote, or APPROVAL_CHECKPOINT"
+    varchar type "inline, provider remote, media remote, APPROVAL_CHECKPOINT or qa.review"
     jsonb config
     varchar input_ref "{step:K.field}; NULL = previous step's output"
   }
@@ -164,8 +164,8 @@ erDiagram
     uuid id PK
     uuid run_id FK "ON DELETE CASCADE"
     uuid run_step_id FK,UK "ON DELETE CASCADE — a step pauses at most once"
-    varchar review_type "APPROVAL_CHECKPOINT"
-    varchar status "pending | approved | rejected"
+    varchar review_type "APPROVAL_CHECKPOINT | QA_REVIEW"
+    varchar status "pending | approved | rejected | expired"
     text original_payload "the checkpoint's input, unwrapped from the provider result"
     text reviewed_payload "plain checkpoints only; a script task approves a revision instead"
     uuid reviewed_by
@@ -174,6 +174,11 @@ erDiagram
     bigint version "JPA @Version — the decision's optimistic lock"
     uuid current_revision_id FK "the revision on screen; NULL = task keeps no revisions"
     uuid approved_revision_id FK "the revision that was approved; NULL until a decision"
+    timestamptz expires_at "time limit; a pending task past it is ended expired by the sweep"
+    jsonb questions "QA_REVIEW only: the questions shown"
+    text questions_state "generating | ready; NOT NULL exactly when review_type = QA_REVIEW"
+    jsonb answers "QA_REVIEW only: the answers given"
+    text decision_key "Idempotency-Key of the decision that ended the task, 1-80 chars"
   }
   script_revision {
     uuid id PK
@@ -306,7 +311,8 @@ erDiagram
 Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
 `idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
 list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
-the reaper scan), `idx_review_task_run_id`, `idx_script_revision_run`,
+the reaper scan), `idx_review_task_run_id`, `idx_review_task_pending_expiry` (partial, `WHERE status = 'pending'` — the
+expiry sweep), `idx_script_revision_run`,
 `idx_step_up_proof_expires_at`, `idx_pat_user_live` (partial, `WHERE revoked_at IS NULL`), `idx_event_publication_serialized_event` (hash),
 `idx_event_publication_completion_date`,
 `idx_workflow_bookmark_page` (`user_id, created_at DESC, workflow_id DESC` — the saved list),
@@ -370,6 +376,73 @@ and slot, which also makes concurrent saves exactly-once), `idx_profile_image_hi
 `profile_image` belongs to the profile module and carries no foreign key to `app_user`, like the other
 cross-module tables: the module boundary is kept at the schema level, and a deleted account leaves its
 rows behind.
+
+## MCP authorization server and token call guards (`V2026.11.15.225` – `V2026.11.15.226`)
+
+```mermaid
+erDiagram
+  oauth_client ||--o{ oauth_authorization_code : "client_id, ON DELETE CASCADE"
+  oauth_client ||--o{ oauth_issued_token : "client_id, ON DELETE CASCADE"
+  app_user ||--o{ oauth_authorization_code : "user_id, ON DELETE CASCADE"
+  personal_access_token ||--o| oauth_issued_token : "token_id, ON DELETE CASCADE"
+
+  oauth_client {
+    varchar client_id PK "mcp_ + 24 hex"
+    varchar client_secret_hash "SHA-256 hex; NULL for a public client (auth_method none)"
+    varchar client_name "1-128 characters, shown on the consent page"
+    jsonb redirect_uris "1-5 URIs validated in Java"
+    varchar auth_method "client_secret_post | client_secret_basic | none"
+    timestamptz created_at "index — unused-client purge"
+  }
+  oauth_authorization_code {
+    varchar code_hash PK "SHA-256 hex of the code; the code itself is never stored"
+    varchar client_id FK "ON DELETE CASCADE"
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar redirect_uri "the exact URI the consent accepted"
+    varchar code_challenge "PKCE S256"
+    varchar scope
+    timestamptz created_at
+    timestamptz expires_at "5 minutes after consent; index — retention scan"
+    timestamptz redeemed_at "set once by a conditional UPDATE; NULL = unspent"
+    uuid issued_token_id "no FK: the token row may be purged before the code row"
+  }
+  oauth_issued_token {
+    uuid token_id PK, FK "personal_access_token, ON DELETE CASCADE"
+    varchar client_id FK "ON DELETE CASCADE; a client with a row here is never purged"
+    timestamptz issued_at
+  }
+  api_token_call {
+    uuid id PK
+    uuid user_id "no FK: rows outlive tokens and accounts until retention"
+    uuid token_id
+    varchar method
+    varchar route "normalized pattern, never the query or body"
+    varchar outcome "ok | error | blocked | replayed"
+    smallint http_status
+    varchar error_code
+    integer duration_ms
+    timestamptz occurred_at "index — daily cap count and 90-day purge"
+  }
+  api_token_idempotency {
+    uuid user_id PK "no FK"
+    varchar idem_key PK "1-80 characters from the Idempotency-Key header"
+    varchar fingerprint "SHA-256 hex of method, path, query and body"
+    varchar state "running | done"
+    timestamptz reserved_at "a running reservation older than 5 minutes is taken over"
+    smallint http_status
+    varchar content_type
+    bytea response_body "the stored answer, at most 256 KiB"
+    timestamptz expires_at "24 hours after the reservation; index — retention scan"
+  }
+```
+
+Indexes: `idx_oauth_client_created_at`, `idx_oauth_code_expires_at`, `idx_oauth_issued_token_client`,
+`idx_api_token_call_user_time` (`user_id, occurred_at`), `idx_api_token_call_occurred_at`,
+`idx_api_token_idempotency_expires_at`.
+
+`api_token_call` and `api_token_idempotency` carry no foreign key on purpose: the audit trail and the
+stored answers outlive the token and the account until the retention job deletes them.
+`user.mcp-oauth-retention` deletes spent codes, unused clients, old call rows and ended reservations.
 
 ## Runtime settings (`V2026.11.11.180`, `V2026.11.11.320`)
 

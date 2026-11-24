@@ -56,6 +56,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/reviews/{reviewId}/helpful:
     put:
       tags:
@@ -87,6 +89,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HelpfulResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/reviews/mine:
     get:
       tags:
@@ -130,6 +134,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
     delete:
       tags:
       - workflow-reviews-controller
@@ -144,6 +150,8 @@ paths:
       responses:
         "200":
           description: OK
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/data/{key}:
     get:
       tags:
@@ -239,6 +247,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
     delete:
       tags:
       - workflow-data-store-controller
@@ -276,6 +286,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/bookmark:
     get:
       tags:
@@ -319,6 +331,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BookmarkResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/users/{id}:
     get:
       tags:
@@ -1355,6 +1369,8 @@ paths:
       tags:
       - workflows-controller
       operationId: createWorkflow
+      parameters:
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1388,10 +1404,17 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/versions:
     get:
       tags:
@@ -1450,6 +1473,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1458,12 +1482,18 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionSavedResponse"
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
@@ -1486,6 +1516,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/versions/{version}/rollback:
     post:
       tags:
@@ -1504,6 +1540,7 @@ paths:
         schema:
           type: integer
           format: int32
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1512,12 +1549,18 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionSavedResponse"
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
@@ -1546,6 +1589,10 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/steps:
     post:
       tags:
@@ -1558,6 +1605,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1597,10 +1645,15 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/runs:
     post:
       tags:
@@ -1618,6 +1671,7 @@ paths:
         required: false
         schema:
           type: string
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1633,10 +1687,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/reviews/{reviewId}/report:
     post:
       tags:
@@ -1655,6 +1720,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1664,10 +1730,21 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReportedResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/reviews/image-uploads:
     post:
       tags:
@@ -1680,6 +1757,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1689,10 +1767,21 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/regenerate-key:
     post:
       tags:
@@ -1705,6 +1794,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "403":
           description: Forbidden
@@ -1726,10 +1816,19 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareSettingsResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/pin:
     get:
       tags:
@@ -1766,6 +1865,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1775,6 +1875,9 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
@@ -1797,6 +1900,10 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
     delete:
       tags:
       - workflow-versions-controller
@@ -1817,6 +1924,8 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "204":
           description: No Content
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/hotfix:
     post:
       tags:
@@ -1829,6 +1938,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -1837,12 +1947,18 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionSavedResponse"
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
@@ -1865,6 +1981,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/fork:
     post:
       tags:
@@ -1877,6 +1999,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "403":
           description: Forbidden
@@ -1904,10 +2027,17 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflow-examples/{exampleId}/workflows:
     post:
       tags:
@@ -2026,6 +2156,8 @@ paths:
       tags:
       - uploads-controller
       operationId: requestUpload
+      parameters:
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -2035,10 +2167,21 @@ paths:
       responses:
         "201":
           description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/support/uploads:
     post:
       tags:
@@ -2374,6 +2517,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "401":
           description: Unauthorized
@@ -2401,10 +2545,19 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}/steps/{stepId}/reset:
     post:
       tags:
@@ -2423,6 +2576,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "401":
           description: Unauthorized
@@ -2444,10 +2598,19 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}/steps/{stepId}/execute:
     post:
       tags:
@@ -2466,6 +2629,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "401":
           description: Unauthorized
@@ -2493,10 +2657,90 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/runs/{id}/steps/{stepId}/children/{itemIndex}/regenerate:
+    post:
+      tags:
+      - runs-controller
+      operationId: regenerateChild
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: itemIndex
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}/retry:
     post:
       tags:
@@ -2509,6 +2753,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -2559,10 +2804,15 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}/cancel:
     post:
       tags:
@@ -2575,13 +2825,25 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/review-tasks/{taskId}/revisions:
     get:
       tags:
@@ -2614,6 +2876,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -2623,10 +2886,21 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScriptRevisionResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/review-tasks/{taskId}/reject:
     post:
       tags:
@@ -2639,13 +2913,43 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
+        "400":
+          description: malformed Idempotency-Key
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, or REVIEW_EXPIRED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewTaskResponse"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/review-tasks/{taskId}/approve:
     post:
       tags:
@@ -2658,18 +2962,113 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ApproveReviewTaskRequest"
       responses:
+        "400":
+          description: malformed Idempotency-Key
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, or REVIEW_EXPIRED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "pickedOption refused (errors.pickedOption), empty content,\
+            \ or a stopping run"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewTaskResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/review-tasks/{taskId}/answers:
+    post:
+      tags:
+      - review-tasks-controller
+      operationId: answerTask
+      parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerReviewTaskRequest"
+        required: true
+      responses:
+        "400":
+          description: malformed Idempotency-Key or answers
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "no longer pending, REVIEW_EXPIRED, or REVIEW_QUESTIONS_NOT_READY"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: "REVIEW_NOT_QA, an answer that does not fit (errors.answers.<id>),\
+            \ or a stopping run"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTaskResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/profile/images/{slot}/originals:
     get:
       tags:
@@ -2736,6 +3135,8 @@ paths:
       tags:
       - product-videos-controller
       operationId: startProductVideoRun
+      parameters:
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -2745,10 +3146,21 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/onboarding/reset:
     post:
       tags:
@@ -2917,6 +3329,172 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "422":
           description: onboarding-invalid (errors.reason)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/oauth/token:
+    post:
+      tags:
+      - o-auth-endpoint-controller
+      operationId: oauthToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/TokenForm"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "400":
+          description: "OAuth JSON: invalid_request, invalid_grant or unsupported_grant_type"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "401":
+          description: "OAuth JSON: invalid_client"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "429":
+          description: "temporarily_unavailable as OAuth JSON, with Retry-After"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/oauth/revoke:
+    post:
+      tags:
+      - o-auth-endpoint-controller
+      operationId: revokeOAuthToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/RevokeForm"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+        "400":
+          description: "OAuth JSON: invalid_request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "401":
+          description: "OAuth JSON: invalid_client"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "429":
+          description: "temporarily_unavailable as OAuth JSON, with Retry-After"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/oauth/register:
+    post:
+      tags:
+      - o-auth-endpoint-controller
+      operationId: registerOAuthClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registration"
+        "400":
+          description: invalid_redirect_uri or invalid_client_metadata as OAuth JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "429":
+          description: "temporarily_unavailable as OAuth JSON, with Retry-After"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthError"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/oauth/authorize:
+    post:
+      tags:
+      - o-auth-consent-controller
+      operationId: grantOAuthAuthorization
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrantResponse"
+        "400":
+          description: "oauth.invalidClient, oauth.invalidRedirectUri or oauth.invalidRequest"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: "PAT_NOT_ELIGIBLE, STEP_UP_REQUIRED or PAT_NOT_ALLOWED"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: PAT_LIMIT_REACHED
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
           content:
             application/problem+json:
               schema:
@@ -4994,6 +5572,8 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "204":
           description: No Content
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
     patch:
       tags:
       - workflows-controller
@@ -5005,6 +5585,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -5038,10 +5619,17 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowResponse"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/visibility:
     patch:
       tags:
@@ -5054,6 +5642,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -5093,10 +5682,15 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareSettingsResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/versions/{version}:
     get:
       tags:
@@ -5145,6 +5739,7 @@ paths:
         schema:
           type: integer
           format: int32
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -5154,6 +5749,9 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
@@ -5182,6 +5780,10 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/steps/{stepId}:
     delete:
       tags:
@@ -5233,6 +5835,8 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "204":
           description: No Content
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
     patch:
       tags:
       - workflows-controller
@@ -5250,6 +5854,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -5289,10 +5894,15 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/published-version:
     patch:
       tags:
@@ -5305,6 +5915,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -5313,6 +5924,9 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
@@ -5335,6 +5949,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}:
     get:
       tags:
@@ -5368,6 +5988,8 @@ paths:
       responses:
         "200":
           description: OK
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
     patch:
       tags:
       - run-history-controller
@@ -5379,6 +6001,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -5388,10 +6011,21 @@ paths:
       responses:
         "200":
           description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunHistoryRowResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/notifications/preferences:
     get:
       tags:
@@ -6201,6 +6835,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevokedResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/graph:
     get:
       tags:
@@ -7159,6 +7795,93 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/oauth/authorize/request:
+    get:
+      tags:
+      - o-auth-consent-controller
+      operationId: checkOAuthAuthorization
+      parameters:
+      - name: response_type
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 32
+          minLength: 0
+      - name: client_id
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 64
+          minLength: 0
+      - name: redirect_uri
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 2048
+          minLength: 0
+      - name: code_challenge
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 256
+          minLength: 0
+      - name: code_challenge_method
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 16
+          minLength: 0
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 64
+          minLength: 0
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 1024
+          minLength: 0
+      - name: resource
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 2048
+          minLength: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckResponse"
+        "400":
+          description: oauth.invalidClient or oauth.invalidRedirectUri
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/notifications:
     get:
       tags:
@@ -7804,6 +8527,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BuilderChartResponse"
+  /api/v1/billing/transactions:
+    get:
+      tags:
+      - transactions-controller
+      summary: List the member's payments
+      description: Newest first. page counts from 0; settled=true keeps payments where
+        money reached us.
+      operationId: listBillingTransactions
+      parameters:
+      - name: page
+        in: query
+        description: Page number from 0 to 10000; default 0
+        required: false
+        schema:
+          type: integer
+          default: 0
+          maximum: 10000
+          minimum: 0
+      - name: size
+        in: query
+        description: Rows per page from 1 to 100; default 20
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: settled
+        in: query
+        description: "true or 1 lists only succeeded, partially refunded and refunded\
+          \ payments"
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "200":
+          description: One page of the member's payments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionListResponse"
+        "400":
+          description: "page or size out of range (code invalid_pagination), or settled\
+            \ not a flag (code invalid_query_flag)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Not signed in
+  /api/v1/billing/transactions/{transactionId}:
+    get:
+      tags:
+      - transactions-controller
+      summary: Read one of the member's payments
+      operationId: getBillingTransaction
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The payment with its provider facts and timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/by-order/{orderRef}:
+    get:
+      tags:
+      - transactions-controller
+      summary: Read one of the member's payments by order reference
+      operationId: getBillingTransactionByOrder
+      parameters:
+      - name: orderRef
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The payment with its provider facts and timeline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/profile/preferences:
     get:
       tags:
@@ -8678,6 +9506,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewAdminAccountResponse"
+  /.well-known/oauth-authorization-server:
+    get:
+      tags:
+      - o-auth-endpoint-controller
+      operationId: oauthMetadata
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Metadata"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+      security: []
   /api/v1/workflows/{id}/link-grants/{userId}:
     delete:
       tags:
@@ -8721,6 +9568,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevokedResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/me/api-tokens/{id}:
     delete:
       tags:
@@ -10324,6 +11173,42 @@ components:
         chargedCredits:
           type: integer
           format: int64
+    RunStepChildResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        itemIndex:
+          type: integer
+          format: int32
+        status:
+          type: string
+        output:
+          type: string
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        attempt:
+          type: integer
+          format: int32
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunStepOutputResponse"
+      required:
+      - attempt
+      - id
+      - itemIndex
+      - outputs
+      - status
     RunStepOutputResponse:
       type: object
       properties:
@@ -10386,8 +11271,13 @@ components:
           enum:
           - inline
           - remote
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunStepChildResponse"
       required:
       - attempt
+      - children
       - deliveryCount
       - mode
       - outputs
@@ -10796,6 +11686,24 @@ components:
         reviewTaskVersion:
           type: integer
           format: int64
+    ReviewQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+      required:
+      - id
+      - options
+      - question
+      - type
     ReviewTaskResponse:
       type: object
       properties:
@@ -10834,6 +11742,25 @@ components:
         approvedRevisionId:
           type: string
           format: uuid
+        expiresAt:
+          type: string
+          format: date-time
+        pickOptions:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewQuestion"
+        questionsState:
+          type: string
+        answers:
+          type: object
+          additionalProperties: {}
+      required:
+      - expiresAt
     ApproveReviewTaskRequest:
       type: object
       properties:
@@ -10845,6 +11772,17 @@ components:
         expectedVersion:
           type: integer
           format: int64
+        pickedOption:
+          type: integer
+          format: int32
+    AnswerReviewTaskRequest:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties: {}
+      required:
+      - answers
     ProductVideoRunRequest:
       type: object
       properties:
@@ -10873,7 +11811,7 @@ components:
           items:
             type: string
             format: uuid
-          maxItems: 1
+          maxItems: 3
           minItems: 1
         video:
           $ref: "#/components/schemas/VideoConfig"
@@ -11074,6 +12012,172 @@ components:
           enum:
           - skipped
           - finished
+    TokenForm:
+      type: object
+      properties:
+        grant_type:
+          type: string
+        code:
+          type: string
+        code_verifier:
+          type: string
+        redirect_uri:
+          type: string
+        client_id:
+          type: string
+        client_secret:
+          type: string
+      required:
+      - code
+      - code_verifier
+      - grant_type
+      - redirect_uri
+    OAuthError:
+      type: object
+      description: "The error object of RFC 6749 section 5.2, also used by RFC 7591"
+      properties:
+        error:
+          type: string
+          description: "The OAuth error code, for example invalid_grant"
+        error_description:
+          type: string
+          description: A human-readable explanation; never echoes a request value
+      required:
+      - error
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+          format: int64
+        scope:
+          type: string
+      required:
+      - access_token
+      - expires_in
+      - scope
+      - token_type
+    RevokeForm:
+      type: object
+      properties:
+        token:
+          type: string
+        token_type_hint:
+          type: string
+        client_id:
+          type: string
+        client_secret:
+          type: string
+      required:
+      - token
+    RegistrationRequest:
+      type: object
+      properties:
+        client_name:
+          type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+        grant_types:
+          type: array
+          items:
+            type: string
+        response_types:
+          type: array
+          items:
+            type: string
+        token_endpoint_auth_method:
+          type: string
+    Registration:
+      type: object
+      properties:
+        client_id:
+          type: string
+        client_secret:
+          type: string
+          description: Absent for a client that authenticates with none
+        client_id_issued_at:
+          type: integer
+          format: int64
+        client_secret_expires_at:
+          type: integer
+          format: int64
+        client_name:
+          type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+        grant_types:
+          type: array
+          items:
+            type: string
+        response_types:
+          type: array
+          items:
+            type: string
+        token_endpoint_auth_method:
+          type: string
+      required:
+      - client_id
+      - client_id_issued_at
+      - client_name
+      - client_secret_expires_at
+      - grant_types
+      - redirect_uris
+      - response_types
+      - token_endpoint_auth_method
+    GrantRequest:
+      type: object
+      properties:
+        response_type:
+          type: string
+          maxLength: 32
+          minLength: 0
+        client_id:
+          type: string
+          maxLength: 64
+          minLength: 0
+        redirect_uri:
+          type: string
+          maxLength: 2048
+          minLength: 0
+        code_challenge:
+          type: string
+          maxLength: 256
+          minLength: 0
+        code_challenge_method:
+          type: string
+          maxLength: 16
+          minLength: 0
+        scope:
+          type: string
+          maxLength: 64
+          minLength: 0
+        state:
+          type: string
+          maxLength: 1024
+          minLength: 0
+        resource:
+          type: string
+          maxLength: 2048
+          minLength: 0
+        stepUpProof:
+          type: string
+          maxLength: 128
+          minLength: 0
+    GrantResponse:
+      type: object
+      properties:
+        redirectTo:
+          type: string
+      required:
+      - redirectTo
     ReadAllResult:
       type: object
       properties:
@@ -13873,6 +14977,31 @@ components:
       - industry
       - track
       - usageType
+    CheckResponse:
+      type: object
+      properties:
+        clientId:
+          type: string
+        clientName:
+          type: string
+        redirectUri:
+          type: string
+        scope:
+          type: string
+        eligible:
+          type: boolean
+        error:
+          type:
+          - string
+          - "null"
+          description: The OAuth error the page sends to the redirect URI; null when
+            the request is valid
+      required:
+      - clientId
+      - clientName
+      - eligible
+      - redirectUri
+      - scope
     NotificationItem:
       type: object
       properties:
@@ -14004,9 +15133,12 @@ components:
           type: boolean
         chat:
           type: boolean
+        drive:
+          type: boolean
       required:
       - chat
       - credits
+      - drive
       - emailConfirmation
       - onboarding
       - passwordReset
@@ -14595,6 +15727,173 @@ components:
       - day
       - failed
       - runs
+    TransactionListMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - page
+      - size
+      - total
+    TransactionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionRow"
+        meta:
+          $ref: "#/components/schemas/TransactionListMeta"
+      required:
+      - data
+      - meta
+    TransactionRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        description:
+          type: string
+        amountVnd:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        openedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - amountVnd
+      - description
+      - id
+      - kind
+      - openedAt
+      - status
+      - succeededAt
+    TransactionDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        description:
+          type: string
+        amountVnd:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        openedAt:
+          type: string
+          format: date-time
+        succeededAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        orderRef:
+          type: string
+        provider:
+          type: string
+        instrument:
+          type:
+          - string
+          - "null"
+          enum:
+          - wallet
+          - domestic_card
+        providerPayType:
+          type:
+          - string
+          - "null"
+        providerTransactionId:
+          type:
+          - string
+          - "null"
+        outcomeCode:
+          type:
+          - string
+          - "null"
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionTimelineEvent"
+      required:
+      - amountVnd
+      - description
+      - id
+      - instrument
+      - kind
+      - openedAt
+      - orderRef
+      - outcomeCode
+      - provider
+      - providerPayType
+      - providerTransactionId
+      - status
+      - succeededAt
+      - timeline
+    TransactionTimelineEvent:
+      type: object
+      properties:
+        at:
+          type: string
+          format: date-time
+        kind:
+          type: string
+          enum:
+          - opened
+          - paid
+          - payment_failed
+          - payment_expired
+        code:
+          type:
+          - string
+          - "null"
+      required:
+      - at
+      - code
+      - kind
     PreferencesView:
       type: object
       properties:
@@ -15495,12 +16794,113 @@ components:
       - page
       - size
       - total
+    Metadata:
+      type: object
+      properties:
+        issuer:
+          type: string
+        authorization_endpoint:
+          type: string
+        token_endpoint:
+          type: string
+        registration_endpoint:
+          type: string
+        revocation_endpoint:
+          type: string
+        response_types_supported:
+          type: array
+          items:
+            type: string
+        grant_types_supported:
+          type: array
+          items:
+            type: string
+        code_challenge_methods_supported:
+          type: array
+          items:
+            type: string
+        scopes_supported:
+          type: array
+          items:
+            type: string
+        token_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+        revocation_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+      required:
+      - authorization_endpoint
+      - code_challenge_methods_supported
+      - grant_types_supported
+      - issuer
+      - registration_endpoint
+      - response_types_supported
+      - revocation_endpoint
+      - revocation_endpoint_auth_methods_supported
+      - scopes_supported
+      - token_endpoint
+      - token_endpoint_auth_methods_supported
     RevokedResponse:
       type: object
       properties:
         revoked:
           type: integer
           format: int32
+  responses:
+    IdempotencyKeyInvalid:
+      description: "The Idempotency-Key header is blank or longer than 80 characters,\
+        \ or the keyed request body cannot be fingerprinted (multipart or over 1 MiB)."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    IdempotencyInProgress:
+      description: A request with the same key is still running.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    IdempotencyKeyReused:
+      description: "The key was used with a different method, path, query or body."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ApiTokenDailyLimit:
+      description: The token owner's daily write limit is reached (code API_TOKEN_DAILY_LIMIT);
+        retry after the UTC day ends.
+      headers:
+        Retry-After:
+          description: Seconds until the next UTC day
+          schema:
+            type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: "Optional on POST and PATCH made with a personal access token.\
+        \ A repeat of the same request within 24 hours returns the stored answer with\
+        \ Idempotent-Replayed: true."
+      required: false
+      schema:
+        type: string
+        maxLength: 80
+        minLength: 1
+  headers:
+    IdempotentReplayed:
+      description: true when the answer is the stored one of an earlier request with
+        the same key
+      schema:
+        type: string
+        enum:
+        - "true"
   securitySchemes:
     BearerAuth:
       type: http

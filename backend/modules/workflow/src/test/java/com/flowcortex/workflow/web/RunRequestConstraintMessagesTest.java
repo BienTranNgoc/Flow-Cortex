@@ -71,12 +71,13 @@ class RunRequestConstraintMessagesTest {
     }
 
     @Test
-    void aProductVideoRunRequestTakesExactlyOneImage() {
+    void aProductVideoRunRequestTakesOneToThreeImages() {
         ProductVideoRunRequest request = new ProductVideoRunRequest("Lamp", "A desk lamp", null, null, null,
-                List.of(UUID.randomUUID(), UUID.randomUUID()), new ProductVideoRunRequest.VideoConfig("9:16"), null);
+                List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()),
+                new ProductVideoRunRequest.VideoConfig("9:16"), null);
 
         assertThat(englishErrors(request))
-                .containsOnly(Map.entry("uploadIds", "Product Video takes exactly one product image"));
+                .containsOnly(Map.entry("uploadIds", "Product Video takes 1 to 3 product images"));
     }
 
     /** Binds under the object name Spring MVC gives a {@code @RequestBody} of the same type. */

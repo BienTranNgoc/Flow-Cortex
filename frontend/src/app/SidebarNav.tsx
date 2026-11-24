@@ -62,7 +62,7 @@ function Entry({
 export function SidebarNav({ rail, onNavigate }: Readonly<SidebarNavProps>) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const { chat } = useFeatures();
+  const { chat, drive } = useFeatures();
   const onDocs = pathname.startsWith('/docs');
   const [docsOpen, setDocsOpen] = useState(onDocs);
   const docsListId = useId();
@@ -77,7 +77,7 @@ export function SidebarNav({ rail, onNavigate }: Readonly<SidebarNavProps>) {
   return (
     <nav className="sidebar-nav" aria-label={t('common.nav.label')}>
       <ul className="sidebar-nav__list">
-        {primaryNavItems(t, { chat }).map((item) => (
+        {primaryNavItems(t, { chat, drive }).map((item) => (
           <li key={item.to}>
             <Entry
               to={item.to}
