@@ -75,7 +75,7 @@ class RunStartPreflight {
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType()))) {
+        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
             throw new DubDisabledException();
         }
         runStartGuards.check(ownerId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));

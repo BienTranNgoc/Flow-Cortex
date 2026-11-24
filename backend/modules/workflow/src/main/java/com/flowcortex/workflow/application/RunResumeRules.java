@@ -15,7 +15,8 @@ import java.util.UUID;
  */
 final class RunResumeRules {
 
-    private static final Set<String> NON_RETRYABLE_CODES = Set.of("APPROVAL_REJECTED", "input_rejected", "probe_failed");
+    private static final Set<String> NON_RETRYABLE_CODES =
+            Set.of("APPROVAL_REJECTED", "input_rejected", "probe_failed", ReviewExpirySweep.CODE);
 
     private RunResumeRules() {}
 
@@ -55,7 +56,7 @@ final class RunResumeRules {
         if (step.status() != RunStepStatus.ERROR) {
             return refused(Kind.STEP_NOT_FAILED);
         }
-        if (KnownStepTypes.APPROVAL_CHECKPOINT.equals(step.type())
+        if (HumanSteps.TYPES.contains(step.type())
                 || (step.errorCode() != null && NON_RETRYABLE_CODES.contains(step.errorCode()))) {
             return refused(Kind.STEP_NOT_RETRYABLE);
         }

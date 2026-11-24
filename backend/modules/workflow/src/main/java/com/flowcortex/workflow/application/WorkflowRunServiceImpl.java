@@ -18,6 +18,7 @@ import com.flowcortex.user.api.UserDirectory;
 import com.flowcortex.workflow.api.AdminRunDetailView;
 import com.flowcortex.workflow.api.AdminRunFilter;
 import com.flowcortex.workflow.api.AdminRunView;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.MediaJobView;
 import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.api.RunInputView;
@@ -227,7 +228,8 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
-        return WorkflowMapper.toRunView(run, steps, registry::isRemote, mediaJobs::isDownloadable);
+        return WorkflowMapper.toRunView(run, steps, runStepRepository.findCurrentChildren(runId), registry::isRemote,
+                mediaJobs::isDownloadable);
     }
 
     @Override
@@ -260,9 +262,21 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                 .filter(candidate -> candidate.getStepOrder() == stepOrder)
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.step.notFound", stepOrder, runId)));
-        StoredOutput output = storedOutputs(step).stream()
-                .filter(candidate -> candidate.name().equals(name))
-                .findFirst()
+        RunStep owner = step;
+        Optional<StoredOutput> stored = namedOutput(step, name);
+        if (stored.isEmpty() && IterateStepConfig.TYPE.equals(step.getType())) {
+            // An iterate step lists its own files only once it completes; its items' files are signed from the start.
+            for (RunStep child : runStepRepository.findCurrentChildren(runId)) {
+                if (step.getId().equals(child.getParentStepId())) {
+                    stored = namedOutput(child, name);
+                    if (stored.isPresent()) {
+                        owner = child;
+                        break;
+                    }
+                }
+            }
+        }
+        StoredOutput output = stored
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name)));
         if (!MediaJob.isBelow(MediaJob.outputPrefix(runId, stepOrder), output.objectKey())) {
             LOG.warn("Stored output not signed, it lies outside its step: runId={} stepOrder={} name={} bucket={} key={}",
@@ -275,8 +289,12 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                     runId, stepOrder, name, output.bucket());
             throw new NotFoundException(new LocalizedMessage("workflow.step.outputNotFound", stepOrder, name));
         }
-        return new DownloadableOutput(step.getId(), step.getAttempt(), output.name(), output.bucket(),
+        return new DownloadableOutput(owner.getId(), owner.getAttempt(), output.name(), output.bucket(),
                 output.objectKey(), output.mime());
+    }
+
+    private Optional<StoredOutput> namedOutput(RunStep step, String name) {
+        return storedOutputs(step).stream().filter(candidate -> candidate.name().equals(name)).findFirst();
     }
 
     @Override

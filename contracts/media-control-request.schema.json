@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flowcortex.dev/contracts/media-control-request.schema.json",
+  "title": "MediaControlRequest",
+  "description": "Control check sent by a video worker before submitting and periodically while processing a delivery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "jobId", "attempt"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "runId": { "type": "string", "format": "uuid" },
+    "jobId": { "type": "string", "format": "uuid" },
+    "attempt": { "type": "integer", "minimum": 1 }
+  }
+}

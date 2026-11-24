@@ -4,6 +4,7 @@ import asyncio
 import importlib
 import io
 import json
+import shutil
 import subprocess
 import threading
 import time
@@ -86,12 +87,13 @@ def test_edge_speech_produces_valid_wav_and_safe_manifest(
         return b"mp3"
 
     monkeypatch.setattr(edge_adapter, "_run_download", download)
-    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort: _wav())
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
     adapter = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig())
 
     outcome = execute(_job("Nội dung bí mật"), adapter, _empty_context())
 
     assert outcome.data["provider"] == "edge"
+    assert outcome.data["speed"] == edge_adapter.DEFAULT_EDGE_RATE
     assert outcome.data["sourceRevisionId"] == str(REVISION_ID)
     assert len(outcome.data["idempotencyKey"]) == 64
     assert [item.name for item in outcome.files] == ["speech.wav", "manifest.json"]
@@ -107,7 +109,7 @@ def test_idempotency_key_changes_with_voice(monkeypatch: pytest.MonkeyPatch) -> 
         return b"mp3"
 
     monkeypatch.setattr(edge_adapter, "_run_download", download)
-    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort: _wav())
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
 
     first = execute(
         _job(),
@@ -224,6 +226,126 @@ def test_stream_without_audio_chunks_is_transient(monkeypatch: pytest.MonkeyPatc
     assert str(raised.value) == "Edge TTS returned no audio"
 
 
+def test_in_process_retry_recovers_from_transient_no_audio_without_logging_script(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def flaky_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise edge_errors.NoAudioReceived("silent")
+        return b"mp3"
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", flaky_download)
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
+
+    with captured_logs() as lines:
+        artifact = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig()).generate_speech(
+            SpeechRequest("Đặt mua bí mật", REVISION_ID), ProcessRunner()
+        )
+
+    assert calls == 3
+    assert artifact.duration_ms == 1000
+    warnings = [line for line in lines if line["level"] == "WARNING"]
+    assert len(warnings) == 2
+    assert [w["downloadAttempt"] for w in warnings] == [1, 2]
+    assert all(w["errorType"] == "NoAudioReceived" for w in warnings)
+    assert all("Đặt mua bí mật" not in json.dumps(line) for line in lines)
+
+
+def test_in_process_retry_recovers_from_websocket_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def flaky_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise edge_errors.WebSocketError("dropped")
+        return b"mp3"
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", flaky_download)
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
+
+    artifact = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig()).generate_speech(
+        SpeechRequest("Đặt mua", REVISION_ID), ProcessRunner()
+    )
+
+    assert calls == 2
+    assert artifact.provider == "edge"
+
+
+def test_in_process_retry_exhaustion_preserves_transient_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def failing_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        raise edge_errors.NoAudioReceived("silent")
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", failing_download)
+
+    with pytest.raises(TransientError, match="Edge TTS returned no audio"):
+        _speak(ProcessRunner())
+
+    assert calls == edge_adapter._MAX_DOWNLOAD_ATTEMPTS
+
+
+def test_in_process_retry_does_not_retry_permanent_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def rejected_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        nonlocal calls
+        calls += 1
+        raise edge_errors.UnexpectedResponse("bad")
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", rejected_download)
+
+    with pytest.raises(PermanentError) as raised:
+        _speak(ProcessRunner())
+
+    assert raised.value.code == "provider_response_invalid"
+    assert calls == 1
+
+
+def test_kill_during_retry_backoff_stops_immediately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retrying = threading.Event()
+
+    async def failing_download(script: str, config: edge_adapter.EdgeConfig) -> bytes:
+        retrying.set()
+        raise edge_errors.NoAudioReceived("silent")
+
+    monkeypatch.setattr(edge_adapter, "_RETRY_DELAYS_SECONDS", (30.0,))
+    monkeypatch.setattr(edge_adapter, "_download_mp3", failing_download)
+    runner = ProcessRunner()
+
+    def kill_once_waiting() -> None:
+        if retrying.wait(5):
+            time.sleep(0.05)
+            runner.kill("shutdown")
+
+    threading.Thread(target=kill_once_waiting, daemon=True).start()
+    began = time.monotonic()
+
+    with pytest.raises(ProcessKilled, match="shutdown"):
+        _speak(runner)
+
+    assert time.monotonic() - began < 5
+
+
 def test_kill_during_download_stops_the_stream(monkeypatch: pytest.MonkeyPatch) -> None:
     streaming = threading.Event()
 
@@ -296,7 +418,7 @@ def test_invalid_audio_is_permanent(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         edge_adapter,
         "_to_wav",
-        lambda body, abort: (_ for _ in ()).throw(
+        lambda body, abort, **_: (_ for _ in ()).throw(
             PermanentError("provider_response_invalid", "invalid audio")
         ),
     )
@@ -355,3 +477,138 @@ def test_build_adapter_rejects_edge_as_explicit_script_provider(
     importlib.reload(provider_main)
     with pytest.raises(RuntimeError, match=r"SCRIPT_PROVIDER 'edge'.*fixture, openai$"):
         provider_main._build_adapter()
+
+
+def test_default_rate_is_ten_percent_and_communicate_uses_zero_rate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert edge_adapter.DEFAULT_EDGE_RATE == "+10%"
+    seen_rates: list[str] = []
+
+    class FakeCommunicate:
+        def __init__(self, script: str, *, voice: str, rate: str) -> None:
+            seen_rates.append(rate)
+
+        async def stream(self) -> Any:
+            yield {"type": "audio", "data": b"mp3"}
+
+    monkeypatch.setattr("edge_tts.Communicate", FakeCommunicate)
+    monkeypatch.setattr(edge_adapter, "_to_wav", lambda body, abort, **_: _wav())
+
+    adapter = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(rate="+10%"))
+    artifact = adapter.generate_speech(SpeechRequest("Đặt mua", REVISION_ID), MagicMock())
+
+    assert seen_rates == ["+0%"]
+    assert adapter.speech_identity().speed == "+10%"
+    assert artifact.speed == "+10%"
+
+
+def test_to_wav_passes_atempo_filter_when_requested() -> None:
+    abort = MagicMock()
+
+    def run(argv: list[str]) -> subprocess.CompletedProcess[bytes]:
+        output = Path(argv[-1])
+        output.write_bytes(_wav())
+        return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+    abort.run.side_effect = run
+    edge_adapter._to_wav(b"mp3", abort, atempo=1.1)
+
+    [argv] = abort.run.call_args.args
+    assert "-filter:a" in argv
+    assert argv[argv.index("-filter:a") + 1] == "atempo=1.100000"
+
+
+def test_soft_fit_cushion_reencodes_from_original_mp3_within_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[float | None] = []
+    monkeypatch.setattr(edge_adapter, "_run_download", lambda *_: b"raw-mp3")
+
+    def fake_to_wav(body: bytes, abort: Any, *, atempo: float | None = None) -> bytes:
+        assert body == b"raw-mp3"
+        calls.append(atempo)
+        return _wav(10_500) if len(calls) == 1 else _wav(9_850)
+
+    monkeypatch.setattr(edge_adapter, "_to_wav", fake_to_wav)
+    artifact = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(rate="+10%")).generate_speech(
+        SpeechRequest("Đặt mua", REVISION_ID), MagicMock()
+    )
+
+    assert len(calls) == 2
+    assert calls[0] == pytest.approx(1.1)
+    assert calls[1] == pytest.approx(1.1 * (10_500 / 9_850))
+    assert artifact.duration_ms == 9_850
+    assert artifact.speed == "+10%"
+
+
+def test_speech_above_soft_fit_ceiling_preserves_duration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[float | None] = []
+    monkeypatch.setattr(edge_adapter, "_run_download", lambda *_: b"raw-mp3")
+
+    def fake_to_wav(body: bytes, abort: Any, *, atempo: float | None = None) -> bytes:
+        calls.append(atempo)
+        return _wav(12_000)
+
+    monkeypatch.setattr(edge_adapter, "_to_wav", fake_to_wav)
+    artifact = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(rate="+10%")).generate_speech(
+        SpeechRequest("Đặt mua", REVISION_ID), MagicMock()
+    )
+
+    assert len(calls) == 1
+    assert artifact.duration_ms == 12_000
+
+
+def _fixture_mp3(tmp_path: Path, duration_seconds: float) -> bytes:
+    target = tmp_path / f"sample-{duration_seconds}.mp3"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=r=24000:cl=mono",
+            "-t",
+            str(duration_seconds),
+            "-c:a",
+            "libmp3lame",
+            target.as_posix(),
+        ],
+        check=True,
+    )
+    return target.read_bytes()
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed on PATH")
+@pytest.mark.parametrize(
+    ("raw_seconds", "expected_range"),
+    [
+        (10.3, (9_000, 10_000)),
+        (11.4, (9_700, 10_000)),
+        (13.5, (11_501, 13_000)),
+    ],
+    ids=["base-tempo-fits", "soft-fit-cushion", "over-ceiling-rejected-later"],
+)
+def test_ffmpeg_tempo_and_soft_fit_real_transcode(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    raw_seconds: float,
+    expected_range: tuple[int, int],
+) -> None:
+    mp3 = _fixture_mp3(tmp_path, raw_seconds)
+    monkeypatch.setattr(edge_adapter, "_run_download", lambda *_: mp3)
+    adapter = edge_adapter.EdgeSpeechAdapter(edge_adapter.EdgeConfig(rate="+10%"))
+
+    artifact = adapter.generate_speech(SpeechRequest("Đặt mua", REVISION_ID), ProcessRunner())
+
+    lo, hi = expected_range
+    assert lo <= artifact.duration_ms <= hi
+    assert artifact.speed == "+10%"
+

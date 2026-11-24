@@ -1,0 +1,71 @@
+{
+  "menu": {
+    "paymentHistory": "Lịch sử thanh toán"
+  },
+  "amount": "{{amount}} ₫",
+  "none": "Không có",
+  "status": {
+    "pending": "Đang chờ",
+    "succeeded": "Đã thanh toán",
+    "failed": "Thất bại",
+    "expired": "Đã hết hạn",
+    "partially_refunded": "Hoàn tiền một phần",
+    "refunded": "Đã hoàn tiền",
+    "disputed": "Đang khiếu nại"
+  },
+  "kind": {
+    "plan_purchase": "Mua gói",
+    "topup": "Nạp tiền"
+  },
+  "history": {
+    "title": "Lịch sử thanh toán",
+    "lede": "Mọi khoản thanh toán bạn đã bắt đầu, mới nhất trước.",
+    "settledOnly": "Chỉ khoản đã thanh toán",
+    "tableLabel": "Các khoản thanh toán của bạn",
+    "column": {
+      "date": "Ngày",
+      "description": "Mô tả",
+      "kind": "Loại",
+      "amount": "Số tiền",
+      "status": "Trạng thái"
+    },
+    "pagination": {
+      "label": "Các trang thanh toán",
+      "previous": "Trước",
+      "next": "Sau",
+      "position": "Trang {{page}} / {{pages}}"
+    },
+    "empty": "Bạn chưa có khoản thanh toán nào.",
+    "emptySettled": "Bạn chưa có khoản thanh toán nào đã hoàn tất.",
+    "loadError": "Không thể tải các khoản thanh toán của bạn.",
+    "retry": "Thử lại"
+  },
+  "detail": {
+    "title": "Chi tiết thanh toán",
+    "back": "Quay lại lịch sử thanh toán",
+    "notFound": "Không tìm thấy khoản thanh toán này.",
+    "loadError": "Không thể tải khoản thanh toán này.",
+    "retry": "Thử lại",
+    "factsLabel": "Thông tin thanh toán",
+    "fact": {
+      "description": "Mô tả",
+      "kind": "Loại",
+      "amount": "Số tiền",
+      "status": "Trạng thái",
+      "openedAt": "Thời điểm tạo",
+      "paidAt": "Thời điểm thanh toán",
+      "payType": "Hình thức thanh toán",
+      "orderRef": "Mã đơn hàng",
+      "providerTransactionId": "Mã giao dịch của nhà cung cấp"
+    },
+    "timeline": {
+      "title": "Diễn biến",
+      "empty": "Khoản thanh toán này chưa có diễn biến nào.",
+      "opened": "Đã tạo khoản thanh toán",
+      "paid": "Đã nhận thanh toán",
+      "payment_failed": "Thanh toán thất bại",
+      "payment_expired": "Thanh toán đã hết hạn",
+      "code": "Mã nhà cung cấp {{code}}"
+    }
+  }
+}
