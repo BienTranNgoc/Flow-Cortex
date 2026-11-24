@@ -60,4 +60,10 @@ tasks.withType<Test> {
     val contracts = rootProject.projectDir.parentFile.resolve("contracts")
     systemProperty("flowcortex.contracts.dir", contracts.absolutePath)
     inputs.dir(contracts).withPropertyName("contracts").withPathSensitivity(PathSensitivity.RELATIVE)
+    // The step-failure code scan reads every module's main sources; declared as an input too, or a
+    // source-only edit would be served from the build cache.
+    val modules = rootProject.projectDir.resolve("modules")
+    systemProperty("flowcortex.backend.modules.dir", modules.absolutePath)
+    inputs.files(fileTree(modules) { include("*/src/main/java/**/*.java") })
+        .withPropertyName("backendMainSources").withPathSensitivity(PathSensitivity.RELATIVE)
 }
