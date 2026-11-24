@@ -1,0 +1,62 @@
+[
+  {
+    "job_id": "vn_jd_001",
+    "title": "Senior Java Backend Engineer (Spring Boot / Microservices)",
+    "company": "FPT Software / VNG",
+    "seniority": "SENIOR",
+    "description": "Yêu cầu: Tối thiểu 4 năm kinh nghiệm phát triển hệ thống với Java 17+, Spring Boot, Spring Cloud. Thành thạo cơ sở dữ liệu PostgreSQL, MySQL và tối ưu truy vấn index. Có kinh nghiệm thiết kế Message Broker RabbitMQ / Apache Kafka cho kiến trúc Event-Driven. Hiểu biết sâu về Docker, Kubernetes, CI/CD pipeline và Distributed Caching với Redis. Tiếng Anh giao tiếp tốt trong môi trường đa quốc gia.",
+    "ideal_resume": "Học vấn: Cử nhân Công nghệ Thông tin - ĐH Bách Khoa Hà Nội. Kỹ năng: Java, Spring Boot, Spring Cloud, PostgreSQL, RabbitMQ, Kafka, Redis, Docker, Kubernetes, Microservices Architecture. Kinh nghiệm: 5 năm làm Senior Backend Engineer tại Fintech Startup. Thiết kế hệ thống Core Banking xử lý 5,000 TPS với RabbitMQ và PostgreSQL. Tối ưu hóa truy vấn DB giảm 45% thời gian phản hồi API.",
+    "matched_resumes": [
+      {
+        "user_id": "vn_res_001",
+        "text": "## Học vấn: ĐH Bách Khoa Hà Nội (GPA 3.4/4.0) - Chuyên ngành Khoa học Máy tính.\n## Kỹ năng: Java, Spring Boot, Hibernate, PostgreSQL, Redis, RabbitMQ, Docker, Git, CI/CD.\n## Kinh nghiệm:\n- Senior Java Developer (2021 - Nay) tại Techcom Securities: Xây dựng hệ thống giao dịch chứng khoán realtime sử dụng Spring Boot và Kafka. Tối ưu hóa kết nối PostgreSQL pool và Redis cache.\n- Java Backend Developer (2019 - 2021) tại FPT Software: Tham gia dự án thương mại điện tử phục vụ thị trường Nhật Bản. Thiết kế RESTful API và migration dữ liệu với Flyway.",
+        "label": 1
+      },
+      {
+        "user_id": "vn_res_002",
+        "text": "## Học vấn: ĐH Kinh tế Quốc dân - Quản trị Kinh doanh.\n## Kỹ năng: Marketing, SEO, Content Writing, Google Analytics, Excel, PowerPoint.\n## Kinh nghiệm: 3 năm làm Digital Marketing Specialist tại agency truyền thông. Lập kế hoạch chiến dịch quảng cáo Facebook/Google, quản lý fanpage và viết bài PR cho thương hiệu thời trang.",
+        "label": 0
+      }
+    ]
+  },
+  {
+    "job_id": "vn_jd_002",
+    "title": "Middle Frontend React Developer (TypeScript / Next.js)",
+    "company": "MoMo (M-Service)",
+    "seniority": "MID",
+    "description": "Responsibilities: Build responsive, high-performance web applications using React 18, TypeScript, and Next.js. Collaborate with UX/UI designers to implement pixel-perfect user interfaces with Tailwind CSS and Radix UI. Integrate RESTful APIs and WebSocket for real-time notifications. Ensure web accessibility (WCAG 2.1) and optimize Core Web Vitals (LCP, FID, CLS). Unit testing with Vitest and React Testing Library.",
+    "ideal_resume": "Education: Bachelor in Software Engineering. Skills: React, TypeScript, Next.js, Redux Toolkit, TanStack Query, Tailwind CSS, Vite, Jest/Vitest. Experience: 3 years building customer-facing web applications at high-growth tech companies. Strong focus on state management, responsive layouts, and performance optimization.",
+    "matched_resumes": [
+      {
+        "user_id": "vn_res_003",
+        "text": "## Education: University of Science VNU-HCM - Computer Science.\n## Skills: JavaScript, TypeScript, React.js, Next.js, TanStack Query, Tailwind CSS, Jest, Git.\n## Experience:\n- Frontend Engineer (2022 - Present) at Tiki: Developed merchant dashboard using React 18, TypeScript, and Next.js. Improved Core Web Vitals score from 65 to 92.\n- Junior Web Developer (2020 - 2022): Built responsive landing pages and web portals using React and SCSS.",
+        "label": 1
+      },
+      {
+        "user_id": "vn_res_004",
+        "text": "## Học vấn: Cao đẳng Kỹ thuật Cao Thắng - Điện - Điện tử.\n## Kỹ năng: Bảo trì phần cứng, lắp đặt mạng nội bộ LAN/WAN, sửa chữa máy tính, Windows Server.\n## Kinh nghiệm: 2 năm làm IT Support Helpdesk cho tòa nhà văn phòng. Hỗ trợ người dùng cài đặt máy in, khắc phục sự cố mạng và backup dữ liệu định kỳ.",
+        "label": 0
+      }
+    ]
+  },
+  {
+    "job_id": "vn_jd_003",
+    "title": "AI / NLP Research & Development Engineer",
+    "company": "Viettel AI / VinAI",
+    "seniority": "MID",
+    "description": "Yêu cầu: Tốt nghiệp đại học hoặc thạc sĩ chuyên ngành KHMT, Trí tuệ Nhân tạo. Có kiến thức vững về Deep Learning, Transformer Architecture, Pre-trained Language Models (BERT, RoBERTa, LLaMA). Thành thạo PyTorch, HuggingFace Transformers, PEFT/LoRA và các kỹ thuật Contrastive Learning / Metric Learning. Có kinh nghiệm huấn luyện và lượng hóa mô hình (ONNX, TensorRT, INT8 Quantization) triển khai trên môi trường production. Đọc hiểu tốt các bài báo khoa học hàng đầu (ACL, EMNLP, NeurIPS).",
+    "ideal_resume": "Học vấn: Thạc sĩ Khoa học Dữ liệu & Trí tuệ Nhân tạo. Kỹ năng: Python, PyTorch, HuggingFace, Transformers, LoRA, Contrastive Learning, ONNX, FAISS, Docker, NLP. Kinh nghiệm: 3 năm nghiên cứu và triển khai các hệ thống Information Retrieval và Semantic Search. Tác giả/Đồng tác giả bài báo khoa học về NLP tại các hội thảo chuyên ngành.",
+    "matched_resumes": [
+      {
+        "user_id": "vn_res_005",
+        "text": "## Học vấn: ĐH Bách Khoa TP.HCM - Thạc sĩ Khoa học Máy tính (Định hướng Xử lý Ngôn ngữ Tự nhiên).\n## Kỹ năng: Python, PyTorch, Transformers, LangChain, HuggingFace, FAISS, ONNX, Docker, Git.\n## Kinh nghiệm:\n- AI Engineer (2022 - Nay) tại Zalo AI: Huấn luyện mô hình Bi-Encoder phục vụ tìm kiếm ngữ nghĩa văn bản tiếng Việt. Ứng dụng PEFT LoRA tối ưu tài nguyên và lượng hóa ONNX chạy CPU.\n- Research Assistant (2020 - 2022) tại Phòng Lab NLP: Thực hiện các đề tài trích xuất thực thể NER và phân loại cảm xúc văn bản.",
+        "label": 1
+      },
+      {
+        "user_id": "vn_res_006",
+        "text": "## Học vấn: Cử nhân Kế toán - Kiểm toán ĐH Tài chính Marketing.\n## Kỹ năng: Kế toán doanh nghiệp, phần mềm MISA, báo cáo thuế, phân tích báo cáo tài chính, Excel nâng cao.\n## Kinh nghiệm: 4 năm làm Kế toán tổng hợp tại công ty xuất nhập khẩu. Lập báo cáo tài chính năm, quyết toán thuế thu nhập doanh nghiệp và quản lý công nợ khách hàng.",
+        "label": 0
+      }
+    ]
+  }
+]

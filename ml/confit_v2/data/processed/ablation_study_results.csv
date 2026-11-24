@@ -1,0 +1,2 @@
+Method,Encoder,Recall@10,Recall@100,nDCG@10,nDCG@100,MRR
+BM25,-,50.0,50.0,50.0,50.0,50.0
