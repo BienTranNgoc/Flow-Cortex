@@ -111,9 +111,10 @@ export function StepUpDialog({ purpose, open, onProof, onCancel }: Readonly<Step
         event.preventDefault();
         cancel();
       }}
-      // A browser may close the dialog on a repeated Escape despite `preventDefault`.
-      onClose={() => {
-        if (open) cancel();
+      // A browser may close the dialog on a repeated Escape despite `preventDefault`. The event of
+      // an earlier close can arrive after the caller opened the dialog again; that must not cancel it.
+      onClose={(event) => {
+        if (open && !event.currentTarget.open) cancel();
       }}
     >
       <form onSubmit={(event) => void submit(event)} noValidate>

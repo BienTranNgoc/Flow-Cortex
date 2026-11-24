@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 
 class ChildRunsTest {
@@ -28,11 +29,34 @@ class ChildRunsTest {
     private final RunStepRepository steps = mock(RunStepRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final RunUpdates runUpdates = mock(RunUpdates.class);
-    private final ChildRuns childRuns = new ChildRuns(runs, steps, events, runUpdates, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final RunStepTransactions transactions = mock(RunStepTransactions.class);
+    private final ChildRuns childRuns = new ChildRuns(runs, steps, events, runUpdates,
+            Clock.fixed(NOW, ZoneOffset.UTC), providerOf(transactions));
 
     private final UUID parentId = UUID.randomUUID();
     private final UUID childId = UUID.randomUUID();
     private final UUID childOwner = UUID.randomUUID();
+
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> providerOf(T bean) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getObject()).thenReturn(bean);
+        return provider;
+    }
+
+    @Test
+    void stopFailsTheIdleIterateOfTheStoppedChildBeforeSettling() {
+        when(runs.findRunningChildren(parentId)).thenReturn(List.of(new ChildRef(childId, childOwner)));
+        when(runs.requestCancel(childId, childOwner)).thenReturn(1);
+        when(transactions.failIdleIterateParents(childId, NOW)).thenReturn(true);
+
+        childRuns.stopChildrenOf(parentId);
+
+        InOrder order = inOrder(steps, transactions);
+        order.verify(steps).skipPending(childId);
+        order.verify(transactions).failIdleIterateParents(childId, NOW);
+        verify(runs, never()).settleCancelled(any(), any());
+    }
 
     @Test
     void finishedPublishesTheSignalOnlyForARunStartedByAStep() {

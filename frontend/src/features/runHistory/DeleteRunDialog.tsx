@@ -1,6 +1,6 @@
 import { useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useModalDialog } from './useModalDialog';
+import { useModalDialog } from '../../lib/useModalDialog';
 
 interface DeleteRunDialogProps {
   open: boolean;

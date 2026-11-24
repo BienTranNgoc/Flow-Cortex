@@ -1,7 +1,8 @@
 import type { RunInputResponse } from '@flow-cortex/api-client';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { inputUrlNeedsRenewal, useRunInputsQuery } from './useWorkflows';
+import { linkNeedsRenewal } from '../../lib/signedLinks';
+import { useRunInputsQuery } from './useWorkflows';
 
 interface RunInputsProps {
   runId: string;
@@ -82,7 +83,7 @@ export function RunInputs({ runId }: Readonly<RunInputsProps>) {
   // An expired link fails like a deleted file; renew it first, and only a link that still fails
   // while unexpired means the file is gone.
   const onLoadError = (input: RunInputResponse) => {
-    if (!inputUrlNeedsRenewal(input.expiresAt)) {
+    if (!linkNeedsRenewal(input.expiresAt)) {
       return false;
     }
     void query.refetch();
