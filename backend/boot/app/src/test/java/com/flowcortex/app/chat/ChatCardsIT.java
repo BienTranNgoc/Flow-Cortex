@@ -368,9 +368,11 @@ class ChatCardsIT extends ChatItSupport {
                 List.of(new Att(cup, "cup.png")), null));
         Att one = new Att(UUID.randomUUID(), "one.png");
         Att two = new Att(UUID.randomUUID(), "two.png");
+        Att three = new Att(UUID.randomUUID(), "three.png");
+        Att four = new Att(UUID.randomUUID(), "four.png");
 
-        ResponseEntity<Refusal> twoForVideo = confirm(token, conversation, video,
-                new Confirm(null, null, List.of(one, two)), Refusal.class);
+        ResponseEntity<Refusal> fourForVideo = confirm(token, conversation, video,
+                new Confirm(null, null, List.of(one, two, three, four)), Refusal.class);
         ResponseEntity<Refusal> noneForImage = confirm(token, conversation, image,
                 new Confirm(null, null, List.of()), Refusal.class);
         ResponseEntity<Refusal> duplicated = confirm(token, conversation, image,
@@ -378,7 +380,7 @@ class ChatCardsIT extends ChatItSupport {
         ResponseEntity<Refusal> nameless = confirm(token, conversation, image,
                 new Confirm(null, null, List.of(new Att(one.uploadId(), " "))), Refusal.class);
 
-        for (ResponseEntity<Refusal> refusal : List.of(twoForVideo, noneForImage, duplicated, nameless)) {
+        for (ResponseEntity<Refusal> refusal : List.of(fourForVideo, noneForImage, duplicated, nameless)) {
             assertThat(refusal.getStatusCode().value()).isEqualTo(400);
             assertThat(refusal.getBody().code()).isEqualTo("chat-card-invalid");
             assertThat(refusal.getBody().errors()).containsKey("attachments");

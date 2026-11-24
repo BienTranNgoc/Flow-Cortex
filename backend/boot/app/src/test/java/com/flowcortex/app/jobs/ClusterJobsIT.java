@@ -328,6 +328,7 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     Map.entry("support.reply-mail-sweep", 60_000L),
                     Map.entry("support.request-retention", 21_600_000L),
                     Map.entry("asset.registration-sweep", 120_000L),
+                    Map.entry("user.mcp-oauth-retention", 3_600_000L),
                     Map.entry("trend.template-purge", 900_000L));
 
             await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {

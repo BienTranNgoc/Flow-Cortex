@@ -3,6 +3,8 @@ package com.flowcortex.media.contract;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.media.api.MediaCapability;
+import com.flowcortex.media.api.MediaControlRequest;
+import com.flowcortex.media.api.MediaControlResponse;
 import com.flowcortex.media.api.MediaError;
 import com.flowcortex.media.api.MediaJob;
 import com.flowcortex.media.api.MediaJobInput;
@@ -69,6 +71,8 @@ class MediaContractSchemaTest {
     private static JsonNode progressTree;
     private static JsonNode providerJobTree;
     private static JsonNode providerVideoTree;
+    private static JsonNode controlRequestTree;
+    private static JsonNode controlResponseTree;
     private static Schema providerVideoSchema;
     private static Schema jobSchema;
     private static Schema resultSchema;
@@ -77,6 +81,8 @@ class MediaContractSchemaTest {
     private static Schema providerScriptSchema;
     private static Schema providerSpeechSchema;
     private static Schema providerStoryboardSchema;
+    private static Schema controlRequestSchema;
+    private static Schema controlResponseSchema;
 
     @BeforeAll
     static void loadSchemas() throws IOException {
@@ -88,6 +94,8 @@ class MediaContractSchemaTest {
         progressTree = read(Path.of(dir, "media-progress.schema.json"));
         providerJobTree = read(Path.of(dir, "provider-job.schema.json"));
         providerVideoTree = read(Path.of(dir, "provider-video-result.schema.json"));
+        controlRequestTree = read(Path.of(dir, "media-control-request.schema.json"));
+        controlResponseTree = read(Path.of(dir, "media-control-response.schema.json"));
         providerVideoSchema = registry.getSchema(providerVideoTree);
         jobSchema = registry.getSchema(jobTree);
         resultSchema = registry.getSchema(resultTree);
@@ -97,6 +105,8 @@ class MediaContractSchemaTest {
         providerSpeechSchema = registry.getSchema(read(Path.of(dir, "provider-speech-result.schema.json")));
         providerStoryboardSchema = registry.getSchema(
                 read(Path.of(dir, "provider-storyboard-result.schema.json")));
+        controlRequestSchema = registry.getSchema(controlRequestTree);
+        controlResponseSchema = registry.getSchema(controlResponseTree);
     }
 
     private static JsonNode read(Path file) throws IOException {
@@ -133,6 +143,14 @@ class MediaContractSchemaTest {
 
     static MediaProgress started() {
         return new MediaProgress("1", JOB_ID, RUN_ID, 1, 0, MediaProgress.Kind.STARTED, null, null, AT);
+    }
+
+    static MediaControlRequest controlRequest() {
+        return new MediaControlRequest("1", RUN_ID, JOB_ID, 1);
+    }
+
+    static MediaControlResponse controlResponse() {
+        return new MediaControlResponse("1", RUN_ID, JOB_ID, 1, MediaControlResponse.Decision.CONTINUE);
     }
 
     static Map<String, Object> scriptParams() {
@@ -401,6 +419,25 @@ class MediaContractSchemaTest {
         assertThat(errors(resultSchema, failed)).isEmpty();
     }
 
+    @Test
+    void siblingFailedErrorCodeConformsToTheResultSchema() {
+        MediaResult failed = new MediaResult("1", JOB_ID, RUN_ID, 1, 0, MediaResult.Status.ERROR, null, null,
+                new MediaError(MediaError.Code.SIBLING_FAILED, "sibling failed", false), AT, "worker-1");
+
+        assertThat(errors(resultSchema, failed)).isEmpty();
+    }
+
+    @Test
+    void controlRequestAndResponseConformToTheirSchemasAndBeanValidation() {
+        assertThat(errors(controlRequestSchema, controlRequest())).isEmpty();
+        assertThat(VALIDATOR.validate(controlRequest())).isEmpty();
+        for (MediaControlResponse.Decision decision : MediaControlResponse.Decision.values()) {
+            MediaControlResponse response = new MediaControlResponse("1", RUN_ID, JOB_ID, 1, decision);
+            assertThat(errors(controlResponseSchema, response)).isEmpty();
+            assertThat(VALIDATOR.validate(response)).isEmpty();
+        }
+    }
+
     private static List<Error> errors(Schema schema, Object record) {
         return schema.validate(MAPPER.valueToTree(record));
     }
@@ -503,7 +540,15 @@ class MediaContractSchemaTest {
         MediaJob j = job();
         MediaResult r = completedResult();
         MediaProgress p = started();
+        MediaControlRequest crq = controlRequest();
+        MediaControlResponse crs = controlResponse();
         return Stream.of(
+                Arguments.of("control request schemaVersion 2", new MediaControlRequest("2", crq.runId(), crq.jobId(),
+                        crq.attempt())),
+                Arguments.of("control request attempt 0", new MediaControlRequest(crq.schemaVersion(), crq.runId(),
+                        crq.jobId(), 0)),
+                Arguments.of("control response without decision", new MediaControlResponse(crs.schemaVersion(),
+                        crs.runId(), crs.jobId(), crs.attempt(), null)),
                 Arguments.of("job schemaVersion 2", new MediaJob("2", j.jobId(), j.runId(), j.correlationId(),
                         j.stepOrder(), j.capability(), j.inputs(), j.params(), j.outputPrefix(), j.attempt(),
                         j.maxRuntimeSeconds(), j.maxInputBytes(), j.issuedAt())),
@@ -604,7 +649,9 @@ class MediaContractSchemaTest {
                 Arguments.of("vendor candidate",
                         propertyNames(providerJobTree.path("$defs").path("vendorCandidate")),
                         VendorLedger.Candidate.class),
-                Arguments.of("video result", propertyNames(providerVideoTree), ProviderVideoData.class));
+                Arguments.of("video result", propertyNames(providerVideoTree), ProviderVideoData.class),
+                Arguments.of("control request", propertyNames(controlRequestTree), MediaControlRequest.class),
+                Arguments.of("control response", propertyNames(controlResponseTree), MediaControlResponse.class));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -632,7 +679,9 @@ class MediaContractSchemaTest {
                 Arguments.of("progress kind", strings(progressTree.path("properties").path("kind").path("enum")),
                         MediaProgress.Kind.class),
                 Arguments.of("vendor task status", strings(progressTree.path("properties").path("vendorTask")
-                        .path("properties").path("status").path("enum")), VendorTaskReport.Status.class));
+                        .path("properties").path("status").path("enum")), VendorTaskReport.Status.class),
+                Arguments.of("control decision", strings(controlResponseTree.path("properties").path("decision")
+                        .path("enum")), MediaControlResponse.Decision.class));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -656,6 +705,8 @@ class MediaContractSchemaTest {
             case MediaJob ignored -> jobSchema;
             case MediaResult ignored -> resultSchema;
             case MediaProgress ignored -> progressSchema;
+            case MediaControlRequest ignored -> controlRequestSchema;
+            case MediaControlResponse ignored -> controlResponseSchema;
             default -> throw new IllegalArgumentException(label);
         };
         JsonNode tree = MAPPER.valueToTree(record);

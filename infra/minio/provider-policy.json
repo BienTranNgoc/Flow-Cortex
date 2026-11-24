@@ -12,7 +12,9 @@
       "Resource": [
         "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
         "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json",
-        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1"
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1",
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_2",
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_3"
       ]
     }
   ]

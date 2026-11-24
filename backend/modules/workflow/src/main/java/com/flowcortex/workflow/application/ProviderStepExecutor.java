@@ -133,12 +133,17 @@ class ProviderStepExecutor implements StepExecutor {
             return List.of();
         }
         if (context.config() != null && !context.config().isBlank()) {
-            JsonNode reference;
+            JsonNode tree;
             try {
-                reference = objectMapper.readTree(context.config()).get("referenceImage");
+                tree = objectMapper.readTree(context.config());
             } catch (JsonProcessingException e) {
                 throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);
             }
+            JsonNode references = tree.get("referenceImages");
+            if (references != null && !references.isNull()) {
+                return resolveMultipleReferences(context, references);
+            }
+            JsonNode reference = tree.get("referenceImage");
             if (reference != null && !reference.isNull()) {
                 if (!reference.isTextual() || reference.textValue().isBlank()) {
                     throw new StepFailedException("contract_violation", "referenceImage must name a run input");
@@ -166,6 +171,42 @@ class ProviderStepExecutor implements StepExecutor {
             }
         }
         return List.of();
+    }
+
+    private List<ProviderInput> resolveMultipleReferences(StepContext context, JsonNode references) {
+        String runInputs = "runs/" + context.runId() + "/inputs/";
+        List<MediaJobInput> available = storedInputs(context.storedInput(), "referenceImages").stream()
+                .filter(input -> input.bucket() != null && !input.bucket().isBlank()
+                        && input.objectKey() != null && MediaJob.isBelow(runInputs, input.objectKey()))
+                .toList();
+        if (references.isTextual() && "all".equals(references.textValue())) {
+            List<ProviderInput> resolved = available.stream()
+                    .limit(3)
+                    .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                    .toList();
+            if (resolved.isEmpty()) {
+                throw missingImage("referenceImages", null);
+            }
+            return resolved;
+        }
+        if (references.isArray() && !references.isEmpty() && references.size() <= 3) {
+            List<ProviderInput> resolved = new java.util.ArrayList<>(references.size());
+            for (JsonNode entry : references) {
+                if (!entry.isTextual() || entry.textValue().isBlank()) {
+                    throw new StepFailedException("contract_violation",
+                            "referenceImages entries must name run inputs");
+                }
+                String key = entry.textValue();
+                resolved.add(available.stream()
+                        .filter(input -> key.equals(input.key()))
+                        .findFirst()
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .orElseThrow(() -> missingImage(key, null)));
+            }
+            return List.copyOf(resolved);
+        }
+        throw new StepFailedException("contract_violation",
+                "referenceImages must be 'all' or an array of 1 to 3 input keys");
     }
 
     private List<MediaJobInput> storedInputs(String storedInput, String key) {

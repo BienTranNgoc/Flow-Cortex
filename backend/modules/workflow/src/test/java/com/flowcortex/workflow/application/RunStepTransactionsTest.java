@@ -14,11 +14,13 @@ import static org.mockito.Mockito.when;
 
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.api.WorkflowRunCompleted;
+import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,11 +41,13 @@ class RunStepTransactionsTest {
     private final RunUpdates runUpdates = mock(RunUpdates.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final ChildRuns childRuns = mock(ChildRuns.class);
+    private final CreditAccounts credits = mock(CreditAccounts.class);
     private final RunStepTransactions transactions = new RunStepTransactions(runStepRepository,
-            workflowRunRepository, mock(CreditAccounts.class), runUpdates, events, childRuns);
+            workflowRunRepository, credits, runUpdates, events, childRuns);
 
     private final UUID runId = UUID.randomUUID();
     private final UUID stepId = UUID.randomUUID();
+    private final UUID parentId = UUID.randomUUID();
     private final WorkflowRun run = new WorkflowRun(runId, UUID.randomUUID(), UUID.randomUUID(), "in", NOW);
 
     @Test
@@ -89,7 +93,7 @@ class RunStepTransactionsTest {
     @Test
     void aWonCompletionOfTheLastOpenStepCompletesTheRun() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
 
         assertThat(transactions.complete(runId, stepId, (short) 1, "out", null, NOW)).isTrue();
@@ -100,7 +104,7 @@ class RunStepTransactionsTest {
     @Test
     void aWonCompletionOfTheLastStepPublishesRunCompletedOnce() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
 
         transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
@@ -111,7 +115,7 @@ class RunStepTransactionsTest {
     @Test
     void aCompletionWhileAnotherStepIsOpenPublishesNothing() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
 
         transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
 
@@ -140,7 +144,7 @@ class RunStepTransactionsTest {
     @Test
     void completeRunIfDoneOnAnAlreadyCompletedRunPublishesNothing() {
         run.markCompleted(NOW);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
 
         transactions.completeRunIfDone(runId, NOW);
@@ -151,7 +155,7 @@ class RunStepTransactionsTest {
     @Test
     void aWonCompletionLeavesTheRunRunningWhileAnotherStepIsOpen() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
 
         assertThat(transactions.complete(runId, stepId, (short) 1, "out", null, NOW)).isTrue();
 
@@ -164,7 +168,7 @@ class RunStepTransactionsTest {
 
         assertThat(transactions.complete(runId, stepId, (short) 1, "out", null, NOW)).isFalse();
 
-        verify(runStepRepository, never()).countByRunIdAndStatusNot(any(), any());
+        verify(runStepRepository, never()).countTopLevelNotCompleted(any());
         verify(workflowRunRepository, never()).findById(any());
     }
 
@@ -173,7 +177,7 @@ class RunStepTransactionsTest {
         AtomicBoolean registered = new AtomicBoolean();
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", "[]", NOW))
                 .thenReturn(1, 0);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
 
         assertThat(transactions.complete(runId, stepId, (short) 1, "out", "[]", NOW,
                 () -> registered.set(true))).isTrue();
@@ -207,7 +211,7 @@ class RunStepTransactionsTest {
 
     @Test
     void completeRunIfDoneCompletesARunningRunWhoseStepsAreAllCompleted() {
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
 
         transactions.completeRunIfDone(runId, NOW);
@@ -218,7 +222,7 @@ class RunStepTransactionsTest {
 
     @Test
     void completeRunIfDoneSignalsNothingWhileAStepIsOpen() {
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
 
         transactions.completeRunIfDone(runId, NOW);
 
@@ -249,7 +253,7 @@ class RunStepTransactionsTest {
     @Test
     void aWonCompletionSignalsTheRunAndALostOneDoesNot() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1, 0);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
 
         transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
         verify(runUpdates, atLeastOnce()).touched(runId);
@@ -308,7 +312,7 @@ class RunStepTransactionsTest {
     @Test
     void completingTheLastStepSignalsTheRunFinished() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(0L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(0L);
         when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
 
         transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
@@ -319,7 +323,7 @@ class RunStepTransactionsTest {
     @Test
     void completingAStepWhileAnotherIsOpenSignalsNothingFinished() {
         when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "out", null, NOW)).thenReturn(1);
-        when(runStepRepository.countByRunIdAndStatusNot(runId, RunStepStatus.COMPLETED)).thenReturn(1L);
+        when(runStepRepository.countTopLevelNotCompleted(runId)).thenReturn(1L);
 
         transactions.complete(runId, stepId, (short) 1, "out", null, NOW);
 
@@ -377,5 +381,310 @@ class RunStepTransactionsTest {
         transactions.recordPickup(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), NOW.plusSeconds(300),
                 (short) 0);
         verify(runUpdates).touched(runId);
+    }
+
+    private static final String GATHERED = "{\"results\":[\"a\",null],\"texts\":[\"a\"],\"succeeded\":1,"
+            + "\"failed\":1,\"total\":2,\"dropped\":0}";
+
+    private void givenItem(short itemIndex) {
+        when(runStepRepository.findLineageById(stepId)).thenReturn(Optional.of(new RunStepRepository.Lineage() {
+            @Override
+            public String getType() {
+                return "echo";
+            }
+
+            @Override
+            public UUID getParentStepId() {
+                return parentId;
+            }
+
+            @Override
+            public Short getParentAttempt() {
+                return 1;
+            }
+
+            @Override
+            public Short getItemIndex() {
+                return itemIndex;
+            }
+        }));
+    }
+
+    private void givenParent(RunStepStatus status, String output, String outputs) {
+        when(runStepRepository.findResultById(parentId)).thenReturn(Optional.of(new RunStepRepository.StepResult() {
+            @Override
+            public RunStepStatus getStatus() {
+                return status;
+            }
+
+            @Override
+            public short getAttempt() {
+                return 1;
+            }
+
+            @Override
+            public String getOutput() {
+                return output;
+            }
+
+            @Override
+            public String getOutputs() {
+                return outputs;
+            }
+        }));
+    }
+
+    private WorkflowRun givenRunStatus(RunStatus status) {
+        WorkflowRun mocked = mock(WorkflowRun.class);
+        when(mocked.getStatus()).thenReturn(status);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(mocked));
+        return mocked;
+    }
+
+    private RunStepRepository.ChildRow childRow(short itemIndex, RunStepStatus status, String output) {
+        RunStepRepository.ChildRow row = mock(RunStepRepository.ChildRow.class);
+        when(row.getId()).thenReturn(stepId);
+        when(row.getItemIndex()).thenReturn(itemIndex);
+        when(row.getStatus()).thenReturn(status);
+        when(row.getOutput()).thenReturn(output);
+        return row;
+    }
+
+    @Test
+    void childFailureRefundsAndLeavesTheRunRunning() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "boom", "no", NOW)).thenReturn(1);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+        givenRunStatus(RunStatus.RUNNING);
+
+        assertThat(transactions.fail(runId, stepId, (short) 1, "boom", "no", NOW)).isTrue();
+
+        verify(credits).refundStep(runId, stepId, (short) 1, "boom");
+        verify(workflowRunRepository, never()).save(any());
+        verify(childRuns, never()).finished(any());
+        verify(childRuns, never()).stopChildOfStep(any());
+        verify(runStepRepository, never()).skipPendingChildren(any());
+    }
+
+    @Test
+    void aLateFailureOfAnItemAlreadyClosedRefundsNothingMore() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "boom", "no", NOW)).thenReturn(0);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+
+        assertThat(transactions.fail(runId, stepId, (short) 1, "boom", "no", NOW)).isFalse();
+
+        verify(credits, never()).refundStep(any(), any(), anyShort(), any());
+        verify(runStepRepository, never()).findLineageById(any());
+    }
+
+    @Test
+    void aLateCompletionOfAnItemAlreadyClosedLeavesTheStepsOutputAlone() {
+        when(runStepRepository.completeIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(0);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.COMPLETED, GATHERED, null);
+
+        assertThat(transactions.complete(runId, stepId, (short) 1, "late", null, NOW)).isFalse();
+
+        verify(runStepRepository, never()).replaceCompletedOutput(any(), any(), any());
+        verify(runStepRepository, never()).findLineageById(any());
+        verify(credits, never()).refundStep(any(), any(), anyShort(), any());
+    }
+
+    @Test
+    void childClaimUsesTheCappedClaim() {
+        UUID childId = stepId;
+        when(runStepRepository.claimPendingChild(childId, parentId, (short) 2, 3, NOW, NOW.plusSeconds(120), "item"))
+                .thenReturn(1, 0);
+        AtomicBoolean dispatched = new AtomicBoolean();
+
+        assertThat(transactions.claimChild(runId, childId, (short) 1, NOW, NOW.plusSeconds(120), "item", parentId,
+                (short) 2, 3, false, () -> dispatched.set(true)))
+                .isEqualTo(RunStepTransactions.ClaimOutcome.DISPATCHED);
+        assertThat(dispatched).isTrue();
+        dispatched.set(false);
+        assertThat(transactions.claimChild(runId, childId, (short) 1, NOW, NOW.plusSeconds(120), "item", parentId,
+                (short) 2, 3, false, () -> dispatched.set(true))).isEqualTo(RunStepTransactions.ClaimOutcome.LOST);
+
+        assertThat(dispatched).isFalse();
+        verify(runStepRepository, never()).claimPending(any(), any(), any(), any());
+        verify(runStepRepository, never()).claimRegeneratedChild(any(), any(), anyShort(), org.mockito.ArgumentMatchers.anyInt(),
+                any(), any(), any());
+    }
+
+    @Test
+    void aRegeneratedChildClaimUsesTheRegeneratedStatement() {
+        when(runStepRepository.claimRegeneratedChild(stepId, parentId, (short) 1, 2, NOW, NOW.plusSeconds(120),
+                "item")).thenReturn(1);
+
+        assertThat(transactions.claimChild(runId, stepId, (short) 2, NOW, NOW.plusSeconds(120), "item", parentId,
+                (short) 1, 2, true, () -> { })).isEqualTo(RunStepTransactions.ClaimOutcome.DISPATCHED);
+
+        verify(runStepRepository, never()).claimPendingChild(any(), any(), anyShort(),
+                org.mockito.ArgumentMatchers.anyInt(), any(), any(), any());
+    }
+
+    @Test
+    void aChildClaimThatCannotBePaidFailsTheChildAndLeavesTheRunRunning() {
+        when(runStepRepository.claimPendingChild(stepId, parentId, (short) 1, 1, NOW, NOW.plusSeconds(120), "item"))
+                .thenReturn(1);
+        when(credits.enabled()).thenReturn(true);
+        when(runStepRepository.findById(stepId)).thenReturn(Optional.of(new com.flowcortex.workflow.domain.RunStep(
+                stepId, runId, (short) 2, "translate", "item")));
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+        when(credits.debitForStep(any(), any(), any(), anyShort(), any())).thenReturn(false);
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "INSUFFICIENT_CREDITS",
+                RunStepTransactions.NOT_ENOUGH_CREDITS, NOW)).thenReturn(1);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+
+        assertThat(transactions.claimChild(runId, stepId, (short) 1, NOW, NOW.plusSeconds(120), "item", parentId,
+                (short) 1, 1, false, () -> { })).isEqualTo(RunStepTransactions.ClaimOutcome.FAILED);
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.RUNNING);
+    }
+
+    @Test
+    void regeneratedChildCompletionRegathersACompletedParent() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 2, "b", null, NOW)).thenReturn(1);
+        givenItem((short) 1);
+        givenParent(RunStepStatus.COMPLETED, GATHERED, null);
+        RunStepRepository.ChildRow regenerated = childRow((short) 1, RunStepStatus.COMPLETED, "b");
+        when(runStepRepository.findChildStates(parentId, (short) 1)).thenReturn(List.of(regenerated));
+
+        assertThat(transactions.complete(runId, stepId, (short) 2, "b", null, NOW)).isTrue();
+
+        verify(runStepRepository).replaceCompletedOutput(parentId,
+                "{\"results\":[\"a\",\"b\"],\"texts\":[\"a\",\"b\"],\"succeeded\":2,\"failed\":0,\"total\":2,"
+                        + "\"dropped\":0}", null);
+        verify(runStepRepository, never()).countTopLevelNotCompleted(any());
+    }
+
+    @Test
+    void regeneratedChildFailureLeavesTheParentOutput() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 2, "boom", "no", NOW)).thenReturn(1);
+        givenItem((short) 1);
+        givenParent(RunStepStatus.COMPLETED, GATHERED, null);
+
+        assertThat(transactions.fail(runId, stepId, (short) 2, "boom", "no", NOW)).isTrue();
+
+        verify(runStepRepository, never()).replaceCompletedOutput(any(), any(), any());
+        verify(credits).refundStep(runId, stepId, (short) 2, "boom");
+    }
+
+    @Test
+    void runCompletionCountsTopLevelStepsOnly() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "x", null, NOW)).thenReturn(1);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+        givenRunStatus(RunStatus.RUNNING);
+
+        assertThat(transactions.complete(runId, stepId, (short) 1, "x", null, NOW)).isTrue();
+
+        verify(runStepRepository, never()).countTopLevelNotCompleted(any());
+        verify(events, never()).publishEvent(any());
+        verify(childRuns, never()).finished(any());
+    }
+
+    @Test
+    void lastChildEndOfACancellingRunFailsTheIdleParentAndSettles() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "x", null, NOW)).thenReturn(1);
+        when(runStepRepository.failIfRunning(parentId, runId, (short) 1, "iterate_cancelled",
+                "The run was stopped before every item ran", NOW)).thenReturn(1);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+        givenRunStatus(RunStatus.CANCELLING);
+        when(runStepRepository.countRunningChildren(parentId, (short) 1)).thenReturn(0L);
+        when(workflowRunRepository.settleCancelled(runId, NOW)).thenReturn(1);
+
+        assertThat(transactions.complete(runId, stepId, (short) 1, "x", null, NOW)).isTrue();
+
+        verify(runStepRepository).failIfRunning(parentId, runId, (short) 1, "iterate_cancelled",
+                "The run was stopped before every item ran", NOW);
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void aChildEndWhileASiblingStillRunsKeepsTheCancellingRunOpen() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "x", null, NOW)).thenReturn(1);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.RUNNING, null, null);
+        givenRunStatus(RunStatus.CANCELLING);
+        when(runStepRepository.countRunningChildren(parentId, (short) 1)).thenReturn(1L);
+
+        assertThat(transactions.complete(runId, stepId, (short) 1, "x", null, NOW)).isTrue();
+
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
+    }
+
+    @Test
+    void aChildEndOfACancellingRunWhoseIterateStepAlreadyFailedSettlesIt() {
+        when(runStepRepository.completeIfRunning(stepId, runId, (short) 1, "x", null, NOW)).thenReturn(1);
+        givenItem((short) 0);
+        givenParent(RunStepStatus.ERROR, null, null);
+        givenRunStatus(RunStatus.CANCELLING);
+        when(workflowRunRepository.settleCancelled(runId, NOW)).thenReturn(1);
+
+        transactions.complete(runId, stepId, (short) 1, "x", null, NOW);
+
+        verify(workflowRunRepository).settleCancelled(runId, NOW);
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void iterateFailureSkipsItsPendingChildren() {
+        when(runStepRepository.failIfRunning(stepId, runId, (short) 1, "run_timeout", "late", NOW)).thenReturn(1);
+        when(runStepRepository.findLineageById(stepId)).thenReturn(Optional.of(new RunStepRepository.Lineage() {
+            @Override
+            public String getType() {
+                return "iterate";
+            }
+
+            @Override
+            public UUID getParentStepId() {
+                return null;
+            }
+
+            @Override
+            public Short getParentAttempt() {
+                return null;
+            }
+
+            @Override
+            public Short getItemIndex() {
+                return null;
+            }
+        }));
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+
+        transactions.fail(runId, stepId, (short) 1, "run_timeout", "late", NOW);
+
+        verify(runStepRepository).skipPendingChildren(stepId);
+        assertThat(run.getStatus()).isEqualTo(RunStatus.ERROR);
+    }
+
+    @Test
+    void anIdleIterateParentOfAStoppedRunFailsAndSettlesTheRun() {
+        RunStepRepository.IdleParent idle = mock(RunStepRepository.IdleParent.class);
+        when(idle.getId()).thenReturn(parentId);
+        when(idle.getAttempt()).thenReturn((short) 2);
+        when(runStepRepository.findIdleIterateParents(runId)).thenReturn(List.of(idle));
+        when(runStepRepository.failIfRunning(parentId, runId, (short) 2, "iterate_cancelled",
+                "The run was stopped before every item ran", NOW)).thenReturn(1);
+        when(runStepRepository.findLineageById(parentId)).thenReturn(Optional.empty());
+        when(workflowRunRepository.settleCancelled(runId, NOW)).thenReturn(1);
+
+        assertThat(transactions.failIdleIterateParents(runId, NOW)).isTrue();
+
+        verify(childRuns).finished(runId);
+    }
+
+    @Test
+    void noIdleIterateParentLeavesTheStopToTheCaller() {
+        when(runStepRepository.findIdleIterateParents(runId)).thenReturn(List.of());
+
+        assertThat(transactions.failIdleIterateParents(runId, NOW)).isFalse();
+
+        verify(runStepRepository, never()).failIfRunning(any(), any(), anyShort(), any(), any(), any());
     }
 }

@@ -269,6 +269,38 @@ flowcortex:
       per-day:
         capacity: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_CAPACITY:1000}
         period: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_PERIOD:1d}
+    # MCP authorization server (OAuth 2.1 code + PKCE) that hands an MCP client a personal access token
+    # after an admin consents in the member app. Off answers 503 on every /api/v1/oauth route and the
+    # /.well-known/oauth-authorization-server metadata; on needs personal-access-tokens.enabled and
+    # flowcortex.app.public-url (the issuer), or startup fails. Registration and token/revoke requests
+    # are limited per client IP (`register-per-ip`, `token-per-ip`; 429 with Retry-After), shared by
+    # every backend instance. `retention-interval` is how often spent codes and unused clients are
+    # purged. Env var + restart.
+    mcp-oauth:
+      enabled: ${FLOWCORTEX_AUTH_MCP_OAUTH_ENABLED:false}
+      register-per-ip:
+        capacity: ${FLOWCORTEX_AUTH_MCP_OAUTH_REGISTER_PER_IP_CAPACITY:10}
+        period: ${FLOWCORTEX_AUTH_MCP_OAUTH_REGISTER_PER_IP_PERIOD:1h}
+      token-per-ip:
+        capacity: ${FLOWCORTEX_AUTH_MCP_OAUTH_TOKEN_PER_IP_CAPACITY:30}
+        period: ${FLOWCORTEX_AUTH_MCP_OAUTH_TOKEN_PER_IP_PERIOD:1m}
+      retention-interval: ${FLOWCORTEX_AUTH_MCP_OAUTH_RETENTION_INTERVAL:1h}
+    # Every write (POST/PUT/PATCH/DELETE) made with a personal access token leaves one audit row (route,
+    # outcome, status, no query or body). `daily-write-limit` caps an owner's token writes per UTC day and
+    # `daily-workflow-create-limit` caps their workflow creations; 0 is off, a negative value stops
+    # startup, and the counts are soft under concurrency. A POST or PATCH with an `Idempotency-Key` runs
+    # once per owner and key for `idempotency-window` and its 2xx answer (up to `max-stored-response-body`)
+    # is replayed to retries; a request body over `max-keyed-request-body` or multipart is refused with a
+    # key; a reservation older than `idempotency-stale-after` is taken over. `retention` is how long
+    # call rows are kept. Env var + restart.
+    api-token-calls:
+      daily-write-limit: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_DAILY_WRITE_LIMIT:0}
+      daily-workflow-create-limit: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_DAILY_WORKFLOW_CREATE_LIMIT:0}
+      retention: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_RETENTION:90d}
+      idempotency-window: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_IDEMPOTENCY_WINDOW:24h}
+      idempotency-stale-after: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_IDEMPOTENCY_STALE_AFTER:5m}
+      max-keyed-request-body: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_MAX_KEYED_REQUEST_BODY:1MB}
+      max-stored-response-body: ${FLOWCORTEX_AUTH_API_TOKEN_CALLS_MAX_STORED_RESPONSE_BODY:256KB}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
     # `audit-events`, refresh-token rows that expired or were revoked, reset-link rows that were
     # used or expired, spent step-up proofs, and revoked access tokens or ones expired longer ago
@@ -419,6 +451,12 @@ flowcortex:
         enabled: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_ENABLED:true}
         failure-threshold: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_FAILURE_THRESHOLD:5}
         open-duration: ${FLOWCORTEX_BILLING_MOMO_CIRCUIT_OPEN_DURATION:PT30S}
+    # Applies accepted provider callbacks to payments; switched off, callbacks wait unapplied.
+    ledger:
+      apply:
+        enabled: ${FLOWCORTEX_BILLING_LEDGER_APPLY_ENABLED:true}
+        interval: ${FLOWCORTEX_BILLING_LEDGER_APPLY_INTERVAL:PT5S}
+        batch-size: ${FLOWCORTEX_BILLING_LEDGER_APPLY_BATCH_SIZE:100}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
@@ -451,6 +489,25 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    # A review nobody decided within expire-after ends as `expired` and stops its run (REVIEW_EXPIRED);
+    # the sweep looks every sweep-interval-ms. Env var + restart.
+    review:
+      expire-after: ${FLOWCORTEX_REVIEW_EXPIRE_AFTER:7d}
+      sweep-interval-ms: 60000
+    qa-review:
+      # ON SENDS RUN CONTENT TO GEMINI: the step's instruction, the run input and the reviewed content
+      # (each cut to 8000 characters, no names or ids) leave for the provider to write the questions.
+      # Off: every QA review asks the standard questions. Env var + restart.
+      ai-questions:
+        enabled: ${FLOWCORTEX_QA_REVIEW_AI_QUESTIONS_ENABLED:false}
+      # A task still waiting for its questions this long after it opened gets the standard ones.
+      generating-timeout: 2m
+      # The model call runs on its own threads so it never starves the shared async pool. `size` run
+      # at once, `queue-capacity` wait; a task arriving with both full gets the standard questions at
+      # once.
+      pool:
+        size: 2
+        queue-capacity: 50
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
@@ -464,6 +521,12 @@ flowcortex:
       # Longest a workflow.call step waits for its child run; past it the step fails run_timeout and the
       # child is stopped. Covers a child of four media steps at their queue and run bounds.
       max-runtime: ${FLOWCORTEX_WORKFLOW_CALL_MAX_RUNTIME:2h}
+    iterate:
+      # Most items of a provider-pool type (translate, tts) one iterate step runs at once, whatever its
+      # `concurrency`. Those items share flowcortex.dub.pool with every member's dub steps, and an item the
+      # full pool rejects fails provider_busy; 1 loads the pool no more than a single top-level step does.
+      # From 1 to flowcortex.dub.pool.size.
+      provider-concurrency: ${FLOWCORTEX_WORKFLOW_ITERATE_PROVIDER_CONCURRENCY:1}
     # How often reviews of an uploaded workflow file that were never imported are deleted.
     import-review:
       purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
@@ -510,6 +573,7 @@ flowcortex:
   # Product Video runs; existing runs remain readable and continue advancing.
   product-video:
     enabled: ${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:false}
+    parallel-clips-enabled: ${PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED:false}
   # Hosted language model (Gemini API). An empty api-key still boots; every model call then fails
   # and logs a config error. read-timeout bounds each request; answer-timeout bounds one whole
   # answer.
@@ -534,6 +598,12 @@ flowcortex:
           attempts: 3
           retry-waits: 10s,30s
           call-timeout: 60s
+        # Questions for a QA review; its worst case (about 42 s) stays under qa-review.generating-timeout.
+        qa-questions:
+          models: gemini-3.5-flash-lite
+          attempts: 2
+          retry-waits: 2s
+          call-timeout: 20s
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
   # up). The assistant switch and the four daily limits below are configured here and changed at
   # runtime in the console Settings page; FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED=false keeps the

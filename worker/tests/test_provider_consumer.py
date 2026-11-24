@@ -1,17 +1,35 @@
 from __future__ import annotations
 
+import io
 import json
+import urllib.error
+import urllib.request
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
-from conftest import FakeConnection, FakeStorage, assert_valid, published, run_consumer, settled
+from conftest import (
+    FakeConnection,
+    FakeStorage,
+    assert_valid,
+    captured_logs,
+    published,
+    run_consumer,
+    settled,
+)
 
 from flowcortex_worker.contracts.media_progress import VendorTaskReport
-from flowcortex_worker.errors import PermanentError, TransientError
-from flowcortex_worker.provider.__main__ import make_execute_job, provider_queue
+from flowcortex_worker.errors import PermanentError, StaleDelivery, TransientError
+from flowcortex_worker.provider.__main__ import (
+    MAX_TRANSIENT_REDELIVERIES,
+    _build_adapter,
+    make_execute_job,
+    provider_queue,
+)
 from flowcortex_worker.provider.adapter import FixtureProviderAdapter
 from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+from flowcortex_worker.provider.openai_adapter import OpenAIConfig, OpenAIProviderAdapter
 from flowcortex_worker.provider.vendor_jobs import VendorJobTimeout
 
 JOB_ID = "5f0c7c1e-8f7e-4a53-9a38-2f6d6f3f9c11"
@@ -286,3 +304,360 @@ def test_any_other_provider_queue_refuses_to_start(
 
     with pytest.raises(RuntimeError, match=r"provider\.jobs, provider\.video\.jobs"):
         provider_queue()
+
+
+def test_masked_200_upstream_error_on_script_job_requeues_until_budget_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+    import urllib.request
+    from unittest.mock import MagicMock
+
+    payload_body = json.dumps(
+        {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "Upstream temporarily unavailable, please retry.",
+                    },
+                }
+            ],
+            "usage": {"prompt_tokens": 0, "completion_tokens": 12, "total_tokens": 12},
+        }
+    ).encode()
+
+    def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
+        response = MagicMock()
+        response.read = MagicMock(return_value=io.BytesIO(payload_body).read())
+        response.__enter__ = MagicMock(return_value=response)
+        response.__exit__ = MagicMock(return_value=False)
+        return response
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    adapter = OpenAIProviderAdapter(
+        OpenAIConfig(api_key="sk-test", base_url="https://llm-proxy.example/v1", model="m")
+    )
+
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    # First delivery: requeued with default 5 s exponential backoff, no terminal result published.
+    conn = FakeConnection()
+    conn.deliver(provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD))
+    waits: list[float] = []
+    run_consumer(
+        conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=waits.append,
+        until=settled,
+    )
+    assert published(conn, "result") == []
+    assert conn.consume.rejects == [(1, True)]
+    assert waits == [5.0]
+
+    # Final delivery at MAX_TRANSIENT_REDELIVERIES: answered with terminal failure and acked.
+    exhausted_conn = FakeConnection()
+    exhausted_conn.deliver(
+        provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD),
+        headers={"x-delivery-count": MAX_TRANSIENT_REDELIVERIES},
+    )
+    run_consumer(
+        exhausted_conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=lambda s: None,
+        until=settled,
+    )
+    result = assert_valid(published(exhausted_conn, "result")[0].body, "media-result")
+    assert result["status"] == "error"
+    assert result["error"]["code"] == "provider_request_failed"
+    assert result["error"]["retryable"] is False
+    assert exhausted_conn.consume.acks == [1]
+
+
+def test_stale_delivery_acks_without_publishing_result() -> None:
+    conn = FakeConnection()
+    conn.deliver(
+        provider_job(
+            "generate_video",
+            "vertical_ad_clip_v1",
+            {"prompt": "p", "sourceRevisionId": REVISION_ID},
+        )
+    )
+
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    def stale_execute(job: Any, runner: Any, report: Any) -> Any:
+        raise StaleDelivery("stale attempt")
+
+    run_consumer(
+        conn,
+        storage=FakeStorage(),
+        queue="provider.video.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=stale_execute,
+        until=settled,
+    )
+
+    assert published(conn, "result") == []
+    assert conn.consume.acks == [1]
+
+
+def test_parallel_clips_flag_restricts_video_worker_to_wan_or_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED", "true")
+    monkeypatch.setenv("VIDEO_PROVIDER", "seedance")
+    monkeypatch.setenv("SEEDANCE_API_KEY", "sk-test")
+
+    with pytest.raises(RuntimeError, match=r"wan.*fixture"):
+        _build_adapter(video_enabled=True)
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "veo")
+    monkeypatch.setenv("VEO_API_KEY", "vk-test")
+    with pytest.raises(RuntimeError, match=r"wan.*fixture"):
+        _build_adapter(video_enabled=True)
+
+    # Non-video worker on provider.jobs is unaffected by VIDEO_PROVIDER=seedance.
+    _build_adapter(video_enabled=False)
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "fixture")
+    _build_adapter(video_enabled=True)
+
+    monkeypatch.setenv("VIDEO_PROVIDER", "wan")
+    monkeypatch.setenv("WAN_API_KEY", "wan-test")
+    _build_adapter(video_enabled=True)
+
+
+def _ok_completion(content: str) -> MagicMock:
+    payload = json.dumps({
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": content},
+            }
+        ],
+    }).encode("utf-8")
+    response = MagicMock()
+    response.read = MagicMock(return_value=payload)
+    response.__enter__ = MagicMock(return_value=response)
+    response.__exit__ = MagicMock(return_value=False)
+    return response
+
+
+def _http_err(status: int, code: str) -> urllib.error.HTTPError:
+    body = json.dumps({"error": {"code": code, "message": "upstream detail"}}).encode("utf-8")
+    return urllib.error.HTTPError(
+        "https://vilao.invalid/v1/chat/completions",
+        status,
+        "HTTP Error",
+        cast(Any, {}),
+        io.BytesIO(body),
+    )
+
+
+def test_fallback_succeeds_through_consumer_with_safe_job_scope_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outcomes: list[Any] = [
+        _http_err(503, "upstream_busy"),
+        _ok_completion(json.dumps({"script": "Kịch bản dự phòng. Mua ngay"})),
+    ]
+    models_seen: list[str] = []
+
+    def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
+        models_seen.append(json.loads(request.data.decode("utf-8"))["model"])
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        assert isinstance(outcome, MagicMock)
+        return outcome
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    adapter = OpenAIProviderAdapter(
+        OpenAIConfig(
+            api_key="sk-test",
+            base_url="https://vilao.invalid/v1",
+            model="vgpt/gpt-6.2-sol",
+            fallback_model="chib/deepseek-v4.1-flash",
+        )
+    )
+
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    conn = FakeConnection()
+    conn.deliver(provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD))
+    with captured_logs() as lines:
+        run_consumer(
+            conn,
+            storage=FakeStorage(),
+            queue="provider.jobs",
+            exchange="provider",
+            parse_job=parse_job,
+            execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+            max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+            wait=lambda s: None,
+            until=settled,
+        )
+
+    assert models_seen == ["vgpt/gpt-6.2-sol", "chib/deepseek-v4.1-flash"]
+    result = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert result["status"] == "completed"
+    assert result["data"]["script"] == "Kịch bản dự phòng. Mua ngay"
+    assert conn.consume.acks == [1]
+
+    fallback_warnings = [
+        line for line in lines if line.get("message") == "provider falling back to secondary model"
+    ]
+    assert len(fallback_warnings) == 1
+    entry = fallback_warnings[0]
+    assert entry["primaryModel"] == "vgpt/gpt-6.2-sol"
+    assert entry["fallbackModel"] == "chib/deepseek-v4.1-flash"
+    assert entry["fallbackReason"] == "upstream_transient"
+    assert entry["providerOperation"] == "generate_script"
+    assert entry["jobId"] == JOB_ID
+    assert entry["runId"] == RUN_ID
+    assert entry["capability"] == "generate_script"
+    assert all("upstream detail" not in json.dumps(line) for line in lines)
+
+
+def test_fallback_terminal_failure_acks_and_transient_failure_requeues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    adapter = OpenAIProviderAdapter(
+        OpenAIConfig(
+            api_key="sk-test",
+            base_url="https://vilao.invalid/v1",
+            model="vgpt/gpt-6.2-sol",
+            fallback_model="chib/deepseek-v4.1-flash",
+        )
+    )
+
+    # Primary 503 + fallback 400 generic bad_request -> terminal PermanentError, acked.
+    perm_outcomes: list[Any] = [
+        _http_err(503, "upstream_busy"),
+        _http_err(400, "bad_request"),
+    ]
+
+    def fake_urlopen_perm(request: Any, timeout: float = 0) -> MagicMock:
+        raise perm_outcomes.pop(0)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen_perm)
+    perm_conn = FakeConnection()
+    perm_conn.deliver(provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD))
+    run_consumer(
+        perm_conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=lambda s: None,
+        until=settled,
+    )
+    perm_result = assert_valid(published(perm_conn, "result")[0].body, "media-result")
+    assert perm_result["status"] == "error"
+    assert perm_result["error"]["code"] == "provider_request_failed"
+    assert perm_result["error"]["retryable"] is False
+    assert perm_conn.consume.acks == [1]
+
+    # Primary bad output + fallback 503 -> TransientError, requeued on delivery 1.
+    trans_outcomes: list[Any] = [
+        _ok_completion("not json"),
+        _http_err(503, "upstream_busy"),
+    ]
+
+    def fake_urlopen_trans(request: Any, timeout: float = 0) -> MagicMock:
+        outcome = trans_outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        assert isinstance(outcome, MagicMock)
+        return outcome
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen_trans)
+    trans_conn = FakeConnection()
+    trans_conn.deliver(provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD))
+    run_consumer(
+        trans_conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=lambda s: None,
+        until=settled,
+    )
+    assert published(trans_conn, "result") == []
+    assert trans_conn.consume.rejects == [(1, True)]
+
+
+def test_fallback_expired_job_runtime_publishes_run_timeout_without_network_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    def fake_urlopen(request: Any, timeout: float = 0) -> MagicMock:
+        nonlocal called
+        called = True
+        return _ok_completion(json.dumps({"script": "unused"}))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    adapter = OpenAIProviderAdapter(
+        OpenAIConfig(
+            api_key="sk-test",
+            base_url="https://vilao.invalid/v1",
+            model="vgpt/gpt-6.2-sol",
+            fallback_model="chib/deepseek-v4.1-flash",
+        )
+    )
+
+    def parse_job(body: bytes) -> Any:
+        return ProviderJob.model_validate_json(body).root
+
+    short_job = provider_job("generate_script", "product_ad_v1", SCRIPT_PAYLOAD)
+    short_job["maxRuntimeSeconds"] = 5
+    conn = FakeConnection()
+    conn.deliver(short_job)
+    run_consumer(
+        conn,
+        storage=FakeStorage(),
+        queue="provider.jobs",
+        exchange="provider",
+        parse_job=parse_job,
+        execute_job=make_execute_job("provider.jobs", FakeStorage(), adapter),
+        max_transient_redeliveries=MAX_TRANSIENT_REDELIVERIES,
+        wait=lambda s: None,
+        until=settled,
+    )
+
+    assert called is False
+    result = assert_valid(published(conn, "result")[0].body, "media-result")
+    assert result["status"] == "error"
+    assert result["error"]["code"] == "run_timeout"
+    assert conn.consume.acks == [1]

@@ -2,6 +2,7 @@ package com.flowcortex.workflow.web;
 
 import com.flowcortex.credit.api.CreditAccounts;
 import com.flowcortex.workflow.api.WorkflowRunService;
+import com.flowcortex.workflow.application.IterateRegeneration;
 import com.flowcortex.workflow.application.RunCancellation;
 import com.flowcortex.workflow.application.RunResumption;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -36,15 +37,17 @@ class RunsController {
     private final WorkflowRunService workflowRunService;
     private final RunCancellation runCancellation;
     private final RunResumption runResumption;
+    private final IterateRegeneration iterateRegeneration;
     private final CurrentUserResolver currentUserResolver;
     private final CreditAccounts creditAccounts;
 
     RunsController(WorkflowRunService workflowRunService, RunCancellation runCancellation,
-            RunResumption runResumption, CurrentUserResolver currentUserResolver,
-            CreditAccounts creditAccounts) {
+            RunResumption runResumption, IterateRegeneration iterateRegeneration,
+            CurrentUserResolver currentUserResolver, CreditAccounts creditAccounts) {
         this.workflowRunService = workflowRunService;
         this.runCancellation = runCancellation;
         this.runResumption = runResumption;
+        this.iterateRegeneration = iterateRegeneration;
         this.currentUserResolver = currentUserResolver;
         this.creditAccounts = creditAccounts;
     }
@@ -112,6 +115,32 @@ class RunsController {
             @PathVariable UUID stepId) {
         UUID currentUserId = currentUserResolver.require(jwt);
         return ResponseEntity.ok(RunResponse.from(runResumption.executeStep(currentUserId, id, stepId), creditAccounts));
+    }
+
+    /**
+     * Runs one item of a completed iterate step again as its next attempt; the run and the other items stay
+     * as they are. 404 when the run, the step or the item is not there, 409 when the run, the step or the item
+     * is not in a state that accepts it or the step already runs as many items as it may, 402 when the
+     * balance is below the item's price.
+     */
+    @ApiResponse(responseCode = "401", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "402", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "404", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "503", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+            schema = @Schema(implementation = ProblemDetail.class)))
+    @PostMapping(value = "/{id}/steps/{stepId}/children/{itemIndex}/regenerate",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.OK)
+    ResponseEntity<RunResponse> regenerateChild(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+            @PathVariable UUID stepId, @PathVariable int itemIndex) {
+        UUID currentUserId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(RunResponse.from(
+                iterateRegeneration.regenerate(currentUserId, id, stepId, itemIndex), creditAccounts));
     }
 
     /** Starts a new run that reuses the finished run's completed steps and re-executes the rest. */
