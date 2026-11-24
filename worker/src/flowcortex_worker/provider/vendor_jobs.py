@@ -10,10 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import socket
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from typing import Any, Literal
 
 from ..errors import PermanentError, TransientError
@@ -250,3 +254,71 @@ def probe_media(
     if status in PROBE_GONE_STATUSES:
         return "gone"
     raise TransientError(f"vendor result probe answered HTTP {status}")
+
+
+def read_bounded_response(
+    resp: Any,
+    *,
+    max_bytes: int,
+    provider: str,
+    task_id: str,
+    abort: Any,
+    deadline: float,
+) -> bytes:
+    """Read an HTTP response body while cutting the underlying socket on abort or deadline."""
+    raw = getattr(getattr(resp, "fp", None), "raw", None)
+    base_sock = getattr(raw, "_sock", None)
+    # SSLSocket subclasses socket.socket and raises NotImplementedError on dup(); hold the live
+    # socket under a lock and clear it before urlopen's context manager closes the response.
+    active_sock: socket.socket | None = (
+        base_sock if isinstance(base_sock, socket.socket) else None
+    )
+    lock = threading.Lock()
+    timed_out = False
+
+    def cut() -> None:
+        with lock:
+            if active_sock is not None:
+                with suppress(OSError):
+                    active_sock.shutdown(socket.SHUT_RDWR)
+
+    def on_timeout() -> None:
+        nonlocal timed_out
+        timed_out = True
+        cut()
+
+    on_kill = getattr(abort, "on_kill", None)
+    if callable(on_kill):
+        on_kill(cut)
+
+    remaining = max(0.0, deadline - time.monotonic())
+    timer = threading.Timer(remaining, on_timeout)
+    timer.daemon = True
+    timer.start()
+    read_fn = getattr(resp, "read1", None) or resp.read
+    chunks = bytearray()
+    try:
+        while True:
+            abort.check()
+            if timed_out or time.monotonic() >= deadline:
+                raise VendorJobTimeout(provider, task_id)
+            chunk = read_fn(65536)
+            if not chunk:
+                break
+            chunks.extend(chunk)
+            if len(chunks) > max_bytes:
+                return bytes(chunks)
+        abort.check()
+        if timed_out or time.monotonic() >= deadline:
+            raise VendorJobTimeout(provider, task_id)
+        return bytes(chunks)
+    except OSError:
+        abort.check()
+        if timed_out or time.monotonic() >= deadline:
+            raise VendorJobTimeout(provider, task_id) from None
+        raise
+    finally:
+        timer.cancel()
+        timer.join()
+        with lock:
+            active_sock = None

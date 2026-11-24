@@ -13,7 +13,7 @@ import urllib.request
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from ..errors import PermanentError, TransientError
 from .adapter import LipsyncRequest, VendorProbe, VideoAbort, VideoArtifact
@@ -25,6 +25,7 @@ from .vendor_jobs import (
     VendorResultGone,
     probe_json,
     probe_media,
+    read_bounded_response,
     vendor_scope,
 )
 from .wan_adapter import _is_replicate_delivery, _string
@@ -33,6 +34,7 @@ log = logging.getLogger("flowcortex_provider_worker.kling_lipsync")
 
 PROVIDER_KLING_LIPSYNC = "kling_lipsync"
 _MAX_VIDEO_BYTES = 100 * 1024 * 1024
+_DOWNLOAD_ATTEMPTS = 4
 _TERMINAL_FAILURES = {"failed", "canceled"}
 
 
@@ -84,7 +86,12 @@ class KlingLipsyncAdapter:
                     raise PermanentError(
                         "provider_response_invalid", "Kling LipSync completed without a video URL"
                     )
-                return VideoArtifact(self._download_video(video_url), task_id)
+                return VideoArtifact(
+                    self._download_video(
+                        video_url, task_id=task_id, abort=abort, deadline=deadline
+                    ),
+                    task_id,
+                )
             if status in _TERMINAL_FAILURES:
                 log.warning("Kling LipSync prediction failed", extra={"taskStatus": status})
                 raise VendorJobEnded(
@@ -194,22 +201,78 @@ class KlingLipsyncAdapter:
             )
         return parsed
 
-    def _download_video(self, url: str) -> bytes:
+    def _download_video(
+        self, url: str, *, task_id: str, abort: VideoAbort, deadline: float
+    ) -> bytes:
         if not _is_replicate_delivery(url):
             raise PermanentError("provider_response_invalid", "Kling LipSync URL outside Replicate")
-        req = urllib.request.Request(url, method="GET", headers={"User-Agent": WORKER_USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=self.config.request_timeout_seconds) as resp:
-                body = resp.read(_MAX_VIDEO_BYTES + 1)
-        except urllib.error.HTTPError as exc:
-            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
-        except (urllib.error.URLError, TimeoutError) as exc:
-            raise TransientError(f"Kling LipSync download failed: {type(exc).__name__}") from exc
+        job_deadline = getattr(abort, "deadline_monotonic", None)
+        effective_deadline = (
+            min(deadline, float(job_deadline))
+            if isinstance(job_deadline, (int, float))
+            else deadline
+        )
+        body = b""
+        for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
+            abort.check()
+            remaining = effective_deadline - time.monotonic()
+            if remaining <= 0:
+                raise VendorJobTimeout(PROVIDER_KLING_LIPSYNC, task_id)
+            try:
+                body = self._download_once(
+                    url,
+                    task_id=task_id,
+                    abort=abort,
+                    deadline=effective_deadline,
+                    timeout=min(self.config.request_timeout_seconds, remaining),
+                )
+                break
+            except TransientError as exc:
+                if attempt == _DOWNLOAD_ATTEMPTS:
+                    raise
+                remaining = effective_deadline - time.monotonic()
+                if remaining <= 0:
+                    raise VendorJobTimeout(PROVIDER_KLING_LIPSYNC, task_id) from exc
+                log.warning(
+                    "Kling LipSync video download will retry",
+                    extra={"downloadAttempt": attempt, "errorType": type(exc.__cause__).__name__},
+                )
+                delay = min(float(2 ** (attempt - 1)), remaining)
+                wait_fn = getattr(abort, "wait", None)
+                if callable(wait_fn):
+                    wait_fn(delay)
+                else:
+                    time.sleep(delay)
         if len(body) > _MAX_VIDEO_BYTES or len(body) < 12 or body[4:8] != b"ftyp":
             raise PermanentError(
                 "provider_response_invalid", "Kling LipSync output is not a valid MP4"
             )
         return bytes(body)
+
+    def _download_once(
+        self,
+        url: str,
+        *,
+        task_id: str,
+        abort: VideoAbort,
+        deadline: float,
+        timeout: float,
+    ) -> bytes:
+        req = urllib.request.Request(url, method="GET", headers={"User-Agent": WORKER_USER_AGENT})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return read_bounded_response(
+                    resp,
+                    max_bytes=_MAX_VIDEO_BYTES,
+                    provider=PROVIDER_KLING_LIPSYNC,
+                    task_id=task_id,
+                    abort=abort,
+                    deadline=deadline,
+                )
+        except urllib.error.HTTPError as exc:
+            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise TransientError(f"Kling LipSync download failed: {type(exc).__name__}") from exc
 
 
 def _upscale_to_720p(video_bytes: bytes) -> bytes:
@@ -250,7 +313,9 @@ def _upscale_to_720p(video_bytes: bytes) -> bytes:
         return dst.read_bytes()
 
 
-def _raise_http_error(exc: urllib.error.HTTPError, *, gone: frozenset[int] = frozenset()) -> None:
+def _raise_http_error(
+    exc: urllib.error.HTTPError, *, gone: frozenset[int] = frozenset()
+) -> NoReturn:
     if exc.code in (408, 429) or 500 <= exc.code < 600:
         raise TransientError(f"Kling LipSync HTTP {exc.code}") from exc
     if exc.code in gone:

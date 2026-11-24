@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import urllib.request
 from uuid import UUID
@@ -24,10 +25,10 @@ TINY_MP4 = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
 
 class _FakeResp:
     def __init__(self, body: bytes) -> None:
-        self._body = body
+        self._stream = io.BytesIO(body)
 
-    def read(self, _n: int = -1) -> bytes:
-        return self._body
+    def read(self, n: int = -1) -> bytes:
+        return self._stream.read(n)
 
     def __enter__(self) -> _FakeResp:
         return self
@@ -539,3 +540,127 @@ def test_edge_adapter_rejects_oversized_scene2_instead_of_truncating(
             ),
             _NoAbort(),  # type: ignore[arg-type]
         )
+
+
+def test_read_bounded_response_handles_ssl_socket_success_timeout_and_abort() -> None:
+    import socket
+    import threading
+    import time
+    from types import SimpleNamespace
+
+    from flowcortex_worker.provider.vendor_jobs import VendorJobTimeout, read_bounded_response
+
+    class _FakeSSLSocket(socket.socket):
+        def __init__(self) -> None:
+            self.shutdown_calls = 0
+
+        def dup(self) -> socket.socket:
+            raise NotImplementedError("Cannot dup() SSLSocket")
+
+        def shutdown(self, _how: int) -> None:
+            self.shutdown_calls += 1
+
+        def close(self) -> None:
+            return None
+
+    class _StreamingResp:
+        def __init__(
+            self,
+            sock: socket.socket,
+            chunks: list[bytes],
+            *,
+            block_event: threading.Event | None = None,
+        ) -> None:
+            self._chunks = iter(chunks)
+            self._block = block_event
+            self.fp = SimpleNamespace(raw=SimpleNamespace(_sock=sock))
+
+        def read1(self, _n: int = -1) -> bytes:
+            if self._block is not None:
+                self._block.wait(timeout=1.0)
+                return b""
+            return next(self._chunks, b"")
+
+    # 1. Success path with SSLSocket (dup raises NotImplementedError)
+    sock_ok = _FakeSSLSocket()
+    resp_ok = _StreamingResp(sock_ok, [b"hello ", b"world"])
+    body = read_bounded_response(
+        resp_ok,
+        max_bytes=1024,
+        provider="seedream",
+        task_id="t-ok",
+        abort=_NoAbort(),
+        deadline=time.monotonic() + 5.0,
+    )
+    assert body == b"hello world"
+    assert sock_ok.shutdown_calls == 0
+
+    # 2. Deadline path shuts down SSLSocket and raises VendorJobTimeout
+    unblock = threading.Event()
+    sock_to = _FakeSSLSocket()
+    orig_shutdown = sock_to.shutdown
+
+    def _shutdown_and_unblock(how: int) -> None:
+        orig_shutdown(how)
+        unblock.set()
+
+    sock_to.shutdown = _shutdown_and_unblock  # type: ignore[method-assign]
+    resp_to = _StreamingResp(sock_to, [], block_event=unblock)
+    with pytest.raises(VendorJobTimeout):
+        read_bounded_response(
+            resp_to,
+            max_bytes=1024,
+            provider="kling_lipsync",
+            task_id="t-to",
+            abort=_NoAbort(),
+            deadline=time.monotonic() + 0.05,
+        )
+    assert sock_to.shutdown_calls >= 1
+
+    # 3. Abort/kill path triggers on_kill shutdown and raises abort error
+    class _KillError(RuntimeError):
+        pass
+
+    class _AbortWithKill:
+        def __init__(self) -> None:
+            self.killed = False
+            self._cb: object = None
+
+        def on_kill(self, cb: object) -> None:
+            self._cb = cb
+
+        def trigger(self) -> None:
+            self.killed = True
+            if callable(self._cb):
+                self._cb()
+
+        def check(self) -> None:
+            if self.killed:
+                raise _KillError("killed")
+
+    unblock_kill = threading.Event()
+    sock_kill = _FakeSSLSocket()
+    orig_kill_shutdown = sock_kill.shutdown
+
+    def _kill_shutdown(how: int) -> None:
+        orig_kill_shutdown(how)
+        unblock_kill.set()
+
+    sock_kill.shutdown = _kill_shutdown  # type: ignore[method-assign]
+    abort = _AbortWithKill()
+    resp_kill = _StreamingResp(sock_kill, [], block_event=unblock_kill)
+    killer = threading.Timer(0.05, abort.trigger)
+    killer.start()
+    try:
+        with pytest.raises(_KillError):
+            read_bounded_response(
+                resp_kill,
+                max_bytes=1024,
+                provider="kling_lipsync",
+                task_id="t-kill",
+                abort=abort,
+                deadline=time.monotonic() + 5.0,
+            )
+    finally:
+        killer.join()
+    assert sock_kill.shutdown_calls >= 1

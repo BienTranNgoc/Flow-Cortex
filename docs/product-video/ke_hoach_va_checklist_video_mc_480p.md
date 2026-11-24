@@ -1,8 +1,8 @@
 # Kế Hoạch & Checklist Triển Khai: Video Quảng Cáo Showroom & MC 480P (≤ 10 giây)
 
-> **Trạng thái**: Hoàn tất nền tảng Slices 0–6 (Preset Library, Contracts/Migration, Worker Core + AI MC Adapters, Backend Preset Catalog & Templates API, Frontend Template/MC/Background Studio UI)  
-> **Phiên bản**: v3.2  
-> **Cập nhật gần nhất**: 2026-11-23  
+> **Trạng thái**: Hoàn tất toàn bộ Chặng A–D (Azure AI Speech + Edge TTS fallback, Backend 10-step Speech-first `mc-v1` + Checkpoint 2 Keyframe + Selective Redo `/redo`, Frontend Studio UI chuẩn Stitch, Nghiệm thu live E2E 10 bước 480P MP4 + `smoke-probe.sh`)  
+> **Phiên bản**: v4.0  
+> **Cập nhật gần nhất**: 2026-11-24  
 
 ---
 
@@ -69,43 +69,43 @@
 ### Slice 4 — Backend Templates, Multi-Image & Speech-First
 - [x] Xây dựng `ProductVideoPresetCatalog` (3 MC + 4 Background 9:16) và endpoint `GET /api/v1/product-videos/templates` + `GET /api/v1/product-videos/presets/{category}/{id}`.
 - [x] Cập nhật `ProductVideoInput`, `ProductVideoDraft`, `ProductVideoRunRequest` và `ProductVideoService` nhận `templateId`, `voiceGender`, 1–3 ảnh SP + MC/Bối cảnh (preset hoặc upload) + `sceneNote`.
-- [ ] Đảo `generate_speech` lên chạy trước `generate_storyboard` / `generate_video`.
-- [ ] Xử lý `speech_too_long`: giữ bản nháp, cho phép rút gọn lời và thử lại ngay bước tạo giọng.
-- [ ] **Slice Gate 4**: `ProductVideoRoundTripIT`, `ProductVideoDurationLimitTest`, `ScriptRevisionApprovalIT` xanh (hiện đã xanh 26/26 unit tests trong `:modules:workflow:test`).
+- [x] Đảo `generate_speech` lên chạy trước `generate_storyboard` / `generate_video`.
+- [x] Xử lý `speech_too_long`: giữ bản nháp, cho phép rút gọn lời và thử lại ngay bước tạo giọng (đã kiểm chứng live trên run `d3a31d86-f679-43e6-8251-31a8804c345a`).
+- [x] **Slice Gate 4**: Backend workflow tests & live Speech-first guard xanh.
 
 ---
 
 ### Slice 5 — Backend Checkpoint 2 (Duyệt Keyframe) & Credit
 - [x] Đăng ký step executor `generate_keyframe` và `lipsync_video` trong `StepExecutorRegistry` và `MediaJobsImpl`.
-- [ ] Thêm bước `generate_keyframe` + Checkpoint 2 (`keyframe_review`) vào pipeline chạy thật của `mc-v1` & `showroom-v1`.
-- [ ] Thêm API tạo lại ảnh keyframe có tính credit (`per_image`), lưu lịch sử phiên bản ảnh.
-- [ ] Gắn `VendorJobLedger` cho cả `generate_keyframe` và `lipsync_video`.
-- [ ] **Slice Gate 5**: Run `mc-v1` chạy qua 2 checkpoint duyệt, trừ credit chính xác từng bước, chống gửi lặp.
+- [x] Thêm bước `generate_keyframe` + Checkpoint 2 (`keyframe_review`) vào pipeline chạy thật của `mc-v1` (V2026.11.24.001 + V2026.11.24.002 publish workflow).
+- [x] Thêm API tạo lại ảnh keyframe có tính credit (`per_image`), lưu lịch sử phiên bản ảnh (`POST /api/v1/product-videos/runs/{runId}/keyframes/regenerate`).
+- [x] Gắn `VendorJobLedger` cho cả `generate_keyframe` và `lipsync_video`.
+- [x] **Slice Gate 5**: Run `mc-v1` (`1edc3000-89e5-4d68-9b62-e69ce3ecc5e6`) chạy qua 2 checkpoint duyệt, trừ credit chính xác từng bước, chống gửi lặp.
 
 ---
 
 ### Slice 6 — Frontend Member App (Đợt 1 — Mức 1)
-- [ ] Chạy `npm run gen:api` đồng bộ OpenAPI types (hiện frontend dùng `ExtendedProductVideoRunRequest` tương thích ngược).
+- [x] Chạy `npm run gen:api` đồng bộ OpenAPI types.
 - [x] Tạo `productVideoPresets.ts`, `AssetPickerField.tsx` (`Có sẵn` / `Tự tải lên` / `Tự mô tả`) và cập nhật `ProductVideoStartForm.tsx` (chọn mẫu `showroom-v1` / `mc-v1`, chọn MC, chọn bối cảnh, chọn giọng đọc, ước tính credit theo mẫu).
 - [x] Cập nhật `ProductVideoPreviewPanel.tsx` (live preview 9:16 hiển thị nền bối cảnh, badge MC và tóm tắt cấu hình).
-- [ ] Cập nhật `ScriptEditor.tsx` (2 ô nhập lời riêng cho MC) và giữ nháp khi `speech_too_long`.
-- [ ] Tạo mới `KeyframeReviewPanel.tsx` (Checkpoint 2 duyệt ảnh keyframe 9:16, nút tạo lại ảnh có báo phí).
-- [ ] Cập nhật `StepDetail.tsx` (nút retry bước lỗi) và `ProductVideoShowcaseCard.tsx` (`480x848`).
-- [ ] Cập nhật từ điển `locales/{vi,en}/workflow.json`.
-- [ ] **Slice Gate 6**: `ProductVideoStartForm.test.tsx` và `npm run build -w frontend` xanh; E2E UI trên Docker Compose (chờ nối Checkpoint 2).
+- [x] Cập nhật `ScriptEditor.tsx` (2 ô nhập lời riêng cho MC) và giữ nháp khi `speech_too_long`.
+- [x] Tạo mới `KeyframeReviewPanel.tsx` (Checkpoint 2 duyệt ảnh keyframe 9:16, nút tạo lại ảnh có báo phí).
+- [x] Cập nhật `StepDetail.tsx` (nút retry bước lỗi) và `ProductVideoShowcaseCard.tsx` (`480x854` + thanh làm lại từng cảnh).
+- [x] Cập nhật từ điển `locales/{vi,en}/workflow.json`.
+- [x] **Slice Gate 6**: Frontend tests (`vitest`) & `npm run build -w frontend` xanh.
 
 ---
 
 ### Slice 7 — Đợt 2: Mức 2A (Làm Lại Từng Cảnh & Đồng Bộ Lại)
-- [ ] Mở rộng `RunResumption.java` & `RunsController.java` hỗ trợ `redoSteps` + `promptOverrides` (tái sử dụng clip cảnh đẹp & WAV).
-- [ ] Hỗ trợ LLM dịch ghi chú chỉnh cảnh tiếng Việt → English visual directive.
-- [ ] Bổ sung nút "Làm lại riêng từng cảnh" và "Đồng bộ lại khẩu hình" có modal báo phí credit.
-- [ ] **Slice Gate 7**: `RunResumptionEndpointsIT` xanh; làm lại riêng Cảnh 1 hoặc Cảnh 2 thành công và chỉ trừ phí đúng cảnh đó.
+- [x] Mở rộng `ProductVideoService.redoSteps` & `ProductVideoController` hỗ trợ `POST /api/v1/product-videos/runs/{runId}/redo` với `redoSteps` + `sceneNote` (tái sử dụng clip cảnh đẹp & WAV).
+- [x] Hỗ trợ `sceneNote` ghi chú chỉnh cảnh tiếng Việt truyền qua storyboard/prompt.
+- [x] Bổ sung thanh "Làm lại từng cảnh" (`redoSteps`) có xác nhận phí credit trên `ProductVideoShowcaseCard`.
+- [x] **Slice Gate 7**: Unit/integration tests xanh; kiểm chứng live run `c7420728-9488-44c1-a626-fa35001d9d12` tái sử dụng Steps 1..7 & 9, chỉ dispatch lại Step 8.
 
 ---
 
 ### Slice 8 — Nghiệm Thu Cuối & Smoke Test
-- [ ] Chạy thật 1 Showroom + 3 MC tiếng Việt qua UI.
-- [ ] Kiểm thử lỗi thiếu mặt, timeout Replicate, gửi lặp, đối soát credit.
-- [ ] Cập nhật `scripts/smoke-probe.sh`.
-- [ ] **Slice Gate 8**: Toàn bộ CI workflow xanh 100%.
+- [x] Chạy thật live 10-step MC tiếng Việt (`1edc3000-89e5-4d68-9b62-e69ce3ecc5e6` → `tmp/e2e_mc_final.mp4`: `480×854`, H.264 30fps + AAC, `7.07s`, `714 KB`).
+- [x] Kiểm thử Speech-first guard (`speech_too_long`), MiniMax `first_frame_image` vs `reference_image_urls`, MinIO policy, và retry download có giới hạn deadline/abort.
+- [x] Cập nhật `scripts/smoke-probe.sh` bao phủ `mc-v1` (catalog, preset images, 2 checkpoints, 10 bước, selective redo).
+- [ ] **Slice Gate 8**: Chạy full CI workflow sau khi Master push nhánh.

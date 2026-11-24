@@ -117,6 +117,46 @@ def test_minimax_submit_uploads_multiple_reference_images(monkeypatch: pytest.Mo
     }
 
 
+def test_minimax_submit_first_frame_omits_reference_image_urls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str, bytes | None]] = []
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResponse:
+        assert req.data is None or isinstance(req.data, bytes)
+        calls.append((req.get_method(), req.full_url, req.data))
+        if req.full_url.endswith("/files"):
+            payload = {"urls": {"get": "https://api.replicate.com/v1/files/kf-0"}}
+            return _FakeResponse(json.dumps(payload).encode())
+        return _FakeResponse(json.dumps({"id": "pred-mm-kf"}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    adapter = MinimaxAdapter(MinimaxConfig(api_key="tok", resolution="480P"))
+    req = VideoRequest(
+        prompt="Locked eye-level MC presenter shot",
+        source_revision_id=uuid4(),
+        reference_image_bytes=_PNG,
+        reference_images=(_PNG, _JPG),
+        first_frame_image_bytes=_JPG,
+        resolution="480P",
+    )
+
+    task_id = adapter.submit_video(req)
+
+    assert task_id == "pred-mm-kf"
+    assert len(calls) == 2
+    assert calls[0][1] == "https://api.replicate.com/v1/files"
+    body = json.loads((calls[1][2] or b"{}").decode())
+    assert body["input"] == {
+        "prompt": "Locked eye-level MC presenter shot",
+        "duration": 5,
+        "resolution": "480P",
+        "ratio": "9:16",
+        "first_frame_image": "https://api.replicate.com/v1/files/kf-0",
+    }
+    assert "reference_image_urls" not in body["input"]
+
+
 def test_minimax_await_and_cancel(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = iter([
         json.dumps({"status": "processing"}).encode(),

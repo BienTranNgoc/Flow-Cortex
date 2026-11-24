@@ -140,17 +140,19 @@ class MinimaxAdapter:
         model_path = "/".join(
             urllib.parse.quote(part, safe="") for part in self.config.model.split("/")
         )
-        reference_urls = self._resolve_reference_urls(request)
         input_body: dict[str, Any] = {
             "prompt": request.prompt,
             "duration": duration,
             "resolution": resolution,
             "ratio": identity.aspect_ratio,
         }
+        # MiniMax H3 rejects first_frame_image combined with reference_image_urls (E006).
         if request.first_frame_image_bytes:
             input_body["first_frame_image"] = self._upload_file(request.first_frame_image_bytes, 0)
-        if reference_urls:
-            input_body["reference_image_urls"] = reference_urls
+        else:
+            reference_urls = self._resolve_reference_urls(request)
+            if reference_urls:
+                input_body["reference_image_urls"] = reference_urls
         body = json.dumps({"input": input_body}).encode()
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/models/{model_path}/predictions",

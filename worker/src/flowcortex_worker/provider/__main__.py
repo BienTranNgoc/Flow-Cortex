@@ -222,13 +222,18 @@ def make_execute_job(
                 "contract_violation",
                 "generate_video jobs are handled by provider-video-worker on provider.video.jobs",
             )
+        probes_needed = request.capability in {
+            VIDEO_CAPABILITY,
+            "generate_keyframe",
+            "lipsync_video",
+        }
         context = ExecutionContext(
             storage=storage,
             bucket=storage.bucket,
             output_prefix=request.outputPrefix,
             abort=runner,
             report=report,
-            probes=build_probe_registry(adapter, os.environ) if is_video else {},
+            probes=build_probe_registry(adapter, os.environ) if probes_needed else {},
             control=control if is_video else None,
             deadline_monotonic=runner.deadline_monotonic,
         )
