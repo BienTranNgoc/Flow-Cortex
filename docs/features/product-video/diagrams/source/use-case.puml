@@ -1,0 +1,18 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName Arial
+left to right direction
+actor "Thành viên" as Member
+rectangle "Tạo video quảng cáo" {
+  usecase "UC-PV-01\nKhởi chạy từ thông tin sản phẩm" as Start
+  usecase "Theo dõi tiến độ" as Track
+  usecase "Sửa kịch bản" as Edit
+  usecase "Duyệt kịch bản" as Approve
+  usecase "Xem video kết quả" as View
+}
+Member -- Start
+Member -- Track
+Member -- Edit
+Member -- Approve
+Member -- View
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName Arial
+hide empty members
+class ProductVideoInput {
+  productName
+  description
+  cta
+}
+class WorkflowRun
+class RunStep
+class ReviewTask {
+  version
+  currentRevisionId
+}
+class ScriptRevision {
+  revisionNumber
+}
+WorkflowRun "1" -- "0..1" ProductVideoInput : đầu vào
+WorkflowRun "1" -- "1..*" RunStep : các bước
+WorkflowRun "1" -- "0..*" ReviewTask : tác vụ duyệt
+RunStep "1" -- "0..1" ReviewTask : điểm duyệt
+ReviewTask "1" -- "0..*" ScriptRevision : lịch sử sửa
+@enduml

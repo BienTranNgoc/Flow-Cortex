@@ -1,0 +1,55 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName Arial
+actor "Thành viên" as User
+participant "Giao diện" as UI
+participant "Backend" as API
+queue "RabbitMQ" as MQ
+participant "Worker" as Worker
+User -> UI : Gửi thông tin và ảnh đã tải lên
+UI -> API : POST /api/v1/product-videos/runs
+API --> UI : Trả lượt chạy
+API -> MQ : Gửi tác vụ sinh kịch bản
+MQ -> Worker : Chuyển tác vụ
+Worker -> MQ : Trả kịch bản
+MQ -> API : Chuyển kết quả
+UI -> API : Đọc tác vụ duyệt
+alt Cần chỉnh sửa
+  User -> UI : Sửa kịch bản
+  UI -> API : Lưu bản sửa mới
+  API --> UI : Trả bản sửa hiện tại
+else Dùng bản hiện tại
+  UI --> User : Hiển thị bản sẵn sàng duyệt
+end
+User -> UI : Duyệt kịch bản
+UI -> API : Gửi revisionId và expectedVersion
+API -> MQ : Điều phối storyboard và lời đọc
+MQ -> Worker : Chuyển lần lượt hai bước
+Worker -> MQ : Trả storyboard và lời đọc
+MQ -> API : Chuyển kết quả
+par Tác vụ clip 1
+  API -> MQ : Gửi yêu cầu clip 1
+  MQ -> Worker : Chuyển công việc clip 1
+else Tác vụ clip 2
+  API -> MQ : Gửi yêu cầu clip 2
+  MQ -> Worker : Chuyển công việc clip 2
+end
+alt Hai clip thành công, clip 2 trả trước
+  Worker -> MQ : Kết quả clip 2
+  MQ -> API : Chuyển clip 2
+  Worker -> MQ : Kết quả clip 1
+  MQ -> API : Chuyển clip 1
+  API -> MQ : Gửi render với clip 1 trước clip 2
+  MQ -> Worker : Chuyển công việc render
+  Worker -> MQ : Trả video đã kết xuất
+  MQ -> API : Chuyển kết quả
+  UI -> API : Đọc kết quả lượt chạy
+  UI --> User : Hiển thị video
+else Một clip thất bại
+  Worker -> MQ : Báo lỗi clip
+  MQ -> API : Chuyển lỗi
+  API -> API : Lưu lỗi và đánh dấu nhánh còn lại
+  UI -> API : Đọc trạng thái lượt chạy
+  UI --> User : Hiển thị lỗi
+end
+@enduml
