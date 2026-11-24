@@ -1,5 +1,5 @@
 import { setToken, type AdminSetting } from '@flow-cortex/api-client';
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ADMIN_ME, renderRoute, staffMe, stubApi } from '../../test/fakeApi';
 import { SettingsPage } from './SettingsPage';
@@ -207,5 +207,184 @@ describe('SettingsPage', () => {
     expect(newest?.compareDocumentPosition(oldest as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(screen.getByText('1–2 of 2')).toBeInTheDocument();
     expect(calls.find((call) => call.path.endsWith('/history'))?.query.get('size')).toBe('10');
+  });
+
+  describe('lowering the versions kept per project', () => {
+    const showModalDescriptor = Object.getOwnPropertyDescriptor(
+      HTMLDialogElement.prototype,
+      'showModal',
+    );
+    const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
+
+    beforeEach(() => {
+      Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+        configurable: true,
+        value(this: HTMLDialogElement) {
+          this.setAttribute('open', '');
+        },
+      });
+      Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+        configurable: true,
+        value(this: HTMLDialogElement) {
+          this.removeAttribute('open');
+          this.dispatchEvent(new Event('close'));
+        },
+      });
+    });
+    afterEach(() => {
+      for (const [name, descriptor] of [
+        ['showModal', showModalDescriptor],
+        ['close', closeDescriptor],
+      ] as const) {
+        if (descriptor) {
+          Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
+        } else {
+          Reflect.deleteProperty(HTMLDialogElement.prototype, name);
+        }
+      }
+    });
+
+    const VERSIONS = 'media.editor.project_max_versions';
+    const VERSIONS_LABEL = 'Versions kept per project';
+    const VERSIONS_ITEM: AdminSetting = {
+      key: VERSIONS,
+      group: 'media',
+      type: 'INTEGER',
+      value: 50,
+      decidedValue: 50,
+      source: 'CONFIGURED',
+      storedValue: null,
+      configuredValue: 50,
+      defaultValue: null,
+      options: [],
+      min: 1,
+      max: 200,
+      updatedBy: null,
+      updatedAt: null,
+    };
+    const stored = (value: number): AdminSetting => ({
+      ...VERSIONS_ITEM,
+      value,
+      decidedValue: value,
+      source: 'STORED',
+      storedValue: value,
+      updatedBy: 'admin@flowcortex.dev',
+      updatedAt: '2026-10-20T01:00:00Z',
+    });
+
+    function stubVersions(item: AdminSetting) {
+      return stubApi({
+        [`GET ${ME}`]: { status: 200, body: ADMIN_ME },
+        [`GET ${LIST}`]: { status: 200, body: { items: [item] } },
+        [`PUT ${LIST}/${VERSIONS}`]: { status: 200, body: stored(20) },
+        [`DELETE ${LIST}/${VERSIONS}`]: { status: 200, body: VERSIONS_ITEM },
+      });
+    }
+
+    const sent = (calls: ReturnType<typeof stubApi>, method: string) =>
+      calls.filter((call) => call.method === method);
+
+    async function typeValue(user: ReturnType<typeof userEvent.setup>, value: string) {
+      const field = await screen.findByRole('textbox', { name: VERSIONS_LABEL });
+      await user.clear(field);
+      await user.type(field, value);
+      return field;
+    }
+
+    it('holds a lowering behind a dialog naming both values and sends nothing until confirmed', async () => {
+      const calls = stubVersions(VERSIONS_ITEM);
+      const user = userEvent.setup();
+      renderSettings();
+
+      await typeValue(user, '20');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Lowering from 50 to 20');
+      expect(sent(calls, 'PUT')).toHaveLength(0);
+
+      await user.click(screen.getByRole('button', { name: 'Lower and save' }));
+
+      expect(await screen.findByText('Set by an admin')).toBeInTheDocument();
+      expect(sent(calls, 'PUT')).toHaveLength(1);
+      expect(sent(calls, 'PUT')[0]?.body).toEqual({ value: 20 });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus();
+    });
+
+    it('cancel sends nothing, keeps the draft and returns focus to Save', async () => {
+      const calls = stubVersions(VERSIONS_ITEM);
+      const user = userEvent.setup();
+      renderSettings();
+
+      const field = await typeValue(user, '20');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(sent(calls, 'PUT')).toHaveLength(0);
+      expect(field).toHaveValue('20');
+      expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus();
+    });
+
+    it('closing the dialog with Escape sends nothing and returns focus to Save', async () => {
+      const calls = stubVersions(VERSIONS_ITEM);
+      const user = userEvent.setup();
+      renderSettings();
+
+      await typeValue(user, '20');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      const dialog = await screen.findByRole('dialog');
+      act(() => {
+        dialog.dispatchEvent(new Event('close'));
+      });
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(sent(calls, 'PUT')).toHaveLength(0);
+      expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus();
+    });
+
+    it('raising the value goes out at once without a dialog', async () => {
+      const calls = stubVersions(VERSIONS_ITEM);
+      const user = userEvent.setup();
+      renderSettings();
+
+      await typeValue(user, '80');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(sent(calls, 'PUT')).toHaveLength(1));
+      expect(sent(calls, 'PUT')[0]?.body).toEqual({ value: 80 });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('resetting a stored value below it asks first and deletes only after confirm', async () => {
+      const calls = stubVersions(stored(80));
+      const user = userEvent.setup();
+      renderSettings();
+
+      await user.click(await screen.findByRole('button', { name: 'Reset to configured value' }));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent('Lowering from 80 to 50');
+      expect(sent(calls, 'DELETE')).toHaveLength(0);
+
+      await user.click(screen.getByRole('button', { name: 'Lower and save' }));
+
+      expect(await screen.findByText('From server configuration')).toBeInTheDocument();
+      expect(sent(calls, 'DELETE')).toHaveLength(1);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('cancelling a lowering reset deletes nothing and returns focus to the reset button', async () => {
+      const calls = stubVersions(stored(80));
+      const user = userEvent.setup();
+      renderSettings();
+
+      await user.click(await screen.findByRole('button', { name: 'Reset to configured value' }));
+      await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+      expect(sent(calls, 'DELETE')).toHaveLength(0);
+      expect(screen.getByRole('button', { name: 'Reset to configured value' })).toHaveFocus();
+    });
   });
 });
