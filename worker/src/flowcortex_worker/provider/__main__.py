@@ -32,8 +32,10 @@ from .adapter import (
 )
 from .capabilities import ExecutionContext, execute
 from .contracts.provider_job import ProviderJob
+from .control import ControlClient, ControlConfig
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
 from .fal_queue import probe_fal_queue, urllib_fetch
+from .minimax_adapter import PROVIDER_MINIMAX, MinimaxAdapter, MinimaxConfig
 from .openai_adapter import (
     _OPENAI_BASE_URL,
     _OPENAI_SCRIPT_MODEL,
@@ -72,9 +74,19 @@ def provider_queue() -> str:
     return queue
 
 
+def _parallel_clips_enabled() -> bool:
+    return os.environ.get("PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def main() -> int:
     telemetry.configure_logging()
     queue = provider_queue()
+    parallel_clips_enabled = _parallel_clips_enabled()
     settings = Settings()
     prepare_state_dir(settings.worker_state_dir)
     liveness_file = settings.liveness_file
@@ -94,7 +106,9 @@ def main() -> int:
     params.blocked_connection_timeout = 300
     params.client_properties = {"connection_name": f"provider-worker {settings.worker_id}"}
     adapter: CapabilityProviderAdapter = _build_adapter(
-        settings.s3_public_endpoint, video_enabled=queue == VIDEO_QUEUE
+        settings.s3_public_endpoint,
+        video_enabled=queue == VIDEO_QUEUE,
+        parallel_clips_enabled=parallel_clips_enabled,
     )
     storage = Storage(
         client_from(settings),
@@ -111,7 +125,17 @@ def main() -> int:
     def parse_job(body: bytes) -> Any:
         return ProviderJob.model_validate_json(body).root
 
-    execute_job = make_execute_job(queue, storage, adapter)
+    control_client: ControlClient | None = None
+    if queue == VIDEO_QUEUE and parallel_clips_enabled:
+        control_client = ControlClient(
+            ControlConfig(
+                amqp_url=settings.amqp_url.get_secret_value(),
+                worker_id=settings.worker_id,
+            )
+        )
+        control_client.start()
+
+    execute_job = make_execute_job(queue, storage, adapter, control=control_client)
 
     def make_consumer(connection: Any) -> Consumer:
         return Consumer(
@@ -138,12 +162,16 @@ def main() -> int:
     log.info("provider worker starting", extra={"workerId": settings.worker_id, "queue": queue})
     remove_leftovers()
     liveness_file.touch()
-    Supervisor(
-        connect=lambda: pika.BlockingConnection(params),
-        make_consumer=make_consumer,
-        stop=stop,
-        wait=wait_alive,
-    ).run()
+    try:
+        Supervisor(
+            connect=lambda: pika.BlockingConnection(params),
+            make_consumer=make_consumer,
+            stop=stop,
+            wait=wait_alive,
+        ).run()
+    finally:
+        if control_client is not None:
+            control_client.close()
     executor.shutdown(wait=False, cancel_futures=True)
     busy = [thread for thread in threading.enumerate() if thread.name.startswith(JOB_THREAD_PREFIX)]
     for thread in busy:
@@ -158,7 +186,11 @@ def main() -> int:
 
 
 def make_execute_job(
-    queue: str, storage: Any, adapter: ScriptAdapter | SpeechAdapter | VideoAdapter
+    queue: str,
+    storage: Any,
+    adapter: ScriptAdapter | SpeechAdapter | VideoAdapter,
+    *,
+    control: ControlClient | None = None,
 ) -> Callable[[Any, ProcessRunner, Callable[[VendorTaskReport], None]], Any]:
     """Runs one job; a job that reached the other pool's queue is answered, never executed.
 
@@ -189,6 +221,8 @@ def make_execute_job(
             abort=runner,
             report=report,
             probes=build_probe_registry(adapter, os.environ) if is_video else {},
+            control=control if is_video else None,
+            deadline_monotonic=runner.deadline_monotonic,
         )
         outcome = execute(ProviderJob(root=job), adapter, context)
         runner.check()
@@ -221,7 +255,10 @@ def build_probe_registry(adapter: Any, environ: Mapping[str, str]) -> ProbeRegis
 
 
 def _build_adapter(
-    s3_public_endpoint: str = "", *, video_enabled: bool = True
+    s3_public_endpoint: str = "",
+    *,
+    video_enabled: bool = True,
+    parallel_clips_enabled: bool | None = None,
 ) -> CapabilityProviderAdapter:
     """Build independently configurable script and speech providers.
 
@@ -235,6 +272,17 @@ def _build_adapter(
     configured_video_provider = os.environ.get(
         "VIDEO_PROVIDER", PROVIDER_FIXTURE
     ).strip().lower()
+    if parallel_clips_enabled is None:
+        parallel_clips_enabled = _parallel_clips_enabled()
+    if video_enabled and parallel_clips_enabled and configured_video_provider not in {
+        PROVIDER_WAN,
+        PROVIDER_MINIMAX,
+        PROVIDER_FIXTURE,
+    }:
+        raise RuntimeError(
+            "PRODUCT_VIDEO_PARALLEL_CLIPS_ENABLED only supports VIDEO_PROVIDER 'wan', "
+            f"'minimax' or 'fixture', got '{configured_video_provider}'"
+        )
     video_provider = configured_video_provider if video_enabled else PROVIDER_FIXTURE
     legacy_openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     script_api_key = (
@@ -254,6 +302,7 @@ def _build_adapter(
         or os.environ.get("FLOWCORTEX_PROVIDER_SCRIPT_MODEL", "").strip()
         or _OPENAI_SCRIPT_MODEL
     )
+    script_fallback_model = os.environ.get("SCRIPT_PROVIDER_FALLBACK_MODEL", "").strip() or None
     speech_base_url = (
         os.environ.get("SPEECH_PROVIDER_BASE_URL", "").strip()
         or legacy_base_url
@@ -275,13 +324,25 @@ def _build_adapter(
         video_api_key = os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
         video_base_url = os.environ.get("WAN_BASE_URL", "").strip() or generic_video_url
         video_model = os.environ.get("WAN_MODEL", "").strip() or generic_video_model
+    elif video_provider == PROVIDER_MINIMAX:
+        video_api_key = (
+            os.environ.get("MINIMAX_API_KEY", "").strip()
+            or os.environ.get("WAN_API_KEY", "").strip()
+            or generic_video_key
+        )
+        video_base_url = os.environ.get("MINIMAX_BASE_URL", "").strip() or generic_video_url
+        video_model = os.environ.get("MINIMAX_MODEL", "").strip() or generic_video_model
     else:
         video_api_key = generic_video_key
         video_base_url = generic_video_url
         video_model = generic_video_model
 
     script_adapter = _build_script_adapter(
-        script_provider, script_api_key, script_base_url, script_model,
+        script_provider,
+        script_api_key,
+        script_base_url,
+        script_model,
+        fallback_model=script_fallback_model,
         explicit=bool(os.environ.get("SCRIPT_PROVIDER", "").strip()),
     )
     speech_adapter = _build_speech_adapter(
@@ -302,10 +363,22 @@ def _build_adapter(
 
 
 def _build_script_adapter(
-    provider: str, api_key: str, base_url: str, model: str, explicit: bool = False
+    provider: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    *,
+    fallback_model: str | None = None,
+    explicit: bool = False,
 ) -> ScriptAdapter:
     if provider == PROVIDER_OPENAI:
-        return select_adapter(provider, api_key, base_url=base_url, model=model)
+        return select_adapter(
+            provider,
+            api_key,
+            base_url=base_url,
+            model=model,
+            fallback_model=fallback_model,
+        )
     if provider == PROVIDER_FIXTURE:
         return FixtureProviderAdapter()
     if provider == PROVIDER_EDGE:
@@ -416,11 +489,40 @@ def _build_video_adapter(
                 ),
             )
         )
+    if provider == PROVIDER_MINIMAX:
+        if not api_key:
+            raise RuntimeError("MiniMax video provider requires MINIMAX_API_KEY")
+        duration = int(os.environ.get("MINIMAX_DURATION", "5"))
+        if duration != 5:
+            raise RuntimeError(
+                f"MiniMax video provider requires MINIMAX_DURATION=5, got {duration}"
+            )
+        adapter = MinimaxAdapter(
+            MinimaxConfig(
+                api_key=api_key,
+                base_url=base_url or "https://api.replicate.com/v1",
+                model=model or "minimax/h3-lite",
+                resolution=os.environ.get("MINIMAX_RESOLUTION", "768P").strip().upper(),
+                duration=duration,
+                request_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_REQUEST_TIMEOUT_SECONDS", "60")
+                ),
+                poll_interval_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_INTERVAL_SECONDS", "5")
+                ),
+                poll_timeout_seconds=float(
+                    os.environ.get("VIDEO_PROVIDER_POLL_TIMEOUT_SECONDS", "480")
+                ),
+            )
+        )
+        adapter.video_identity()
+        return adapter
     if provider == PROVIDER_FIXTURE:
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown VIDEO_PROVIDER '{provider}'; accepted values: "
-        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}, {PROVIDER_WAN}"
+        f"{PROVIDER_FIXTURE}, {PROVIDER_SEEDANCE}, {PROVIDER_VEO}, {PROVIDER_WAN}, "
+        f"{PROVIDER_MINIMAX}"
     )
 
 

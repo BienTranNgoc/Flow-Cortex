@@ -3,11 +3,14 @@ import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { activeLocale } from '../../lib/i18n';
 import { ApprovalPanel } from './ApprovalPanel';
+import { parseStoryboardOutput } from './productVideoSchemas';
+import { StepActivityCard } from './StepActivityCard';
 import { StepDownloads } from './StepDownloads';
 import { formatTime, stepDuration, stepKey, stepNameId } from './stepDisplay';
 import { stepErrorSentence } from './stepErrorMessages';
 import { StepOutput } from './StepOutput';
 import { StoredOutputDownload } from './StoredOutputDownload';
+import { StoryboardOutputView } from './StoryboardOutputView';
 
 function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
   const { t } = useTranslation();
@@ -42,6 +45,27 @@ interface StepDetailProps {
   /** The run is paused on this step: the panel shows the approval form. */
   needsYou: boolean;
   fileName: string | undefined;
+  isProductVideo?: boolean | undefined;
+  stepTitle?: string | undefined;
+  productName?: string | undefined;
+}
+
+function visibleProductVideoArtifacts(
+  stepType: string | undefined,
+  artifacts: readonly NonNullable<RunStepResponse['outputs']>[number][],
+) {
+  if (stepType === 'render_video') {
+    return artifacts.filter((a) => a.mime?.startsWith('video/') || a.name.endsWith('.mp4'));
+  }
+  if (stepType === 'generate_speech') {
+    return artifacts.filter(
+      (a) => a.mime?.startsWith('audio/') || a.name.endsWith('.wav') || a.name.endsWith('.mp3'),
+    );
+  }
+  if (stepType === 'generate_video') {
+    return artifacts.filter((a) => a.mime?.startsWith('video/') || a.name.endsWith('.mp4'));
+  }
+  return [];
 }
 
 /** The details of the selected step: progress, output, downloads, or the failure and its code. */
@@ -53,6 +77,9 @@ export function StepDetail({
   awaitingApproval,
   needsYou,
   fileName,
+  isProductVideo = false,
+  stepTitle,
+  productName,
 }: Readonly<StepDetailProps>) {
   const { t } = useTranslation();
   const locale = activeLocale();
@@ -60,6 +87,12 @@ export function StepDetail({
   const outputs = step.outputs ?? [];
   const details = outputs.find((output) => output.mime === 'application/json');
   const artifacts = outputs.filter((output) => output.mime !== 'application/json');
+  const displayedArtifacts = isProductVideo
+    ? visibleProductVideoArtifacts(step.type, artifacts)
+    : artifacts;
+  const storyboard =
+    step.type === 'generate_storyboard' ? parseStoryboardOutput(step.output) : null;
+  const allowDownloadForStep = !isProductVideo || step.type === 'render_video';
   const stepOrder = step.stepOrder;
   const duration = stepDuration(step, t, locale);
   const started = formatTime(step.startedAt, locale);
@@ -102,9 +135,22 @@ export function StepDetail({
         </div>
       )}
       <div key={stepKey(step)} className="step-detail-body">
-        <StepProgress step={step} />
-        {status === 'completed' && step.output && <StepOutput output={step.output} />}
-        {status === 'completed' && details && stepOrder !== undefined && (
+        {isProductVideo && !needsYou && (status === 'running' || status === 'pending') ? (
+          <StepActivityCard
+            step={step}
+            stepTitle={stepTitle ?? t('workflow.step.fallback', { order: step.stepOrder })}
+            productName={productName}
+          />
+        ) : (
+          <StepProgress step={step} />
+        )}
+        {status === 'completed' && storyboard ? (
+          <StoryboardOutputView storyboard={storyboard} />
+        ) : (
+          status === 'completed' &&
+          step.output && <StepOutput output={step.output} hideRaw={isProductVideo} />
+        )}
+        {status === 'completed' && !isProductVideo && details && stepOrder !== undefined && (
           <StepDownloads
             runId={runId}
             stepOrder={stepOrder}
@@ -115,12 +161,18 @@ export function StepDetail({
         )}
         {status === 'completed' &&
           stepOrder !== undefined &&
-          artifacts.map((artifact) => (
+          displayedArtifacts.map((artifact) => (
             <StoredOutputDownload
               key={artifact.name}
               runId={runId}
               stepOrder={stepOrder}
               output={artifact}
+              allowDownload={allowDownloadForStep}
+              downloadLabel={
+                isProductVideo && step.type === 'render_video'
+                  ? t('workflow.download.downloadFinalStepVideo', { name: artifact.name })
+                  : undefined
+              }
             />
           ))}
         {status === 'error' && (
@@ -132,9 +184,9 @@ export function StepDetail({
                 step.mode === 'remote',
                 t,
                 locale,
+                step.type,
               )}
             </p>
-            {step.errorCode && <small className="run-step-code">{step.errorCode}</small>}
           </div>
         )}
       </div>

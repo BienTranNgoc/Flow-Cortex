@@ -14,7 +14,9 @@ interface StepExecutor {
         INLINE,
         REMOTE,
         /** Starts a child run in the claim and finishes when that run ends. */
-        NESTED
+        NESTED,
+        /** Creates child steps of the same run in the claim and finishes from their rows. */
+        FANOUT
     }
 
     /** Which thread pool an inline step runs on; a step that waits on a provider must not hold a shared thread. */

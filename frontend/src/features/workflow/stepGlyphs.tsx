@@ -37,6 +37,12 @@ const STATUS_PATHS: Record<StepState, ReactNode> = {
   ),
   completed: <path d="M3.5 8.5l3 3 6-7" />,
   error: <path d="M4 4l8 8M12 4l-8 8" />,
+  stopped: (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <rect x="6" y="6" width="4" height="4" fill="currentColor" stroke="none" />
+    </>
+  ),
   skipped: (
     <>
       <circle cx="8" cy="8" r="5.5" />
@@ -62,6 +68,42 @@ const TYPE_PATHS: Record<string, ReactNode> = {
   ),
   extract_audio: <path d="M2 8h1.5M5 5v6M8 3v10M11 6v4M14 7.5v1" />,
   APPROVAL_CHECKPOINT: <path d="M8 2l5 2v4c0 3-2 5-5 6-3-1-5-3-5-6V4l5-2z" />,
+  generate_script: (
+    <>
+      <rect x="3" y="2" width="10" height="12" rx="1.5" />
+      <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" />
+    </>
+  ),
+  generate_storyboard: (
+    <>
+      <rect x="2" y="3" width="5" height="10" rx="1" />
+      <rect x="9" y="3" width="5" height="10" rx="1" />
+    </>
+  ),
+  generate_speech: (
+    <>
+      <rect x="6" y="2" width="4" height="7" rx="2" />
+      <path d="M4 7.5a4 4 0 0 0 8 0M8 11.5v2.5M5.5 14h5" />
+    </>
+  ),
+  generate_video: (
+    <>
+      <rect x="2" y="4" width="8.5" height="8" rx="1.5" />
+      <path d="M10.5 6.8l3.5-1.8v6l-3.5-1.8" />
+    </>
+  ),
+  render_video: (
+    <>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <path d="M6.5 5.8l4 2.2-4 2.2V5.8z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  'qa.review': (
+    <>
+      <path d="M5.5 6a2.5 2.5 0 1 1 3.7 2.2c-.8.5-1.2 1-1.2 1.8" />
+      <path d="M8 13h.01" />
+    </>
+  ),
 };
 
 /** The step-type icon; a type without a drawing gets a plain dot. */

@@ -159,7 +159,7 @@ public class WorkflowExamples {
         List<NewWorkflowStep> steps = steps(root.get("steps"), label);
         Set<ConstraintViolation<KnownStepTypes.Definition>> violations = validator.validate(
                 new KnownStepTypes.Definition(steps, registry.knownTypes(), registry.storedInputTypes(),
-                        registry.remoteTypes(), registry.ingestTypes()));
+                        registry.remoteTypes(), registry.ingestTypes(), registry.iterateChildTypes()));
         if (!violations.isEmpty()) {
             throw fault(label, "has invalid steps: " + violations.stream()
                     .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())

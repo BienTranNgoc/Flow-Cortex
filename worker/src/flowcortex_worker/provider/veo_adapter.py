@@ -15,6 +15,7 @@ from typing import Any, NoReturn
 from ..errors import PermanentError, TransientError
 from .adapter import (
     Abort,
+    CancelResult,
     SpeechArtifact,
     SpeechIdentity,
     SpeechRequest,
@@ -160,6 +161,9 @@ class VeoAdapter:
 
     def vendor_scope(self) -> dict[str, str]:
         return vendor_scope(self.config.base_url, self.config.api_key)
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=False, reason="cancel is not supported for veo")
 
     def _task_url(self, task_id: str) -> str:
         return f"{self.config.base_url.rstrip('/')}/{task_id}"

@@ -19,8 +19,10 @@ MANIFEST_NAME = "manifest.json"
 VIDEO_MIME = "video/mp4"
 TARGET_DURATION_SECONDS = 10
 CLIP_DURATION_SECONDS = 5
-WIDTH = 360
-HEIGHT = 640
+WIDTH = 480
+HEIGHT = 854
+VIDEO_PRESET = "medium"
+VIDEO_CRF = "20"
 MAX_IMAGES = 10
 
 
@@ -87,7 +89,9 @@ def _render_product_video(
             "-c:v",
             "libx264",
             "-preset",
-            "fast",
+            VIDEO_PRESET,
+            "-crf",
+            VIDEO_CRF,
             "-pix_fmt",
             "yuv420p",
             "-r",
