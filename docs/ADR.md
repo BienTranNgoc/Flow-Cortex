@@ -1,12 +1,12 @@
-# Architecture Decision Log — Flow-Cortex
+# Nhật ký quyết định kiến trúc — Flow-Cortex
 
-Lightweight ADRs: one short entry per decision that a future reader (including
-future-you) would otherwise have to reverse-engineer. Newest at the bottom.
-Format per entry: **Context → Decision → Consequences**.
+Mỗi ADR ghi **Bối cảnh → Quyết định → Hệ quả**. Mục mới được thêm ở cuối. Mỗi quyết định hiện có phần tóm tắt tiếng Việt, kèm bản chi tiết lịch sử và các phép đo gốc. Tiêu đề lịch sử giữ anchor để tham chiếu.
 
 ---
 
 ## ADR-0001 — Adopt the reference conventions in tiers
+
+Áp dụng quy ước DigiShield theo từng tầng để khởi động nhanh. Phạm vi sản phẩm và cấu trúc build đã được cập nhật bởi các quyết định sau.
 
 - **Status:** the tiering below still holds; two parts are superseded. Product
   scope is full feature parity with Xood (ADR-0007, "Xood is the functional
@@ -35,6 +35,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0002 — Java 25 + Spring Boot 4.1, Gradle Kotlin DSL
 
+Dùng Java 25, Spring Boot 4.1 và Gradle Kotlin DSL để đồng bộ toolchain. Các test MVC và import cần theo cách tổ chức package của Spring Boot 4.
+
 - **Context:** Match the reference stack and the JDK already installed on the
   dev machine.
 - **Decision:** Java 25 toolchain, Spring Boot 4.1.0, Gradle 9.6.1 (Kotlin DSL),
@@ -47,6 +49,8 @@ Format per entry: **Context → Decision → Consequences**.
 ---
 
 ## ADR-0003 — Modular monolith via Spring Modulith
+
+Tách monolith thành các mô-đun nghiệp vụ được Spring Modulith kiểm tra. Mô-đun giao tiếp qua package công khai `api`.
 
 - **Context:** The `workflow` module is the second bounded context, exactly
   the trigger ADR-0001 named for promoting off a single Gradle module. A
@@ -73,6 +77,8 @@ Format per entry: **Context → Decision → Consequences**.
 ---
 
 ## ADR-0004 — Flyway migrations, `ddl-auto: validate`
+
+Flyway quản lý schema thông qua migration có phiên bản ngày. Hibernate kiểm tra schema bằng `ddl-auto: validate` khi khởi động.
 
 - **Context:** Both business modules need persistence. Letting Hibernate
   auto-generate/alter the schema (`ddl-auto: update`/`create`) is convenient
@@ -104,6 +110,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0005 — Contract-first OpenAPI + generated frontend client
 
+Lưu snapshot OpenAPI và sinh client frontend từ hợp đồng. CI kiểm tra snapshot và client khi hợp đồng thay đổi.
+
 - **Context:** The backend and frontend are two separate codebases (no
   shared TypeScript monorepo), so nothing stops a controller's response
   shape from silently drifting away from what the frontend was hand-typed
@@ -134,6 +142,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0006 — RFC 9457 `ProblemDetail` + Jakarta Bean Validation as the uniform error contract
 
+Chuẩn hóa lỗi HTTP bằng `ProblemDetail` theo RFC 9457 và xác thực đầu vào bằng Jakarta Bean Validation.
+
 - **Context:** An inconsistent per-endpoint error shape is a gap the
   DigiShield adoption analysis found in that very reference repo. Flow-Cortex
   wants one uniform, machine-parseable error contract from the first
@@ -157,6 +167,8 @@ Format per entry: **Context → Decision → Consequences**.
 ---
 
 ## ADR-0007 — Media engine: RabbitMQ + a Python worker + an S3-compatible store
+
+Tách tác vụ media ra worker Python, truyền công việc và kết quả qua RabbitMQ, lưu tệp trong kho tương thích S3. Bên dưới ghi riêng quyết định về tải tệp, timeout và retry.
 
 - **Context:** The pipeline's real work (download, demucs, FFmpeg) is slow,
   CPU-bound and Python-native, so it cannot run inside an API request or an
@@ -270,6 +282,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0008 — npm workspaces + a separate admin SPA
 
+Dùng npm workspaces để chia sẻ mã giữa ứng dụng thành viên và SPA quản trị. Mỗi giao diện giữ điểm vào và quy trình build riêng.
+
 - **Context:** The engine needs an operator view (every user's runs, the media
   jobs with their delivery counts and timeout markers, user management) that
   members must never load. The member SPA and that console would otherwise
@@ -296,6 +310,8 @@ Format per entry: **Context → Decision → Consequences**.
 ---
 
 ## ADR-0009 — Realtime transport: Server-Sent Events
+
+Dùng Server-Sent Events để đẩy cập nhật tiến độ và trạng thái từ backend đến giao diện.
 
 - **Context:** A run advances on the worker and in the API, and the run page
   learned about it by polling `GET /api/v1/runs/{id}` on a timer. The product
@@ -368,6 +384,8 @@ Format per entry: **Context → Decision → Consequences**.
 ---
 
 ## ADR-0010 — Egress isolation: one forward proxy with a domain allowlist
+
+Định tuyến truy cập ra ngoài qua forward proxy với danh sách tên miền cho phép. Các phần bên dưới ghi phạm vi áp dụng và cấu hình triển khai.
 
 - **Context:** ADR-0007 left URL ingest out because an IP-pinned HTTP guard
   cannot protect yt-dlp, and required the download capability to run behind
@@ -520,6 +538,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0011 — GPU workers: external APIs first, self-host later
 
+Dùng API ngoài cho công việc cần GPU trong giai đoạn đầu. Đánh giá lại phương án tự vận hành theo nhu cầu và chi phí thực tế.
+
 - **Context:** Xood is the functional target (ADR-0007, `docs/ADR.md:252`), and
   part of its media work is GPU-class: face swap, upscaling, FLUX.2 image
   generation, SAM 2.1 role tracking, RT-DETR role suggestion, LaMa overlay
@@ -619,6 +639,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0012 — Connector credential key custody
 
+Tách việc lưu giữ khóa khỏi dữ liệu thông tin xác thực của connector. Các phần bên dưới mô tả ranh giới truy cập khóa.
+
 - **Context:** a member's connector secrets (a Telegram bot token, an HTTP
   connector's API key) are stored in `connector_auth` and read back by the
   server to call the third party. A database dump or backup alone must not
@@ -662,6 +684,8 @@ Format per entry: **Context → Decision → Consequences**.
 ---
 
 ## ADR-0013 — Payment gateway
+
+Tổ chức thanh toán qua cổng thanh toán và hợp đồng theo nhà cung cấp. Xem ADR-0028 cho bổ sung về MoMo.
 
 - **Context:** Nodi will take payments through third-party providers that
   charge the payer on their own page and report the result later. Nothing in
@@ -741,6 +765,8 @@ Format per entry: **Context → Decision → Consequences**.
 
 ## ADR-0022 — Personal access tokens: decoder dispatch, role-less principal, route allowlist
 
+Phân luồng bộ giải mã token, xác thực PAT với principal không mang vai trò và giới hạn các route chấp nhận PAT.
+
 Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
 
 - **Context:** Admin accounts need to call the API from scripts without a
@@ -788,6 +814,8 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
 
 ## ADR-0016 — Runtime settings registry
 
+Đưa cấu hình runtime vào registry để đọc giá trị có kiểu và quản lý thay đổi theo từng khóa.
+
 - **Context:** Operator-tunable values (the Help Center assistant switch and
   its four daily limits) were bound once from environment variables at
   startup, with one ad-hoc table per feature for the switch. Changing a limit
@@ -829,6 +857,8 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
     it.
 
 ## ADR-0028 — MoMo payment provider
+
+Tích hợp MoMo theo ranh giới của mô-đun thanh toán. Các phần bên dưới mô tả xử lý trạng thái và thông báo từ nhà cung cấp.
 
 - **Context:** ADR-0013 defines one gateway shape for every provider and
   leaves each adapter to its own change. MoMo is the first adapter. It opens a
@@ -912,6 +942,8 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
 
 ## ADR-0024 — A step may wait on a child run
 
+Cho phép bước cha chờ một lượt chạy con và dùng kết quả của lượt con để tiếp tục.
+
 - **Context:** ADR-0007's run engine runs one workflow's steps in order. A step
   either runs inline and returns its output, or hands a job to the media engine
   and waits for a media event. The `workflow.call` step type runs another
@@ -958,6 +990,8 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
 ---
 
 ## ADR-0043 — MCP authorization server: personal access tokens for consenting admins
+
+Thêm máy chủ ủy quyền MCP cho quản trị viên chấp thuận cấp quyền qua token. Các phần bên dưới ghi quy tắc cấp, sử dụng và thu hồi.
 
 Number provisional until merge; see `openspec/changes/mcp-oauth-runtime/`.
 
@@ -1016,6 +1050,8 @@ Number provisional until merge; see `openspec/changes/mcp-oauth-runtime/`.
 ---
 
 ## ADR-0032 — A step may fan out child steps within its run
+
+Cho phép một bước mở rộng danh sách đầu vào thành các bước con trong cùng lượt chạy. Các phần bên dưới mô tả cách tổng hợp kết quả và xử lý lỗi.
 
 The number is provisional: it is the next free one on the base when this was
 written, and whichever change merges first takes it.

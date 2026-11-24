@@ -22,3 +22,4 @@ wrong name, not a style problem.
 - [ ] If this PR adds or changes a SQL migration, its version
       (`V<yyyy.MM.dd>.NNN__…`) is **strictly newer** than the latest version
       already on `origin/development` (AGENTS.md §15).
+- [ ] Đã cập nhật tài liệu và ca kiểm thử bị ảnh hưởng, hoặc ghi lý do tài liệu hiện tại vẫn đúng (AGENTS.md §16).

@@ -1,5 +1,7 @@
 # Flow-Cortex
 
+Xem [mục lục tài liệu Flow-Cortex](docs/README.md) để tra cứu kiến trúc, đặc tả tính năng và kiểm thử.
+
 Nodi FlowCortex is built toward full feature parity with Xood (backend, member
 app, admin console, media worker, clay render), ported domain by domain. Xood
 sets what the product does; the engineering conventions come from the

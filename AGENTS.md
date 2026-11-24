@@ -155,3 +155,10 @@ This repo keeps comments **minimal**. Well-named code is the primary documentati
 ## 15. Migration version (Flyway)
 
 Migration filenames under `backend/boot/app/src/main/resources/db/migration/` MUST use the version format of ADR-0004 — `V<yyyy.MM.dd>.NNN__<description>.sql` (e.g. `V2026.10.18.100__…`). A new migration's version must be **strictly greater than every version already on `origin/development`**: Flyway refuses to start when it sees a version older than one already applied, and the fix (rename several files plus update the docs that cite their versions) is exactly the kind of dirty, low-confidence work this rule exists to prevent. A copy-from-another-branch + forgot-to-bump is the most common cause. `scripts/check-migration-version.sh` (wired into CI) catches it before merge; it also refuses two migrations that share a version anywhere in the tree, and an added file whose name is not in the `V<yyyy.MM.dd>.NNN` format.
+
+## 16. Update documentation alongside code
+
+- Before changing behavior, consult the [documentation index](docs/README.md) and read `docs/features/<slug>/README.md` and its testing documentation. If the feature needs a new specification, create a page and add it to the index. Document user flows and admin actions for the same business capability together.
+- In the same PR, update affected use cases, diagrams, test cases, and links to test assertions. For changes to shared mechanisms, update the [architecture documentation](docs/ARCHITECTURE.md). For schema changes, check the Flyway migrations and update the [ERD](docs/ERD.md). Record lasting technical decisions in the [ADR log](docs/ADR.md) and follow the existing snapshot process when the HTTP contract changes.
+- Write explanatory documentation in Vietnamese and preserve technical identifiers. Verify behavior against code, configuration, or tests. Mark proposed designs and test cases that have yet to be automated as described in the [testing guide](docs/TESTING.md).
+- Before handing off, list the documentation and test cases you updated. For a behavior-preserving refactor, explain in one sentence why the existing documentation still applies.
