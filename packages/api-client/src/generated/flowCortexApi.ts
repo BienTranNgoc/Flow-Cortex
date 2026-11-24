@@ -1054,6 +1054,19 @@ export const RunStepResponseMode = {
   remote: 'remote',
 } as const;
 
+export interface RunStepChildResponse {
+  id: string;
+  itemIndex: number;
+  status: string;
+  output?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  attempt: number;
+  startedAt?: string;
+  finishedAt?: string;
+  outputs: RunStepOutputResponse[];
+}
+
 export interface RunStepResponse {
   id?: string;
   stepOrder?: number;
@@ -1071,6 +1084,7 @@ export interface RunStepResponse {
   pickedUpAt?: string;
   outputs: RunStepOutputResponse[];
   mode: RunStepResponseMode;
+  children: RunStepChildResponse[];
 }
 
 export interface RunResponse {
@@ -1355,6 +1369,17 @@ export interface ScriptRevisionResponse {
   reviewTaskVersion?: number;
 }
 
+export interface ReviewQuestion {
+  id: string;
+  type: string;
+  question: string;
+  options: string[];
+}
+
+export type ReviewTaskResponsePickOptionsItem = { [key: string]: unknown };
+
+export type ReviewTaskResponseAnswers = { [key: string]: unknown };
+
 export interface ReviewTaskResponse {
   id?: string;
   runId?: string;
@@ -1369,12 +1394,24 @@ export interface ReviewTaskResponse {
   version?: number;
   currentRevisionId?: string;
   approvedRevisionId?: string;
+  expiresAt: string;
+  pickOptions?: ReviewTaskResponsePickOptionsItem[];
+  questions?: ReviewQuestion[];
+  questionsState?: string;
+  answers?: ReviewTaskResponseAnswers;
 }
 
 export interface ApproveReviewTaskRequest {
   reviewedPayload?: string;
   revisionId?: string;
   expectedVersion?: number;
+  pickedOption?: number;
+}
+
+export type AnswerReviewTaskRequestAnswers = { [key: string]: unknown };
+
+export interface AnswerReviewTaskRequest {
+  answers: AnswerReviewTaskRequestAnswers;
 }
 
 export interface VideoConfig {
@@ -1410,7 +1447,7 @@ export interface ProductVideoRunRequest {
   promotion?: string;
   /**
    * @minItems 1
-   * @maxItems 1
+   * @maxItems 3
    */
   uploadIds: string[];
   video: VideoConfig;
@@ -1592,6 +1629,112 @@ export const BuilderCompleteBodyReason = {
 
 export interface BuilderCompleteBody {
   reason?: BuilderCompleteBodyReason;
+}
+
+export interface TokenForm {
+  grant_type: string;
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+/**
+ * The error object of RFC 6749 section 5.2, also used by RFC 7591
+ */
+export interface OAuthError {
+  /** The OAuth error code, for example invalid_grant */
+  error: string;
+  /** A human-readable explanation; never echoes a request value */
+  error_description?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+export interface RevokeForm {
+  token: string;
+  token_type_hint?: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+export interface RegistrationRequest {
+  client_name?: string;
+  redirect_uris?: string[];
+  grant_types?: string[];
+  response_types?: string[];
+  token_endpoint_auth_method?: string;
+}
+
+export interface Registration {
+  client_id: string;
+  /** Absent for a client that authenticates with none */
+  client_secret?: string;
+  client_id_issued_at: number;
+  client_secret_expires_at: number;
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: string[];
+  response_types: string[];
+  token_endpoint_auth_method: string;
+}
+
+export interface GrantRequest {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  response_type?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  client_id?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  redirect_uri?: string;
+  /**
+   * @minLength 0
+   * @maxLength 256
+   */
+  code_challenge?: string;
+  /**
+   * @minLength 0
+   * @maxLength 16
+   */
+  code_challenge_method?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  scope?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  state?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  resource?: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof?: string;
+}
+
+export interface GrantResponse {
+  redirectTo: string;
 }
 
 export interface ReadAllResult {
@@ -3228,6 +3371,19 @@ export interface OnboardingResultResponse {
   usageType: OnboardingResultResponseUsageType;
 }
 
+export interface CheckResponse {
+  clientId: string;
+  clientName: string;
+  redirectUri: string;
+  scope: string;
+  eligible: boolean;
+  /**
+   * The OAuth error the page sends to the redirect URI; null when the request is valid
+   * @nullable
+   */
+  error?: string | null;
+}
+
 export interface NotificationItem {
   id?: string;
   type?: string;
@@ -3291,6 +3447,7 @@ export interface FeaturesResponse {
   personalAccessTokens: boolean;
   onboarding: boolean;
   chat: boolean;
+  drive: boolean;
 }
 
 export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];
@@ -3468,6 +3625,119 @@ export interface DayCountResponse {
 export interface BuilderChartResponse {
   period: BuilderChartResponsePeriod;
   series: DayCountResponse[];
+}
+
+export interface TransactionListMeta {
+  total: number;
+  page: number;
+  size: number;
+}
+
+export type TransactionRowKind = (typeof TransactionRowKind)[keyof typeof TransactionRowKind];
+
+export const TransactionRowKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type TransactionRowStatus = (typeof TransactionRowStatus)[keyof typeof TransactionRowStatus];
+
+export const TransactionRowStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  expired: 'expired',
+  partially_refunded: 'partially_refunded',
+  refunded: 'refunded',
+  disputed: 'disputed',
+} as const;
+
+export interface TransactionRow {
+  id: string;
+  kind: TransactionRowKind;
+  description: string;
+  amountVnd: number;
+  status: TransactionRowStatus;
+  openedAt: string;
+  /** @nullable */
+  succeededAt: string | null;
+}
+
+export interface TransactionListResponse {
+  data: TransactionRow[];
+  meta: TransactionListMeta;
+}
+
+export type TransactionDetailResponseKind =
+  (typeof TransactionDetailResponseKind)[keyof typeof TransactionDetailResponseKind];
+
+export const TransactionDetailResponseKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type TransactionDetailResponseStatus =
+  (typeof TransactionDetailResponseStatus)[keyof typeof TransactionDetailResponseStatus];
+
+export const TransactionDetailResponseStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  expired: 'expired',
+  partially_refunded: 'partially_refunded',
+  refunded: 'refunded',
+  disputed: 'disputed',
+} as const;
+
+/**
+ * @nullable
+ */
+export type TransactionDetailResponseInstrument =
+  | (typeof TransactionDetailResponseInstrument)[keyof typeof TransactionDetailResponseInstrument]
+  | null;
+
+export const TransactionDetailResponseInstrument = {
+  wallet: 'wallet',
+  domestic_card: 'domestic_card',
+} as const;
+
+export type TransactionTimelineEventKind =
+  (typeof TransactionTimelineEventKind)[keyof typeof TransactionTimelineEventKind];
+
+export const TransactionTimelineEventKind = {
+  opened: 'opened',
+  paid: 'paid',
+  payment_failed: 'payment_failed',
+  payment_expired: 'payment_expired',
+} as const;
+
+export interface TransactionTimelineEvent {
+  at: string;
+  kind: TransactionTimelineEventKind;
+  /** @nullable */
+  code: string | null;
+}
+
+export interface TransactionDetailResponse {
+  id: string;
+  kind: TransactionDetailResponseKind;
+  description: string;
+  amountVnd: number;
+  status: TransactionDetailResponseStatus;
+  openedAt: string;
+  /** @nullable */
+  succeededAt: string | null;
+  orderRef: string;
+  provider: string;
+  /** @nullable */
+  instrument: TransactionDetailResponseInstrument;
+  /** @nullable */
+  providerPayType: string | null;
+  /** @nullable */
+  providerTransactionId: string | null;
+  /** @nullable */
+  outcomeCode: string | null;
+  timeline: TransactionTimelineEvent[];
 }
 
 /**
@@ -3911,9 +4181,48 @@ export interface PageViewAdminAccountResponse {
   total: number;
 }
 
+export interface Metadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint: string;
+  revocation_endpoint: string;
+  response_types_supported: string[];
+  grant_types_supported: string[];
+  code_challenge_methods_supported: string[];
+  scopes_supported: string[];
+  token_endpoint_auth_methods_supported: string[];
+  revocation_endpoint_auth_methods_supported: string[];
+}
+
 export interface RevokedResponse {
   revoked?: number;
 }
+
+/**
+ * The Idempotency-Key header is blank or longer than 80 characters, or the keyed request body cannot be fingerprinted (multipart or over 1 MiB).
+ */
+export type IdempotencyKeyInvalidResponse = ProblemDetail;
+
+/**
+ * A request with the same key is still running.
+ */
+export type IdempotencyInProgressResponse = ProblemDetail;
+
+/**
+ * The key was used with a different method, path, query or body.
+ */
+export type IdempotencyKeyReusedResponse = ProblemDetail;
+
+/**
+ * The token owner's daily write limit is reached (code API_TOKEN_DAILY_LIMIT); retry after the UTC day ends.
+ */
+export type ApiTokenDailyLimitResponse = ProblemDetail;
+
+/**
+ * Optional on POST and PATCH made with a personal access token. A repeat of the same request within 24 hours returns the stored answer with Idempotent-Replayed: true.
+ */
+export type IdempotencyKeyParameter = string;
 
 export type ListWorkflowVersionsParams = {
   /**
@@ -3978,6 +4287,8 @@ export const ListUsersSort = {
   email: 'email',
   name: 'name',
 } as const;
+
+export type RevokeOAuthToken200 = { [key: string]: unknown };
 
 export type UnsubscribeEmailLinkParams = {
   src?: string;
@@ -4262,6 +4573,49 @@ export type OpenRealtimeStreamParams = {
   topic?: string[];
 };
 
+export type CheckOAuthAuthorizationParams = {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  response_type?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  client_id?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  redirect_uri?: string;
+  /**
+   * @minLength 0
+   * @maxLength 256
+   */
+  code_challenge?: string;
+  /**
+   * @minLength 0
+   * @maxLength 16
+   */
+  code_challenge_method?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  scope?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  state?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  resource?: string;
+};
+
 export type ListNotificationsParams = {
   filter?: string;
   page?: string;
@@ -4320,6 +4674,25 @@ export const GetBuilderRunsChartPeriod = {
   '30d': '30d',
   '90d': '90d',
 } as const;
+
+export type ListBillingTransactionsParams = {
+  /**
+   * Page number from 0 to 10000; default 0
+   * @minimum 0
+   * @maximum 10000
+   */
+  page?: number;
+  /**
+   * Rows per page from 1 to 100; default 20
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  /**
+   * true or 1 lists only succeeded, partially refunded and refunded payments
+   */
+  settled?: boolean;
+};
 
 export type CallbackParams = {
   code?: string;
@@ -4638,12 +5011,18 @@ export type reorderWorkflowStepsResponse422 = {
   status: 422;
 };
 
+export type reorderWorkflowStepsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type reorderWorkflowStepsResponseError = (
   | reorderWorkflowStepsResponse400
   | reorderWorkflowStepsResponse403
   | reorderWorkflowStepsResponse404
   | reorderWorkflowStepsResponse409
   | reorderWorkflowStepsResponse422
+  | reorderWorkflowStepsResponse429
 ) & {
   headers: Headers;
 };
@@ -4691,10 +5070,20 @@ export type setWorkflowReviewHelpfulResponse200 = {
   status: 200;
 };
 
+export type setWorkflowReviewHelpfulResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowReviewHelpfulResponseSuccess = setWorkflowReviewHelpfulResponse200 & {
   headers: Headers;
 };
-export type setWorkflowReviewHelpfulResponse = setWorkflowReviewHelpfulResponseSuccess;
+export type setWorkflowReviewHelpfulResponseError = setWorkflowReviewHelpfulResponse429 & {
+  headers: Headers;
+};
+
+export type setWorkflowReviewHelpfulResponse =
+  setWorkflowReviewHelpfulResponseSuccess | setWorkflowReviewHelpfulResponseError;
 
 export const getSetWorkflowReviewHelpfulUrl = (id: string, reviewId: string) => {
   return `/api/v1/workflows/${id}/reviews/${reviewId}/helpful`;
@@ -4765,10 +5154,20 @@ export type putMyWorkflowReviewResponse200 = {
   status: 200;
 };
 
+export type putMyWorkflowReviewResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type putMyWorkflowReviewResponseSuccess = putMyWorkflowReviewResponse200 & {
   headers: Headers;
 };
-export type putMyWorkflowReviewResponse = putMyWorkflowReviewResponseSuccess;
+export type putMyWorkflowReviewResponseError = putMyWorkflowReviewResponse429 & {
+  headers: Headers;
+};
+
+export type putMyWorkflowReviewResponse =
+  putMyWorkflowReviewResponseSuccess | putMyWorkflowReviewResponseError;
 
 export const getPutMyWorkflowReviewUrl = (id: string) => {
   return `/api/v1/workflows/${id}/reviews/mine`;
@@ -4811,10 +5210,20 @@ export type deleteMyWorkflowReviewResponse200 = {
   status: 200;
 };
 
+export type deleteMyWorkflowReviewResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteMyWorkflowReviewResponseSuccess = deleteMyWorkflowReviewResponse200 & {
   headers: Headers;
 };
-export type deleteMyWorkflowReviewResponse = deleteMyWorkflowReviewResponseSuccess;
+export type deleteMyWorkflowReviewResponseError = deleteMyWorkflowReviewResponse429 & {
+  headers: Headers;
+};
+
+export type deleteMyWorkflowReviewResponse =
+  deleteMyWorkflowReviewResponseSuccess | deleteMyWorkflowReviewResponseError;
 
 export const getDeleteMyWorkflowReviewUrl = (id: string) => {
   return `/api/v1/workflows/${id}/reviews/mine`;
@@ -4901,6 +5310,11 @@ export type putWorkflowDataResponse422 = {
   status: 422;
 };
 
+export type putWorkflowDataResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type putWorkflowDataResponseSuccess = putWorkflowDataResponse200 & {
   headers: Headers;
 };
@@ -4910,6 +5324,7 @@ export type putWorkflowDataResponseError = (
   | putWorkflowDataResponse404
   | putWorkflowDataResponse409
   | putWorkflowDataResponse422
+  | putWorkflowDataResponse429
 ) & {
   headers: Headers;
 };
@@ -4973,11 +5388,19 @@ export type deleteWorkflowDataResponse409 = {
   status: 409;
 };
 
+export type deleteWorkflowDataResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowDataResponseSuccess = deleteWorkflowDataResponse204 & {
   headers: Headers;
 };
 export type deleteWorkflowDataResponseError = (
-  deleteWorkflowDataResponse403 | deleteWorkflowDataResponse404 | deleteWorkflowDataResponse409
+  | deleteWorkflowDataResponse403
+  | deleteWorkflowDataResponse404
+  | deleteWorkflowDataResponse409
+  | deleteWorkflowDataResponse429
 ) & {
   headers: Headers;
 };
@@ -5029,10 +5452,20 @@ export type setWorkflowBookmarkResponse200 = {
   status: 200;
 };
 
+export type setWorkflowBookmarkResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowBookmarkResponseSuccess = setWorkflowBookmarkResponse200 & {
   headers: Headers;
 };
-export type setWorkflowBookmarkResponse = setWorkflowBookmarkResponseSuccess;
+export type setWorkflowBookmarkResponseError = setWorkflowBookmarkResponse429 & {
+  headers: Headers;
+};
+
+export type setWorkflowBookmarkResponse =
+  setWorkflowBookmarkResponseSuccess | setWorkflowBookmarkResponseError;
 
 export const getSetWorkflowBookmarkUrl = (id: string) => {
   return `/api/v1/workflows/${id}/bookmark`;
@@ -6957,9 +7390,19 @@ export type createWorkflowResponse404 = {
   status: 404;
 };
 
+export type createWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type createWorkflowResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type createWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type createWorkflowResponseSuccess = createWorkflowResponse201 & {
@@ -6969,7 +7412,9 @@ export type createWorkflowResponseError = (
   | createWorkflowResponse400
   | createWorkflowResponse403
   | createWorkflowResponse404
+  | createWorkflowResponse409
   | createWorkflowResponse422
+  | createWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -7090,13 +7535,33 @@ export type saveWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type saveWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type saveWorkflowVersionResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type saveWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type saveWorkflowVersionResponseSuccess = (
   saveWorkflowVersionResponse200 | saveWorkflowVersionResponse201
 ) & {
   headers: Headers;
 };
 export type saveWorkflowVersionResponseError = (
-  saveWorkflowVersionResponse400 | saveWorkflowVersionResponse403 | saveWorkflowVersionResponse404
+  | saveWorkflowVersionResponse400
+  | saveWorkflowVersionResponse403
+  | saveWorkflowVersionResponse404
+  | saveWorkflowVersionResponse409
+  | saveWorkflowVersionResponse422
+  | saveWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -7165,9 +7630,19 @@ export type rollbackWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type rollbackWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type rollbackWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type rollbackWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type rollbackWorkflowVersionResponseSuccess = (
@@ -7179,7 +7654,9 @@ export type rollbackWorkflowVersionResponseError = (
   | rollbackWorkflowVersionResponse400
   | rollbackWorkflowVersionResponse403
   | rollbackWorkflowVersionResponse404
+  | rollbackWorkflowVersionResponse409
   | rollbackWorkflowVersionResponse422
+  | rollbackWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -7254,6 +7731,11 @@ export type addStepResponse422 = {
   status: 422;
 };
 
+export type addStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
@@ -7263,6 +7745,7 @@ export type addStepResponseError = (
   | addStepResponse404
   | addStepResponse409
   | addStepResponse422
+  | addStepResponse429
 ) & {
   headers: Headers;
 };
@@ -7310,15 +7793,41 @@ export type startRunResponse200 = {
   status: 200;
 };
 
+export type startRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type startRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type startRunResponse410 = {
   data: ProblemDetail;
   status: 410;
 };
 
+export type startRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type startRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type startRunResponseSuccess = startRunResponse200 & {
   headers: Headers;
 };
-export type startRunResponseError = startRunResponse410 & {
+export type startRunResponseError = (
+  | startRunResponse400
+  | startRunResponse409
+  | startRunResponse410
+  | startRunResponse422
+  | startRunResponse429
+) & {
   headers: Headers;
 };
 
@@ -7378,10 +7887,40 @@ export type reportWorkflowReviewResponse200 = {
   status: 200;
 };
 
+export type reportWorkflowReviewResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type reportWorkflowReviewResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type reportWorkflowReviewResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type reportWorkflowReviewResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type reportWorkflowReviewResponseSuccess = reportWorkflowReviewResponse200 & {
   headers: Headers;
 };
-export type reportWorkflowReviewResponse = reportWorkflowReviewResponseSuccess;
+export type reportWorkflowReviewResponseError = (
+  | reportWorkflowReviewResponse400
+  | reportWorkflowReviewResponse409
+  | reportWorkflowReviewResponse422
+  | reportWorkflowReviewResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportWorkflowReviewResponse =
+  reportWorkflowReviewResponseSuccess | reportWorkflowReviewResponseError;
 
 export const getReportWorkflowReviewUrl = (id: string, reviewId: string) => {
   return `/api/v1/workflows/${id}/reviews/${reviewId}/report`;
@@ -7425,10 +7964,40 @@ export type createReviewImageUploadResponse200 = {
   status: 200;
 };
 
+export type createReviewImageUploadResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type createReviewImageUploadResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type createReviewImageUploadResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type createReviewImageUploadResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type createReviewImageUploadResponseSuccess = createReviewImageUploadResponse200 & {
   headers: Headers;
 };
-export type createReviewImageUploadResponse = createReviewImageUploadResponseSuccess;
+export type createReviewImageUploadResponseError = (
+  | createReviewImageUploadResponse400
+  | createReviewImageUploadResponse409
+  | createReviewImageUploadResponse422
+  | createReviewImageUploadResponse429
+) & {
+  headers: Headers;
+};
+
+export type createReviewImageUploadResponse =
+  createReviewImageUploadResponseSuccess | createReviewImageUploadResponseError;
 
 export const getCreateReviewImageUploadUrl = (id: string) => {
   return `/api/v1/workflows/${id}/reviews/image-uploads`;
@@ -7471,6 +8040,11 @@ export type regenerateWorkflowShareKeyResponse200 = {
   status: 200;
 };
 
+export type regenerateWorkflowShareKeyResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type regenerateWorkflowShareKeyResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -7486,13 +8060,26 @@ export type regenerateWorkflowShareKeyResponse409 = {
   status: 409;
 };
 
+export type regenerateWorkflowShareKeyResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateWorkflowShareKeyResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type regenerateWorkflowShareKeyResponseSuccess = regenerateWorkflowShareKeyResponse200 & {
   headers: Headers;
 };
 export type regenerateWorkflowShareKeyResponseError = (
+  | regenerateWorkflowShareKeyResponse400
   | regenerateWorkflowShareKeyResponse403
   | regenerateWorkflowShareKeyResponse404
   | regenerateWorkflowShareKeyResponse409
+  | regenerateWorkflowShareKeyResponse422
+  | regenerateWorkflowShareKeyResponse429
 ) & {
   headers: Headers;
 };
@@ -7563,16 +8150,30 @@ export type pinWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type pinWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type pinWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type pinWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type pinWorkflowVersionResponseSuccess = pinWorkflowVersionResponse200 & {
   headers: Headers;
 };
 export type pinWorkflowVersionResponseError = (
-  pinWorkflowVersionResponse400 | pinWorkflowVersionResponse404 | pinWorkflowVersionResponse422
+  | pinWorkflowVersionResponse400
+  | pinWorkflowVersionResponse404
+  | pinWorkflowVersionResponse409
+  | pinWorkflowVersionResponse422
+  | pinWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -7626,10 +8227,17 @@ export type unpinWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type unpinWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type unpinWorkflowVersionResponseSuccess = unpinWorkflowVersionResponse204 & {
   headers: Headers;
 };
-export type unpinWorkflowVersionResponseError = unpinWorkflowVersionResponse404 & {
+export type unpinWorkflowVersionResponseError = (
+  unpinWorkflowVersionResponse404 | unpinWorkflowVersionResponse429
+) & {
   headers: Headers;
 };
 
@@ -7675,13 +8283,33 @@ export type hotfixWorkflowResponse404 = {
   status: 404;
 };
 
+export type hotfixWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type hotfixWorkflowResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type hotfixWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type hotfixWorkflowResponseSuccess = (
   hotfixWorkflowResponse200 | hotfixWorkflowResponse201
 ) & {
   headers: Headers;
 };
 export type hotfixWorkflowResponseError = (
-  hotfixWorkflowResponse400 | hotfixWorkflowResponse403 | hotfixWorkflowResponse404
+  | hotfixWorkflowResponse400
+  | hotfixWorkflowResponse403
+  | hotfixWorkflowResponse404
+  | hotfixWorkflowResponse409
+  | hotfixWorkflowResponse422
+  | hotfixWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -7729,6 +8357,11 @@ export type forkWorkflowResponse201 = {
   status: 201;
 };
 
+export type forkWorkflowResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type forkWorkflowResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -7749,14 +8382,21 @@ export type forkWorkflowResponse422 = {
   status: 422;
 };
 
+export type forkWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type forkWorkflowResponseSuccess = forkWorkflowResponse201 & {
   headers: Headers;
 };
 export type forkWorkflowResponseError = (
+  | forkWorkflowResponse400
   | forkWorkflowResponse403
   | forkWorkflowResponse404
   | forkWorkflowResponse409
   | forkWorkflowResponse422
+  | forkWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -7902,10 +8542,39 @@ export type requestUploadResponse201 = {
   status: 201;
 };
 
+export type requestUploadResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type requestUploadResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type requestUploadResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type requestUploadResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type requestUploadResponseSuccess = requestUploadResponse201 & {
   headers: Headers;
 };
-export type requestUploadResponse = requestUploadResponseSuccess;
+export type requestUploadResponseError = (
+  | requestUploadResponse400
+  | requestUploadResponse409
+  | requestUploadResponse422
+  | requestUploadResponse429
+) & {
+  headers: Headers;
+};
+
+export type requestUploadResponse = requestUploadResponseSuccess | requestUploadResponseError;
 
 export const getRequestUploadUrl = () => {
   return `/api/v1/uploads`;
@@ -8433,6 +9102,11 @@ export type retryRunStepResponse200 = {
   status: 200;
 };
 
+export type retryRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type retryRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -8448,6 +9122,16 @@ export type retryRunStepResponse409 = {
   status: 409;
 };
 
+export type retryRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type retryRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type retryRunStepResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -8457,9 +9141,12 @@ export type retryRunStepResponseSuccess = retryRunStepResponse200 & {
   headers: Headers;
 };
 export type retryRunStepResponseError = (
+  | retryRunStepResponse400
   | retryRunStepResponse401
   | retryRunStepResponse404
   | retryRunStepResponse409
+  | retryRunStepResponse422
+  | retryRunStepResponse429
   | retryRunStepResponse503
 ) & {
   headers: Headers;
@@ -8487,6 +9174,11 @@ export type resetRunStepResponse200 = {
   status: 200;
 };
 
+export type resetRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type resetRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -8502,11 +9194,26 @@ export type resetRunStepResponse409 = {
   status: 409;
 };
 
+export type resetRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type resetRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type resetRunStepResponseSuccess = resetRunStepResponse200 & {
   headers: Headers;
 };
 export type resetRunStepResponseError = (
-  resetRunStepResponse401 | resetRunStepResponse404 | resetRunStepResponse409
+  | resetRunStepResponse400
+  | resetRunStepResponse401
+  | resetRunStepResponse404
+  | resetRunStepResponse409
+  | resetRunStepResponse422
+  | resetRunStepResponse429
 ) & {
   headers: Headers;
 };
@@ -8533,6 +9240,11 @@ export type executeRunStepResponse200 = {
   status: 200;
 };
 
+export type executeRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type executeRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -8548,6 +9260,16 @@ export type executeRunStepResponse409 = {
   status: 409;
 };
 
+export type executeRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type executeRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type executeRunStepResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -8557,9 +9279,12 @@ export type executeRunStepResponseSuccess = executeRunStepResponse200 & {
   headers: Headers;
 };
 export type executeRunStepResponseError = (
+  | executeRunStepResponse400
   | executeRunStepResponse401
   | executeRunStepResponse404
   | executeRunStepResponse409
+  | executeRunStepResponse422
+  | executeRunStepResponse429
   | executeRunStepResponse503
 ) & {
   headers: Headers;
@@ -8577,6 +9302,85 @@ export const executeRunStep = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<executeRunStepResponse> => {
   return customFetch<executeRunStepResponse>(getExecuteRunStepUrl(id, stepId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type regenerateChildResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type regenerateChildResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type regenerateChildResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type regenerateChildResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type regenerateChildResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type regenerateChildResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type regenerateChildResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateChildResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type regenerateChildResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type regenerateChildResponseSuccess = regenerateChildResponse200 & {
+  headers: Headers;
+};
+export type regenerateChildResponseError = (
+  | regenerateChildResponse400
+  | regenerateChildResponse401
+  | regenerateChildResponse402
+  | regenerateChildResponse404
+  | regenerateChildResponse409
+  | regenerateChildResponse422
+  | regenerateChildResponse429
+  | regenerateChildResponse503
+) & {
+  headers: Headers;
+};
+
+export type regenerateChildResponse = regenerateChildResponseSuccess | regenerateChildResponseError;
+
+export const getRegenerateChildUrl = (id: string, stepId: string, itemIndex: number) => {
+  return `/api/v1/runs/${id}/steps/${stepId}/children/${itemIndex}/regenerate`;
+};
+
+export const regenerateChild = async (
+  id: string,
+  stepId: string,
+  itemIndex: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<regenerateChildResponse> => {
+  return customFetch<regenerateChildResponse>(getRegenerateChildUrl(id, stepId, itemIndex), {
     ...options,
     method: 'POST',
   });
@@ -8617,6 +9421,11 @@ export type retryRunResponse422 = {
   status: 422;
 };
 
+export type retryRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type retryRunResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -8632,6 +9441,7 @@ export type retryRunResponseError = (
   | retryRunResponse404
   | retryRunResponse409
   | retryRunResponse422
+  | retryRunResponse429
   | retryRunResponse503
 ) & {
   headers: Headers;
@@ -8680,10 +9490,36 @@ export type cancelRunResponse200 = {
   status: 200;
 };
 
+export type cancelRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type cancelRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type cancelRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type cancelRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type cancelRunResponseSuccess = cancelRunResponse200 & {
   headers: Headers;
 };
-export type cancelRunResponse = cancelRunResponseSuccess;
+export type cancelRunResponseError = (
+  cancelRunResponse400 | cancelRunResponse409 | cancelRunResponse422 | cancelRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type cancelRunResponse = cancelRunResponseSuccess | cancelRunResponseError;
 
 export const getCancelRunUrl = (id: string) => {
   return `/api/v1/runs/${id}/cancel`;
@@ -8728,10 +9564,39 @@ export type saveRevisionResponse200 = {
   status: 200;
 };
 
+export type saveRevisionResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type saveRevisionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type saveRevisionResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type saveRevisionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type saveRevisionResponseSuccess = saveRevisionResponse200 & {
   headers: Headers;
 };
-export type saveRevisionResponse = saveRevisionResponseSuccess;
+export type saveRevisionResponseError = (
+  | saveRevisionResponse400
+  | saveRevisionResponse409
+  | saveRevisionResponse422
+  | saveRevisionResponse429
+) & {
+  headers: Headers;
+};
+
+export type saveRevisionResponse = saveRevisionResponseSuccess | saveRevisionResponseError;
 
 export const getSaveRevisionUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/revisions`;
@@ -8774,10 +9639,45 @@ export type rejectTaskResponse200 = {
   status: 200;
 };
 
+export type rejectTaskResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type rejectTaskResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type rejectTaskResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type rejectTaskResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type rejectTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type rejectTaskResponseSuccess = rejectTaskResponse200 & {
   headers: Headers;
 };
-export type rejectTaskResponse = rejectTaskResponseSuccess;
+export type rejectTaskResponseError = (
+  | rejectTaskResponse400
+  | rejectTaskResponse404
+  | rejectTaskResponse409
+  | rejectTaskResponse422
+  | rejectTaskResponse429
+) & {
+  headers: Headers;
+};
+
+export type rejectTaskResponse = rejectTaskResponseSuccess | rejectTaskResponseError;
 
 export const getRejectTaskUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/reject`;
@@ -8798,10 +9698,45 @@ export type approveTaskResponse200 = {
   status: 200;
 };
 
+export type approveTaskResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type approveTaskResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type approveTaskResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type approveTaskResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type approveTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type approveTaskResponseSuccess = approveTaskResponse200 & {
   headers: Headers;
 };
-export type approveTaskResponse = approveTaskResponseSuccess;
+export type approveTaskResponseError = (
+  | approveTaskResponse400
+  | approveTaskResponse404
+  | approveTaskResponse409
+  | approveTaskResponse422
+  | approveTaskResponse429
+) & {
+  headers: Headers;
+};
+
+export type approveTaskResponse = approveTaskResponseSuccess | approveTaskResponseError;
 
 export const getApproveTaskUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/approve`;
@@ -8836,6 +9771,87 @@ export const approveTask = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(approveReviewTaskRequest),
+  });
+};
+
+export type answerTaskResponse200 = {
+  data: ReviewTaskResponse;
+  status: 200;
+};
+
+export type answerTaskResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type answerTaskResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type answerTaskResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type answerTaskResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type answerTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type answerTaskResponseSuccess = answerTaskResponse200 & {
+  headers: Headers;
+};
+export type answerTaskResponseError = (
+  | answerTaskResponse400
+  | answerTaskResponse404
+  | answerTaskResponse409
+  | answerTaskResponse422
+  | answerTaskResponse429
+) & {
+  headers: Headers;
+};
+
+export type answerTaskResponse = answerTaskResponseSuccess | answerTaskResponseError;
+
+export const getAnswerTaskUrl = (taskId: string) => {
+  return `/api/v1/review-tasks/${taskId}/answers`;
+};
+
+export const answerTask = async (
+  taskId: string,
+  answerReviewTaskRequest: AnswerReviewTaskRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<answerTaskResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<answerTaskResponse>(getAnswerTaskUrl(taskId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(answerReviewTaskRequest),
   });
 };
 
@@ -8959,10 +9975,40 @@ export type startProductVideoRunResponse200 = {
   status: 200;
 };
 
+export type startProductVideoRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type startProductVideoRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type startProductVideoRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type startProductVideoRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
   headers: Headers;
 };
-export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+export type startProductVideoRunResponseError = (
+  | startProductVideoRunResponse400
+  | startProductVideoRunResponse409
+  | startProductVideoRunResponse422
+  | startProductVideoRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type startProductVideoRunResponse =
+  startProductVideoRunResponseSuccess | startProductVideoRunResponseError;
 
 export const getStartProductVideoRunUrl = () => {
   return `/api/v1/product-videos/runs`;
@@ -9346,6 +10392,324 @@ export const completeBuilderOnboarding = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(builderCompleteBody),
+  });
+};
+
+export type oauthTokenResponse200 = {
+  data: TokenResponse;
+  status: 200;
+};
+
+export type oauthTokenResponse400 = {
+  data: OAuthError;
+  status: 400;
+};
+
+export type oauthTokenResponse401 = {
+  data: OAuthError;
+  status: 401;
+};
+
+export type oauthTokenResponse429 = {
+  data: OAuthError;
+  status: 429;
+};
+
+export type oauthTokenResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type oauthTokenResponseSuccess = oauthTokenResponse200 & {
+  headers: Headers;
+};
+export type oauthTokenResponseError = (
+  oauthTokenResponse400 | oauthTokenResponse401 | oauthTokenResponse429 | oauthTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export type oauthTokenResponse = oauthTokenResponseSuccess | oauthTokenResponseError;
+
+export const getOauthTokenUrl = () => {
+  return `/api/v1/oauth/token`;
+};
+
+export const oauthToken = async (
+  tokenForm: TokenForm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oauthTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`grant_type`, tokenForm.grant_type);
+  formUrlEncoded.append(`code`, tokenForm.code);
+  formUrlEncoded.append(`code_verifier`, tokenForm.code_verifier);
+  formUrlEncoded.append(`redirect_uri`, tokenForm.redirect_uri);
+  if (tokenForm.client_id !== undefined) {
+    formUrlEncoded.append(`client_id`, tokenForm.client_id);
+  }
+  if (tokenForm.client_secret !== undefined) {
+    formUrlEncoded.append(`client_secret`, tokenForm.client_secret);
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<oauthTokenResponse>(getOauthTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export type revokeOAuthTokenResponse200 = {
+  data: RevokeOAuthToken200;
+  status: 200;
+};
+
+export type revokeOAuthTokenResponse400 = {
+  data: OAuthError;
+  status: 400;
+};
+
+export type revokeOAuthTokenResponse401 = {
+  data: OAuthError;
+  status: 401;
+};
+
+export type revokeOAuthTokenResponse429 = {
+  data: OAuthError;
+  status: 429;
+};
+
+export type revokeOAuthTokenResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type revokeOAuthTokenResponseSuccess = revokeOAuthTokenResponse200 & {
+  headers: Headers;
+};
+export type revokeOAuthTokenResponseError = (
+  | revokeOAuthTokenResponse400
+  | revokeOAuthTokenResponse401
+  | revokeOAuthTokenResponse429
+  | revokeOAuthTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export type revokeOAuthTokenResponse =
+  revokeOAuthTokenResponseSuccess | revokeOAuthTokenResponseError;
+
+export const getRevokeOAuthTokenUrl = () => {
+  return `/api/v1/oauth/revoke`;
+};
+
+export const revokeOAuthToken = async (
+  revokeForm: RevokeForm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revokeOAuthTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`token`, revokeForm.token);
+  if (revokeForm.token_type_hint !== undefined) {
+    formUrlEncoded.append(`token_type_hint`, revokeForm.token_type_hint);
+  }
+  if (revokeForm.client_id !== undefined) {
+    formUrlEncoded.append(`client_id`, revokeForm.client_id);
+  }
+  if (revokeForm.client_secret !== undefined) {
+    formUrlEncoded.append(`client_secret`, revokeForm.client_secret);
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<revokeOAuthTokenResponse>(getRevokeOAuthTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export type registerOAuthClientResponse201 = {
+  data: Registration;
+  status: 201;
+};
+
+export type registerOAuthClientResponse400 = {
+  data: OAuthError;
+  status: 400;
+};
+
+export type registerOAuthClientResponse429 = {
+  data: OAuthError;
+  status: 429;
+};
+
+export type registerOAuthClientResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type registerOAuthClientResponseSuccess = registerOAuthClientResponse201 & {
+  headers: Headers;
+};
+export type registerOAuthClientResponseError = (
+  registerOAuthClientResponse400 | registerOAuthClientResponse429 | registerOAuthClientResponse503
+) & {
+  headers: Headers;
+};
+
+export type registerOAuthClientResponse =
+  registerOAuthClientResponseSuccess | registerOAuthClientResponseError;
+
+export const getRegisterOAuthClientUrl = () => {
+  return `/api/v1/oauth/register`;
+};
+
+export const registerOAuthClient = async (
+  registrationRequest: RegistrationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<registerOAuthClientResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<registerOAuthClientResponse>(getRegisterOAuthClientUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registrationRequest),
+  });
+};
+
+export type grantOAuthAuthorizationResponse200 = {
+  data: GrantResponse;
+  status: 200;
+};
+
+export type grantOAuthAuthorizationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type grantOAuthAuthorizationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type grantOAuthAuthorizationResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type grantOAuthAuthorizationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type grantOAuthAuthorizationResponseSuccess = grantOAuthAuthorizationResponse200 & {
+  headers: Headers;
+};
+export type grantOAuthAuthorizationResponseError = (
+  | grantOAuthAuthorizationResponse400
+  | grantOAuthAuthorizationResponse403
+  | grantOAuthAuthorizationResponse409
+  | grantOAuthAuthorizationResponse503
+) & {
+  headers: Headers;
+};
+
+export type grantOAuthAuthorizationResponse =
+  grantOAuthAuthorizationResponseSuccess | grantOAuthAuthorizationResponseError;
+
+export const getGrantOAuthAuthorizationUrl = () => {
+  return `/api/v1/oauth/authorize`;
+};
+
+export const grantOAuthAuthorization = async (
+  grantRequest: GrantRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<grantOAuthAuthorizationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<grantOAuthAuthorizationResponse>(getGrantOAuthAuthorizationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(grantRequest),
   });
 };
 
@@ -12669,6 +14033,11 @@ export type deleteWorkflowResponse422 = {
   status: 422;
 };
 
+export type deleteWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowResponseSuccess = deleteWorkflowResponse204 & {
   headers: Headers;
 };
@@ -12677,6 +14046,7 @@ export type deleteWorkflowResponseError = (
   | deleteWorkflowResponse403
   | deleteWorkflowResponse404
   | deleteWorkflowResponse422
+  | deleteWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -12717,9 +14087,19 @@ export type updateWorkflowResponse404 = {
   status: 404;
 };
 
+export type updateWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type updateWorkflowResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type updateWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type updateWorkflowResponseSuccess = updateWorkflowResponse200 & {
@@ -12729,7 +14109,9 @@ export type updateWorkflowResponseError = (
   | updateWorkflowResponse400
   | updateWorkflowResponse403
   | updateWorkflowResponse404
+  | updateWorkflowResponse409
   | updateWorkflowResponse422
+  | updateWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -12802,6 +14184,11 @@ export type setWorkflowVisibilityResponse422 = {
   status: 422;
 };
 
+export type setWorkflowVisibilityResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowVisibilityResponseSuccess = setWorkflowVisibilityResponse200 & {
   headers: Headers;
 };
@@ -12811,6 +14198,7 @@ export type setWorkflowVisibilityResponseError = (
   | setWorkflowVisibilityResponse404
   | setWorkflowVisibilityResponse409
   | setWorkflowVisibilityResponse422
+  | setWorkflowVisibilityResponse429
 ) & {
   headers: Headers;
 };
@@ -12909,9 +14297,19 @@ export type renameWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type renameWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type renameWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type renameWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type renameWorkflowVersionResponseSuccess = renameWorkflowVersionResponse200 & {
@@ -12921,7 +14319,9 @@ export type renameWorkflowVersionResponseError = (
   | renameWorkflowVersionResponse400
   | renameWorkflowVersionResponse403
   | renameWorkflowVersionResponse404
+  | renameWorkflowVersionResponse409
   | renameWorkflowVersionResponse422
+  | renameWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -12996,6 +14396,11 @@ export type deleteWorkflowStepResponse422 = {
   status: 422;
 };
 
+export type deleteWorkflowStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowStepResponseSuccess = deleteWorkflowStepResponse204 & {
   headers: Headers;
 };
@@ -13005,6 +14410,7 @@ export type deleteWorkflowStepResponseError = (
   | deleteWorkflowStepResponse404
   | deleteWorkflowStepResponse409
   | deleteWorkflowStepResponse422
+  | deleteWorkflowStepResponse429
 ) & {
   headers: Headers;
 };
@@ -13057,6 +14463,11 @@ export type updateStepResponse422 = {
   status: 422;
 };
 
+export type updateStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type updateStepResponseSuccess = updateStepResponse200 & {
   headers: Headers;
 };
@@ -13066,6 +14477,7 @@ export type updateStepResponseError = (
   | updateStepResponse404
   | updateStepResponse409
   | updateStepResponse422
+  | updateStepResponse429
 ) & {
   headers: Headers;
 };
@@ -13114,6 +14526,11 @@ export type setPublishedWorkflowVersionResponse200 = {
   status: 200;
 };
 
+export type setPublishedWorkflowVersionResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type setPublishedWorkflowVersionResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -13124,18 +14541,31 @@ export type setPublishedWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type setPublishedWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type setPublishedWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type setPublishedWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type setPublishedWorkflowVersionResponseSuccess = setPublishedWorkflowVersionResponse200 & {
   headers: Headers;
 };
 export type setPublishedWorkflowVersionResponseError = (
+  | setPublishedWorkflowVersionResponse400
   | setPublishedWorkflowVersionResponse403
   | setPublishedWorkflowVersionResponse404
+  | setPublishedWorkflowVersionResponse409
   | setPublishedWorkflowVersionResponse422
+  | setPublishedWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -13208,10 +14638,19 @@ export type deleteRunResponse200 = {
   status: 200;
 };
 
+export type deleteRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteRunResponseSuccess = deleteRunResponse200 & {
   headers: Headers;
 };
-export type deleteRunResponse = deleteRunResponseSuccess;
+export type deleteRunResponseError = deleteRunResponse429 & {
+  headers: Headers;
+};
+
+export type deleteRunResponse = deleteRunResponseSuccess | deleteRunResponseError;
 
 export const getDeleteRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
@@ -13232,10 +14671,36 @@ export type updateRunResponse200 = {
   status: 200;
 };
 
+export type updateRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type updateRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type updateRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type updateRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type updateRunResponseSuccess = updateRunResponse200 & {
   headers: Headers;
 };
-export type updateRunResponse = updateRunResponseSuccess;
+export type updateRunResponseError = (
+  updateRunResponse400 | updateRunResponse409 | updateRunResponse422 | updateRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type updateRunResponse = updateRunResponseSuccess | updateRunResponseError;
 
 export const getUpdateRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
@@ -14362,6 +15827,11 @@ export type revokeAllWorkflowLinkGrantsResponse409 = {
   status: 409;
 };
 
+export type revokeAllWorkflowLinkGrantsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type revokeAllWorkflowLinkGrantsResponseSuccess = revokeAllWorkflowLinkGrantsResponse200 & {
   headers: Headers;
 };
@@ -14369,6 +15839,7 @@ export type revokeAllWorkflowLinkGrantsResponseError = (
   | revokeAllWorkflowLinkGrantsResponse403
   | revokeAllWorkflowLinkGrantsResponse404
   | revokeAllWorkflowLinkGrantsResponse409
+  | revokeAllWorkflowLinkGrantsResponse429
 ) & {
   headers: Headers;
 };
@@ -15582,6 +17053,66 @@ export const getOnboardingResult = async (
   });
 };
 
+export type checkOAuthAuthorizationResponse200 = {
+  data: CheckResponse;
+  status: 200;
+};
+
+export type checkOAuthAuthorizationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type checkOAuthAuthorizationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type checkOAuthAuthorizationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type checkOAuthAuthorizationResponseSuccess = checkOAuthAuthorizationResponse200 & {
+  headers: Headers;
+};
+export type checkOAuthAuthorizationResponseError = (
+  | checkOAuthAuthorizationResponse400
+  | checkOAuthAuthorizationResponse403
+  | checkOAuthAuthorizationResponse503
+) & {
+  headers: Headers;
+};
+
+export type checkOAuthAuthorizationResponse =
+  checkOAuthAuthorizationResponseSuccess | checkOAuthAuthorizationResponseError;
+
+export const getCheckOAuthAuthorizationUrl = (params?: CheckOAuthAuthorizationParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/oauth/authorize/request?${stringifiedParams}`
+    : `/api/v1/oauth/authorize/request`;
+};
+
+export const checkOAuthAuthorization = async (
+  params?: CheckOAuthAuthorizationParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<checkOAuthAuthorizationResponse> => {
+  return customFetch<checkOAuthAuthorizationResponse>(getCheckOAuthAuthorizationUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listNotificationsResponse200 = {
   data: NotificationPage;
   status: 200;
@@ -16216,6 +17747,155 @@ export const getBuilderRunsChart = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listBillingTransactionsResponse200 = {
+  data: TransactionListResponse;
+  status: 200;
+};
+
+export type listBillingTransactionsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listBillingTransactionsResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type listBillingTransactionsResponseSuccess = listBillingTransactionsResponse200 & {
+  headers: Headers;
+};
+export type listBillingTransactionsResponseError = (
+  listBillingTransactionsResponse400 | listBillingTransactionsResponse401
+) & {
+  headers: Headers;
+};
+
+export type listBillingTransactionsResponse =
+  listBillingTransactionsResponseSuccess | listBillingTransactionsResponseError;
+
+export const getListBillingTransactionsUrl = (params?: ListBillingTransactionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/billing/transactions?${stringifiedParams}`
+    : `/api/v1/billing/transactions`;
+};
+
+/**
+ * Newest first. page counts from 0; settled=true keeps payments where money reached us.
+ * @summary List the member's payments
+ */
+export const listBillingTransactions = async (
+  params?: ListBillingTransactionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBillingTransactionsResponse> => {
+  return customFetch<listBillingTransactionsResponse>(getListBillingTransactionsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBillingTransactionResponse200 = {
+  data: TransactionDetailResponse;
+  status: 200;
+};
+
+export type getBillingTransactionResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getBillingTransactionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBillingTransactionResponseSuccess = getBillingTransactionResponse200 & {
+  headers: Headers;
+};
+export type getBillingTransactionResponseError = (
+  getBillingTransactionResponse401 | getBillingTransactionResponse404
+) & {
+  headers: Headers;
+};
+
+export type getBillingTransactionResponse =
+  getBillingTransactionResponseSuccess | getBillingTransactionResponseError;
+
+export const getGetBillingTransactionUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}`;
+};
+
+/**
+ * @summary Read one of the member's payments
+ */
+export const getBillingTransaction = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBillingTransactionResponse> => {
+  return customFetch<getBillingTransactionResponse>(getGetBillingTransactionUrl(transactionId), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBillingTransactionByOrderResponse200 = {
+  data: TransactionDetailResponse;
+  status: 200;
+};
+
+export type getBillingTransactionByOrderResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getBillingTransactionByOrderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBillingTransactionByOrderResponseSuccess =
+  getBillingTransactionByOrderResponse200 & {
+    headers: Headers;
+  };
+export type getBillingTransactionByOrderResponseError = (
+  getBillingTransactionByOrderResponse401 | getBillingTransactionByOrderResponse404
+) & {
+  headers: Headers;
+};
+
+export type getBillingTransactionByOrderResponse =
+  getBillingTransactionByOrderResponseSuccess | getBillingTransactionByOrderResponseError;
+
+export const getGetBillingTransactionByOrderUrl = (orderRef: string) => {
+  return `/api/v1/billing/transactions/by-order/${orderRef}`;
+};
+
+/**
+ * @summary Read one of the member's payments by order reference
+ */
+export const getBillingTransactionByOrder = async (
+  orderRef: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBillingTransactionByOrderResponse> => {
+  return customFetch<getBillingTransactionByOrderResponse>(
+    getGetBillingTransactionByOrderUrl(orderRef),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type getAccountPreferencesResponse200 = {
@@ -17255,6 +18935,38 @@ export const listAdminAccounts = async (
   });
 };
 
+export type oauthMetadataResponse200 = {
+  data: Metadata;
+  status: 200;
+};
+
+export type oauthMetadataResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type oauthMetadataResponseSuccess = oauthMetadataResponse200 & {
+  headers: Headers;
+};
+export type oauthMetadataResponseError = oauthMetadataResponse503 & {
+  headers: Headers;
+};
+
+export type oauthMetadataResponse = oauthMetadataResponseSuccess | oauthMetadataResponseError;
+
+export const getOauthMetadataUrl = () => {
+  return `/.well-known/oauth-authorization-server`;
+};
+
+export const oauthMetadata = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oauthMetadataResponse> => {
+  return customFetch<oauthMetadataResponse>(getOauthMetadataUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type revokeWorkflowLinkGrantResponse200 = {
   data: RevokedResponse;
   status: 200;
@@ -17275,6 +18987,11 @@ export type revokeWorkflowLinkGrantResponse409 = {
   status: 409;
 };
 
+export type revokeWorkflowLinkGrantResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type revokeWorkflowLinkGrantResponseSuccess = revokeWorkflowLinkGrantResponse200 & {
   headers: Headers;
 };
@@ -17282,6 +18999,7 @@ export type revokeWorkflowLinkGrantResponseError = (
   | revokeWorkflowLinkGrantResponse403
   | revokeWorkflowLinkGrantResponse404
   | revokeWorkflowLinkGrantResponse409
+  | revokeWorkflowLinkGrantResponse429
 ) & {
   headers: Headers;
 };

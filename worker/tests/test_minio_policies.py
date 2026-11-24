@@ -18,7 +18,11 @@ SPEECH_ARTIFACTS = {
     "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
     "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json",
 }
-FIRST_PRODUCT_IMAGE = "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1"
+PRODUCT_IMAGES = {
+    "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1",
+    "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_2",
+    "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_3",
+}
 
 
 def _resources_for(action: str) -> set[str]:
@@ -37,11 +41,11 @@ def _status(response: dict[str, Any]) -> int:
     return int(response["ResponseMetadata"]["HTTPStatusCode"])
 
 
-def test_provider_reads_only_speech_artifacts_and_the_first_product_image() -> None:
+def test_provider_reads_only_speech_artifacts_and_the_first_three_product_images() -> None:
     readable = _resources_for("s3:GetObject")
 
     assert not [resource for resource in readable if resource.endswith("*")]
-    assert readable == SPEECH_ARTIFACTS | {FIRST_PRODUCT_IMAGE}
+    assert readable == SPEECH_ARTIFACTS | PRODUCT_IMAGES
 
 
 def test_provider_writes_only_under_its_step_attempts() -> None:
@@ -97,7 +101,7 @@ def test_a_presigned_url_opens_the_first_product_image_and_no_other_input(
     from flowcortex_worker.storage import client_from
 
     run = f"runs/{uuid.uuid4()}/inputs"
-    for name in ("image_1", "image_2"):
+    for name in ("image_1", "image_3", "image_4"):
         provider_silo.root.client().put_object(
             Bucket=MEDIA_BUCKET, Key=f"{run}/{name}", Body=name.encode()
         )
@@ -119,18 +123,19 @@ def test_a_presigned_url_opens_the_first_product_image_and_no_other_input(
         presign_client=client_from(settings, settings.s3_public_endpoint),
     )
 
-    url = storage.presigned_get_url(MEDIA_BUCKET, f"{run}/image_1")
-    with urllib.request.urlopen(url, timeout=10) as response:
-        assert response.read() == b"image_1"
+    for allowed in ("image_1", "image_3"):
+        url = storage.presigned_get_url(MEDIA_BUCKET, f"{run}/{allowed}")
+        with urllib.request.urlopen(url, timeout=10) as response:
+            assert response.read() == allowed.encode()
     with pytest.raises(urllib.error.HTTPError) as denied:
         urllib.request.urlopen(
-            storage.presigned_get_url(MEDIA_BUCKET, f"{run}/image_2"), timeout=10
+            storage.presigned_get_url(MEDIA_BUCKET, f"{run}/image_4"), timeout=10
         )
     assert denied.value.code == 403
 
 
 @pytest.mark.parametrize(
-    "name", ["inputs/x", "inputs/image_2", "inputs/image_10", "steps/4/attempts/1/video.mp4"]
+    "name", ["inputs/x", "inputs/image_4", "inputs/image_10", "steps/4/attempts/1/video.mp4"]
 )
 def test_store_answers_403_when_the_provider_reads_a_run_input_or_video(
     provider_silo: ProviderSilo, name: str

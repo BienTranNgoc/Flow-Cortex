@@ -152,7 +152,7 @@ class RuntimeFeatureSwitchesIT extends AbstractPostgresBootTest {
         List<AdminFeature> items = response.getBody().items();
         assertThat(items).extracting(AdminFeature::name).containsExactly("emailConfirmation", "phoneVerification",
                 "uploadContentCheck", "runCancellation", "credits", "passwordReset", "supportWidget",
-                "supportAssistant", "personalAccessTokens", "onboarding", "chat");
+                "supportAssistant", "personalAccessTokens", "onboarding", "chat", "drive");
         assertThat(items).filteredOn(item -> item.settingKey() != null)
                 .extracting(AdminFeature::name, AdminFeature::settingKey, AdminFeature::value)
                 .containsExactly(

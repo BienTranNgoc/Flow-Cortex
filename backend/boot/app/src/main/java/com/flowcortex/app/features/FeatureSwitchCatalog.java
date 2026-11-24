@@ -47,7 +47,8 @@ class FeatureSwitchCatalog implements SmartInitializingSingleton {
                 environmentOnly("personalAccessTokens", environment, "flowcortex.auth.personal-access-tokens.enabled",
                         false),
                 environmentOnly("onboarding", environment, "flowcortex.onboarding.enabled", false),
-                environmentOnly("chat", environment, "flowcortex.chat.enabled", false));
+                environmentOnly("chat", environment, "flowcortex.chat.enabled", false),
+                environmentOnly("drive", environment, "flowcortex.spaces.enabled", false));
     }
 
     @Override

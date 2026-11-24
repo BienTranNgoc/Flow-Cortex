@@ -13,6 +13,7 @@ const ALL_OFF: FeaturesResponse = {
   personalAccessTokens: false,
   onboarding: false,
   chat: false,
+  drive: false,
 };
 
 /**

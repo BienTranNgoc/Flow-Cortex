@@ -71,6 +71,8 @@ class VideoRequest:
     profile: str = "vertical_ad_clip_v1"
     reference_image_url: str | None = None
     reference_image_bytes: bytes | None = None
+    reference_images: tuple[bytes, ...] = ()
+    reference_image_urls: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -90,16 +92,38 @@ class VideoArtifact:
     mime: str = "video/mp4"
 
 
+@dataclass(frozen=True)
+class CancelResult:
+    confirmed: bool
+    status: str | None = None
+    reason: str | None = None
+
+
+class ScriptAbort(Protocol):
+    def check(self) -> None: ...
+
+
 class VideoAbort(Protocol):
     def check(self) -> None: ...
 
 
 class ScriptAdapter(Protocol):
     def generate_script(
-        self, payload: ProductAdPayload, reference_image: bytes | None = None
+        self,
+        payload: ProductAdPayload,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> str: ...
     def generate_storyboard(
-        self, request: StoryboardRequest, reference_image: bytes | None = None
+        self,
+        request: StoryboardRequest,
+        reference_image: bytes | None = None,
+        *,
+        reference_images: tuple[bytes, ...] = (),
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact: ...
 class SpeechAdapter(Protocol):
     def speech_identity(self) -> SpeechIdentity: ...
@@ -118,6 +142,8 @@ class VideoAdapter(Protocol):
     def vendor_scope(self) -> dict[str, str]:
         """Endpoint host and key hash that scope this adapter's job ids (see `vendor_scope`)."""
         ...
+
+    def cancel_video(self, task_id: str) -> CancelResult: ...
 
 
 class ProviderAdapter(ScriptAdapter, SpeechAdapter, VideoAdapter, Protocol):
@@ -139,14 +165,36 @@ class CapabilityProviderAdapter:
     video_adapter: VideoAdapter
 
     def generate_script(
-        self, payload: ProductAdPayload, reference_image: bytes | None = None
+        self,
+        payload: ProductAdPayload,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> str:
-        return self.script_adapter.generate_script(payload, reference_image)
+        return self.script_adapter.generate_script(
+            payload,
+            reference_image,
+            abort=abort,
+            deadline_monotonic=deadline_monotonic,
+        )
 
     def generate_storyboard(
-        self, request: StoryboardRequest, reference_image: bytes | None = None
+        self,
+        request: StoryboardRequest,
+        reference_image: bytes | None = None,
+        *,
+        reference_images: tuple[bytes, ...] = (),
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
-        return self.script_adapter.generate_storyboard(request, reference_image)
+        return self.script_adapter.generate_storyboard(
+            request,
+            reference_image,
+            reference_images=reference_images,
+            abort=abort,
+            deadline_monotonic=deadline_monotonic,
+        )
 
     def speech_identity(self) -> SpeechIdentity:
         return self.speech_adapter.speech_identity()
@@ -169,13 +217,23 @@ class CapabilityProviderAdapter:
     def vendor_scope(self) -> dict[str, str]:
         return self.video_adapter.vendor_scope()
 
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return self.video_adapter.cancel_video(task_id)
+
 
 class FixtureProviderAdapter:
     """Deterministic local adapter for development and contract tests."""
 
     def generate_script(
-        self, payload: ProductAdPayload, reference_image: bytes | None = None
+        self,
+        payload: ProductAdPayload,
+        reference_image: bytes | None = None,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> str:
+        if abort is not None:
+            abort.check()
         parts = [
             f"Khám phá {payload.productName}.",
             payload.description,
@@ -191,13 +249,21 @@ class FixtureProviderAdapter:
         return " ".join(parts)
 
     def generate_storyboard(
-        self, request: StoryboardRequest, reference_image: bytes | None = None
+        self,
+        request: StoryboardRequest,
+        reference_image: bytes | None = None,
+        *,
+        reference_images: tuple[bytes, ...] = (),
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
+        if abort is not None:
+            abort.check()
         return StoryboardArtifact(
-            "Vertical 9:16 opening product hero shot, dynamic push-in, premium studio lighting, "
-            "realistic movement, clean background, no text.",
-            "Vertical 9:16 product-in-use benefit shot followed by a clean closing beauty shot, "
-            "space for CTA overlay, realistic movement, no rendered text.",
+            "Vertical 9:16 opening product hero shot, smooth push-in, soft even studio lighting, "
+            "clean minimalist backdrop, realistic commercial photography.",
+            "Vertical 9:16 product-in-use benefit shot followed by a clean centered closing hero "
+            "frame, natural movement, realistic commercial lighting.",
         )
 
     def speech_identity(self) -> SpeechIdentity:
@@ -238,6 +304,9 @@ class FixtureProviderAdapter:
 
     def vendor_scope(self) -> dict[str, str]:
         return {"endpoint": "fixture", "account": "fixture"}
+
+    def cancel_video(self, task_id: str) -> CancelResult:
+        return CancelResult(confirmed=True, status="canceled")
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
         abort.check()

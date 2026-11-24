@@ -191,7 +191,7 @@ class RunResumptionIT {
                             i.input().bucket(), "runs/" + to + "/inputs/" + i.input().key())))
                     .toList();
         });
-        when(registry.isAvailable(anyString())).thenReturn(true);
+        when(registry.isAvailable(anyString(), any())).thenReturn(true);
         when(registry.isRemote(anyString())).thenAnswer(call -> REMOTE.equals(call.getArgument(0)));
         when(registry.snapshotsUpload(any(), anyInt())).thenAnswer(call -> {
             List<String> types = call.getArgument(0);
@@ -461,7 +461,7 @@ class RunResumptionIT {
         assertThat(snapshot(seed)).isEqualTo(afterReset);
 
         when(mediaJobs.isEnabled()).thenReturn(true);
-        when(registry.isAvailable(REMOTE)).thenReturn(false);
+        when(registry.isAvailable(eq(REMOTE), any())).thenReturn(false);
         assertThatThrownBy(() -> resumption.executeStep(seed.ownerId(), seed.runId(), stepId))
                 .isInstanceOf(DubDisabledException.class);
         assertThat(snapshot(seed)).isEqualTo(afterReset);
@@ -792,5 +792,116 @@ class RunResumptionIT {
                     assertThat(e.getErrors()).containsKey("fromStepOrder");
                 });
         assertThat(workflowRunRepository.count()).isEqualTo(runsBefore);
+    }
+
+    private static final String SIBLING_FAILED = "sibling_failed";
+    private static final int FIRST_CLIP = 4;
+    private static final int SECOND_CLIP = 5;
+
+    /** A Product Video run whose two parallel clips were both claimed, then failed with the given codes in order. */
+    private Seed failedClipPair(String firstClipCode, String secondClipCode) throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        workflowRunRepository.saveAndFlush(new WorkflowRun(runId, ProductVideoWorkflow.ID, ownerId, "in", NOW));
+        String[] types = {"generate_script", "APPROVAL_CHECKPOINT", "generate_storyboard", "generate_speech",
+                "generate_video", "generate_video", "render_video"};
+        List<UUID> stepIds = new ArrayList<>();
+        for (int index = 0; index < types.length; index++) {
+            UUID stepId = UUID.randomUUID();
+            stepIds.add(stepId);
+            String inputRef = index == FIRST_CLIP || index == SECOND_CLIP ? "{step:3}" : null;
+            runStepRepository.saveAndFlush(new RunStep(stepId, runId, (short) (index + 1), types[index], null, null,
+                    inputRef));
+        }
+        for (int index = 0; index < FIRST_CLIP; index++) {
+            claim(runId, stepIds.get(index), (short) 1, "resolved");
+            transactions.complete(runId, stepIds.get(index), (short) 1, "out-" + (index + 1),
+                    outputsOf(runId, index + 1), NOW);
+        }
+        claim(runId, stepIds.get(FIRST_CLIP), (short) 1, "resolved");
+        claim(runId, stepIds.get(SECOND_CLIP), (short) 1, "resolved");
+        transactions.fail(runId, stepIds.get(FIRST_CLIP), (short) 1, firstClipCode, "clip failed", NOW);
+        transactions.fail(runId, stepIds.get(SECOND_CLIP), (short) 1, secondClipCode, "clip failed", NOW);
+        return new Seed(ownerId, runId, stepIds);
+    }
+
+    private ReadyStepSelector.Decision decisionAfterResume(Seed seed) {
+        return ReadyStepSelector.select(true, ProductVideoWorkflow.ID, run(seed).getStatus(), stepsOf(seed.runId()));
+    }
+
+    @Test
+    void retryOfOneClipReArmsTheSiblingThatNeverFailedItselfAndBothDispatch() throws Exception {
+        Seed seed = failedClipPair("provider_request_failed", SIBLING_FAILED);
+        UUID failed = seed.stepIds().get(FIRST_CLIP);
+        UUID cancelled = seed.stepIds().get(SECOND_CLIP);
+        assertThat(decisionAfterResume(seed)).isInstanceOf(ReadyStepSelector.Decision.Halt.class);
+
+        resumption.retryStep(seed.ownerId(), seed.runId(), failed);
+
+        for (int clip : new int[] {FIRST_CLIP, SECOND_CLIP}) {
+            RunStep rearmed = step(seed, clip);
+            assertThat(rearmed.getStatus()).isEqualTo(RunStepStatus.PENDING);
+            assertThat(rearmed.getAttempt()).isEqualTo((short) 2);
+            assertThat(rearmed.getErrorCode()).isNull();
+        }
+        assertThat(run(seed).getStatus()).isEqualTo(RunStatus.RUNNING);
+        assertThat(decisionAfterResume(seed)).isInstanceOfSatisfying(ReadyStepSelector.Decision.Dispatch.class,
+                dispatch -> assertThat(dispatch.steps()).extracting(RunStep::getId)
+                        .containsExactly(failed, cancelled));
+        assertThat(recorder.resumed).extracting(WorkflowRunResumedEvent::runId).containsExactly(seed.runId());
+
+        claim(seed.runId(), failed, (short) 2, "resolved");
+        claim(seed.runId(), cancelled, (short) 2, "resolved");
+
+        verify(creditAccounts).refundStep(seed.runId(), cancelled, (short) 1, SIBLING_FAILED);
+        verify(creditAccounts).debitForStep(any(), eq(seed.runId()), eq(failed), eq((short) 1), anyString());
+        verify(creditAccounts).debitForStep(any(), eq(seed.runId()), eq(failed), eq((short) 2), anyString());
+        verify(creditAccounts).debitForStep(any(), eq(seed.runId()), eq(cancelled), eq((short) 1), anyString());
+        verify(creditAccounts).debitForStep(any(), eq(seed.runId()), eq(cancelled), eq((short) 2), anyString());
+    }
+
+    @Test
+    void resumingAClipIsRefusedWhileTheOtherOneFailedOnItsOwn() throws Exception {
+        Seed cancelledSecond = failedClipPair("provider_request_failed", SIBLING_FAILED);
+        Seed bothOwn = failedClipPair("provider_request_failed", "provider_timeout");
+
+        assertRefused(cancelledSecond, SECOND_CLIP, "retry", "workflow.runStep.siblingClipFailed");
+        assertRefused(bothOwn, FIRST_CLIP, "retry", "workflow.runStep.siblingClipFailed");
+        assertRefused(bothOwn, SECOND_CLIP, "retry", "workflow.runStep.siblingClipFailed");
+    }
+
+    @Test
+    void aClipThatFailedOnItsOwnIsResetBeforeTheOtherOneCanBeResumed() throws Exception {
+        Seed seed = failedClipPair("provider_request_failed", "provider_timeout");
+        UUID first = seed.stepIds().get(FIRST_CLIP);
+        UUID second = seed.stepIds().get(SECOND_CLIP);
+
+        resumption.resetStep(seed.ownerId(), seed.runId(), second);
+        assertThat(run(seed).getStatus()).isEqualTo(RunStatus.ERROR);
+        assertThat(step(seed, SECOND_CLIP).getStatus()).isEqualTo(RunStepStatus.PENDING);
+
+        resumption.retryStep(seed.ownerId(), seed.runId(), first);
+
+        assertThat(run(seed).getStatus()).isEqualTo(RunStatus.RUNNING);
+        assertThat(decisionAfterResume(seed)).isInstanceOfSatisfying(ReadyStepSelector.Decision.Dispatch.class,
+                dispatch -> assertThat(dispatch.steps()).extracting(RunStep::getId).containsExactly(first, second));
+    }
+
+    @Test
+    void resetOfOneClipAlsoPutsTheCancelledSiblingBackAndLeavesTheRunFailed() throws Exception {
+        Seed seed = failedClipPair("provider_request_failed", SIBLING_FAILED);
+
+        resumption.resetStep(seed.ownerId(), seed.runId(), seed.stepIds().get(FIRST_CLIP));
+
+        assertThat(step(seed, FIRST_CLIP).getStatus()).isEqualTo(RunStepStatus.PENDING);
+        assertThat(step(seed, SECOND_CLIP).getStatus()).isEqualTo(RunStepStatus.PENDING);
+        assertThat(step(seed, SECOND_CLIP).getAttempt()).isEqualTo((short) 2);
+        assertThat(run(seed).getStatus()).isEqualTo(RunStatus.ERROR);
+        assertThat(recorder.resumed).isEmpty();
+
+        resumption.executeStep(seed.ownerId(), seed.runId(), seed.stepIds().get(FIRST_CLIP));
+
+        assertThat(run(seed).getStatus()).isEqualTo(RunStatus.RUNNING);
+        assertThat(decisionAfterResume(seed)).isInstanceOf(ReadyStepSelector.Decision.Dispatch.class);
     }
 }

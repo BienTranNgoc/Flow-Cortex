@@ -41,7 +41,7 @@ public class FeaturesController {
         return new FeaturesResponse(byName.get("emailConfirmation"), byName.get("phoneVerification"),
                 byName.get("uploadContentCheck"), byName.get("runCancellation"), byName.get("credits"),
                 byName.get("passwordReset"), byName.get("supportWidget"), byName.get("supportAssistant"),
-                byName.get("personalAccessTokens"), byName.get("onboarding"), byName.get("chat"));
+                byName.get("personalAccessTokens"), byName.get("onboarding"), byName.get("chat"), byName.get("drive"));
     }
 
     public record FeaturesResponse(
@@ -55,6 +55,7 @@ public class FeaturesController {
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean supportAssistant,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean personalAccessTokens,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean onboarding,
-            @Schema(requiredMode = RequiredMode.REQUIRED) boolean chat) {
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean chat,
+            @Schema(requiredMode = RequiredMode.REQUIRED) boolean drive) {
     }
 }

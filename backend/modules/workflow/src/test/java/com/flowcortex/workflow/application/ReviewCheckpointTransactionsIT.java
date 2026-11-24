@@ -1,7 +1,9 @@
 package com.flowcortex.workflow.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
+import com.flowcortex.workflow.domain.ReviewTask;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
@@ -11,12 +13,14 @@ import com.flowcortex.workflow.infrastructure.ReviewTaskRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -24,6 +28,8 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
@@ -46,6 +52,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import(ReviewCheckpointTransactions.class)
+@RecordApplicationEvents
 @Testcontainers
 class ReviewCheckpointTransactionsIT {
 
@@ -60,6 +67,12 @@ class ReviewCheckpointTransactionsIT {
 
     @MockitoBean
     private RunUpdates runUpdates;
+
+    @MockitoBean
+    private ReviewSettings settings;
+
+    @Autowired
+    private ApplicationEvents events;
 
     @Autowired
     private ReviewCheckpointTransactions checkpoints;
@@ -79,14 +92,29 @@ class ReviewCheckpointTransactionsIT {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @BeforeEach
+    void givenTheDefaultSettings() {
+        when(settings.expireAfter()).thenReturn(Duration.ofDays(7));
+        when(settings.aiQuestionsEnabled()).thenReturn(false);
+    }
+
     /** A running run whose only step is a pending checkpoint, as the advancer reads it. */
     private RunStep pendingCheckpoint() {
+        return pendingStep("APPROVAL_CHECKPOINT");
+    }
+
+    private RunStep pendingStep(String type) {
         Workflow workflow = workflowRepository.saveAndFlush(
                 new Workflow(UUID.randomUUID(), UUID.randomUUID(), "it-" + UUID.randomUUID(), false));
         WorkflowRun run = workflowRunRepository.saveAndFlush(
                 new WorkflowRun(UUID.randomUUID(), workflow.getId(), UUID.randomUUID(), "in", NOW));
-        return runStepRepository.saveAndFlush(
-                new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "APPROVAL_CHECKPOINT"));
+        return runStepRepository.saveAndFlush(new RunStep(UUID.randomUUID(), run.getId(), (short) 1, type));
+    }
+
+    private ReviewTask pausedTask(RunStep step) {
+        WorkflowRun run = workflowRunRepository.findById(step.getRunId()).orElseThrow();
+        assertThat(checkpoints.pause(run, step, "draft", NOW)).isTrue();
+        return reviewTaskRepository.findByRunStepId(step.getId()).orElseThrow();
     }
 
     /** The statements a member's stop runs, in its order. */
@@ -103,6 +131,42 @@ class ReviewCheckpointTransactionsIT {
         assertThat(runStepRepository.findById(step.getId()).orElseThrow().getStatus())
                 .isEqualTo(RunStepStatus.SKIPPED);
         assertThat(reviewTaskRepository.findByRunStepId(step.getId())).isEmpty();
+    }
+
+    @Test
+    void pauseSetsExpiresAtFromTheWindow() {
+        when(settings.expireAfter()).thenReturn(Duration.ofHours(36));
+
+        ReviewTask task = pausedTask(pendingCheckpoint());
+
+        assertThat(task.getReviewType()).isEqualTo("APPROVAL_CHECKPOINT");
+        assertThat(task.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofHours(36)));
+        assertThat(task.getQuestionsState()).isNull();
+        assertThat(events.stream(QaReviewOpenedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void aQaPauseWithModelQuestionsOffIsReadyWithTheStandardMarker() {
+        ReviewTask task = pausedTask(pendingStep("qa.review"));
+
+        assertThat(task.getReviewType()).isEqualTo("QA_REVIEW");
+        assertThat(task.getQuestionsState()).isEqualTo(ReviewTask.QUESTIONS_READY);
+        assertThat(QaQuestions.isStandard(task.getQuestions())).isTrue();
+        assertThat(task.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(7)));
+        assertThat(events.stream(QaReviewOpenedEvent.class)).isEmpty();
+    }
+
+    @Test
+    void aQaPauseWithModelQuestionsOnIsGeneratingAndPublishesTheEvent() {
+        when(settings.aiQuestionsEnabled()).thenReturn(true);
+
+        ReviewTask task = pausedTask(pendingStep("qa.review"));
+
+        assertThat(task.getReviewType()).isEqualTo("QA_REVIEW");
+        assertThat(task.getQuestionsState()).isEqualTo(ReviewTask.QUESTIONS_GENERATING);
+        assertThat(task.getQuestions()).isNull();
+        assertThat(events.stream(QaReviewOpenedEvent.class))
+                .containsExactly(new QaReviewOpenedEvent(task.getId()));
     }
 
     @Test

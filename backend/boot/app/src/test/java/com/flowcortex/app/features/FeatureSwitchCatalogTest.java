@@ -108,7 +108,8 @@ class FeatureSwitchCatalogTest {
                 Arguments.of("credits", "flowcortex.credits.enabled", true),
                 Arguments.of("personalAccessTokens", "flowcortex.auth.personal-access-tokens.enabled", true),
                 Arguments.of("onboarding", "flowcortex.onboarding.enabled", true),
-                Arguments.of("chat", "flowcortex.chat.enabled", true));
+                Arguments.of("chat", "flowcortex.chat.enabled", true),
+                Arguments.of("drive", "flowcortex.spaces.enabled", true));
     }
 
     @ParameterizedTest

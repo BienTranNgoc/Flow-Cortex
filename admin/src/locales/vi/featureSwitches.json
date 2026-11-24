@@ -36,6 +36,10 @@
     "chat": {
       "label": "Trò chuyện",
       "help": "Thành viên có thể dùng trang Trò chuyện."
+    },
+    "drive": {
+      "label": "Ổ đĩa",
+      "help": "Thành viên có thể dùng trang Ổ đĩa và không gian cá nhân."
     }
   }
 }

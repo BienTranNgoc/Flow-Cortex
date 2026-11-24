@@ -36,6 +36,10 @@
     "chat": {
       "label": "Chat",
       "help": "Members can use the Chat page."
+    },
+    "drive": {
+      "label": "Drive",
+      "help": "Members can use the Drive page and their personal space."
     }
   }
 }

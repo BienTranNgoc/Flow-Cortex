@@ -122,8 +122,8 @@ class WorkflowCallStepExecutor implements StepExecutor {
                 ancestors, parentDepth, found.isPresent(), ProductVideoWorkflow.ID, types,
                 !types.isEmpty() && executors.snapshotsRunInputs(types.getFirst()),
                 types.stream().anyMatch(executors::isRemote),
-                types.stream().anyMatch(type -> !executors.isAvailable(type)), workflowsEnabled,
-                mediaJobs.isEnabled())));
+                steps.stream().anyMatch(step -> !executors.isAvailable(step.getType(), step.getConfig())),
+                workflowsEnabled, mediaJobs.isEnabled())));
 
         Workflow workflow = found.orElseThrow();
         checkGuards(ownerId, workflow, steps);

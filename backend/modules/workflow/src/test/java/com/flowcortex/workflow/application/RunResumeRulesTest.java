@@ -79,9 +79,23 @@ class RunResumeRulesTest {
 
     @Test
     void aCheckpointStepIsNotRetryable() {
-        StepState checkpoint = failed(1, KnownStepTypes.APPROVAL_CHECKPOINT, "SOMETHING_ELSE", (short) 1);
+        StepState checkpoint = failed(1, HumanSteps.APPROVAL_CHECKPOINT, "SOMETHING_ELSE", (short) 1);
 
         assertRefused(RunResumeRules.forRetry(RunStatus.ERROR, List.of(checkpoint), checkpoint.id()), Kind.STEP_NOT_RETRYABLE);
+    }
+
+    @Test
+    void aFailedQaReviewStepIsNotRetryable() {
+        StepState review = failed(1, HumanSteps.QA_REVIEW, "SOMETHING_ELSE", (short) 1);
+
+        assertRefused(RunResumeRules.forRetry(RunStatus.ERROR, List.of(review), review.id()), Kind.STEP_NOT_RETRYABLE);
+    }
+
+    @Test
+    void aStepThatFailedReviewExpiredIsNotRetryable() {
+        StepState expired = failed(1, "echo", "REVIEW_EXPIRED", (short) 1);
+
+        assertRefused(RunResumeRules.forRetry(RunStatus.ERROR, List.of(expired), expired.id()), Kind.STEP_NOT_RETRYABLE);
     }
 
     @Test
