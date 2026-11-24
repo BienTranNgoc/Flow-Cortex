@@ -240,6 +240,30 @@ describe('RunHistoryPage', () => {
       }
     });
 
+    it('refreshes the summary of a run that finished after the summary was taken', async () => {
+      const running = { ...COMPLETED, status: 'running', finishedAt: null, durationSeconds: null };
+      let finished = false;
+      const requested: string[][] = [];
+      stubHistory([COMPLETED], {
+        'GET /api/v1/runs': () => page([finished ? COMPLETED : running]),
+        [RESULTS]: () => {
+          const url = String(vi.mocked(fetch).mock.calls.at(-1)?.[0]);
+          requested.push(new URLSearchParams(url.split('?')[1]).getAll('runId'));
+          return finished ? summary({ count: 2, registration: 'done' }) : summary({});
+        },
+      });
+      const { queryClient, container } = renderPage();
+      await screen.findByRole('link', { name: 'Open run Launch cut' });
+      await waitFor(() => expect(requested).toHaveLength(1));
+      expect(container.querySelector('.run-result')).toBeNull();
+
+      finished = true;
+      await act(() => queryClient.invalidateQueries({ queryKey: ['run-history'] }));
+
+      expect(await screen.findByText('2 files')).toBeInTheDocument();
+      expect(requested).toEqual([['a1'], ['a1']]);
+    });
+
     it('leaves every row as it was when the summary request fails', async () => {
       stubHistory([COMPLETED], { [RESULTS]: { status: 503, body: { status: 503 } } });
       const { queryClient, container } = renderPage();

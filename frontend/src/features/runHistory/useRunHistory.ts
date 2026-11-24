@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   authHeaders,
   deleteRun,
@@ -24,9 +24,11 @@ import {
   overrideResults,
   pendingRunIds,
   resultsRefetchInterval,
+  settledRunIds,
   toListParams,
   trayRefetchInterval,
   type RunHistoryFilters,
+  type RunStatus,
 } from './runHistoryRules';
 
 export const RUN_HISTORY_PAGE_SIZE = 20;
@@ -121,6 +123,49 @@ export function usePendingRunResults(
     staleTime: RESULTS_POLL_INTERVAL_MS,
     refetchInterval: (query) =>
       resultsRefetchInterval(query.state.data, query.state.dataUpdateCount),
+  });
+}
+
+/**
+ * Asks again about each run of `items` that finished since the previous list answer, and writes the answer into
+ * `runIds`' cache for those runs alone. The long `staleTime` of {@link useRunResultsQuery} would otherwise keep
+ * the summary taken while the run was still running (no files, no registration yet).
+ */
+export function useRefreshSettledRuns(
+  items: readonly { id: string; status: RunStatus }[] | undefined,
+  runIds: readonly string[],
+): void {
+  const queryClient = useQueryClient();
+  const previous = useRef<ReadonlyMap<string, RunStatus>>(new Map());
+  const [settledIds, setSettledIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (!items) return;
+    const settled = settledRunIds(previous.current, items);
+    previous.current = new Map(items.map((run) => [run.id, run.status]));
+    if (settled.length > 0) setSettledIds(settled);
+  }, [items]);
+  useQuery({
+    queryKey: ['run-results', 'settled', settledIds],
+    queryFn: async () => {
+      const key = runResultsKey(runIds);
+      // Nothing to merge into, or a request in flight that may predate the run finishing: ask for every run again.
+      if (
+        queryClient.getQueryData(key) === undefined ||
+        queryClient.getQueryState(key)?.fetchStatus === 'fetching'
+      ) {
+        await queryClient.invalidateQueries({ queryKey: key });
+        return [];
+      }
+      const fresh = await fetchRunResults(settledIds);
+      queryClient.setQueryData<RunResultResponse[]>(
+        key,
+        (current) => current && overrideResults(current, fresh),
+      );
+      return fresh;
+    },
+    enabled: settledIds.length > 0,
+    retry: 1,
+    staleTime: Infinity,
   });
 }
 

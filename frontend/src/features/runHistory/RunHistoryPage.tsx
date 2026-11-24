@@ -27,6 +27,7 @@ import {
   useDeleteRunMutation,
   useRunHistoryQuery,
   usePendingRunResults,
+  useRefreshSettledRuns,
   useRunResultsQuery,
   useRunWorkflowsQuery,
   useUpdateRunMutation,
@@ -195,6 +196,7 @@ export function RunHistoryPage() {
   const runIds = useMemo(() => page?.items.map((run) => run.id) ?? [], [page]);
   const resultsQuery = useRunResultsQuery(runIds);
   usePendingRunResults(runIds, resultsQuery);
+  useRefreshSettledRuns(page?.items, runIds);
   const resultsByRun = useMemo(
     () => new Map(resultsQuery.data?.map((result) => [result.runId, result])),
     [resultsQuery.data],

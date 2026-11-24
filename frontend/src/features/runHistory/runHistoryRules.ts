@@ -136,6 +136,22 @@ export function pendingRunIds(results: readonly RunResultResponse[] | undefined)
   return results?.filter((result) => result.registration === 'pending').map((result) => result.runId) ?? [];
 }
 
+/**
+ * The runs of `items` that were unfinished in `previous` and are finished now: their result summary was
+ * answered before any output registered, so it is stale however recently it was fetched.
+ */
+export function settledRunIds(
+  previous: ReadonlyMap<string, RunStatus>,
+  items: readonly { id: string; status: RunStatus }[],
+): string[] {
+  return items
+    .filter((run) => {
+      const before = previous.get(run.id);
+      return before !== undefined && !FINISHED.has(before) && FINISHED.has(run.status);
+    })
+    .map((run) => run.id);
+}
+
 /** `current` with each run's entry replaced by its fresher one in `fresh`; runs absent from `current` are not added. */
 export function overrideResults(
   current: readonly RunResultResponse[],

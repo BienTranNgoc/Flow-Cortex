@@ -7,6 +7,7 @@ import {
   resultSummaryView,
   resultsRefetchInterval,
   serialize,
+  settledRunIds,
   toListParams,
   trayRefetchInterval,
 } from './runHistoryRules';
@@ -154,6 +155,32 @@ describe('pendingRunIds and overrideResults', () => {
 
     expect(merged).toEqual([settled, fresh]);
     expect(merged[0]).toBe(settled);
+  });
+});
+
+describe('settledRunIds', () => {
+  const before = new Map<string, 'running' | 'waiting_approval' | 'completed'>([
+    ['live', 'running'],
+    ['gate', 'waiting_approval'],
+    ['done', 'completed'],
+  ]);
+
+  it('lists the runs that went from unfinished to finished', () => {
+    const now = [
+      { id: 'live', status: 'completed' as const },
+      { id: 'gate', status: 'error' as const },
+      { id: 'done', status: 'completed' as const },
+    ];
+    expect(settledRunIds(before, now)).toEqual(['live', 'gate']);
+  });
+
+  it('ignores runs still unfinished and runs not seen before', () => {
+    const now = [
+      { id: 'live', status: 'waiting_approval' as const },
+      { id: 'new', status: 'completed' as const },
+    ];
+    expect(settledRunIds(before, now)).toEqual([]);
+    expect(settledRunIds(new Map(), now)).toEqual([]);
   });
 });
 
