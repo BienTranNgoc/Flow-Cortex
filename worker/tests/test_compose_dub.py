@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 from conftest import job_body
 
-from flowcortex_worker.assembly.compose import audio_graph
+from flowcortex_worker.assembly.compose import EVEN_CROP, audio_graph
 from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError, TransientError
 from flowcortex_worker.handlers import compose_dub
@@ -346,6 +346,21 @@ def test_the_encode_flags_are_h264_ultrafast_aac_and_faststart(
     ) in flags
 
 
+def test_the_picture_is_cropped_to_even_sides_before_any_padding(
+    tmp_path: Path, build: Build
+) -> None:
+    inputs = staged(tmp_path, "media", "voice", "background")
+    padded = build(media_for(inputs, media=Media(seconds=5.0), voice=Media(9.0, video=False)))
+    compose_dub.handle(job_with(), {k: inputs[k] for k in ("media", "voice")}, padded)
+    mixed = build(media_for(inputs))
+    compose_dub.handle(job_with(), inputs, mixed)
+
+    (voice_only,) = padded.encodes()
+    (with_background,) = mixed.encodes()
+    assert f"[0:v]{EVEN_CROP},tpad=" in graph_of(voice_only)
+    assert graph_of(with_background).startswith(f"[0:v]{EVEN_CROP}[v];")
+
+
 def test_a_voice_longer_than_the_clip_extends_the_picture_and_the_output(
     tmp_path: Path, build: Build
 ) -> None:
@@ -417,7 +432,7 @@ def test_a_background_is_mixed_at_the_gains_the_loudness_targets_give(
 
     (argv,) = runner.encodes()
     expected = audio_graph(
-        "null", "file", False, {"voice": 6.8, "background": -10.6, "effects": 0.0}, 10.0
+        EVEN_CROP, "file", False, {"voice": 6.8, "background": -10.6, "effects": 0.0}, 10.0
     )
     assert expected is not None
     assert graph_of(argv) == expected.graph
@@ -638,6 +653,25 @@ def test_a_short_voice_does_not_cut_the_background(tmp_path: Path) -> None:
 
     assert length == pytest.approx(3.0, abs=0.1)
     assert sorted(codecs) == ["aac", "h264"]
+
+
+@needs_ffmpeg
+def test_a_picture_with_odd_sides_is_cropped_to_even_ones(tmp_path: Path) -> None:
+    picture = lavfi(
+        tmp_path / "media.mp4",
+        "testsrc=duration=2:size=641x361:rate=25",
+        extra=("-pix_fmt", "yuv444p"),
+    )
+    for name, extras in (("voice only", {}), ("with background", {"background": True})):
+        inputs = {"media": picture, "voice": tone(tmp_path / "voice.wav", 1.0)}
+        if extras:
+            inputs["background"] = tone(tmp_path / "background.wav", 2.0, 220)
+        output, runner = composed(inputs, durationPolicy="match_video")
+        try:
+            size = ffprobe(output, "-select_streams", "v:0", "-show_entries", "stream=width,height")
+        finally:
+            runner.close()
+        assert size == "640,360", name
 
 
 @needs_ffmpeg

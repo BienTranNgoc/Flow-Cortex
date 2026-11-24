@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from ..assembly.compose import BackgroundSource, audio_graph
+from ..assembly.compose import EVEN_CROP, BackgroundSource, audio_graph
 from ..assembly.duration import plan, resolve_policy
 from ..assembly.inputs import is_run_bound
 from ..assembly.loudness import effects_gain, gains, unusable_reason
@@ -180,7 +180,7 @@ def _encode_argv(
     length: float,
     target: Path,
 ) -> list[str]:
-    video_chain = tpad or "null"
+    video_chain = ",".join(filter(None, [EVEN_CROP, tpad]))
     graph = audio_graph(
         video_chain,
         music,

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 BG_DUCK = "threshold=0.05:ratio=4:attack=20:release=400"
+# libx264 with yuv420p refuses an odd width or height; cropping loses at most one edge pixel.
+EVEN_CROP = "crop=trunc(iw/2)*2:trunc(ih/2)*2"
 
 Role = Literal["video", "background", "voice", "effects"]
 BackgroundSource = Literal["file", "video"]
