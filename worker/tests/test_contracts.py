@@ -475,6 +475,34 @@ def test_provider_timeout_error_code_validates() -> None:
     )
 
 
+def test_sibling_failed_and_control_contracts_validate() -> None:
+    from flowcortex_worker.contracts.media_control_request import MediaControlRequest
+    from flowcortex_worker.contracts.media_control_response import MediaControlResponse
+
+    MediaResult.model_validate(
+        result()
+        | {
+            "status": "error",
+            "outputs": [],
+            "error": {"code": "sibling_failed", "message": "sibling failed", "retryable": False},
+        }
+    )
+
+    req = {"schemaVersion": "1", "runId": RUN_ID, "jobId": JOB_ID, "attempt": 1}
+    MediaControlRequest.model_validate(req)
+    with pytest.raises(ValidationError):
+        MediaControlRequest.model_validate(req | {"attempt": 0})
+    with pytest.raises(ValidationError):
+        MediaControlRequest.model_validate(req | {"extra": True})
+
+    for decision in ("continue", "cancel_sibling_failed", "discard_stale"):
+        MediaControlResponse.model_validate(req | {"decision": decision})
+    with pytest.raises(ValidationError):
+        MediaControlResponse.model_validate(req | {"decision": "unknown"})
+    with pytest.raises(ValidationError):
+        MediaControlResponse.model_validate(req | {"decision": "continue", "extra": 1})
+
+
 def test_transient_budget_matches_the_broker_delivery_limit() -> None:
     from flowcortex_worker.provider import __main__ as provider_main
 

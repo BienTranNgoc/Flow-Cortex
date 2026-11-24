@@ -13,10 +13,10 @@ import java.util.UUID;
 public record ProviderVideoData(
         @NotBlank @Pattern(regexp = "vertical_ad_clip_v1") String profile,
         @NotNull Integer durationSeconds,
-        @NotBlank @Pattern(regexp = "seedance|veo|wan|fixture") String provider,
+        @NotBlank @Pattern(regexp = "seedance|veo|wan|minimax|fixture") String provider,
         @NotBlank @Size(max = 200) String model,
         @NotBlank @Pattern(regexp = "9:16") String aspectRatio,
-        @NotBlank @Pattern(regexp = "480p|720p") String resolution,
+        @NotBlank @Pattern(regexp = "480p|720p|768p") String resolution,
         @NotNull UUID sourceRevisionId,
         @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String idempotencyKey,
         @NotBlank @Size(max = 200) String providerTaskId,

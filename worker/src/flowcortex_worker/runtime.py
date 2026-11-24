@@ -36,16 +36,25 @@ class ProcessRunner:
     """A job's kill switch: its subprocesses and transfers stop when the watchdog, a cancel
     or a shutdown kills it."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, deadline_monotonic: float | None = None) -> None:
         self._lock = threading.Lock()
         self._process: subprocess.Popen[bytes] | None = None
         self._killed: str | None = None
         self._on_kill: list[Callable[[], None]] = []
+        self._deadline_monotonic: float | None = deadline_monotonic
         self._scratch: Path | None = None
 
     @property
     def killed(self) -> str | None:
         return self._killed
+
+    @property
+    def deadline_monotonic(self) -> float | None:
+        return self._deadline_monotonic
+
+    def set_deadline_monotonic(self, deadline_monotonic: float) -> None:
+        with self._lock:
+            self._deadline_monotonic = deadline_monotonic
 
     def check(self) -> None:
         if self._killed is not None:

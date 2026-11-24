@@ -64,6 +64,9 @@ class MediaTopologyConfig {
     static final String PROVIDER_JOBS = "provider.jobs";
     static final String PROVIDER_RESULTS = "provider.results";
     static final String PROVIDER_PROGRESS = "provider.progress";
+    static final String PROVIDER_CONTROL = "provider.control";
+    static final String CONTROL_KEY = "control";
+    static final String CONTROL_REPLY_PREFIX = "provider.control.reply.";
     /**
      * Video clips run for minutes, so they get their own queue and worker pool: a clip in progress
      * must not hold a script, storyboard or speech job past its pickup deadline.
@@ -145,6 +148,9 @@ class MediaTopologyConfig {
         Queue providerVideoJobsDlq = QueueBuilder.durable(PROVIDER_VIDEO_JOBS + ".dlq").quorum().build();
         Queue providerResultsDlq = QueueBuilder.durable(PROVIDER_RESULTS + ".dlq").quorum().build();
         Queue providerProgressDlq = QueueBuilder.durable(PROVIDER_PROGRESS + ".dlq").quorum().build();
+        Queue providerControl = QueueBuilder.durable(PROVIDER_CONTROL).quorum()
+                .deadLetterExchange(PROVIDER_DEAD_LETTER_EXCHANGE).build();
+        Queue providerControlDlq = QueueBuilder.durable(PROVIDER_CONTROL + ".dlq").quorum().build();
         return new Declarables(media, unrouted, deadLetters,
                 unroutedQueue, jobs, results, progress, jobsDlq, resultsDlq, progressDlq,
                 BindingBuilder.bind(unroutedQueue).to(unrouted),
@@ -159,6 +165,9 @@ class MediaTopologyConfig {
                 bind(providerJobsDlq, providerDeadLetters, JOB_KEY),
                 bind(providerResultsDlq, providerDeadLetters, RESULT_KEY),
                 bind(providerProgressDlq, providerDeadLetters, PROGRESS_KEY),
+                providerControl, providerControlDlq,
+                bind(providerControl, provider, CONTROL_KEY),
+                bind(providerControlDlq, providerDeadLetters, CONTROL_KEY),
                 providerVideoJobs, providerVideoJobsDlq,
                 bind(providerVideoJobs, provider, VIDEO_JOB_KEY),
                 bind(providerVideoJobsDlq, providerDeadLetters, VIDEO_JOB_KEY),

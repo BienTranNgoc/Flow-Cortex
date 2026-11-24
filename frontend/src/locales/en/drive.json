@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Drive"
+  },
+  "tabs": {
+    "label": "Drive sections",
+    "items": "Items",
+    "memory": "Memory"
+  },
+  "gate": {
+    "loading": "Loading Drive…"
+  },
+  "roles": {
+    "brand_voice_text": "Brand voice",
+    "company_bio": "Company bio",
+    "audience_note": "Audience note",
+    "logo": "Logo",
+    "product_photo": "Product photo",
+    "reference_face": "Reference face",
+    "persona_image": "Persona image",
+    "image_asset": "Image",
+    "driver_video": "Driver video",
+    "video_asset": "Video",
+    "audio_asset": "Audio"
+  },
+  "sources": {
+    "text": "Written here",
+    "upload": "Uploaded",
+    "run_output": "From a run"
+  },
+  "notice": {
+    "title": "Your earlier results are now in Drive",
+    "body": "We moved {{runs}} and {{results}} from your earlier work into your Drive.",
+    "bodyNoCounts": "Your earlier work has been moved into your Drive.",
+    "runs_one": "{{n}} run",
+    "runs_other": "{{n}} runs",
+    "results_one": "{{n}} result",
+    "results_other": "{{n}} results",
+    "dismiss": "Got it"
+  },
+  "confirm": {
+    "cancel": "Cancel"
+  },
+  "preview": {
+    "close": "Close preview",
+    "empty": "There is nothing to show for this item."
+  },
+  "media": {
+    "unavailable": "This file is not available right now."
+  },
+  "pagination": {
+    "label": "Pages",
+    "previous": "Previous page",
+    "next": "Next page",
+    "page": "Page {{page}}",
+    "sizeLabel": "Per page"
+  },
+  "status": {
+    "loading": "Loading…",
+    "failed": "Something went wrong. Try again.",
+    "retry": "Retry"
+  }
+}

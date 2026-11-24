@@ -40,7 +40,7 @@ function metaLine(step: RunStepResponse, t: TFunction): string {
   return first ? `${first.label}: ${first.value}` : '';
 }
 
-interface NodeProps {
+export interface PipelineNodeProps {
   step: PipelineStep;
   order: number;
   state: StepState | undefined;
@@ -48,18 +48,38 @@ interface NodeProps {
   panelId: string | undefined;
   onSelect: ((id: string) => void) | undefined;
   problem: boolean;
+  /** Time since a worker picked the step up, shown where a finished duration would be. */
+  elapsed?: string | undefined;
+  /** Id of the element holding the name; the default is unique per step on a page. */
+  nameId?: string | undefined;
+  buttonRef?: ((button: HTMLButtonElement | null) => void) | undefined;
 }
 
-function Node({ step, order, state, selected, panelId, onSelect, problem }: Readonly<NodeProps>) {
+export function PipelineNode({
+  step,
+  order,
+  state,
+  selected,
+  panelId,
+  onSelect,
+  problem,
+  elapsed,
+  nameId,
+  buttonRef,
+}: Readonly<PipelineNodeProps>) {
   const { t } = useTranslation();
-  const duration = step.run ? stepDuration(step.run, t, activeLocale()) : null;
+  const finished = step.run ? stepDuration(step.run, t, activeLocale()) : null;
+  const duration = finished ?? elapsed ?? null;
+  const durationTitle = finished
+    ? t('workflow.step.timing.timeTaken')
+    : t('workflow.canvas.elapsed', { time: elapsed });
   const content = (
     <>
       <span className="pipeline-order">{order}</span>
       <span className="pipeline-type">
         <TypeGlyph type={step.run?.type} />
       </span>
-      <span className="pipeline-name" id={stepNameId(step.id)}>
+      <span className="pipeline-name" id={nameId ?? stepNameId(step.id)}>
         {step.name}
       </span>
       {state && (
@@ -75,7 +95,7 @@ function Node({ step, order, state, selected, panelId, onSelect, problem }: Read
         </span>
       )}
       {duration && (
-        <span className="pipeline-duration" title={t('workflow.step.timing.timeTaken')}>
+        <span className="pipeline-duration" title={durationTitle}>
           <svg
             className="pipeline-clock-icon"
             width="12"
@@ -112,6 +132,7 @@ function Node({ step, order, state, selected, panelId, onSelect, problem }: Read
   }
   return (
     <button
+      ref={buttonRef}
       type="button"
       className="pipeline-node"
       data-state={state}
@@ -161,7 +182,7 @@ export function Pipeline({
           const next = steps[index + 1];
           return (
             <li key={step.id} className="pipeline-item">
-              <Node
+              <PipelineNode
                 step={step}
                 order={index + 1}
                 state={step.run && stepState(step.run, runSteps, runStatus)}

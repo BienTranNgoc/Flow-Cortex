@@ -8,7 +8,7 @@ import org.springframework.http.HttpMethod;
  * pattern Spring resolved. Everything not listed is refused, so a route outside the listed prefixes
  * needs a row here before a token can reach it.
  */
-final class PatRoutePolicy {
+public final class PatRoutePolicy {
 
     private static final List<String> ANY_METHOD_PREFIXES = List.of(
             "/api/v1/workflows",
@@ -23,7 +23,7 @@ final class PatRoutePolicy {
     private PatRoutePolicy() {
     }
 
-    static boolean allows(HttpMethod method, String pattern) {
+    public static boolean allows(HttpMethod method, String pattern) {
         if (method == null || pattern == null) {
             return false;
         }
