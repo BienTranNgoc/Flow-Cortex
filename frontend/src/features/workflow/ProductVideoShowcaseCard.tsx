@@ -1,17 +1,27 @@
 import type { RunStepOutputResponse, RunStepResponse } from '@flow-cortex/api-client';
-import { CheckCircle, DownloadSimple, Play } from '@phosphor-icons/react';
+import { ArrowsClockwise, CheckCircle, DownloadSimple, Play } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { openInCurrentTab } from './browser';
 import { parseVideoOutput } from './productVideoSchemas';
-import { useOutputUrlMutation } from './useWorkflows';
+import { startProblem } from './startProblem';
+import { useOutputUrlMutation, useRedoProductVideoMutation } from './useWorkflows';
+
+const MAX_REDO_NOTE = 500;
+
+interface RedoTarget {
+  stepOrder: number;
+  label: string;
+  supportsNote: boolean;
+}
 
 interface ProductVideoShowcaseCardProps {
   runId: string;
   workflowId?: string | undefined;
   renderStep: RunStepResponse;
   artifact: RunStepOutputResponse;
+  steps?: readonly RunStepResponse[] | undefined;
 }
 
 /** Hero showcase presenting the single final MP4 ad video with inline 9:16 playback and download. */
@@ -20,16 +30,75 @@ export function ProductVideoShowcaseCard({
   workflowId,
   renderStep,
   artifact,
+  steps = [],
 }: Readonly<ProductVideoShowcaseCardProps>) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const stepOrder = renderStep.stepOrder ?? 7;
   const previewMutation = useOutputUrlMutation(runId, stepOrder, artifact.name);
   const downloadMutation = useOutputUrlMutation(runId, stepOrder, artifact.name);
+  const redoMutation = useRedoProductVideoMutation(runId);
 
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [videoRetried, setVideoRetried] = useState(false);
+  const [activeRedo, setActiveRedo] = useState<RedoTarget | null>(null);
+  const [redoNote, setRedoNote] = useState('');
   const openingRef = useRef(false);
+
+  const videoSteps = steps.filter(
+    (s) => s.type === 'generate_video' && s.stepOrder !== undefined,
+  );
+  const lipsyncStep = steps.find(
+    (s) => s.type === 'lipsync_video' && s.stepOrder !== undefined,
+  );
+  const redoTargets: RedoTarget[] = [
+    ...videoSteps.map((s, idx) => ({
+      stepOrder: s.stepOrder!,
+      label: t('workflow.redo.scene', { n: idx + 1 }),
+      supportsNote: true,
+    })),
+    ...(lipsyncStep
+      ? [
+          {
+            stepOrder: lipsyncStep.stepOrder!,
+            label: t('workflow.redo.lipsync'),
+            supportsNote: false,
+          },
+        ]
+      : []),
+  ];
+
+  const submitRedo = (acknowledgeCost: boolean) => {
+    if (!activeRedo || redoMutation.isPending) return;
+    const trimmed = activeRedo.supportsNote ? redoNote.trim() : '';
+    redoMutation.mutate(
+      {
+        redoSteps: [activeRedo.stepOrder],
+        ...(trimmed ? { sceneNote: trimmed } : {}),
+        acknowledgeCost,
+      },
+      {
+        onSuccess: (created) => {
+          if (created.id) {
+            const targetWf = created.workflowId ?? workflowId;
+            navigate(targetWf ? `/workflows/${targetWf}/runs/${created.id}` : `/runs/${created.id}`);
+          }
+        },
+      },
+    );
+  };
+
+  const redoProblem = redoMutation.isError
+    ? startProblem(redoMutation.error, t('workflow.redo.failed'), t)
+    : null;
+  const canConfirmRedoCost = redoProblem?.kind === 'credits' && redoProblem.canRunAnyway;
+  const redoAlertMessage =
+    redoProblem && !canConfirmRedoCost
+      ? redoProblem.kind === 'incomplete'
+        ? redoProblem.summary
+        : redoProblem.message
+      : null;
 
   const meta = parseVideoOutput(renderStep.output);
   const aspectRatio = meta?.aspectRatio ?? '9:16';
@@ -172,6 +241,101 @@ export function ProductVideoShowcaseCard({
             <p role="alert" className="run-step-download-error">
               {t('workflow.download.linkError')}
             </p>
+          )}
+
+          {redoTargets.length > 0 && (
+            <div className="pv-redo-bar">
+              <div className="pv-redo-actions">
+                {redoTargets.map((target) => {
+                  const selected = activeRedo?.stepOrder === target.stepOrder;
+                  return (
+                    <button
+                      key={target.stepOrder}
+                      type="button"
+                      className={selected ? 'pv-secondary-btn pv-redo-btn--active' : 'pv-secondary-btn'}
+                      aria-pressed={selected}
+                      disabled={redoMutation.isPending}
+                      onClick={() => {
+                        redoMutation.reset();
+                        setRedoNote('');
+                        setActiveRedo(selected ? null : target);
+                      }}
+                    >
+                      <ArrowsClockwise size={15} aria-hidden="true" />
+                      {target.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeRedo && (
+                <div className="pv-redo-panel">
+                  {activeRedo.supportsNote && (
+                    <div className="pv-field">
+                      <div className="pv-field-header">
+                        <label htmlFor="pv-redo-note">{t('workflow.redo.noteLabel')}</label>
+                        <span className="pv-char-count">
+                          {redoNote.length} / {MAX_REDO_NOTE}
+                        </span>
+                      </div>
+                      <textarea
+                        id="pv-redo-note"
+                        className="pv-textarea pv-keyframe-note"
+                        rows={2}
+                        maxLength={MAX_REDO_NOTE}
+                        value={redoNote}
+                        disabled={redoMutation.isPending}
+                        placeholder={t('workflow.redo.notePlaceholder')}
+                        onChange={(event) => setRedoNote(event.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {canConfirmRedoCost && redoProblem.kind === 'credits' && (
+                    <div className="pv-keyframe-confirm" role="alert">
+                      <span>{redoProblem.message}</span>
+                      <button
+                        type="button"
+                        className="pv-secondary-btn"
+                        disabled={redoMutation.isPending}
+                        onClick={() => submitRedo(true)}
+                      >
+                        {t('workflow.redo.confirmCostAction')}
+                      </button>
+                    </div>
+                  )}
+
+                  {redoAlertMessage && (
+                    <p role="alert" className="approval-error">
+                      {redoAlertMessage}
+                    </p>
+                  )}
+
+                  <div className="pv-redo-panel-actions">
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={redoMutation.isPending}
+                      aria-busy={redoMutation.isPending}
+                      onClick={() => submitRedo(false)}
+                    >
+                      {redoMutation.isPending ? t('workflow.redo.running') : t('workflow.redo.confirm')}
+                    </button>
+                    <button
+                      type="button"
+                      className="pv-secondary-btn"
+                      disabled={redoMutation.isPending}
+                      onClick={() => {
+                        redoMutation.reset();
+                        setActiveRedo(null);
+                      }}
+                    >
+                      {t('workflow.redo.cancel')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

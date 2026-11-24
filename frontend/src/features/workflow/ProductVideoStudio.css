@@ -1362,3 +1362,41 @@
   border: 0;
   border-top: 1px solid var(--card-edge);
 }
+
+/* Selective scene & lip-sync redo bar on completed Product Video showcase */
+.pv-redo-bar {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--card-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pv-redo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pv-redo-btn--active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.pv-redo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-edge);
+  background: var(--paper);
+}
+
+.pv-redo-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

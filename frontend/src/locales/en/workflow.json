@@ -286,6 +286,17 @@
     "confirmCostAction": "Confirm regenerate",
     "approveAndGenerate": "Approve & generate video"
   },
+  "redo": {
+    "scene": "Redo Scene {{n}}",
+    "lipsync": "Re-sync lip movement",
+    "noteLabel": "Scene adjustment note",
+    "notePlaceholder": "Slower camera move, keep product centered",
+    "confirm": "Confirm redo",
+    "running": "Starting new run…",
+    "cancel": "Cancel",
+    "failed": "Could not start selective redo.",
+    "confirmCostAction": "Confirm anyway"
+  },
   "storyboard": {
     "heading": "2-scene storyboard",
     "scene1Title": "Scene 1 · Product hook (0s – 5s)",

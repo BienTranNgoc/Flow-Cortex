@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedStatusException;
@@ -412,6 +413,92 @@ class ProductVideoServiceTest {
         assertThatThrownBy(() -> service.regenerateKeyframe(runId, ownerId, null, "Thử lại", false))
                 .isInstanceOf(ConflictException.class);
         verify(reviewTasks, never()).delete(any());
+    }
+
+    @Test
+    void redoesSelectedSceneReusingCompletedClipsAndChargingOnlySubset() {
+        UUID ownerId = UUID.randomUUID();
+        UUID originalRunId = UUID.randomUUID();
+        Instant now = Instant.now();
+        WorkflowRun original = new WorkflowRun(originalRunId, ProductVideoWorkflow.MC_ID, ownerId,
+                "{\"productName\":\"Đồng hồ\",\"description\":\"Chống nước\"}", now);
+        original.markCompleted(now);
+
+        RunStep s3 = new RunStep(UUID.randomUUID(), originalRunId, (short) 3, "generate_speech", null,
+                "{\"profile\":\"vi_voice_v1\"}", null);
+        s3.markRunning(now);
+        s3.markCompleted(null, "{}", now,
+                "[{\"name\":\"speech.wav\",\"bucket\":\"media\",\"objectKey\":\"runs/" + originalRunId + "/steps/3/attempts/1/speech.wav\",\"mime\":\"audio/wav\",\"bytes\":1000}]");
+        RunStep s7 = new RunStep(UUID.randomUUID(), originalRunId, (short) 7, "generate_video", null,
+                "{\"profile\":\"vertical_ad_clip_v2\",\"referenceImages\":\"all\"}", null);
+        s7.markRunning(now);
+        s7.markCompleted(null, "{}", now);
+        RunStep s8 = new RunStep(UUID.randomUUID(), originalRunId, (short) 8, "generate_video", null,
+                "{\"profile\":\"vertical_ad_clip_v2\",\"referenceImages\":\"all\"}", null);
+        s8.markRunning(now);
+        s8.markCompleted(null, "{}", now);
+        RunStep s9 = new RunStep(UUID.randomUUID(), originalRunId, (short) 9, "lipsync_video", null,
+                "{\"outputInputs\":[{\"stepOrder\":7,\"outputName\":\"clip.mp4\",\"inputKey\":\"video\"}]}", null);
+        s9.markRunning(now);
+        s9.markCompleted(null, "{}", now);
+        RunStep s10 = new RunStep(UUID.randomUUID(), originalRunId, (short) 10, "render_video", null,
+                "{\"profile\":\"vertical_ad_v2\"}", null);
+        s10.markRunning(now);
+        s10.markCompleted(null, "{}", now);
+
+        Workflow workflow = new Workflow(ProductVideoWorkflow.MC_ID, Workflow.SYSTEM_OWNER_ID, "Product Video MC", true);
+        List<WorkflowStep> defs = List.of(
+                configured(3, "generate_speech", s3.getConfig(), null),
+                configured(7, "generate_video", s7.getConfig(), null),
+                configured(8, "generate_video", s8.getConfig(), null),
+                configured(9, "lipsync_video", s9.getConfig(), null),
+                configured(10, "render_video", s10.getConfig(), null));
+
+        List<String> chargedTypes = new ArrayList<>();
+        RunStartGuard costGuard = (o, wfId, stepDefs, ctx) -> stepDefs.forEach(d -> chargedTypes.add(d.type()));
+
+        MediaAssetInput boundImg = new MediaAssetInput(UUID.randomUUID(),
+                new MediaJobInput("image_1", "media", "runs/" + originalRunId + "/inputs/image_1"));
+        MediaAssetInput copiedImg = new MediaAssetInput(boundImg.assetId(),
+                new MediaJobInput("image_1", "media", "runs/new/inputs/image_1"));
+        MediaOutput copiedSpeech = new MediaOutput("speech.wav", "media",
+                "runs/new/steps/3/attempts/1/speech.wav", "audio/wav", 1000L, null);
+
+        when(media.isEnabled()).thenReturn(true);
+        when(runs.findByIdAndOwnerId(originalRunId, ownerId)).thenReturn(Optional.of(original));
+        when(runSteps.findByRunIdOrderByStepOrderAsc(originalRunId)).thenReturn(List.of(s3, s7, s8, s9, s10));
+        when(workflows.findVisibleTo(ProductVideoWorkflow.MC_ID, ownerId)).thenReturn(Optional.of(workflow));
+        when(workflowSteps.findByWorkflowIdOrderByStepOrderAsc(ProductVideoWorkflow.MC_ID)).thenReturn(defs);
+        when(media.boundRunInputs(originalRunId)).thenReturn(List.of(boundImg));
+        when(media.copyRunInputs(any(), eq(List.of(boundImg)))).thenReturn(List.of(copiedImg));
+        when(media.copyStepOutputs(eq(originalRunId), any(), eq(3), any())).thenReturn(List.of(copiedSpeech));
+        when(inputs.findById(originalRunId)).thenReturn(Optional.empty());
+        when(runs.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(runSteps.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs,
+                reviewTasks, stubPresetCatalog(), media, registry, events, runUpdates, transactions,
+                new RunStartGuards(List.of(new WorkflowReadinessGuard(), costGuard)), Tracer.NOOP,
+                true, true, true);
+
+        var created = service.redoSteps(originalRunId, ownerId, List.of(8), "Cận cảnh chậm hơn", true);
+
+        assertThat(created.id()).isNotEqualTo(originalRunId);
+        assertThat(chargedTypes).containsExactly("generate_video", "render_video");
+        ArgumentCaptor<List<RunStep>> savedSteps = ArgumentCaptor.forClass(List.class);
+        verify(runSteps).saveAll(savedSteps.capture());
+        assertThat(savedSteps.getValue()).filteredOn(s -> s.getStepOrder() == 3 || s.getStepOrder() == 7 || s.getStepOrder() == 9)
+                .allMatch(s -> s.getStatus() == RunStepStatus.COMPLETED);
+        assertThat(savedSteps.getValue()).filteredOn(s -> s.getStepOrder() == 8 || s.getStepOrder() == 10)
+                .allMatch(s -> s.getStatus() == RunStepStatus.PENDING);
+        assertThat(savedSteps.getValue()).filteredOn(s -> s.getStepOrder() == 8)
+                .singleElement()
+                .extracting(RunStep::getConfig)
+                .asString()
+                .contains("\"promptSuffix\":\"Cận cảnh chậm hơn\"");
+        verify(media).registerOutputs(eq(ownerId), eq(created.id()), any(), eq(3), eq((short) 1),
+                eq(List.of(copiedSpeech)));
+        verify(events).publishEvent(any(WorkflowRunStartedEvent.class));
     }
 
     private static WorkflowStep step(int order, String type) {

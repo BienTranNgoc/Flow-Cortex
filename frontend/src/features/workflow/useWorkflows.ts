@@ -16,6 +16,7 @@ import {
   getWorkflow,
   listWorkflowExamples,
   listWorkflows,
+  redoProductVideoSteps,
   regenerateKeyframe,
   rejectTask,
   requestUpload,
@@ -29,6 +30,7 @@ import type {
   ApproveReviewTaskRequest,
   GetRunLogLevel,
   ProductVideoRunRequest,
+  RedoProductVideoRequest,
   RegenerateKeyframeRequest,
   RunInputResponse,
   StartRunRequest,
@@ -253,6 +255,19 @@ export function useRegenerateKeyframeMutation(runId: string) {
     onSuccess: (run) => {
       queryClient.setQueryData(runKey, run);
       queryClient.invalidateQueries({ queryKey: ['runs', runId, 'review-tasks'] });
+    },
+  });
+}
+
+export function useRedoProductVideoMutation(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RedoProductVideoRequest) =>
+      unwrap(redoProductVideoSteps(runId, body, authHeaders())),
+    onSuccess: (created) => {
+      if (created.id) {
+        queryClient.setQueryData(['runs', created.id], created);
+      }
     },
   });
 }

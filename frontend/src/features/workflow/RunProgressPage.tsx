@@ -290,6 +290,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
           workflowId={backTo}
           renderStep={finalVideo.step}
           artifact={finalVideo.artifact}
+          steps={steps}
         />
       )}
       {selected && (

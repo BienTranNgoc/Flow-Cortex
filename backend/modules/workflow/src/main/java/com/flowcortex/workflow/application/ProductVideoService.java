@@ -7,7 +7,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.media.api.MediaAssetInput;
 import com.flowcortex.media.api.MediaJobInput;
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.UploadPurpose;
+import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
@@ -35,6 +37,7 @@ import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
 import io.micrometer.tracing.Tracer;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -350,6 +353,131 @@ public class ProductVideoService implements ProductVideoRuns {
     }
 
     private record StagedPresetImage(MediaJobInput input, long bytes) {
+    }
+
+    public RunView redoSteps(UUID runId, UUID ownerId, List<Integer> requestedOrders,
+            String rawSceneNote, boolean acknowledgeCost) {
+        if (!enabled || !workflowEnabled) {
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    new LocalizedMessage("workflow.productVideo.disabled"));
+        }
+        if (!mediaJobs.isEnabled()) {
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
+        }
+        String sceneNote = normalizeOptional(rawSceneNote);
+        WorkflowRun original = runs.findByIdAndOwnerId(runId, ownerId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+        List<RunStep> orderedSteps = runSteps.findByRunIdOrderByStepOrderAsc(runId);
+        ProductVideoRedoRules.Plan plan = ProductVideoRedoRules.resolve(
+                original.getWorkflowId(), original.getStatus(), orderedSteps, requestedOrders);
+
+        workflows.findVisibleTo(original.getWorkflowId(), ownerId)
+                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.productVideo.notInstalled")));
+        List<WorkflowStep> definitions = workflowSteps.findByWorkflowIdOrderByStepOrderAsc(original.getWorkflowId());
+        List<WorkflowStep> rerunDefs = definitions.stream()
+                .filter(d -> plan.rerunOrders().contains((int) d.getStepOrder()))
+                .toList();
+        runStartGuards.checkSubset(ownerId, original.getWorkflowId(), definitions, rerunDefs,
+                new StartContext(acknowledgeCost));
+
+        UUID newRunId = UUID.randomUUID();
+        List<MediaAssetInput> originalInputs = mediaJobs.boundRunInputs(runId);
+        List<MediaAssetInput> copies;
+        try {
+            copies = originalInputs.isEmpty() ? List.of() : mediaJobs.copyRunInputs(newRunId, originalInputs);
+        } catch (UploadRejectedException e) {
+            throw new ConflictException(new LocalizedMessage("workflow.run.retry.objectGone", 0));
+        }
+
+        Map<UUID, List<MediaOutput>> reusedCopiedOutputs = new HashMap<>();
+        Map<UUID, String> reusedOutputsJson = new HashMap<>();
+        for (RunStep step : plan.reusedSteps()) {
+            List<MediaOutput> stored = parseStoredOutputs(step);
+            if (stored.isEmpty()) {
+                continue;
+            }
+            try {
+                List<MediaOutput> copied = mediaJobs.copyStepOutputs(runId, newRunId, step.getStepOrder(), stored);
+                reusedCopiedOutputs.put(step.getId(), copied);
+                reusedOutputsJson.put(step.getId(), json(copied));
+            } catch (UploadRejectedException e) {
+                throw new ConflictException(new LocalizedMessage("workflow.run.retry.objectGone", step.getStepOrder()));
+            }
+        }
+
+        String assetJson = json(copies.stream().map(MediaAssetInput::input).toList());
+        String productAssetJson = json(copies.stream()
+                .map(MediaAssetInput::input)
+                .filter(input -> input.key() != null && input.key().startsWith("image_"))
+                .toList());
+        Optional<ProductVideoInput> originalProductInput = productInputs.findById(runId);
+        Instant now = Instant.now();
+        String traceId = CurrentTrace.idFor(tracer);
+
+        return transactions.execute(status -> {
+            WorkflowRun created = runs.save(new WorkflowRun(newRunId, original.getWorkflowId(), ownerId,
+                    original.getInput(), original.getOptions(), now).withTraceId(traceId));
+            originalProductInput.ifPresent(src -> productInputs.save(src.copyForRun(newRunId, sceneNote, now)));
+            if (!copies.isEmpty()) {
+                mediaJobs.bindRunInputs(newRunId, copies);
+            }
+            List<RunStep> newSteps = new ArrayList<>(orderedSteps.size());
+            Map<UUID, UUID> reusedNewIds = new HashMap<>();
+            for (RunStep step : orderedSteps) {
+                UUID newStepId = UUID.randomUUID();
+                if (!plan.rerunOrders().contains((int) step.getStepOrder())) {
+                    reusedNewIds.put(step.getId(), newStepId);
+                    newSteps.add(RunStep.reused(newStepId, newRunId, step.getStepOrder(), step.getType(),
+                            step.getInput(), step.getConfig(), step.getInputRef(), step.getOutput(),
+                            reusedOutputsJson.get(step.getId()), step.getStartedAt(), step.getFinishedAt()));
+                } else {
+                    String storedInput = null;
+                    if (registry.snapshotsRunInputs(step.getType()) || namesReferenceImage(step.getConfig())) {
+                        storedInput = "render_video".equals(step.getType()) ? productAssetJson : assetJson;
+                    }
+                    String stepConfig = step.getConfig();
+                    if (sceneNote != null && "generate_video".equals(step.getType())) {
+                        stepConfig = withPromptSuffix(stepConfig, sceneNote);
+                    }
+                    newSteps.add(new RunStep(newStepId, newRunId, step.getStepOrder(), step.getType(),
+                            storedInput, stepConfig, step.getInputRef()));
+                }
+            }
+            List<RunStep> saved = runSteps.saveAll(newSteps);
+            for (RunStep step : plan.reusedSteps()) {
+                List<MediaOutput> copied = reusedCopiedOutputs.get(step.getId());
+                if (copied != null && registry.isRemote(step.getType())) {
+                    mediaJobs.registerOutputs(ownerId, newRunId, reusedNewIds.get(step.getId()),
+                            step.getStepOrder(), (short) 1, copied);
+                }
+            }
+            runUpdates.touched(newRunId);
+            events.publishEvent(new WorkflowRunStartedEvent(newRunId));
+            return WorkflowMapper.toRunView(created, saved, List.of(), registry::isRemote, mediaJobs::isDownloadable);
+        });
+    }
+
+    private String withPromptSuffix(String rawConfig, String suffix) {
+        try {
+            Map<String, Object> config = rawConfig == null || rawConfig.isBlank()
+                    ? new LinkedHashMap<>()
+                    : json.readValue(rawConfig, new TypeReference<>() { });
+            config.put("promptSuffix", suffix);
+            return json.writeValueAsString(config);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Product Video step config is not valid JSON", e);
+        }
+    }
+
+    private List<MediaOutput> parseStoredOutputs(RunStep step) {
+        if (step.getOutputs() == null || step.getOutputs().isBlank()) {
+            return List.of();
+        }
+        try {
+            return json.readValue(step.getOutputs(), new TypeReference<>() { });
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Stored outputs of step " + step.getId() + " are not readable", e);
+        }
     }
 
     private record KeyframeReviewContext(List<RunStep> allSteps, RunStep keyframeStep, RunStep checkpointStep,

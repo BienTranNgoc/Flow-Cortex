@@ -384,6 +384,11 @@ class ProviderStepExecutor implements StepExecutor {
                     }
                 }
             }
+            if (parsedConfig.get("promptSuffix") instanceof String suffix && !suffix.isBlank()
+                    && result.get("prompt") instanceof String basePrompt && !basePrompt.isBlank()) {
+                String combined = basePrompt + "\nAdjustment: " + suffix.trim();
+                result.put("prompt", combined.length() <= 2500 ? combined : combined.substring(0, 2500));
+            }
             appendPromptInstruction(result, parsedConfig);
             return result;
         } catch (JsonProcessingException e) {

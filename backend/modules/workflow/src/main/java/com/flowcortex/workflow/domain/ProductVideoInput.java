@@ -86,4 +86,10 @@ public class ProductVideoInput {
     public UUID getRunId() {
         return runId;
     }
+
+    public ProductVideoInput copyForRun(UUID newRunId, String overrideSceneNote, Instant now) {
+        return new ProductVideoInput(newRunId, productName, description, cta, price, promotion, aspectRatio,
+                templateId, templateVersion, voiceGender, mcPresetId, backgroundPresetId,
+                overrideSceneNote != null ? overrideSceneNote : sceneNote, now);
+    }
 }

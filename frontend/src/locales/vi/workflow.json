@@ -286,6 +286,17 @@
     "confirmCostAction": "Xác nhận tạo lại",
     "approveAndGenerate": "Duyệt & Sinh video"
   },
+  "redo": {
+    "scene": "Làm lại Cảnh {{n}}",
+    "lipsync": "Đồng bộ lại khẩu hình",
+    "noteLabel": "Ghi chú chỉnh cảnh",
+    "notePlaceholder": "Góc máy chậm hơn, giữ rõ mặt sản phẩm",
+    "confirm": "Xác nhận làm lại",
+    "running": "Đang tạo lượt chạy mới…",
+    "cancel": "Hủy",
+    "failed": "Không thể tạo lượt làm lại.",
+    "confirmCostAction": "Xác nhận tiếp tục"
+  },
   "storyboard": {
     "heading": "Bảng phân cảnh 2 cảnh",
     "scene1Title": "Cảnh 1 · Giới thiệu sản phẩm (0s – 5s)",

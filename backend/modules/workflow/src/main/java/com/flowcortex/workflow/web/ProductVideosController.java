@@ -81,4 +81,15 @@ class ProductVideosController {
         return ResponseEntity.ok(RunResponse.from(productVideos.regenerateKeyframe(
                 runId, ownerId, backgroundPresetId, sceneNote, acknowledgeCost), creditAccounts));
     }
+
+    @PostMapping(value = "/runs/{runId}/redo", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<RunResponse> redoProductVideoSteps(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID runId,
+            @Valid @RequestBody RedoProductVideoRequest request) {
+        UUID ownerId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(RunResponse.from(productVideos.redoSteps(
+                runId, ownerId, request.redoSteps(), request.sceneNote(),
+                Boolean.TRUE.equals(request.acknowledgeCost())), creditAccounts));
+    }
 }
