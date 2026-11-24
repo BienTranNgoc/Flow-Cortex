@@ -10,6 +10,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import org.hibernate.validator.constraintvalidation.HibernateConstraintValidatorContext;
@@ -38,11 +39,11 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
     /**
      * The steps being created, with the types the registry knows, those of them that take the
      * assets stored at run start, those of them that run remotely, and those that copy an upload
-     * into their own output.
+     * into their own output, and the files each type declares it records ({@link StepFileOutputs}).
      */
     @KnownStepTypes
     record Definition(List<NewWorkflowStep> steps, Set<String> knownTypes, Set<String> storedInputTypes,
-            Set<String> remoteTypes, Set<String> ingestTypes) {
+            Set<String> remoteTypes, Set<String> ingestTypes, Map<String, Set<String>> declaredOutputs) {
     }
 
     final class Validator implements ConstraintValidator<KnownStepTypes, Definition> {
@@ -86,7 +87,7 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
                     }
                 }
                 boolean runsInline = allowedTypes.contains(type) && !definition.remoteTypes().contains(type);
-                String configFault = configFault(steps.get(i), i + 1, runsInline);
+                String configFault = configFault(steps, i, runsInline, definition);
                 if (configFault != null) {
                     valid = false;
                     // A message parameter is inserted literally, so the caller's text is never interpolated.
@@ -115,15 +116,33 @@ import org.hibernate.validator.constraintvalidation.HibernateConstraintValidator
         }
 
         /**
-         * What is wrong with the config of step {@code order}: its {@code outputInputs} declaration,
-         * then its type's rule; or {@code null}.
+         * What is wrong with the config of step {@code steps[index]}: its {@code outputInputs} declaration, the files
+         * those entries take from earlier steps, then its type's rule; or {@code null}.
          */
-        private static String configFault(NewWorkflowStep step, int order, boolean runsInline) {
-            String fault = StoredWithOutputsResolver.declarationFault(step.config(), order);
+        private static String configFault(List<NewWorkflowStep> steps, int index, boolean runsInline,
+                Definition definition) {
+            NewWorkflowStep step = steps.get(index);
+            String fault = StoredWithOutputsResolver.declarationFault(step.config(), index + 1);
             if (fault == null && runsInline && StoredWithOutputsResolver.declaresOutputInputs(step.config())) {
                 return "only a remote step reads outputInputs; '" + step.type() + "' runs inline";
             }
+            if (fault == null) {
+                fault = undeclaredFileFault(step.config(), steps, definition);
+            }
             return fault != null ? fault : StepConfigRules.fault(step.type(), step.config());
+        }
+
+        /** The first {@code outputInputs} entry naming a file its source step's type declares it does not record. */
+        private static String undeclaredFileFault(String config, List<NewWorkflowStep> steps, Definition definition) {
+            return StepFileOutputs.firstUndeclared(config, order -> order <= steps.size()
+                            ? definition.declaredOutputs().get(steps.get(order - 1).type())
+                            : null)
+                    .map(undeclared -> "outputInputs reads '" + undeclared.file() + "' from step "
+                            + undeclared.sourceOrder() + ", which records "
+                            + (undeclared.recorded().isEmpty()
+                                    ? "no files"
+                                    : "only: " + String.join(", ", new TreeSet<>(undeclared.recorded()))))
+                    .orElse(null);
         }
 
         private static void violation(HibernateConstraintValidatorContext context, String template, String type,

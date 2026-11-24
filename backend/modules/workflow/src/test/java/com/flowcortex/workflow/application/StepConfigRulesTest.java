@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -80,6 +81,6 @@ class StepConfigRulesTest {
 
     private static KnownStepTypes.Definition definition(NewWorkflowStep... steps) {
         return new KnownStepTypes.Definition(List.of(steps), Set.of("echo", "connector.call", "workflow.call"),
-                Set.of(), Set.of(), Set.of());
+                Set.of(), Set.of(), Set.of(), Map.of());
     }
 }
