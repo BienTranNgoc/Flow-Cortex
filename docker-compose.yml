@@ -390,6 +390,7 @@ services:
       FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_ALIGN_AUDIO:-10m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_RENDER_VIDEO:-5m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_SEPARATE_AUDIO:-15m}
+      FLOWCORTEX_MEDIA_MAX_RUNTIME_COMPOSE_DUB: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_COMPOSE_DUB:-15m}
       FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO: ${FLOWCORTEX_MEDIA_MAX_RUNTIME_FETCH_VIDEO:-10m}
       FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT: ${FLOWCORTEX_MEDIA_CONSUMER_TIMEOUT:-20m}
       FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME: ${FLOWCORTEX_MEDIA_PROVIDER_MAX_RUNTIME:-2m}
@@ -512,7 +513,7 @@ services:
       WORKER_ID: ${WORKER_ID:-flow-worker-1}
       OTEL_SERVICE_NAME: flow-worker
 
-  # Render pool: consumes media.render.jobs (render_video), so an encode never waits
+  # Render pool: consumes media.render.jobs (render_video, compose_dub), so an encode never waits
   # behind probe or audio jobs and the pool is sized on its own. One job per
   # container: the broker connection is not thread-safe, so the pool size is the
   # replica count. A capability added to the backend's render lane is added to
@@ -523,7 +524,7 @@ services:
     environment:
       <<: *media-worker-env
       MEDIA_QUEUE: media.render.jobs
-      WORKER_CAPABILITIES: render_video
+      WORKER_CAPABILITIES: render_video,compose_dub
       OTEL_SERVICE_NAME: render-worker
     deploy:
       replicas: ${MEDIA_RENDER_WORKERS:-1}
