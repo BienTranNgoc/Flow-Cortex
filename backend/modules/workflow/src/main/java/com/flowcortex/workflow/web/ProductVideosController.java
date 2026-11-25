@@ -82,6 +82,14 @@ class ProductVideosController {
                 runId, ownerId, backgroundPresetId, sceneNote, acknowledgeCost), creditAccounts));
     }
 
+    @PostMapping(value = "/runs/{runId}/script/reopen", produces = MediaType.APPLICATION_JSON_VALUE)
+    ResponseEntity<RunResponse> reopenProductVideoScript(@AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID runId) {
+        UUID ownerId = currentUserResolver.require(jwt);
+        return ResponseEntity.ok(RunResponse.from(
+                productVideos.reopenScriptReview(runId, ownerId), creditAccounts));
+    }
+
     @PostMapping(value = "/runs/{runId}/redo", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<RunResponse> redoProductVideoSteps(@AuthenticationPrincipal Jwt jwt,

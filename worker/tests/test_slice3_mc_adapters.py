@@ -23,6 +23,30 @@ TINY_JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
 TINY_MP4 = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
 
 
+def _make_wav_bytes(duration_ms: int, *, comment: str | None = None) -> bytes:
+    import wave
+
+    buf = io.BytesIO()
+    sample_rate = 24_000
+    nframes = round(sample_rate * duration_ms / 1000)
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(b"\x00\x00" * nframes)
+    raw = buf.getvalue()
+    if not comment:
+        return raw
+    payload = comment.encode("ascii") + b"\x00"
+    if len(payload) % 2:
+        payload += b"\x00"
+    icmt = b"ICMT" + len(payload).to_bytes(4, "little") + payload
+    info = b"INFO" + icmt
+    list_chunk = b"LIST" + len(info).to_bytes(4, "little") + info
+    new_size = (int.from_bytes(raw[4:8], "little") + len(list_chunk)).to_bytes(4, "little")
+    return raw[:4] + new_size + raw[8:] + list_chunk
+
+
 class _FakeResp:
     def __init__(self, body: bytes) -> None:
         self._stream = io.BytesIO(body)
@@ -132,7 +156,7 @@ def test_kling_lipsync_submit_and_await(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(
-        "flowcortex_worker.provider.lipsync_adapter._upscale_to_720p", lambda raw: raw
+        "flowcortex_worker.provider.lipsync_adapter._upscale_to_720p", lambda raw, **_: raw
     )
 
     adapter = KlingLipsyncAdapter(KlingLipsyncConfig(api_key="tok", poll_interval_seconds=0.01))
@@ -259,7 +283,7 @@ def test_capabilities_dispatch_keyframe_and_lipsync(monkeypatch: pytest.MonkeyPa
         }
     )
     ls_ctx = ExecutionContext(
-        storage=_FakeStorage({"k/v.mp4": TINY_MP4, "k/a.wav": b"RIFF0000WAVE"}),
+        storage=_FakeStorage({"k/v.mp4": TINY_MP4, "k/a.wav": _make_wav_bytes(4000)}),
         bucket="b",
         output_prefix=f"runs/{REV_ID}/steps/6/attempts/1/",
         abort=_NoAbort(),
@@ -664,3 +688,94 @@ def test_read_bounded_response_handles_ssl_socket_success_timeout_and_abort() ->
     finally:
         killer.join()
     assert sock_kill.shutdown_calls >= 1
+
+
+def test_mc_script_split_wav_marker_and_lipsync_trim(monkeypatch: pytest.MonkeyPatch) -> None:
+    import wave
+
+    from flowcortex_worker.provider.adapter import FixtureProviderAdapter, VideoArtifact
+    from flowcortex_worker.provider.capabilities import ExecutionContext, execute
+    from flowcortex_worker.provider.contracts.provider_job import ProviderJob
+    from flowcortex_worker.provider.edge_adapter import (
+        extract_mc_end_ms,
+        split_mc_script_segments,
+        trim_wav,
+    )
+
+    assert split_mc_script_segments("Câu một MC.\n\nCâu hai sản phẩm.") == (
+        "Câu một MC.",
+        "Câu hai sản phẩm.",
+    )
+    assert split_mc_script_segments("Một đoạn duy nhất.") is None
+    assert "NO speaking" in MC_STORYBOARD_SYSTEM_PROMPT
+    assert "never floating" in MC_STORYBOARD_SYSTEM_PROMPT
+
+    wav_7s = _make_wav_bytes(7000, comment="mc_end_ms=3480")
+    assert extract_mc_end_ms(wav_7s) == 3480
+    trimmed = trim_wav(wav_7s, 3480)
+    with wave.open(io.BytesIO(trimmed), "rb") as w:
+        assert round(w.getnframes() * 1000 / w.getframerate()) == 3480
+
+    captured: dict[str, object] = {}
+
+    class _RecordingLipsync(FixtureProviderAdapter):
+        def submit_lipsync(self, request: LipsyncRequest) -> str:
+            captured["duration_seconds"] = request.duration_seconds
+            captured["audio_bytes"] = request.audio_bytes
+            return "ls-trim-1"
+
+        def await_lipsync(self, task_id: str, abort: object) -> VideoArtifact:
+            return VideoArtifact(TINY_MP4, task_id)
+
+    def _fake_norm(body: bytes, _ctx: object, **kw: object) -> bytes:
+        captured["norm_dur"] = kw.get("duration_seconds")
+        return body
+
+    monkeypatch.setattr("flowcortex_worker.provider.capabilities._normalize_video", _fake_norm)
+    ls_job = ProviderJob.model_validate(
+        {
+            "schemaVersion": "1",
+            "jobId": str(REV_ID),
+            "runId": str(REV_ID),
+            "correlationId": str(REV_ID),
+            "stepOrder": 9,
+            "capability": "lipsync_video",
+            "params": {
+                "profile": "vertical_ad_lipsync_v1",
+                "payload": {"sourceRevisionId": str(REV_ID), "durationSeconds": 5},
+            },
+            "inputs": [
+                {"key": "video", "bucket": "b", "objectKey": "k/v.mp4"},
+                {"key": "audio", "bucket": "b", "objectKey": "k/speech.wav"},
+            ],
+            "outputPrefix": f"runs/{REV_ID}/steps/9/attempts/1/",
+            "attempt": 1,
+            "maxRuntimeSeconds": 480,
+            "issuedAt": "2026-11-24T00:00:00Z",
+        }
+    )
+
+    class _MemStorage:
+        def __init__(self, objs: dict[str, bytes]) -> None:
+            self._objs = objs
+
+        def head_object(self, _b: str, key: str) -> int | None:
+            return len(self._objs[key]) if key in self._objs else None
+
+        def fetch_bytes(self, _b: str, key: str, _a: object) -> bytes:
+            return self._objs[key]
+
+        def put(self, key: str, body: bytes, _m: str, _a: object) -> None:
+            self._objs[key] = body
+
+    ctx = ExecutionContext(
+        storage=_MemStorage({"k/v.mp4": TINY_MP4, "k/speech.wav": wav_7s}),
+        bucket="b",
+        output_prefix=f"runs/{REV_ID}/steps/9/attempts/1/",
+        abort=_NoAbort(),
+    )
+    execute(ls_job, _RecordingLipsync(), ctx)
+    assert captured["duration_seconds"] == 3.48
+    assert captured["norm_dur"] == 3.48
+    with wave.open(io.BytesIO(captured["audio_bytes"]), "rb") as w:  # type: ignore[arg-type]
+        assert round(w.getnframes() * 1000 / w.getframerate()) == 3480

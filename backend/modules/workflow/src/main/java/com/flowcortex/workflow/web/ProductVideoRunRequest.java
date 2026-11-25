@@ -26,12 +26,13 @@ record ProductVideoRunRequest(
         UUID mcUploadId,
         @Size(max = 64) String backgroundPresetId,
         UUID backgroundUploadId,
-        @Size(max = 500) String sceneNote) {
+        @Size(max = 500) String sceneNote,
+        @Pattern(regexp = "voice_bgm|music_only") String audioMode) {
 
     ProductVideoRunRequest(String productName, String description, String cta, String price, String promotion,
             List<UUID> uploadIds, VideoConfig video, Boolean acknowledgeCost) {
         this(productName, description, cta, price, promotion, uploadIds, video, acknowledgeCost,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 
     record VideoConfig(@NotNull @Pattern(regexp = "9:16") String aspectRatio) {
@@ -74,9 +75,15 @@ record ProductVideoRunRequest(
                 && (backgroundUploadId == null || !uploadIds.contains(backgroundUploadId));
     }
 
+    @AssertTrue(message = "audioMode music_only is only supported for showroom-v1")
+    @JsonIgnore
+    boolean hasSupportedAudioModeForTemplate() {
+        return !"music_only".equals(audioMode) || !"mc-v1".equals(templateId);
+    }
+
     ProductVideoDraft draft() {
         return ProductVideoDraft.of(productName, description, cta, price, promotion, video.aspectRatio(),
-                templateId, voiceGender, mcPresetId, backgroundPresetId, sceneNote);
+                templateId, voiceGender, mcPresetId, backgroundPresetId, sceneNote, audioMode);
     }
 
     private static boolean notBlankWhenPresent(String value) {

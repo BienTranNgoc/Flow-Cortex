@@ -113,7 +113,7 @@ class LipsyncRequest:
     video_bytes: bytes
     audio_bytes: bytes
     source_revision_id: UUID
-    duration_seconds: int = 5
+    duration_seconds: float = 5.0
     profile: str = "vertical_ad_lipsync_v1"
 
 

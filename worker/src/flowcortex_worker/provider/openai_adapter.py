@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -43,9 +44,19 @@ from .adapter import (
     VideoRequest,
 )
 from .contracts.provider_job import ProductAdPayload
+from .edge_adapter import split_mc_script_segments
 from .prompts.templates import MC_STORYBOARD_SYSTEM_PROMPT, scene_setting_instruction
+from .vendor_jobs import VendorJobTimeout, read_bounded_response
 
 log = logging.getLogger("flowcortex_provider_worker.openai")
+
+
+class _NoopAbort:
+    def check(self) -> None:
+        return None
+
+
+_NOOP_ABORT = _NoopAbort()
 
 PROVIDER_OPENAI = "openai"
 
@@ -113,107 +124,88 @@ _STORYBOARD_RESPONSE_FORMAT: dict[str, Any] = {
 }
 
 _STORYBOARD_SYSTEM_PROMPT = (
-    "You are an expert visual director for vertical (9:16) commercial product video "
-    "advertisements. Convert the approved Vietnamese voice-over and ALL attached product "
-    "reference images (1 to 3 photos) into exactly two distinct, compelling English video "
-    "generation prompts, each designed for a five-second 9:16 clip.\n\n"
-    "MULTI-IMAGE VISUAL GROUND TRUTH (INSPECT ALL ATTACHED IMAGES):\n"
-    "- Treat ALL attached product photos as the absolute visual ground truth for product "
-    "identity, silhouette, proportions, materials, logos, and hardware. Never invent unrelated "
-    "accessories or alter the product's core design.\n"
-    "- Inspect how the attached images relate to each other and apply the matching branch:\n"
-    "  * MULTIPLE COLORWAYS OR FINISH VARIANTS (2-3 photos showing the same product in "
-    "different colors or finishes, e.g. matte black, matte grey, glossy black):\n"
-    "    - Scene 1 (`scene1Prompt`, 0-5s — Hero Color/Variant Showcase): Present the product "
-    "centered against a clean, minimalist neutral studio backdrop with soft, even commercial "
-    "lighting. Keep the framing steady with a gentle slow push-in or subtle angle shift as "
-    "the product smoothly transitions across the exact colorways and finishes shown in the "
-    "reference images. Do NOT lock Scene 1 to only the first photo's color.\n"
-    "    - Scene 2 (`scene2Prompt`, 5-10s — Lifestyle In-Use & Benefit): Feature the hero "
-    "product from the reference images in an authentic, dynamic real-world usage moment "
-    "matching the voice-over, concluding on a clean, balanced close-up hero frame.\n"
-    "  * MULTIPLE ANGLES OF THE SAME PRODUCT (2-3 photos showing front, side, back, or detail "
-    "views of one single colorway):\n"
-    "    - Scene 1 (`scene1Prompt`, 0-5s — Hero 3D Angle Showcase): Combine the geometry and "
-    "details from all reference angles in a smooth, continuous parallax glide or gentle "
-    "rotation under soft, even studio lighting.\n"
-    "    - Scene 2 (`scene2Prompt`, 5-10s — Lifestyle In-Use & Benefit): Show the exact same "
-    "product in natural active use matching the voice-over, settling on a crisp hero frame.\n"
+    "You are an expert commercial visual director for dynamic vertical (9:16) showroom product "
+    "videos. Convert the approved Vietnamese script and ALL attached product reference images "
+    "(1 to 3 photos) into exactly two distinct, high-contrast English video generation prompts, "
+    "each for a 5-second 9:16 clip.\n\n"
+    "VISUAL CONTINUITY & ORIENTATION (MANDATORY FOR BOTH SCENES):\n"
+    "- Treat ALL attached product photos as absolute visual ground truth for silhouette, colors, "
+    "dials, logos, materials, and hardware. Never invent unrelated accessories.\n"
+    "- Honor any TARGET ENVIRONMENT PRESET or user note. Keep lighting, color grading, and mood "
+    "cohesive between Scene 1 and Scene 2 while giving Scene 2 richer architectural depth.\n"
+    "- Always keep the product oriented UPRIGHT and RIGHT-SIDE UP facing the camera (never upside "
+    "down, never inverted on a wrist, no hands obscuring or twisting the face/logo).\n"
+    "- Rest every product firmly on a solid display stand, surface, or stone pedestal with crisp "
+    "grounded contact shadows directly beneath its base — NEVER floating in mid-air.\n\n"
+    "DYNAMIC MULTI-IMAGE CHOREOGRAPHY (INSPECT ALL ATTACHED IMAGES — AVOID STATIC SHOTS):\n"
     "  * SINGLE PRODUCT IMAGE (1 photo provided):\n"
-    "    - Scene 1 (`scene1Prompt`, 0-5s — Opening Hero Reveal): Clean, scroll-stopping "
-    "commercial reveal preserving 100% of the product's exact color, finish, and details "
-    "with smooth directional camera movement.\n"
-    "    - Scene 2 (`scene2Prompt`, 5-10s — Lifestyle In-Use & Benefit): Authentic in-use "
-    "benefit shot of the exact same product, finishing on a clean centered hero frame.\n\n"
-    "PHYSICAL GROUNDING & CAMERA STABILITY:\n"
-    "- If the reference images are isolated cutouts on a white background, keep Scene 1 on a "
-    "clean minimalist studio backdrop or resting firmly on a solid surface — NEVER place a "
-    "cutout product hovering above a turntable or floating unnaturally in mid-air.\n"
-    "- Keep each prompt concise and vivid (40-75 English words) with ONE smooth continuous "
-    "camera or subject motion per scene. Avoid chaotic cuts or extreme 360-degree spins.\n\n"
-    "PURE VISUAL CINEMATOGRAPHY — STRICT PROHIBITIONS:\n"
+    "    - Scene 1 (`scene1Prompt`, 0-5s — Hero Studio Orbit Reveal): Product upright and centered "
+    "on a clean studio pedestal/stand; camera performs a smooth, clearly visible 35-to-45-degree "
+    "orbital arc around the product as a crisp rim light sweeps across edges, bezels, and glossy "
+    "contours to showcase 3D volume.\n"
+    "    - Scene 2 (`scene2Prompt`, 5-10s — Showroom Context Macro Push-In): Contrasting closer "
+    "angle in the rich target showroom environment with softly blurred display shelves and "
+    "architectural bokeh behind; smooth macro dolly push-in highlighting surface materials and "
+    "front details, settling on a crisp centered hero packshot.\n"
+    "  * MULTIPLE COLORWAYS OR FINISH VARIANTS (2-3 photos in different colors):\n"
+    "    - Scene 1 (`scene1Prompt`, 0-5s — Solo Hero Variant 1 Orbit): Showcase the PRIMARY "
+    "variant (first photo) solo and upright on a clean studio display stand/pedestal so every "
+    "detail stays razor-sharp; camera performs a smooth 35-to-45-degree orbital arc with sweeping "
+    "studio rim light to reveal full 3D form.\n"
+    "    - Scene 2 (`scene2Prompt`, 5-10s — Variant 2 Showroom Reveal): Designed to cross-dissolve "
+    "seamlessly from Scene 1 — showcase the SECOND variant (second photo) upright in front on a "
+    "matching pedestal inside the full target showroom setting (if a third colorway photo is "
+    "attached, stage it softly staggered beside or behind so all attached colorways appear) with "
+    "soft display bokeh behind; contrasting macro 45-degree push-in highlighting its finish.\n"
+    "  * MULTIPLE ANGLES OF THE SAME PRODUCT (2-3 photos showing front, side, back, or details):\n"
+    "    - Scene 1 (`scene1Prompt`, 0-5s — 3D Turntable/Orbit Reveal): Combine geometry from all "
+    "angles on a clean studio pedestal; smooth 35-to-45-degree camera orbit from a 3/4 view toward "
+    "front hero with sweeping rim light.\n"
+    "    - Scene 2 (`scene2Prompt`, 5-10s — Showroom Macro Angle Shift): Contrasting macro "
+    "close-up inside the full target showroom setting gliding across tactile details and "
+    "alternate-angle hardware, settling onto a balanced upright hero frame.\n\n"
+    "CAMERA & PROHIBITIONS:\n"
+    "- Keep each prompt concise and vivid (45-75 English words) with ONE clear, continuous motion "
+    "per scene. Ensure Scene 1 and Scene 2 use visibly different camera angles and motion "
+    "directions so the transition feels cinematic rather than repetitive. Avoid chaotic 360 spins."
+    "\n"
     "- NEVER mention text, graphics, or UI elements ('text', 'caption', 'subtitle', 'CTA', "
-    "'overlay', 'watermark', 'font', 'price tag', 'button', 'no text') anywhere in "
-    "`scene1Prompt` or `scene2Prompt`.\n"
+    "'overlay', 'watermark', 'font', 'price tag', 'button', 'no text') anywhere in prompts.\n"
     "- Do not mention voice, speech, sound effects, or music.\n"
     "- Return only one valid JSON object with exactly two distinct string fields: "
-    "`scene1Prompt` and `scene2Prompt`; do not rename, nest, or wrap these fields."
+    "`scene1Prompt` and `scene2Prompt`."
 )
 
 _SYSTEM_PROMPT = (
-    "You are an expert Vietnamese short-form video advertising copywriter "
-    "specializing in TikTok, Facebook Reels, and YouTube Shorts.\n"
-    "Write a compelling, natural Vietnamese voice-over script for a "
-    "10-second product advertisement.\n\n"
+    "You are an expert Vietnamese commercial copywriter for luxury 10-second vertical showroom ads "
+    "(TikTok, Reels, Shorts).\n"
+    "Write a crisp, high-impact Vietnamese voice-over script structured in TWO balanced beats "
+    "(Beat 1 for Scene 1: 0-5s; Beat 2 for Scene 2: 5-10s).\n\n"
 
     "OUTPUT FORMAT:\n"
     "- Return ONLY a valid JSON object with exactly one string field: `script`.\n"
     "- Do not include markdown, explanations, or extra fields.\n\n"
 
-    "SCRIPT STRUCTURE:\n"
-    "1. HOOK: Start with one short, attention-grabbing sentence "
-    "that sparks curiosity or highlights a relevant customer desire.\n"
-    "2. BENEFITS: Use 1-2 concise sentences highlighting the product's "
-    "most appealing benefits based strictly on the provided description. "
-    "Focus on why customers would want the product rather than "
-    "simply listing features.\n"
-    "3. PRICE: If a price is provided, mention it naturally and accurately.\n"
-    "4. PROMOTION: If a promotion is provided, mention it naturally "
-    "without exaggeration.\n"
-    "5. CTA: If a call-to-action is provided, end with the exact call-to-action "
-    "sentence provided by the user. If no call-to-action is provided, generate a "
-    "natural, compelling Vietnamese call-to-action that fits the product and urges "
-    "the viewer to act (e.g. 'Khám phá ngay!', 'Mua ngay hôm nay!').\n\n"
+    "TWO-BEAT SCRIPT STRUCTURE (MAXIMUM 2 SENTENCES TOTAL):\n"
+    "1. BEAT 1 (Scene 1, 0-5s — 9 to 13 words): Open with a compelling hook or the SINGLE "
+    "strongest standout benefit/desire (do NOT open with a dry list of raw specs or long model "
+    "codes).\n"
+    "2. BEAT 2 (Scene 2, 5-10s — 9 to 13 words): Product name + ONE decisive benefit (plus every "
+    "explicitly provided price and promotion — include both when both are given) + the exact CTA "
+    "(or a natural short Vietnamese CTA like 'Khám phá ngay!' if none provided).\n\n"
 
-    "STYLE GUIDELINES:\n"
-    "- Write entirely in natural, conversational Vietnamese.\n"
-    "- Use an energetic, engaging, modern advertising tone.\n"
-    "- Make the script sound like a real Vietnamese content creator, "
-    "not a robotic advertisement.\n"
-    "- Prioritize emotional appeal, clarity, and memorable wording.\n"
-    "- Use short sentences that sound smooth when spoken by TTS.\n"
-    "- Avoid generic phrases, repetitive adjectives, and unnecessary filler.\n"
-    "- Do not include emojis, hashtags, scene directions, or timestamps.\n\n"
-
-    "DURATION CONSTRAINTS:\n"
-    "- Target 22-28 Vietnamese whitespace-separated words in total.\n"
-    "- Optimize for approximately 8.5 to 9.5 seconds of natural speech "
-    "so punctuation pauses and numbers stay under 10 seconds.\n"
-    "- Prioritize the hook, strongest benefit, and CTA.\n"
-    "- If the supplied CTA, price, or promotion makes the target "
-    "impossible, preserve required information and minimize other text.\n\n"
+    "TTS-FRIENDLY VIETNAMESE & DURATION RULES:\n"
+    "- Target 18-26 Vietnamese whitespace-separated words in total (~7.5 to 9.2 seconds spoken).\n"
+    "- Select at most TWO strongest selling points — never cram 4-5 technical specs into 10s.\n"
+    "- Avoid stacking multiple English abbreviations or decimal units back-to-back so Vietnamese "
+    "TTS sounds effortless and premium.\n"
+    "- Use at most 2 sentences total so TTS does not insert choppy mid-sentence pauses.\n"
+    "- No emojis, hashtags, stage directions, or timestamps.\n\n"
 
     "FACTUAL ACCURACY:\n"
-    "- Use ONLY product information explicitly provided in the input.\n"
-    "- Never invent features, materials, discounts, guarantees, "
-    "scarcity, customer reviews, or product performance claims.\n"
-    "- Never invent a price or promotion.\n"
-    "- Treat the attached product image as visual ground truth for appearance, colour, shape, "
-    "packaging and visible details. Do not infer materials, performance or claims that are not "
-    "confirmed by the text input.\n"
-    "- If a CTA is provided, never modify it. If omitted, create an appropriate call-to-action.\n"
-    "- Ensure the final script is coherent, persuasive, and ready "
-    "for direct text-to-speech generation."
+    "- Use ONLY product information explicitly provided in the input and visible details from the "
+    "attached product photos. Never invent features, materials, prices, discounts, or guarantees.\n"
+    "- If a CTA is provided, preserve it verbatim."
 )
 
 
@@ -324,7 +316,7 @@ class OpenAIProviderAdapter:
         deadline_monotonic: float | None = None,
     ) -> str:
         user_content = self._user_content(payload, reference_image)
-        return self._run_with_fallback(
+        script = self._run_with_fallback(
             operation="generate_script",
             system_prompt=_SYSTEM_PROMPT,
             fallback_schema_instructions=_SCRIPT_FALLBACK_SCHEMA_INSTRUCTIONS,
@@ -335,6 +327,90 @@ class OpenAIProviderAdapter:
             abort=abort,
             deadline_monotonic=deadline_monotonic,
         )
+        return self._shorten_script_if_needed(
+            script,
+            payload,
+            abort=abort,
+            deadline_monotonic=deadline_monotonic,
+        )
+
+    def _shorten_script_if_needed(
+        self,
+        script: str,
+        payload: ProductAdPayload,
+        *,
+        abort: ScriptAbort | None = None,
+        deadline_monotonic: float | None = None,
+    ) -> str:
+        is_mc = payload.templateId == "mc-v1"
+
+        def _within_limit(candidate: str) -> bool:
+            stripped = candidate.strip()
+            if not stripped:
+                return False
+            if is_mc:
+                parts = split_mc_script_segments(stripped)
+                return (
+                    parts is not None
+                    and len(parts[0].split()) <= 14
+                    and len(parts[1].split()) <= 14
+                    and len(stripped.split()) <= 28
+                )
+            return len(stripped.split()) <= 26
+
+        if _within_limit(script):
+            return script
+        shorten_timeout = 15.0
+        if deadline_monotonic is not None:
+            remaining = deadline_monotonic - time.monotonic()
+            if remaining < 8.0:
+                return script
+            shorten_timeout = min(15.0, remaining - 3.0)
+        shorten_deadline = time.monotonic() + shorten_timeout
+        keep_parts: list[str] = []
+        if payload.price and payload.price.strip():
+            keep_parts.append(f"price '{payload.price.strip()}'")
+        if payload.promotion and payload.promotion.strip():
+            keep_parts.append(f"promotion '{payload.promotion.strip()}'")
+        if payload.cta and payload.cta.strip():
+            keep_parts.append(f"exact CTA '{payload.cta.strip()}'")
+        keep_note = (
+            f" Keep {' and '.join(keep_parts)}; trim intro/benefits first if needed."
+            if keep_parts
+            else ""
+        )
+        if is_mc:
+            prompt = (
+                "Shorten this Vietnamese product ad script into EXACTLY TWO short paragraphs "
+                "separated by a blank line: Paragraph 1 (9-12 Vietnamese words, MC hook) and "
+                "Paragraph 2 (9-12 Vietnamese words, product close + CTA). "
+                f"Preserve all facts.{keep_note}\n\nOriginal:\n{script}"
+            )
+        else:
+            prompt = (
+                "Shorten this Vietnamese product ad script to 18-26 whitespace-separated words "
+                "total (max 2 sentences) so spoken audio stays under 9.2 seconds. Preserve key "
+                f"facts.{keep_note}\n\nOriginal:\n{script}"
+            )
+        try:
+            shortened = self._run_with_fallback(
+                operation="generate_script_shorten",
+                system_prompt=_SYSTEM_PROMPT,
+                fallback_schema_instructions=_SCRIPT_FALLBACK_SCHEMA_INSTRUCTIONS,
+                user_content=prompt,
+                response_format=_SCRIPT_RESPONSE_FORMAT,
+                validate=_validate_script_response,
+                temperature=0.2,
+                abort=abort,
+                deadline_monotonic=shorten_deadline,
+                max_timeout_seconds=shorten_timeout,
+            )
+            required_cta = payload.cta.strip() if payload.cta and payload.cta.strip() else None
+            cta_preserved = required_cta is None or _contains_exact_cta(shortened, required_cta)
+            return shortened.strip() if (_within_limit(shortened) and cta_preserved) else script
+        except (PermanentError, TransientError):
+            log.warning("Script auto-shorten failed; returning original draft")
+            return script
 
     def generate_storyboard(
         self,
@@ -428,23 +504,60 @@ class OpenAIProviderAdapter:
         temperature: float,
         abort: ScriptAbort | None,
         deadline_monotonic: float | None,
+        max_timeout_seconds: float | None = None,
     ) -> T:
         if abort is not None:
             abort.check()
         fallback_model = self.config.fallback_model
-        primary_timeout = (
-            _REQUEST_TIMEOUT_SECONDS
-            if fallback_model is None
-            else _primary_attempt_timeout(deadline_monotonic)
-        )
-        try:
-            result = self._request_json(
-                model=self.config.model,
-                system_prompt=system_prompt,
+        if max_timeout_seconds is not None:
+            budget = max(_FALLBACK_MIN_BUDGET_SECONDS, max_timeout_seconds)
+            primary_timeout = (
+                max(_FALLBACK_MIN_BUDGET_SECONDS, budget / 2.0)
+                if fallback_model is not None
+                else budget
+            )
+        else:
+            primary_timeout = (
+                _REQUEST_TIMEOUT_SECONDS
+                if fallback_model is None
+                else _primary_attempt_timeout(deadline_monotonic)
+            )
+        def _call_request(
+            *,
+            model: str,
+            sys_prompt: str,
+            resp_fmt: dict[str, Any],
+            attempt_timeout: float,
+        ) -> dict[str, Any]:
+            if max_timeout_seconds is None:
+                return self._request_json(
+                    model=model,
+                    system_prompt=sys_prompt,
+                    user_message=user_content,
+                    response_format=resp_fmt,
+                    temperature=temperature,
+                    timeout=attempt_timeout,
+                )
+            attempt_deadline = time.monotonic() + attempt_timeout
+            if deadline_monotonic is not None:
+                attempt_deadline = min(attempt_deadline, deadline_monotonic)
+            return self._request_json(
+                model=model,
+                system_prompt=sys_prompt,
                 user_message=user_content,
-                response_format=response_format,
+                response_format=resp_fmt,
                 temperature=temperature,
-                timeout=primary_timeout,
+                timeout=attempt_timeout,
+                abort=abort,
+                attempt_deadline=attempt_deadline,
+            )
+
+        try:
+            result = _call_request(
+                model=self.config.model,
+                sys_prompt=system_prompt,
+                resp_fmt=response_format,
+                attempt_timeout=primary_timeout,
             )
             return validate(result)
         except Exception as exc:
@@ -455,7 +568,19 @@ class OpenAIProviderAdapter:
                 _reraise_unwrapped(exc)
             if abort is not None:
                 abort.check()
-            fallback_timeout = _fallback_attempt_timeout(deadline_monotonic)
+            if max_timeout_seconds is not None:
+                remaining_budget = (
+                    max_timeout_seconds
+                    if deadline_monotonic is None
+                    else deadline_monotonic - time.monotonic()
+                )
+                fallback_timeout = (
+                    min(max_timeout_seconds, remaining_budget)
+                    if remaining_budget >= _FALLBACK_MIN_BUDGET_SECONDS
+                    else None
+                )
+            else:
+                fallback_timeout = _fallback_attempt_timeout(deadline_monotonic)
             if fallback_timeout is None:
                 log.warning(
                     "provider fallback skipped due to insufficient remaining budget",
@@ -478,13 +603,11 @@ class OpenAIProviderAdapter:
             )
 
         try:
-            fallback_result = self._request_json(
+            fallback_result = _call_request(
                 model=fallback_model,
-                system_prompt=system_prompt + fallback_schema_instructions,
-                user_message=user_content,
-                response_format=_JSON_OBJECT_RESPONSE_FORMAT,
-                temperature=temperature,
-                timeout=fallback_timeout,
+                sys_prompt=system_prompt + fallback_schema_instructions,
+                resp_fmt=_JSON_OBJECT_RESPONSE_FORMAT,
+                attempt_timeout=fallback_timeout,
             )
             validated = validate(fallback_result)
         except _AttemptFailure as failure:
@@ -509,6 +632,8 @@ class OpenAIProviderAdapter:
         response_format: dict[str, Any],
         temperature: float,
         timeout: float,
+        abort: ScriptAbort | None = None,
+        attempt_deadline: float | None = None,
     ) -> dict[str, Any]:
         body = json.dumps({
             "model": model,
@@ -531,11 +656,81 @@ class OpenAIProviderAdapter:
                 "Content-Type": "application/json",
             },
         )
+        socket_timeout = timeout
+        if attempt_deadline is not None:
+            remaining = attempt_deadline - time.monotonic()
+            if remaining <= 0:
+                raise _AttemptFailure(
+                    TransientError("provider request deadline exceeded"),
+                    "transport",
+                )
+            socket_timeout = min(timeout, max(0.001, remaining))
+        def _execute_http() -> bytes:
+            with urllib.request.urlopen(request, timeout=socket_timeout) as response:
+                if attempt_deadline is None:
+                    return response.read()
+                if isinstance(response, http.client.HTTPResponse):
+                    return read_bounded_response(
+                        response,
+                        max_bytes=4 * 1024 * 1024,
+                        provider="openai",
+                        task_id=model,
+                        abort=abort if abort is not None else _NOOP_ABORT,
+                        deadline=attempt_deadline,
+                    )
+                if time.monotonic() >= attempt_deadline:
+                    raise VendorJobTimeout("openai", model)
+                raw = response.read()
+                if time.monotonic() >= attempt_deadline:
+                    raise VendorJobTimeout("openai", model)
+                return raw
+
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
-                payload_bytes = response.read()
+            if attempt_deadline is None:
+                payload_bytes = _execute_http()
+            else:
+                result_box: list[bytes] = []
+                error_box: list[BaseException] = []
+                done = threading.Event()
+
+                def _worker() -> None:
+                    try:
+                        result_box.append(_execute_http())
+                    except BaseException as exc:
+                        error_box.append(exc)
+                    finally:
+                        done.set()
+
+                thread = threading.Thread(target=_worker, daemon=True)
+                thread.start()
+                if not done.wait(timeout=max(0.0, attempt_deadline - time.monotonic())):
+                    raise VendorJobTimeout("openai", model)
+                if error_box:
+                    raise error_box[0]
+                payload_bytes = result_box[0]
+        except VendorJobTimeout as exc:
+            log.warning(
+                "provider request timed out",
+                extra={"model": model},
+            )
+            raise _AttemptFailure(
+                TransientError("provider request timed out"),
+                "transport",
+            ) from exc
         except urllib.error.HTTPError as exc:
-            log_code, tokens = _read_http_error_tokens(exc)
+            if attempt_deadline is not None and time.monotonic() >= attempt_deadline:
+                with contextlib.suppress(Exception):
+                    exc.close()
+                raise _AttemptFailure(
+                    TransientError("provider request timed out"),
+                    "transport",
+                ) from exc
+            log_code, tokens = _read_http_error_tokens(
+                exc,
+                attempt_deadline=attempt_deadline,
+                abort=abort,
+                model=model,
+            )
             log.warning(
                 "provider HTTP request failed",
                 extra={"status": exc.code, "providerErrorCode": log_code, "model": model},
@@ -769,11 +964,9 @@ class OpenAIProviderAdapter:
             f"MULTI-IMAGE VISUAL GROUND TRUTH (Reference images provided: {count}):\n"
             "1. Inspect ALL attached product photos as visual ground truth.\n"
             "2. Decide whether the photos show multiple color/finish variants, multiple angles "
-            "of one colorway, or a single product photo, and follow the matching branch.\n"
-            "3. When multiple color variants are provided, make Scene 1 smoothly showcase the "
-            "color/finish transitions on a clean minimalist studio backdrop (no floating above "
-            "a turntable), and make Scene 2 an authentic lifestyle in-use shot.\n"
-            "4. Keep each prompt 40-75 English words and NEVER mention text, captions, CTA, "
+            "of one colorway, or a single product photo, and follow the matching branch in the "
+            "system prompt.\n"
+            "3. Keep each prompt 45-75 English words and NEVER mention text, captions, CTA, "
             "overlays, or audio."
         )
         content: list[dict[str, Any]] = [{"type": "text", "text": instruction}]
@@ -1064,11 +1257,33 @@ def _extract_error_tokens(err: dict[str, Any]) -> tuple[str, frozenset[str]]:
     return code or error_type or "unknown", tokens
 
 
-def _read_http_error_tokens(exc: urllib.error.HTTPError) -> tuple[str, frozenset[str]]:
+def _contains_exact_cta(text: str, cta: str) -> bool:
+    prefix = r"(?<!\w)" if cta[0].isalnum() or cta[0] == "_" else ""
+    suffix = r"(?!\w)" if cta[-1].isalnum() or cta[-1] == "_" else ""
+    return re.search(f"{prefix}{re.escape(cta)}{suffix}", text) is not None
+
+
+def _read_http_error_tokens(
+    exc: urllib.error.HTTPError,
+    *,
+    attempt_deadline: float | None = None,
+    abort: ScriptAbort | None = None,
+    model: str = "openai",
+) -> tuple[str, frozenset[str]]:
     """Read at most 64 KiB from HTTPError, close it, and extract only sanitized code/type."""
     raw = b""
     try:
-        raw = exc.read(_MAX_ERROR_BODY_BYTES)
+        if attempt_deadline is not None and isinstance(exc.fp, http.client.HTTPResponse):
+            raw = read_bounded_response(
+                exc.fp,
+                max_bytes=_MAX_ERROR_BODY_BYTES,
+                provider="openai",
+                task_id=model,
+                abort=abort if abort is not None else _NOOP_ABORT,
+                deadline=attempt_deadline,
+            )
+        else:
+            raw = exc.read(_MAX_ERROR_BODY_BYTES)
     except Exception:
         raw = b""
     finally:

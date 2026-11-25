@@ -48,8 +48,17 @@
         "sourceRevisionId": { "type": "string", "format": "uuid" },
         "voiceGender": { "enum": ["male", "female"] },
         "voice": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "templateId": { "enum": ["showroom-v1", "mc-v1"] },
+        "audioMode": { "enum": ["voice_bgm", "music_only"] },
         "mcHookScript": { "type": "string", "minLength": 1, "maxLength": 2000 },
         "productCloseScript": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      },
+      "not": {
+        "required": ["templateId", "audioMode"],
+        "properties": {
+          "templateId": { "const": "mc-v1" },
+          "audioMode": { "const": "music_only" }
+        }
       }
     },
     "storyboardPayload": {

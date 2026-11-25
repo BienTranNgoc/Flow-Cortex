@@ -322,6 +322,14 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
               keyframeStep={keyframeStep}
               stepTitle={stepLabel(selected, t, steps, isProductVideo)}
               productName={brief?.productName}
+              onReopenScript={() => {
+                const cp1 = steps.find(
+                  (s) => s.stepOrder === 2 && s.type === 'APPROVAL_CHECKPOINT',
+                );
+                if (cp1) {
+                  onSelect(stepKey(cp1));
+                }
+              }}
             />
           </div>
         </div>

@@ -21,6 +21,7 @@ import {
   rejectTask,
   requestUpload,
   saveRevision,
+  sessionFetch,
   startProductVideoRun,
   startRun,
   unwrap,
@@ -268,6 +269,26 @@ export function useRedoProductVideoMutation(runId: string) {
       if (created.id) {
         queryClient.setQueryData(['runs', created.id], created);
       }
+    },
+  });
+}
+
+export function useReopenProductVideoScriptMutation(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await sessionFetch(`/api/v1/product-videos/runs/${runId}/script/reopen`, {
+        method: 'POST',
+        ...authHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    },
+    onSuccess: (run) => {
+      queryClient.setQueryData(['runs', runId], run);
+      queryClient.invalidateQueries({ queryKey: ['runs', runId, 'review-tasks'] });
     },
   });
 }

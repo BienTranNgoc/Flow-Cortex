@@ -28,11 +28,19 @@ public record ProductVideoDraft(
         @Pattern(regexp = "male|female") String voiceGender,
         @Size(max = 64) String mcPresetId,
         @Size(max = 64) String backgroundPresetId,
-        @Size(max = 500) String sceneNote) {
+        @Size(max = 500) String sceneNote,
+        @Pattern(regexp = "voice_bgm|music_only") String audioMode) {
 
     public ProductVideoDraft(String productName, String description, String cta, String price,
             String promotion, String aspectRatio) {
-        this(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", null, null, null, null);
+        this(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", null, null, null, null, null);
+    }
+
+    public ProductVideoDraft(String productName, String description, String cta, String price,
+            String promotion, String aspectRatio, String templateId, String voiceGender, String mcPresetId,
+            String backgroundPresetId, String sceneNote) {
+        this(productName, description, cta, price, promotion, aspectRatio, templateId, voiceGender, mcPresetId,
+                backgroundPresetId, sceneNote, null);
     }
 
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
@@ -44,24 +52,32 @@ public record ProductVideoDraft(
     public static ProductVideoDraft of(String productName, String description, String cta, String price,
             String promotion, String aspectRatio) {
         return of(productName, description, cta, price, promotion, aspectRatio, "showroom-v1", null,
-                null, null, null);
+                null, null, null, null);
     }
 
     public static ProductVideoDraft of(String productName, String description, String cta, String price,
             String promotion, String aspectRatio, String templateId, String voiceGender, String mcPresetId,
             String backgroundPresetId, String sceneNote) {
+        return of(productName, description, cta, price, promotion, aspectRatio, templateId, voiceGender,
+                mcPresetId, backgroundPresetId, sceneNote, null);
+    }
+
+    public static ProductVideoDraft of(String productName, String description, String cta, String price,
+            String promotion, String aspectRatio, String templateId, String voiceGender, String mcPresetId,
+            String backgroundPresetId, String sceneNote, String audioMode) {
         String resolvedTemplate = templateId == null || templateId.isBlank() ? "showroom-v1" : templateId.trim();
         String resolvedVoice = voiceGender == null || voiceGender.isBlank() ? null : voiceGender.trim();
+        String resolvedAudioMode = audioMode == null || audioMode.isBlank() ? null : audioMode.trim();
         ProductVideoDraft raw = new ProductVideoDraft(productName, description, cta, price, promotion, aspectRatio,
                 resolvedTemplate, resolvedVoice, trimToNull(mcPresetId), trimToNull(backgroundPresetId),
-                trimToNull(sceneNote));
+                trimToNull(sceneNote), resolvedAudioMode);
         Set<ConstraintViolation<ProductVideoDraft>> violations = VALIDATOR.validate(raw);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
         return new ProductVideoDraft(productName.trim(), description.trim(), trimToNull(cta), trimToNull(price),
                 trimToNull(promotion), aspectRatio, resolvedTemplate, resolvedVoice, trimToNull(mcPresetId),
-                trimToNull(backgroundPresetId), trimToNull(sceneNote));
+                trimToNull(backgroundPresetId), trimToNull(sceneNote), resolvedAudioMode);
     }
 
     /** Product Video takes 1 to 3 product images, and the same upload is never named twice. */
@@ -75,6 +91,11 @@ public record ProductVideoDraft(
     @AssertTrue(message = "price, promotion, and cta must be omitted or contain text")
     boolean hasNoBlankOptionalClaims() {
         return notBlankWhenPresent(price) && notBlankWhenPresent(promotion) && notBlankWhenPresent(cta);
+    }
+
+    @AssertTrue(message = "audioMode music_only is only supported for showroom-v1")
+    boolean hasSupportedAudioModeForTemplate() {
+        return !"music_only".equals(audioMode) || !"mc-v1".equals(templateId);
     }
 
     private static boolean notBlankWhenPresent(String value) {

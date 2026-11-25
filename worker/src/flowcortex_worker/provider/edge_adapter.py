@@ -14,6 +14,7 @@ import io
 import logging
 import os
 import random
+import re
 import tempfile
 import wave
 from dataclasses import dataclass
@@ -55,6 +56,8 @@ def resolve_edge_voice(request: SpeechRequest, default_voice: str) -> str:
 _MAX_SPEECH_MS = 10_000
 _SOFT_FIT_CEILING_MS = 11_500
 _TARGET_FIT_MS = 9_850
+_MC_GAP_MS = 300
+_MC_END_MS_PATTERN = re.compile(rb"mc_end_ms=(\d{3,5})")
 _MAX_DOWNLOAD_ATTEMPTS = 4
 _RETRY_DELAYS_SECONDS: tuple[float, ...] = (0.5, 1.0, 1.5)
 _TRANSPORT_ERRORS = (
@@ -298,8 +301,113 @@ def _to_wav(mp3: bytes, abort: Abort, *, atempo: float | None = None) -> bytes:
         return output.read_bytes()
 
 
+def split_mc_script_segments(script: str) -> tuple[str, str] | None:
+    """Split a two-paragraph MC script separated by a blank line into (mc_hook, product_close)."""
+    parts = [part.strip() for part in re.split(r"\r?\n\s*\r?\n", script.strip()) if part.strip()]
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return None
+
+
+def _extract_riff_icmt(wav_bytes: bytes) -> bytes | None:
+    """Read raw RIFF WAVE LIST/INFO/ICMT metadata bounded strictly by declared RIFF size."""
+    if len(wav_bytes) < 12 or wav_bytes[:4] != b"RIFF" or wav_bytes[8:12] != b"WAVE":
+        return None
+    riff_end = 8 + int.from_bytes(wav_bytes[4:8], "little")
+    if riff_end < 12 or riff_end > len(wav_bytes):
+        return None
+    offset = 12
+    while offset + 8 <= riff_end:
+        chunk_id = wav_bytes[offset : offset + 4]
+        chunk_size = int.from_bytes(wav_bytes[offset + 4 : offset + 8], "little")
+        body_start = offset + 8
+        body_end = body_start + chunk_size
+        if body_end > riff_end:
+            break
+        is_info_list = (
+            chunk_id == b"LIST"
+            and chunk_size >= 4
+            and wav_bytes[body_start : body_start + 4] == b"INFO"
+        )
+        if is_info_list:
+            sub_offset = body_start + 4
+            while sub_offset + 8 <= body_end:
+                sub_id = wav_bytes[sub_offset : sub_offset + 4]
+                sub_size = int.from_bytes(wav_bytes[sub_offset + 4 : sub_offset + 8], "little")
+                sub_start = sub_offset + 8
+                sub_end = sub_start + sub_size
+                if sub_end > body_end:
+                    break
+                if sub_id == b"ICMT":
+                    return wav_bytes[sub_start:sub_end].rstrip(b"\x00").strip()
+                sub_offset = sub_end + (sub_size & 1)
+        offset = body_end + (chunk_size & 1)
+    return None
+
+
+def extract_mc_end_ms(wav_bytes: bytes) -> int | None:
+    """Read `mc_end_ms` strictly from a RIFF WAVE LIST/INFO/ICMT metadata chunk."""
+    raw_comment = _extract_riff_icmt(wav_bytes)
+    if raw_comment is None:
+        return None
+    match = _MC_END_MS_PATTERN.fullmatch(raw_comment)
+    if not match:
+        return None
+    value = int(match.group(1))
+    return value if 500 <= value <= 5_000 else None
+
+
+def extract_audio_mode(wav_bytes: bytes) -> str | None:
+    """Read `audio_mode` marker (`music_only`) from a RIFF WAVE LIST/INFO/ICMT chunk."""
+    raw_comment = _extract_riff_icmt(wav_bytes)
+    if raw_comment == b"audio_mode=music_only":
+        return "music_only"
+    return None
+
+
+def make_music_only_wav(duration_ms: int = 10_000, *, sample_rate: int = 24_000) -> bytes:
+    """Generate a silent mono PCM WAV tagged with `audio_mode=music_only` for BGM-only showroom."""
+    buf = io.BytesIO()
+    nframes = max(1, round(sample_rate * duration_ms / 1000))
+    with wave.open(buf, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(sample_rate)
+        wav.writeframes(b"\x00\x00" * nframes)
+    raw = buf.getvalue()
+    payload = b"audio_mode=music_only\x00"
+    if len(payload) % 2:
+        payload += b"\x00"
+    icmt = b"ICMT" + len(payload).to_bytes(4, "little") + payload
+    info = b"INFO" + icmt
+    list_chunk = b"LIST" + len(info).to_bytes(4, "little") + info
+    new_size = (int.from_bytes(raw[4:8], "little") + len(list_chunk)).to_bytes(4, "little")
+    return raw[:4] + new_size + raw[8:] + list_chunk
+
+
+def trim_wav(wav_bytes: bytes, duration_ms: int) -> bytes:
+    """Return a clean mono PCM WAV trimmed to at most `duration_ms` milliseconds."""
+    if duration_ms <= 0:
+        raise PermanentError("contract_violation", "trim duration must be positive")
+    try:
+        with wave.open(io.BytesIO(wav_bytes), "rb") as src:
+            params = src.getparams()
+            max_frames = max(1, round(duration_ms * params.framerate / 1000))
+            frames = src.readframes(min(params.nframes, max_frames))
+    except (EOFError, wave.Error) as exc:
+        raise PermanentError("provider_response_invalid", "audio input is not a valid WAV") from exc
+    out = io.BytesIO()
+    with wave.open(out, "wb") as dst:
+        dst.setparams(params)
+        dst.writeframes(frames)
+    return out.getvalue()
+
+
 def _concat_aligned_wav(mc_wav: bytes, sp_wav: bytes, abort: Abort) -> bytes:
-    """Pads mc_wav to 5.0s so Scene 2 voice-over aligns cleanly at t=5.000s."""
+    """Concatenates mc_wav + natural 300ms pause + sp_wav and embeds mc_end_ms in WAV metadata."""
+    mc_ms = _validate_wav(mc_wav)
+    mc_end_ms = min(5_000, max(2_000, mc_ms + _MC_GAP_MS))
+    mc_end_s = mc_end_ms / 1000.0
     with tempfile.TemporaryDirectory(prefix=TEMP_PREFIX) as directory:
         root = Path(directory)
         mc_path = root / "mc.wav"
@@ -314,10 +422,12 @@ def _concat_aligned_wav(mc_wav: bytes, sp_wav: bytes, abort: Abort) -> bytes:
                     "-i", str(mc_path),
                     "-i", str(sp_path),
                     "-filter_complex",
-                    "[0:a]apad=whole_dur=5,atrim=duration=5,asetpts=PTS-STARTPTS[a0];"
+                    f"[0:a]apad=whole_dur={mc_end_s:.3f},atrim=duration={mc_end_s:.3f},"
+                    "asetpts=PTS-STARTPTS[a0];"
                     "[1:a]asetpts=PTS-STARTPTS[a1];"
                     "[a0][a1]concat=n=2:v=0:a=1[a]",
                     "-map", "[a]",
+                    "-metadata", f"comment=mc_end_ms={mc_end_ms}",
                     "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le",
                     str(out_path),
                 ]

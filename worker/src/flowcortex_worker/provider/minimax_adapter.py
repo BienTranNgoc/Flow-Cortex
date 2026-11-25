@@ -44,7 +44,9 @@ log = logging.getLogger("flowcortex_provider_worker.minimax")
 
 PROVIDER_MINIMAX = "minimax"
 _MAX_VIDEO_BYTES = 100 * 1024 * 1024
-_DOWNLOAD_ATTEMPTS = 4
+_DOWNLOAD_ATTEMPTS = 8
+_DOWNLOAD_TIMEOUT_SECONDS = 8.0
+_DOWNLOAD_RETRY_DELAY_SECONDS = 1.0
 _TERMINAL_FAILURES = {"failed", "canceled"}
 _CANCEL_ATTEMPTS = 3
 _CANCEL_RETRY_DELAYS = (1.0, 2.0)
@@ -400,7 +402,7 @@ class MinimaxAdapter:
                     "MiniMax video download will retry",
                     extra={"downloadAttempt": attempt, "errorType": type(exc.__cause__).__name__},
                 )
-                time.sleep(float(2 ** (attempt - 1)))
+                time.sleep(_DOWNLOAD_RETRY_DELAY_SECONDS)
         else:  # pragma: no cover
             raise last_error or TransientError("MiniMax video download failed")
         if len(body) > _MAX_VIDEO_BYTES:
@@ -418,8 +420,13 @@ class MinimaxAdapter:
             )
             with urllib.request.urlopen(
                 req,
-                timeout=self.config.request_timeout_seconds,
+                timeout=min(self.config.request_timeout_seconds, _DOWNLOAD_TIMEOUT_SECONDS),
             ) as response:
+                raw_sock = getattr(
+                    getattr(getattr(response, "fp", None), "raw", None), "_sock", None
+                )
+                if raw_sock is not None and hasattr(raw_sock, "settimeout"):
+                    raw_sock.settimeout(self.config.request_timeout_seconds)
                 return cast(bytes, response.read(_MAX_VIDEO_BYTES + 1))
         except urllib.error.HTTPError as exc:
             _raise_http_error(exc, gone=RESULT_GONE_STATUSES)

@@ -152,7 +152,7 @@ public class ProductVideoService implements ProductVideoRuns {
             UUID mcUploadId, UUID backgroundUploadId, boolean acknowledgeCost, String requestKey) {
         ProductVideoDraft validated = ProductVideoDraft.of(draft.productName(), draft.description(), draft.cta(),
                 draft.price(), draft.promotion(), draft.aspectRatio(), draft.templateId(), draft.voiceGender(),
-                draft.mcPresetId(), draft.backgroundPresetId(), draft.sceneNote());
+                draft.mcPresetId(), draft.backgroundPresetId(), draft.sceneNote(), draft.audioMode());
         ProductVideoDraft.requireUploads(uploadIds);
         return startRun(ownerId, validated, uploadIds, mcUploadId, backgroundUploadId, acknowledgeCost, requestKey);
     }
@@ -355,6 +355,76 @@ public class ProductVideoService implements ProductVideoRuns {
     private record StagedPresetImage(MediaJobInput input, long bytes) {
     }
 
+    public RunView reopenScriptReview(UUID runId, UUID ownerId) {
+        if (!enabled || !workflowEnabled) {
+            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    new LocalizedMessage("workflow.productVideo.disabled"));
+        }
+        return transactions.execute(status -> {
+            runs.lockById(runId);
+            WorkflowRun run = runs.findByIdAndOwnerId(runId, ownerId)
+                    .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
+            if (!ProductVideoWorkflow.isProductVideo(run.getWorkflowId())) {
+                throw new LocalizedStatusException(HttpStatus.BAD_REQUEST,
+                        new LocalizedMessage("workflow.productVideo.redoNotSupported"));
+            }
+            if (run.getStatus() != RunStatus.ERROR) {
+                throw new ConflictException(new LocalizedMessage("workflow.productVideo.reopenNotAllowed"));
+            }
+            List<RunStep> allSteps = runSteps.findByRunIdOrderByStepOrderAsc(runId);
+            RunStep speechStep = allSteps.stream()
+                    .filter(s -> "generate_speech".equals(s.getType()) && s.getStatus() == RunStepStatus.ERROR)
+                    .findFirst()
+                    .orElseThrow(() -> new ConflictException(
+                            new LocalizedMessage("workflow.productVideo.reopenNotAllowed")));
+            String code = speechStep.getErrorCode();
+            if (!"speech_too_long".equals(code) && !"provider_request_failed".equals(code)) {
+                throw new ConflictException(new LocalizedMessage("workflow.productVideo.reopenNotAllowed"));
+            }
+            boolean hasExpensiveCompleted = allSteps.stream().anyMatch(s ->
+                    s.getStatus() == RunStepStatus.COMPLETED
+                            && ("generate_keyframe".equals(s.getType())
+                                    || "generate_video".equals(s.getType())
+                                    || "lipsync_video".equals(s.getType())));
+            if (hasExpensiveCompleted) {
+                throw new ConflictException(new LocalizedMessage("workflow.productVideo.reopenNotAllowed"));
+            }
+            RunStep checkpointStep = allSteps.stream()
+                    .filter(s -> s.getStepOrder() == 2 && "APPROVAL_CHECKPOINT".equals(s.getType()))
+                    .findFirst()
+                    .orElseThrow(() -> new ConflictException(
+                            new LocalizedMessage("workflow.productVideo.reopenNotAllowed")));
+            ReviewTask scriptTask = reviewTasks.findByRunStepId(checkpointStep.getId())
+                    .filter(t -> t.getStatus() == ReviewTaskStatus.APPROVED)
+                    .orElseThrow(() -> new ConflictException(
+                            new LocalizedMessage("workflow.productVideo.reopenNotAllowed")));
+
+            Instant now = Instant.now();
+            scriptTask.reopen(now.plusSeconds(7L * 24 * 3600));
+            reviewTasks.save(scriptTask);
+
+            boolean isMcRun = ProductVideoWorkflow.MC_ID.equals(run.getWorkflowId());
+            for (RunStep step : allSteps) {
+                if (step.getStepOrder() >= checkpointStep.getStepOrder()
+                        && (step.getStatus() == RunStepStatus.COMPLETED
+                                || step.getStatus() == RunStepStatus.ERROR)) {
+                    String updatedConfig = (isMcRun && "generate_speech".equals(step.getType()))
+                            ? mergePayloadDefaults(step.getConfig(), Map.of("templateId", "mc-v1"))
+                            : null;
+                    step.resetToPendingForReopen(updatedConfig);
+                    runSteps.save(step);
+                }
+            }
+            if (!run.reopenWaitingApproval()) {
+                throw new ConflictException(new LocalizedMessage("workflow.productVideo.reopenNotAllowed"));
+            }
+            runs.save(run);
+            runUpdates.touched(runId);
+            return WorkflowMapper.toRunView(run, allSteps, List.of(),
+                    registry::isRemote, mediaJobs::isDownloadable);
+        });
+    }
+
     public RunView redoSteps(UUID runId, UUID ownerId, List<Integer> requestedOrders,
             String rawSceneNote, boolean acknowledgeCost) {
         if (!enabled || !workflowEnabled) {
@@ -526,6 +596,20 @@ public class ProductVideoService implements ProductVideoRuns {
         if (backgroundPresetId == null && sceneNote == null) {
             return rawConfig;
         }
+        Map<String, Object> additions = new LinkedHashMap<>();
+        if (backgroundPresetId != null) {
+            additions.put("scenePreset", backgroundPresetId);
+        }
+        if (sceneNote != null) {
+            additions.put("sceneNote", sceneNote);
+        }
+        return mergePayloadDefaults(rawConfig, additions);
+    }
+
+    private String mergePayloadDefaults(String rawConfig, Map<String, Object> additions) {
+        if (additions.isEmpty()) {
+            return rawConfig;
+        }
         try {
             Map<String, Object> config = rawConfig == null || rawConfig.isBlank()
                     ? new LinkedHashMap<>()
@@ -535,12 +619,7 @@ public class ProductVideoService implements ProductVideoRuns {
             if (existing instanceof Map<?, ?> map) {
                 map.forEach((k, v) -> defaults.put(String.valueOf(k), v));
             }
-            if (backgroundPresetId != null) {
-                defaults.put("scenePreset", backgroundPresetId);
-            }
-            if (sceneNote != null) {
-                defaults.put("sceneNote", sceneNote);
-            }
+            defaults.putAll(additions);
             config.put("payloadDefaults", defaults);
             return json.writeValueAsString(config);
         } catch (JsonProcessingException e) {
@@ -586,8 +665,15 @@ public class ProductVideoService implements ProductVideoRuns {
 
     private String enrichStepConfig(String stepType, String rawConfig, ProductVideoDraft draft) {
         Map<String, Object> defaults = new LinkedHashMap<>();
-        if ("generate_speech".equals(stepType) && draft.voiceGender() != null) {
-            defaults.put("voiceGender", draft.voiceGender());
+        if ("generate_speech".equals(stepType)) {
+            if (draft.voiceGender() != null) {
+                defaults.put("voiceGender", draft.voiceGender());
+            }
+            if (draft.templateId() != null && !"showroom-v1".equals(draft.templateId())) {
+                defaults.put("templateId", draft.templateId());
+            } else if ("music_only".equals(draft.audioMode())) {
+                defaults.put("audioMode", "music_only");
+            }
         } else if ("generate_storyboard".equals(stepType)) {
             if (draft.templateId() != null && !"showroom-v1".equals(draft.templateId())) {
                 defaults.put("templateId", draft.templateId());

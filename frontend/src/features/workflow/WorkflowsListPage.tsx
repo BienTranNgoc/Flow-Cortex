@@ -13,6 +13,7 @@ import { useMeQuery } from '../auth/useAuth';
 import { iconForWorkflow } from '../dashboard/workflowIconKey';
 import { metaFor, type StatusTone } from '../dashboard/workflowMeta';
 import { WorkflowIcon } from '../dashboard/WorkflowIcon';
+import { PRODUCT_VIDEO_MC_WORKFLOW_ID } from './productVideoSchemas';
 import { useCapabilitiesQuery } from './useCapabilities';
 import { useWorkflowsQuery } from './useWorkflows';
 import { OwnerCell } from './OwnerCell';
@@ -73,8 +74,9 @@ export function WorkflowsListPage() {
     if (capabilitiesQuery.isPending) return undefined;
     return (workflowsQuery.data ?? []).filter(
       (workflow) =>
-        capabilities?.productVideoEnabled !== false ||
-        workflow.id !== capabilities.productVideoWorkflowId,
+        workflow.id !== PRODUCT_VIDEO_MC_WORKFLOW_ID &&
+        (capabilities?.productVideoEnabled !== false ||
+          workflow.id !== capabilities.productVideoWorkflowId),
     );
   }, [capabilitiesQuery.isPending, workflowsQuery.data, capabilities]);
 

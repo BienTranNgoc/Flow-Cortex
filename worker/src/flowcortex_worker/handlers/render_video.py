@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Mapping
 from pathlib import Path
 
 from ..contracts.media_job import MediaJob
 from ..errors import PermanentError
+from ..provider.edge_adapter import extract_audio_mode, extract_mc_end_ms
 from ..render.document import PROJECT_PROFILES
 from ..render.execute import render_project
 from ..runtime import ProcessRunner
 from . import HandlerOutcome, OutputFile
+from .luxury_bgm import write_luxury_bgm_wav
+
+log = logging.getLogger("flowcortex_worker.render_video")
 
 PROFILE = "vertical_ad_v1"
 PROFILE_V2 = "vertical_ad_v2"
@@ -57,64 +62,127 @@ def _render_product_video(
                 "contract_violation", "render_video requires two non-empty generated videos"
             )
     video = speech.parent / VIDEO_NAME
-    completed = processes.run(
-        [
-            "ffmpeg",
-            "-nostdin",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-i",
-            str(generated_video_1),
-            "-i",
-            str(generated_video_2),
-            "-i",
-            str(speech),
-            "-filter_complex",
+    audio_mode = extract_audio_mode(speech.read_bytes())
+    bgm = write_luxury_bgm_wav(speech.parent / "luxury_bgm.wav", float(TARGET_DURATION_SECONDS))
+    dissolve_dur = 0.55
+    if image_count >= 2:
+        # 3-beat choreography: Scene 1 (0-4.3s) -> dissolve 0.55s -> Scene 2 (3.75-8.2s)
+        # -> dissolve 0.25s -> Split-screen top/bottom finale (7.95-10.0s).
+        divider_h = 2
+        half_h = (HEIGHT - divider_h) // 2
+        scene1_len = 4.3
+        scene2_len = 4.45
+        split_len = 2.05
+        offset_1 = round(scene1_len - dissolve_dur, 3)  # 3.75
+        split_fade = 0.25
+        offset_2 = round(offset_1 + scene2_len - split_fade, 3)  # 7.95
+        video_filter = (
             f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
-            f"fps=30,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
-            f"trim=duration={CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS[v0];"
+            f"format=yuv420p,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
+            f"split=2[s0a][s0b];"
             f"[1:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
-            f"fps=30,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
-            f"trim=duration={CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS[v1];"
-            f"[v0][v1]concat=n=2:v=1:a=0[v];"
-            f"[2:a]apad=whole_dur={TARGET_DURATION_SECONDS},"
-            f"atrim=duration={TARGET_DURATION_SECONDS},asetpts=PTS-STARTPTS[a]",
-            "-map",
-            "[v]",
-            "-map",
-            "[a]",
-            "-t",
-            str(TARGET_DURATION_SECONDS),
-            "-c:v",
-            "libx264",
-            "-preset",
-            VIDEO_PRESET,
-            "-crf",
-            VIDEO_CRF,
-            "-pix_fmt",
-            "yuv420p",
-            "-r",
-            "30",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-ar",
-            "24000",
-            "-ac",
-            "1",
-            "-map_metadata",
-            "-1",
-            "-movflags",
-            "+faststart",
-            str(video),
-        ]
-    )
+            f"format=yuv420p,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
+            f"split=2[s1a][s1b];"
+            f"[s0a]trim=duration={scene1_len},setpts=PTS-STARTPTS,fps=30[v0];"
+            f"[s1a]trim=duration={scene2_len},setpts=PTS-STARTPTS,fps=30[v1];"
+            f"[v0][v1]xfade=transition=dissolve:duration={dissolve_dur}:offset={offset_1}[v01];"
+            f"[s0b]trim=start=2.5:duration={split_len},setpts=PTS-STARTPTS,"
+            f"crop={WIDTH}:{half_h}:(iw-{WIDTH})/2:(ih-{half_h})/2,fps=30[top];"
+            f"[s1b]trim=start=2.5:duration={split_len},setpts=PTS-STARTPTS,"
+            f"crop={WIDTH}:{half_h}:(iw-{WIDTH})/2:(ih-{half_h})/2,fps=30[bot];"
+            f"color=c=0xF5E6C8:s={WIDTH}x{divider_h}:r=30:d={split_len},"
+            f"format=yuv420p,setsar=1,setpts=PTS-STARTPTS,fps=30[div];"
+            f"[top][div][bot]vstack=inputs=3,format=yuv420p,setpts=PTS-STARTPTS,fps=30[v2];"
+            f"[v01][v2]xfade=transition=dissolve:duration={split_fade}:offset={offset_2}[v];"
+        )
+    else:
+        xfade_offset = round(float(CLIP_DURATION_SECONDS) - dissolve_dur, 3)
+        clip2_len = round(float(CLIP_DURATION_SECONDS) + dissolve_dur, 3)
+        video_filter = (
+            f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
+            f"format=yuv420p,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
+            f"trim=duration={CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS,fps=30[v0];"
+            f"[1:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
+            f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
+            f"format=yuv420p,tpad=stop_mode=clone:stop_duration={clip2_len},"
+            f"trim=duration={clip2_len},setpts=PTS-STARTPTS,fps=30[v1];"
+            f"[v0][v1]xfade=transition=dissolve:duration={dissolve_dur}:offset={xfade_offset}[v];"
+        )
+    if audio_mode == "music_only":
+        audio_filter = (
+            f"[3:a]volume=0.82,apad=whole_dur={TARGET_DURATION_SECONDS},"
+            f"atrim=duration={TARGET_DURATION_SECONDS},asetpts=PTS-STARTPTS[a]"
+        )
+    else:
+        audio_filter = (
+            f"[2:a]volume=0.92,apad=whole_dur={TARGET_DURATION_SECONDS},"
+            f"atrim=duration={TARGET_DURATION_SECONDS},asetpts=PTS-STARTPTS[voice];"
+            f"[3:a]volume=0.13,apad=whole_dur={TARGET_DURATION_SECONDS},"
+            f"atrim=duration={TARGET_DURATION_SECONDS},asetpts=PTS-STARTPTS[bgm];"
+            "[voice][bgm]amix=inputs=2:duration=first:normalize=0,"
+            "alimiter=limit=0.95:attack=5:release=50:level=0[a]"
+        )
+    try:
+        completed = processes.run(
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(generated_video_1),
+                "-i",
+                str(generated_video_2),
+                "-i",
+                str(speech),
+                "-i",
+                str(bgm),
+                "-filter_complex",
+                f"{video_filter}{audio_filter}",
+                "-map",
+                "[v]",
+                "-map",
+                "[a]",
+                "-t",
+                str(TARGET_DURATION_SECONDS),
+                "-c:v",
+                "libx264",
+                "-preset",
+                VIDEO_PRESET,
+                "-crf",
+                VIDEO_CRF,
+                "-pix_fmt",
+                "yuv420p",
+                "-r",
+                "30",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
+                "-map_metadata",
+                "-1",
+                "-movflags",
+                "+faststart",
+                str(video),
+            ]
+        )
+    finally:
+        bgm.unlink(missing_ok=True)
     if completed.returncode != 0 or not video.is_file() or video.stat().st_size == 0:
+        log.warning(
+            "product video ffmpeg compose failed: rc=%s stderr=%s",
+            completed.returncode,
+            completed.stderr.decode("utf-8", errors="replace").strip()[-500:],
+        )
         video.unlink(missing_ok=True)
         raise PermanentError(
             "contract_violation",
@@ -207,19 +275,28 @@ def _render_product_video_v2(
     if clip2 is not None and (not clip2.is_file() or clip2.stat().st_size == 0):
         raise PermanentError("contract_violation", "generated_video_2 must be non-empty")
 
-    speech_dur = _probe_audio_duration(speech, processes)
+    speech_dur = _probe_media_duration(speech, processes)
     target_dur = round(min(float(TARGET_DURATION_SECONDS), max(1.0, speech_dur)), 3)
     video = speech.parent / VIDEO_NAME
     if clip2 is not None:
-        clip2_dur = round(max(0.5, target_dur - CLIP_DURATION_SECONDS), 3)
+        mc_end_ms = extract_mc_end_ms(speech.read_bytes())
+        clip1_dur = (
+            round(min(float(CLIP_DURATION_SECONDS), mc_end_ms / 1000.0), 3)
+            if mc_end_ms is not None
+            else float(CLIP_DURATION_SECONDS)
+        )
+        target_dur = round(
+            min(float(TARGET_DURATION_SECONDS), max(target_dur, clip1_dur + 0.5)), 3
+        )
+        clip2_dur = round(max(0.5, target_dur - clip1_dur), 3)
         cmd = [
             "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-i", str(clip1), "-i", str(clip2), "-i", str(speech),
             "-filter_complex",
             f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
-            f"fps=30,tpad=stop_mode=clone:stop_duration={CLIP_DURATION_SECONDS},"
-            f"trim=duration={CLIP_DURATION_SECONDS},setpts=PTS-STARTPTS[v0];"
+            f"fps=30,tpad=stop_mode=clone:stop_duration={clip1_dur},"
+            f"trim=duration={clip1_dur},setpts=PTS-STARTPTS[v0];"
             f"[1:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
             f"fps=30,tpad=stop_mode=clone:stop_duration={clip2_dur},"
@@ -281,21 +358,21 @@ def _render_product_video_v2(
     )
 
 
-def _probe_audio_duration(speech: Path, processes: ProcessRunner) -> float:
+def _probe_media_duration(media: Path, processes: ProcessRunner) -> float:
     completed = processes.run(
         [
             "ffprobe", "-v", "error",
             "-show_entries", "format=duration",
             "-of", "json",
-            str(speech),
+            str(media),
         ]
     )
     if completed.returncode != 0:
-        raise PermanentError("contract_violation", "speech input could not be probed")
+        raise PermanentError("contract_violation", "media input could not be probed")
     try:
         return float(json.loads(completed.stdout)["format"]["duration"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise PermanentError("contract_violation", "speech duration is invalid") from exc
+        raise PermanentError("contract_violation", "media duration is invalid") from exc
 
 
 def _verify_video(

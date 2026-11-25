@@ -18,6 +18,7 @@ import './ProductVideoStudio.css';
 import { MediaStartForm } from './MediaStartForm';
 import { Pipeline } from './Pipeline';
 import { ProductVideoStartForm } from './ProductVideoStartForm';
+import { PRODUCT_VIDEO_MC_WORKFLOW_ID } from './productVideoSchemas';
 import { stepKey } from './stepDisplay';
 import { startProblem, type IncompleteStep, type IncompleteWorkflow } from './startProblem';
 import {
@@ -188,13 +189,20 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
   // (4 steps + plain input) before switching to the 5-field product form. If they fail, the
   // generic form is safe — the server refuses a Product Video start through the generic route.
   const productVideoWorkflowId = capabilitiesQuery.data?.productVideoWorkflowId;
+  const isMcWorkflow = workflowId === PRODUCT_VIDEO_MC_WORKFLOW_ID;
   const isProductVideo =
-    productVideoWorkflowId !== undefined && workflowId === productVideoWorkflowId;
+    (productVideoWorkflowId !== undefined && workflowId === productVideoWorkflowId) || isMcWorkflow;
   // A start against a definition that is loading or failed to load would 404.
   const startDisabled = workflowQuery.isLoading || workflowQuery.isError || !workflow;
   let startForm: ReactNode = null;
   if (isProductVideo) {
-    startForm = <ProductVideoStartForm disabled={startDisabled} onIncomplete={setIncomplete} />;
+    startForm = (
+      <ProductVideoStartForm
+        disabled={startDisabled}
+        onIncomplete={setIncomplete}
+        initialTemplateId={isMcWorkflow ? 'mc-v1' : 'showroom-v1'}
+      />
+    );
   } else if (workflow && !capabilitiesQuery.isPending) {
     const startInput = workflow.startInput;
     startForm =

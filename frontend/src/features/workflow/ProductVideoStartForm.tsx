@@ -136,9 +136,11 @@ function startButtonLabel(phase: MultiUploadPhase | null, t: TFunction): string 
 export function ProductVideoStartForm({
   disabled,
   onIncomplete,
+  initialTemplateId = 'showroom-v1',
 }: Readonly<{
   disabled: boolean;
   onIncomplete: (problem: IncompleteWorkflow | null) => void;
+  initialTemplateId?: ProductVideoTemplateId | undefined;
 }>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
@@ -156,7 +158,8 @@ export function ProductVideoStartForm({
     [createUpload.mutateAsync],
   );
 
-  const [templateId, setTemplateId] = useState<ProductVideoTemplateId>('showroom-v1');
+  const [templateId, setTemplateId] = useState<ProductVideoTemplateId>(initialTemplateId);
+  const [audioMode, setAudioMode] = useState<'voice_bgm' | 'music_only'>('voice_bgm');
   const [voiceGender, setVoiceGender] = useState<VoiceGender>('male');
   const [mcMode, setMcMode] = useState<AssetMode>('preset');
   const [mcPresetId, setMcPresetId] = useState<string>('mc-nu-tre');
@@ -441,7 +444,7 @@ export function ProductVideoStartForm({
       showFailure(error);
       return;
     }
-    const payload: ProductVideoRunRequest = {
+    const payload: ProductVideoRunRequest & { audioMode?: 'voice_bgm' | 'music_only' } = {
       productName: text.productName.trim(),
       description: text.description.trim(),
       uploadIds,
@@ -449,6 +452,9 @@ export function ProductVideoStartForm({
       templateId,
       voiceGender,
     };
+    if (templateId === 'showroom-v1' && audioMode === 'music_only') {
+      payload.audioMode = 'music_only';
+    }
     if (templateId === 'mc-v1') {
       if (mcUploadId) {
         payload.mcUploadId = mcUploadId;
@@ -756,33 +762,68 @@ export function ProductVideoStartForm({
             onNoteChange={setSceneNote}
             disabled={phase !== null}
           />
-          <div className="pv-field">
-            <div className="pv-field-header">
-              <label id="pv-voice-label">{t('workflow.productVideo.voiceLabel')}</label>
-            </div>
-            <div className="pv-voice-toggle" role="radiogroup" aria-labelledby="pv-voice-label">
-              <button
-                type="button"
-                role="radio"
-                aria-checked={voiceGender === 'male'}
-                disabled={phase !== null}
-                className={voiceGender === 'male' ? 'pv-tab pv-tab--active' : 'pv-tab'}
-                onClick={() => setVoiceGender('male')}
+          {templateId === 'showroom-v1' && (
+            <div className="pv-field">
+              <div className="pv-field-header">
+                <label id="pv-audio-mode-label">{t('workflow.productVideo.audioModeLabel')}</label>
+              </div>
+              <div
+                className="pv-voice-toggle"
+                role="radiogroup"
+                aria-labelledby="pv-audio-mode-label"
               >
-                {t('workflow.productVideo.voiceMale')}
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={voiceGender === 'female'}
-                disabled={phase !== null}
-                className={voiceGender === 'female' ? 'pv-tab pv-tab--active' : 'pv-tab'}
-                onClick={() => setVoiceGender('female')}
-              >
-                {t('workflow.productVideo.voiceFemale')}
-              </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={audioMode === 'voice_bgm'}
+                  disabled={phase !== null}
+                  className={audioMode === 'voice_bgm' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setAudioMode('voice_bgm')}
+                >
+                  {t('workflow.productVideo.audioVoiceBgm')}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={audioMode === 'music_only'}
+                  disabled={phase !== null}
+                  className={audioMode === 'music_only' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setAudioMode('music_only')}
+                >
+                  {t('workflow.productVideo.audioMusicOnly')}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+          {(templateId !== 'showroom-v1' || audioMode !== 'music_only') && (
+            <div className="pv-field">
+              <div className="pv-field-header">
+                <label id="pv-voice-label">{t('workflow.productVideo.voiceLabel')}</label>
+              </div>
+              <div className="pv-voice-toggle" role="radiogroup" aria-labelledby="pv-voice-label">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={voiceGender === 'male'}
+                  disabled={phase !== null}
+                  className={voiceGender === 'male' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setVoiceGender('male')}
+                >
+                  {t('workflow.productVideo.voiceMale')}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={voiceGender === 'female'}
+                  disabled={phase !== null}
+                  className={voiceGender === 'female' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setVoiceGender('female')}
+                >
+                  {t('workflow.productVideo.voiceFemale')}
+                </button>
+              </div>
+            </div>
+          )}
           {uploadPercent !== null && (
             <progress
               className="upload-progress"

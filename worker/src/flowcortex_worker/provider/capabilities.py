@@ -45,7 +45,13 @@ from .contracts.provider_job import (
 )
 from .contracts.provider_speech_result import ProviderSpeechData
 from .control import ControlClient, JobControlSession, SiblingFailedSignal
-from .edge_adapter import resolve_edge_voice
+from .edge_adapter import (
+    extract_mc_end_ms,
+    make_music_only_wav,
+    resolve_edge_voice,
+    split_mc_script_segments,
+    trim_wav,
+)
 from .seedance_adapter import PROVIDER_SEEDANCE
 from .vendor_jobs import (
     ProbeRegistry,
@@ -187,13 +193,41 @@ def _generate_speech(
     if not isinstance(job, GenerateSpeechJob):
         raise UnsupportedCapability("generate_speech received the wrong job shape")
     payload = job.params.payload
+    if payload.audioMode == "music_only" and payload.templateId != "mc-v1":
+        silent_wav = make_music_only_wav(10_000)
+        silent_identity = SpeechIdentity("silent", "music-only", "+0%", 24_000)
+        silent_req = SpeechRequest(payload.script, payload.sourceRevisionId)
+        data = {
+            "profile": silent_req.profile,
+            "durationMs": 10_000,
+            "provider": silent_identity.provider,
+            "voice": silent_identity.voice,
+            "speed": silent_identity.speed,
+            "sourceRevisionId": str(silent_req.source_revision_id),
+            "idempotencyKey": _speech_idempotency_key(silent_req, silent_identity),
+            "format": "wav",
+        }
+        manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
+        return ProviderOutcome(
+            data=data,
+            files=(
+                ProviderFile("speech.wav", "audio/wav", silent_wav),
+                ProviderFile("manifest.json", "application/json", manifest),
+            ),
+        )
+    mc_hook = payload.mcHookScript
+    product_close = payload.productCloseScript
+    if payload.templateId == "mc-v1" and not mc_hook and not product_close:
+        inferred = split_mc_script_segments(payload.script)
+        if inferred is not None:
+            mc_hook, product_close = inferred
     request = SpeechRequest(
         payload.script,
         payload.sourceRevisionId,
         voice=payload.voice,
         voice_gender=payload.voiceGender,
-        mc_hook_script=payload.mcHookScript,
-        product_close_script=payload.productCloseScript,
+        mc_hook_script=mc_hook,
+        product_close_script=product_close,
     )
     identity = _resolve_speech_identity(adapter.speech_identity(), request)
     fallback_base = _fallback_speech_identity(adapter)
@@ -702,7 +736,7 @@ def _store_video_task(
 
 
 def _normalize_video(
-    body: bytes, context: ExecutionContext, *, duration_seconds: int = 5
+    body: bytes, context: ExecutionContext, *, duration_seconds: float | int = 5
 ) -> bytes:
     with tempfile.TemporaryDirectory(prefix="flowcortex-video-") as directory:
         source = Path(directory) / "source.mp4"
@@ -840,6 +874,16 @@ def _video_idempotency_key(request: VideoRequest, identity: VideoIdentity) -> st
 def _load_task_checkpoint(
     context: ExecutionContext, idempotency_key: str, provider: str, model: str
 ) -> str | None:
+    loaded = _load_task_checkpoint_any(context, (idempotency_key,), provider, model)
+    return loaded[0] if loaded is not None else None
+
+
+def _load_task_checkpoint_any(
+    context: ExecutionContext,
+    idempotency_keys: tuple[str, ...],
+    provider: str,
+    model: str,
+) -> tuple[str, str] | None:
     key = f"{context.output_prefix}manifest.json"
     if context.storage.head_object(context.bucket, key) is None:
         return None
@@ -850,13 +894,13 @@ def _load_task_checkpoint(
         raise PermanentError(
             "provider_response_invalid", "stored task checkpoint is invalid"
         ) from exc
-    expected = {
-        "idempotencyKey": idempotency_key,
-        "model": model,
-        "provider": provider,
-    }
-    if not isinstance(checkpoint, dict) or any(
-        checkpoint.get(k) != v for k, v in expected.items()
+    stored_key = checkpoint.get("idempotencyKey") if isinstance(checkpoint, dict) else None
+    if (
+        not isinstance(checkpoint, dict)
+        or checkpoint.get("model") != model
+        or checkpoint.get("provider") != provider
+        or not isinstance(stored_key, str)
+        or stored_key not in idempotency_keys
     ):
         raise PermanentError(
             "provider_response_invalid",
@@ -867,7 +911,7 @@ def _load_task_checkpoint(
         raise PermanentError(
             "provider_response_invalid", "stored task checkpoint has no provider task id"
         )
-    return task_id
+    return task_id, stored_key
 
 
 def _store_task_checkpoint(
@@ -1029,6 +1073,19 @@ def _lipsync_video(
     video_bytes = context.storage.fetch_bytes(video_ref.bucket, video_ref.objectKey, context.abort)
     audio_bytes = context.storage.fetch_bytes(audio_ref.bucket, audio_ref.objectKey, context.abort)
     effective_duration = payload.durationSeconds or 5
+    mc_end_ms = extract_mc_end_ms(audio_bytes)
+    if mc_end_ms is not None:
+        if mc_end_ms > effective_duration * 1000:
+            raise PermanentError(
+                "contract_violation",
+                f"MC speech segment ({mc_end_ms} ms) exceeds requested lip-sync duration "
+                f"({effective_duration} s)",
+            )
+        clip_duration_s = round(max(2.0, mc_end_ms / 1000.0), 3)
+        lipsync_audio = trim_wav(audio_bytes, mc_end_ms)
+    else:
+        clip_duration_s = float(effective_duration)
+        lipsync_audio = trim_wav(audio_bytes, round(clip_duration_s * 1000))
     is_fixture = isinstance(adapter, FixtureProviderAdapter) or isinstance(
         getattr(adapter, "lipsync_adapter", None), FixtureProviderAdapter
     )
@@ -1036,10 +1093,20 @@ def _lipsync_video(
     model = "flowcortex-fixture-v1" if is_fixture else "kwaivgi/kling-lip-sync"
     request = LipsyncRequest(
         video_bytes=video_bytes,
-        audio_bytes=audio_bytes,
+        audio_bytes=lipsync_audio,
         source_revision_id=payload.sourceRevisionId,
+        duration_seconds=clip_duration_s,
     )
     idempotency_key = hashlib.sha256(
+        "\0".join((
+            str(payload.sourceRevisionId),
+            job.params.profile,
+            f"{clip_duration_s:.3f}",
+            hashlib.sha256(video_bytes).hexdigest(),
+            hashlib.sha256(lipsync_audio).hexdigest(),
+        )).encode()
+    ).hexdigest()
+    legacy_idempotency_key = hashlib.sha256(
         "\0".join((
             str(payload.sourceRevisionId),
             job.params.profile,
@@ -1049,27 +1116,40 @@ def _lipsync_video(
         )).encode()
     ).hexdigest()
     ledger = job.vendorLedger
-    fingerprint = idempotency_key if ledger else None
-    task_id = _load_task_checkpoint(context, idempotency_key, provider, model)
-    if task_id is None:
+    active_key = idempotency_key
+    loaded = _load_task_checkpoint_any(
+        context, (idempotency_key, legacy_idempotency_key), provider, model
+    )
+    if loaded is not None:
+        task_id, active_key = loaded
+    else:
         attached: VendorCandidate | None = None
-        if ledger is not None and fingerprint is not None:
+        if ledger is not None:
             attached = select_attach(
                 ledger.candidates,
-                fingerprint,
+                idempotency_key,
                 context.probes,
                 lambda candidate, status: _report_verdict(context, candidate, status),
             )
+            if attached is None and legacy_idempotency_key != idempotency_key:
+                attached = select_attach(
+                    ledger.candidates,
+                    legacy_idempotency_key,
+                    context.probes,
+                    lambda candidate, status: _report_verdict(context, candidate, status),
+                )
+                if attached is not None:
+                    active_key = legacy_idempotency_key
         if attached is not None:
             task_id = attached.vendorJobId
         else:
             task_id = adapter.submit_lipsync(request)
-            if ledger is not None and fingerprint is not None:
+            if ledger is not None:
                 context.report(
                     VendorTaskReport(
                         vendor=provider,
                         model=model,
-                        fingerprint=fingerprint,
+                        fingerprint=active_key,
                         requestKey=ledger.requestKey,
                         vendorJobId=task_id,
                         handle={},
@@ -1077,9 +1157,9 @@ def _lipsync_video(
                         vendorCreatedAt=datetime.now(UTC),
                     )
                 )
-        _store_task_checkpoint(context, task_id, idempotency_key, provider, model)
+        _store_task_checkpoint(context, task_id, active_key, provider, model)
     video = adapter.await_lipsync(task_id, context.abort)
-    normalized = _normalize_video(video.body, context, duration_seconds=effective_duration)
+    normalized = _normalize_video(video.body, context, duration_seconds=clip_duration_s)
     probed = _probe_duration_seconds(normalized, context)
     reported_duration = (
         max(2, min(10, round(probed))) if probed is not None else effective_duration
@@ -1092,12 +1172,12 @@ def _lipsync_video(
         "aspectRatio": "9:16",
         "resolution": "480p",
         "sourceRevisionId": str(payload.sourceRevisionId),
-        "idempotencyKey": idempotency_key,
+        "idempotencyKey": active_key,
         "providerTaskId": video.provider_task_id,
         "format": "mp4",
     }
-    if ledger is not None and fingerprint is not None:
-        data["fingerprint"] = fingerprint
+    if ledger is not None:
+        data["fingerprint"] = active_key
         data["requestKey"] = ledger.requestKey
     manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
     return ProviderOutcome(

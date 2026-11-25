@@ -259,6 +259,19 @@ public class ReviewTask {
         this.reviewedAt = now;
     }
 
+    /** Reopens an approved review task back to {@code PENDING}, preserving revision history and current draft. */
+    public void reopen(Instant newExpiresAt) {
+        if (this.status != ReviewTaskStatus.APPROVED) {
+            throw new IllegalStateException("Review task is not approved: " + this.status);
+        }
+        this.status = ReviewTaskStatus.PENDING;
+        this.reviewedBy = null;
+        this.reviewedAt = null;
+        this.approvedRevisionId = null;
+        this.decisionKey = null;
+        this.expiresAt = newExpiresAt;
+    }
+
     private void requirePending() {
         if (this.status != ReviewTaskStatus.PENDING) {
             throw new ConflictException(NOT_WAITING_FOR_REVIEW);

@@ -2,7 +2,16 @@
 #   filename:  provider-job.schema.json
 
 from __future__ import annotations
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel, StrictInt, StrictStr
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    StrictInt,
+    StrictStr,
+    model_validator,
+)
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -37,8 +46,16 @@ class SpeechPayload(BaseModel):
     sourceRevisionId: UUID
     voiceGender: Literal["male", "female"] | None = None
     voice: Annotated[StrictStr | None, Field(max_length=100, min_length=1)] = None
+    templateId: Literal["showroom-v1", "mc-v1"] | None = None
+    audioMode: Literal["voice_bgm", "music_only"] | None = None
     mcHookScript: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
     productCloseScript: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
+
+    @model_validator(mode="after")
+    def _validate_audio_mode(self) -> SpeechPayload:
+        if self.templateId == "mc-v1" and self.audioMode == "music_only":
+            raise ValueError("audioMode 'music_only' is only supported for showroom-v1")
+        return self
 
 
 class StoryboardPayload(BaseModel):

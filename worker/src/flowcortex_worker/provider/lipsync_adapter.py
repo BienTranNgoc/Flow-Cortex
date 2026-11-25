@@ -56,7 +56,9 @@ class KlingLipsyncAdapter:
         model_path = "/".join(
             urllib.parse.quote(part, safe="") for part in self.config.model.split("/")
         )
-        video_720p = _upscale_to_720p(request.video_bytes)
+        video_720p = _upscale_to_720p(
+            request.video_bytes, max_duration_seconds=request.duration_seconds
+        )
         video_url = self._upload_binary(video_720p, "clip_720p.mp4", "video/mp4")
         audio_url = self._upload_binary(request.audio_bytes, "mc_hook.wav", "audio/wav")
         body = json.dumps({"input": {"video_url": video_url, "audio_file": audio_url}}).encode()
@@ -275,37 +277,40 @@ class KlingLipsyncAdapter:
             raise TransientError(f"Kling LipSync download failed: {type(exc).__name__}") from exc
 
 
-def _upscale_to_720p(video_bytes: bytes) -> bytes:
+def _upscale_to_720p(
+    video_bytes: bytes, *, max_duration_seconds: float | None = None
+) -> bytes:
     """kwaivgi/kling-lip-sync requires >= 720p input; local ffmpeg upscale is free."""
     with tempfile.TemporaryDirectory(prefix="flowcortex-lipsync-") as directory:
         src = Path(directory) / "in.mp4"
         dst = Path(directory) / "up720p.mp4"
         src.write_bytes(video_bytes)
-        completed = subprocess.run(
-            [
-                "ffmpeg",
-                "-nostdin",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-y",
-                "-i",
-                str(src),
-                "-vf",
-                "scale=720:1280:flags=lanczos:force_original_aspect_ratio=decrease,"
-                "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
-                "-an",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "fast",
-                "-pix_fmt",
-                "yuv420p",
-                str(dst),
-            ],
-            capture_output=True,
-            check=False,
-        )
+        cmd = [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(src),
+        ]
+        if max_duration_seconds is not None and max_duration_seconds > 0:
+            cmd.extend(["-t", f"{max_duration_seconds:.3f}"])
+        cmd.extend([
+            "-vf",
+            "scale=720:1280:flags=lanczos:force_original_aspect_ratio=decrease,"
+            "pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+            "-an",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-pix_fmt",
+            "yuv420p",
+            str(dst),
+        ])
+        completed = subprocess.run(cmd, capture_output=True, check=False)
         if completed.returncode != 0 or not dst.is_file() or dst.stat().st_size == 0:
             raise PermanentError(
                 "provider_response_invalid", "video could not be upscaled for lip-sync"

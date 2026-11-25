@@ -1,3 +1,4 @@
+import { ArrowCounterClockwise } from '@phosphor-icons/react';
 import type { RunStepResponse } from '@flow-cortex/api-client';
 import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +12,7 @@ import { stepErrorSentence } from './stepErrorMessages';
 import { StepOutput } from './StepOutput';
 import { StoredOutputDownload } from './StoredOutputDownload';
 import { StoryboardOutputView } from './StoryboardOutputView';
+import { useReopenProductVideoScriptMutation } from './useWorkflows';
 
 function StepProgress({ step }: Readonly<{ step: RunStepResponse }>) {
   const { t } = useTranslation();
@@ -50,6 +52,7 @@ interface StepDetailProps {
   keyframeStep?: RunStepResponse | undefined;
   stepTitle?: string | undefined;
   productName?: string | undefined;
+  onReopenScript?: (() => void) | undefined;
 }
 
 function visibleProductVideoArtifacts(
@@ -86,9 +89,11 @@ export function StepDetail({
   keyframeStep,
   stepTitle,
   productName,
+  onReopenScript,
 }: Readonly<StepDetailProps>) {
   const { t } = useTranslation();
   const locale = activeLocale();
+  const reopenScript = useReopenProductVideoScriptMutation(runId);
   const status = step.status ?? 'pending';
   const outputs = step.outputs ?? [];
   const details = outputs.find((output) => output.mime === 'application/json');
@@ -193,6 +198,33 @@ export function StepDetail({
                 step.type,
               )}
             </p>
+            {isProductVideo &&
+              step.type === 'generate_speech' &&
+              (step.errorCode === 'speech_too_long' ||
+                step.errorCode === 'provider_request_failed') && (
+                <div className="run-step-failure-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={reopenScript.isPending}
+                    onClick={() => {
+                      reopenScript.mutate(undefined, {
+                        onSuccess: () => onReopenScript?.(),
+                      });
+                    }}
+                  >
+                    <ArrowCounterClockwise size={16} aria-hidden="true" />{' '}
+                    {reopenScript.isPending
+                      ? t('workflow.step.reopeningScript')
+                      : t('workflow.step.reopenScript')}
+                  </button>
+                  {reopenScript.isError && (
+                    <p role="alert" className="run-step-error">
+                      {t('workflow.step.reopenScriptFailed')}
+                    </p>
+                  )}
+                </div>
+              )}
           </div>
         )}
       </div>
