@@ -1,6 +1,6 @@
 {
   "pageTitle": "AI CV Checker (Gemini)",
-  "pageLede": "Evaluate the alignment between candidate resume and job description (JD). Analyze strengths, weaknesses, optimize STAR bullets, and predict interview questions.",
+  "pageLede": "Upload your PDF CV for a comprehensive evaluation: ATS compliance, core technical depth, STAR impact rewriting, and predicted interview questions.",
   "intro": {
     "title": "PDF CV Verification Frame",
     "desc": "Upload your PDF CV directly for full in-browser preview and automated text extraction via Apache PDFBox + Google Gemini 3.5 Flash."

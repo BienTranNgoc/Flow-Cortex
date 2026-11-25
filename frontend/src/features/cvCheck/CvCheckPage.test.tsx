@@ -56,7 +56,6 @@ describe('CvCheckPage', () => {
 
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Khung tải lên file CV PDF|PDF CV upload frame/i })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /Bản mô tả công việc|Job Description/i })).toBeInTheDocument();
   });
 
   it('loads sample PDF and renders preview frame', async () => {

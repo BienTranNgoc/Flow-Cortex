@@ -61,8 +61,20 @@
   gap: 1.5rem;
 }
 
+.cv-check-form--single {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.cv-check-form:not(.cv-check-form--single) {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
 @media (min-width: 900px) {
-  .cv-check-form {
+  .cv-check-form:not(.cv-check-form--single) {
     grid-template-columns: 1fr 1fr;
   }
 }

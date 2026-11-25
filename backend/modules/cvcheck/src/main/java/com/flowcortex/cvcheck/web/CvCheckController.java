@@ -32,8 +32,8 @@ class CvCheckController {
     @Operation(operationId = "checkCv")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     JsonNode check(@RequestBody CheckRequest request) {
-        String cv = clean(request.cvText(), CvCheckService.MAX_CV_CHARS, "cvText");
-        String jd = clean(request.jobDescription(), CvCheckService.MAX_JD_CHARS, "jobDescription");
+        String cv = clean(request.cvText(), CvCheckService.MAX_CV_CHARS, "cvText", true);
+        String jd = clean(request.jobDescription(), CvCheckService.MAX_JD_CHARS, "jobDescription", false);
         return evaluate(cv, jd);
     }
 
@@ -42,7 +42,7 @@ class CvCheckController {
     JsonNode checkMultipart(
             @RequestParam(value = "cvFile", required = false) MultipartFile cvFile,
             @RequestParam(value = "cvText", required = false) String cvText,
-            @RequestParam("jobDescription") String jobDescription) {
+            @RequestParam(value = "jobDescription", required = false) String jobDescription) {
         String cv;
         if (cvFile != null && !cvFile.isEmpty()) {
             try {
@@ -59,8 +59,8 @@ class CvCheckController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cvFile or cvText must be provided");
         }
 
-        String cleanedCv = clean(cv, CvCheckService.MAX_CV_CHARS, "cvText");
-        String cleanedJd = clean(jobDescription, CvCheckService.MAX_JD_CHARS, "jobDescription");
+        String cleanedCv = clean(cv, CvCheckService.MAX_CV_CHARS, "cvText", true);
+        String cleanedJd = clean(jobDescription, CvCheckService.MAX_JD_CHARS, "jobDescription", false);
         return evaluate(cleanedCv, cleanedJd);
     }
 
@@ -75,9 +75,12 @@ class CvCheckController {
         };
     }
 
-    private static String clean(String value, int max, String field) {
+    private static String clean(String value, int max, String field, boolean required) {
         if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must not be blank");
+            if (required) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must not be blank");
+            }
+            return null;
         }
         if (value.length() > max) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be at most " + max + " characters");

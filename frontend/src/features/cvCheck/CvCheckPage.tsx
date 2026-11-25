@@ -1,6 +1,5 @@
 import {
   ArrowsClockwise,
-  Briefcase,
   CheckCircle,
   FilePdf,
   FileText,
@@ -15,7 +14,6 @@ import { PageHeading } from '../../app/PageHeading';
 import {
   createSamplePdfBlob,
   SAMPLE_CV,
-  SAMPLE_JD,
   type CvCheckReport,
 } from './cvCheckTypes';
 import { useCvCheckMutation } from './useCvCheck';
@@ -31,13 +29,11 @@ function formatSize(bytes: number): string {
 
 export function CvCheckPage() {
   const { t } = useTranslation();
-  const jdInputId = useId();
   const fileUploadId = useId();
 
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvPdfUrl, setCvPdfUrl] = useState<string | null>(null);
   const [cvText, setCvText] = useState('');
-  const [jobDescription, setJobDescription] = useState('');
   const [report, setReport] = useState<CvCheckReport | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('evaluation');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -75,13 +71,11 @@ export function CvCheckPage() {
     });
     setPdfFile(sampleFile);
     setCvText(SAMPLE_CV);
-    setJobDescription(SAMPLE_JD);
   };
 
   const handleClear = () => {
     setPdfFile(null);
     setCvText('');
-    setJobDescription('');
     setReport(null);
   };
 
@@ -116,13 +110,12 @@ export function CvCheckPage() {
   };
 
   const handleSubmit = async () => {
-    if ((!cvFile && !cvText.trim()) || !jobDescription.trim()) return;
+    if (!cvFile && !cvText.trim()) return;
 
     try {
       const result = await checkMutation.mutateAsync({
         cvFile,
         cvText: cvText.trim(),
-        jobDescription: jobDescription.trim(),
       });
       setReport(result);
       setActiveTab('evaluation');
@@ -164,7 +157,7 @@ export function CvCheckPage() {
         title={t('cvCheck.pageTitle', 'Kiểm tra CV với AI (Gemini)')}
         lede={t(
           'cvCheck.pageLede',
-          'Đánh giá độ khớp giữa hồ sơ ứng viên và tin tuyển dụng (JD). Phân tích điểm mạnh, điểm yếu, chuẩn hóa câu mô tả STAR và gợi ý câu hỏi phỏng vấn.',
+          'Tải lên file CV PDF để phân tích toàn diện: điểm chuẩn ATS, kỹ năng cốt lõi, tối ưu thành tích STAR và gợi ý câu hỏi phỏng vấn.',
         )}
         actions={
           <div className="cv-check-panel__tools">
@@ -176,7 +169,7 @@ export function CvCheckPage() {
               <Sparkle size={16} aria-hidden="true" />
               {t('cvCheck.actions.loadSample', 'Tải CV PDF mẫu')}
             </button>
-            {(cvFile || cvText || jobDescription || report) && (
+            {(cvFile || cvText || report) && (
               <button
                 type="button"
                 className="cortex-btn cortex-btn--ghost"
@@ -220,9 +213,8 @@ export function CvCheckPage() {
         </div>
       )}
 
-      {/* 2-Column Form */}
-      <div className="cv-check-form">
-        {/* PDF Input Box */}
+      {/* PDF Upload and Preview Area */}
+      <div className="cv-check-form cv-check-form--single">
         <section className="cv-check-panel" aria-labelledby="cv-panel-title">
           <header className="cv-check-panel__head">
             <h3 id="cv-panel-title" className="cv-check-panel__title">
@@ -322,34 +314,6 @@ export function CvCheckPage() {
             )}
           </div>
         </section>
-
-        {/* JD Input Panel */}
-        <section className="cv-check-panel" aria-labelledby="jd-panel-title">
-          <header className="cv-check-panel__head">
-            <h3 id="jd-panel-title" className="cv-check-panel__title">
-              <Briefcase size={18} aria-hidden="true" />
-              {t('cvCheck.form.jdTitle', 'Bản mô tả công việc (JD)')}
-            </h3>
-          </header>
-          <div className="cv-check-panel__body">
-            <textarea
-              id={jdInputId}
-              aria-labelledby="jd-panel-title"
-              className="cv-check-textarea"
-              placeholder={t(
-                'cvCheck.form.jdPlaceholder',
-                'Dán bản mô tả công việc (JD) mục tiêu vào đây (yêu cầu kỹ thuật, trách nhiệm công việc, quyền lợi)...',
-              )}
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              maxLength={10000}
-            />
-            <div className="cv-check-panel__foot">
-              <span>{t('cvCheck.form.maxCharsJd', 'Tối đa 10.000 ký tự')}</span>
-              <span>{jobDescription.length} / 10.000</span>
-            </div>
-          </div>
-        </section>
       </div>
 
       {/* Action Button */}
@@ -357,7 +321,7 @@ export function CvCheckPage() {
         <button
           type="button"
           className="cortex-btn cortex-btn--primary cv-check-submit-btn"
-          disabled={(!cvFile && !cvText.trim()) || !jobDescription.trim() || checkMutation.isPending}
+          disabled={(!cvFile && !cvText.trim()) || checkMutation.isPending}
           onClick={handleSubmit}
         >
           {checkMutation.isPending ? (

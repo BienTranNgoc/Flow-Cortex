@@ -16,7 +16,7 @@ class CvCheckServiceTest {
             @Override
             public LlmJsonResult generateJson(String slot, String userText, String schema) {
                 assertThat(slot).isEqualTo(CvCheckService.SLOT);
-                assertThat(userText).contains("JD text").contains("CV text");
+                assertThat(userText).contains("CV text");
                 return result;
             }
 
@@ -43,7 +43,15 @@ class CvCheckServiceTest {
     }
 
     @Test
-    void returnsTheModelReport() {
+    void returnsTheModelReportForStandaloneCv() {
+        Outcome outcome = new CvCheckService(slots(new LlmJsonResult.Answered("{\"overallScore\":85}", "m", 1, 1)))
+                .check("CV text");
+        assertThat(outcome).isInstanceOf(Outcome.Report.class);
+        assertThat(((Outcome.Report) outcome).report().get("overallScore").asInt()).isEqualTo(85);
+    }
+
+    @Test
+    void returnsTheModelReportWithJd() {
         Outcome outcome = new CvCheckService(slots(new LlmJsonResult.Answered("{\"overallScore\":80}", "m", 1, 1)))
                 .check("CV text", "JD text");
         assertThat(outcome).isInstanceOf(Outcome.Report.class);

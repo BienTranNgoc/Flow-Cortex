@@ -1,6 +1,6 @@
 {
   "pageTitle": "Kiểm tra CV với AI (Gemini)",
-  "pageLede": "Đánh giá độ khớp giữa hồ sơ ứng viên và tin tuyển dụng (JD). Phân tích điểm mạnh, điểm yếu, chuẩn hóa câu mô tả STAR và gợi ý câu hỏi phỏng vấn.",
+  "pageLede": "Tải lên file CV PDF để phân tích toàn diện: điểm chuẩn ATS, kỹ năng cốt lõi, tối ưu thành tích STAR và gợi ý câu hỏi phỏng vấn.",
   "intro": {
     "title": "Khung đối soát hồ sơ CV PDF",
     "desc": "Tải trực tiếp file CV PDF để xem trước toàn diện và trích xuất nội dung tự động bằng Apache PDFBox + Google Gemini 3.5 Flash."

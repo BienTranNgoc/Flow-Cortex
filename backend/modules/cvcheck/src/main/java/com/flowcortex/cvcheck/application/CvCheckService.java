@@ -13,7 +13,29 @@ public class CvCheckService {
     public static final int MAX_CV_CHARS = 20_000;
     public static final int MAX_JD_CHARS = 10_000;
 
-    private static final String PROMPT = """
+    private static final String STANDALONE_PROMPT = """
+            You are a senior technical recruiter, executive resume reviewer and CV coach.
+            Evaluate this candidate's CV thoroughly on its own merits to help them improve it.
+            Score each dimension 0-100 using only evidence in the CV; never invent experience:
+            - hardSkills: Technical depth, clarity, and industry-standard proficiency of the skill stack.
+            - experienceImpact: Action-oriented achievements, measurable business/technical outcomes, and strong use of metrics (STAR/XYZ format).
+            - softSkills: Leadership, collaboration, communication, and ownership evident in project and job descriptions.
+            - atsCompliance: ATS-friendliness, formatting clarity, clean sectioning, professional contact info, and industry keyword density.
+            - domainRelevance: Career progression consistency, credibility, and overall professional presentation.
+
+            overallScore: Weighted overall assessment (0-100).
+            Write all text in the language of the CV (e.g. Vietnamese if the CV is in Vietnamese, English if in English).
+            strengths: 3-5 outstanding strong points of this CV.
+            weaknesses: 3-5 weaknesses, vague descriptions, or gaps that should be improved.
+            missingKeywords: 4-8 important industry keywords or certifications that would elevate this CV.
+            rewrittenBullets: Select up to 5 weak, passive, or vague bullets in the CV and rewrite them in punchy STAR style with strong action verbs (without fabricating facts).
+            interviewQuestions: 5-8 insightful technical and behavioral interview questions hiring managers will likely ask based on this CV.
+
+            CANDIDATE CV:
+            %s
+            """;
+
+    private static final String JD_PROMPT = """
             You are a senior technical recruiter and CV coach. Evaluate the CV against the job description.
             Score each dimension 0-100 using only evidence in the CV; never invent experience.
             Dimensions: hardSkills (match of core skills), experienceImpact (measurable results, STAR/XYZ),
@@ -51,8 +73,15 @@ public class CvCheckService {
         this.llm = llm;
     }
 
+    public Outcome check(String cvText) {
+        return check(cvText, null);
+    }
+
     public Outcome check(String cvText, String jobDescription) {
-        LlmJsonResult result = llm.generateJson(SLOT, PROMPT.formatted(jobDescription, cvText), SCHEMA);
+        String prompt = (jobDescription == null || jobDescription.isBlank())
+                ? STANDALONE_PROMPT.formatted(cvText)
+                : JD_PROMPT.formatted(jobDescription, cvText);
+        LlmJsonResult result = llm.generateJson(SLOT, prompt, SCHEMA);
         return switch (result) {
             case LlmJsonResult.Answered answered -> parse(answered.json());
             case LlmJsonResult.Blocked blocked -> new Outcome.Refused(Refusal.BLOCKED);

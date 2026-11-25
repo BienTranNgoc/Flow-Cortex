@@ -5,7 +5,7 @@ import type { CvCheckReport } from './cvCheckTypes';
 export interface CheckCvParams {
   readonly cvFile?: File | null;
   readonly cvText?: string;
-  readonly jobDescription: string;
+  readonly jobDescription?: string;
 }
 
 export class CvCheckError extends Error {
@@ -26,7 +26,9 @@ export async function executeCvCheck(params: CheckCvParams): Promise<CvCheckRepo
   if (params.cvFile) {
     const formData = new FormData();
     formData.append('cvFile', params.cvFile, params.cvFile.name);
-    formData.append('jobDescription', params.jobDescription);
+    if (params.jobDescription) {
+      formData.append('jobDescription', params.jobDescription);
+    }
     if (params.cvText) {
       formData.append('cvText', params.cvText);
     }
@@ -37,7 +39,7 @@ export async function executeCvCheck(params: CheckCvParams): Promise<CvCheckRepo
     };
     body = JSON.stringify({
       cvText: params.cvText ?? '',
-      jobDescription: params.jobDescription,
+      ...(params.jobDescription ? { jobDescription: params.jobDescription } : {}),
     });
   }
 
