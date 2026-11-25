@@ -37,6 +37,7 @@ import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
 import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
 import { NotificationsPage } from './features/notifications/NotificationsPage';
+import { CvCheckPage } from './features/cvCheck/CvCheckPage';
 import { RunProgressPage } from './features/workflow/RunProgressPage';
 import { WorkflowDetailPage } from './features/workflow/WorkflowDetailPage';
 import { WorkflowsListPage } from './features/workflow/WorkflowsListPage';
@@ -149,6 +150,7 @@ export function App() {
               <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />
+              <Route path="check-cv" element={<CvCheckPage />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />

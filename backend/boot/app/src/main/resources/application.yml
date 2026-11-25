@@ -591,6 +591,11 @@ flowcortex:
           attempts: 3
           retry-waits: 10s,30s
           call-timeout: 60s
+        cv-check:
+          models: ${FLOWCORTEX_CV_CHECK_MODELS:gemini-3.5-flash,gemini-3.5-flash-lite}
+          attempts: 2
+          retry-waits: 3s
+          call-timeout: 60s
         # Questions for a QA review; its worst case (about 42 s) stays under qa-review.generating-timeout.
         qa-questions:
           models: gemini-3.5-flash-lite

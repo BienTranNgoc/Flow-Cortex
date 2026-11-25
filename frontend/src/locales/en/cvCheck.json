@@ -1,0 +1,68 @@
+{
+  "pageTitle": "AI CV Checker (Gemini)",
+  "pageLede": "Evaluate the alignment between candidate resume and job description (JD). Analyze strengths, weaknesses, optimize STAR bullets, and predict interview questions.",
+  "intro": {
+    "title": "PDF CV Verification Frame",
+    "desc": "Upload your PDF CV directly for full in-browser preview and automated text extraction via Apache PDFBox + Google Gemini 3.5 Flash."
+  },
+  "verdict": {
+    "excellent": "Strong Fit",
+    "good": "Good Fit",
+    "moderate": "Moderate Fit",
+    "poor": "Weak Fit"
+  },
+  "actions": {
+    "loadSample": "Load Sample PDF CV",
+    "clearAll": "Clear all",
+    "uploadFile": "Upload PDF file",
+    "uploadPdf": "Upload PDF file",
+    "browsePdf": "Browse PDF file",
+    "useSamplePdf": "Use Sample PDF CV",
+    "changePdf": "Change PDF",
+    "removePdf": "Remove PDF file",
+    "analyze": "Analyze CV with Gemini",
+    "analyzing": "Extracting & scoring with Gemini..."
+  },
+  "form": {
+    "cvTitle": "Resume (PDF Format)",
+    "cvPlaceholder": "Paste resume text here...",
+    "dropzoneTitle": "Drag & drop PDF CV here",
+    "dropzoneDesc": "or click to browse a PDF file from your computer (supports .pdf up to 10MB)",
+    "dropzoneAria": "PDF CV upload frame",
+    "pdfPreviewTitle": "PDF CV Preview",
+    "jdTitle": "Job Description (JD)",
+    "jdPlaceholder": "Paste target job description here (technical requirements, responsibilities, benefits)...",
+    "maxChars": "Max 20,000 characters",
+    "maxCharsJd": "Max 10,000 characters"
+  },
+  "results": {
+    "title": "Analysis Results",
+    "overallScore": "Overall Fit Score",
+    "strengths": "Key Strengths",
+    "weaknesses": "Areas for Improvement",
+    "missingKeywords": "Missing Keywords & Skills"
+  },
+  "dimensions": {
+    "hardSkills": "Hard Skills Match",
+    "experienceImpact": "Experience & Impact (STAR)",
+    "softSkills": "Soft Skills & Culture",
+    "atsCompliance": "ATS Compliance & Keywords",
+    "domainRelevance": "Domain Relevance"
+  },
+  "tabs": {
+    "evaluation": "Strengths & Weaknesses",
+    "bullets": "STAR Bullet Optimization",
+    "interview": "Predicted Interview Questions"
+  },
+  "bullets": {
+    "original": "[Original]:",
+    "improved": "[Suggested STAR]:",
+    "empty": "No rewritten bullet suggestions available."
+  },
+  "interview": {
+    "empty": "No interview questions predicted."
+  },
+  "error": {
+    "general": "An error occurred while evaluating the CV. Please verify your PDF file or try again in a few moments."
+  }
+}

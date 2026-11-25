@@ -24,6 +24,7 @@ include(
     ":modules:connector",
     ":modules:billing",
     ":modules:chat",
+    ":modules:cvcheck",
     ":modules:notification",
     ":shared:web",
     ":shared:security",

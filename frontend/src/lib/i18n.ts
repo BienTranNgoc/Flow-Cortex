@@ -12,12 +12,14 @@ import enOnboarding from '../locales/en/onboarding.json';
 import enRunHistory from '../locales/en/runHistory.json';
 import enNotifications from '../locales/en/notifications.json';
 import enSupport from '../locales/en/support.json';
+import enCvCheck from '../locales/en/cvCheck.json';
 import enWorkflow from '../locales/en/workflow.json';
 import viAuth from '../locales/vi/auth.json';
 import viBilling from '../locales/vi/billing.json';
 import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viCredits from '../locales/vi/credits.json';
+import viCvCheck from '../locales/vi/cvCheck.json';
 import viDashboard from '../locales/vi/dashboard.json';
 import viDrive from '../locales/vi/drive.json';
 import viDriveItems from '../locales/vi/driveItems.json';
@@ -46,6 +48,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     driveItems: viDriveItems,
     driveMemory: viDriveMemory,
     billing: viBilling,
+    cvCheck: viCvCheck,
   },
   en: {
     common: enCommon,
@@ -62,6 +65,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     driveItems: enDriveItems,
     driveMemory: enDriveMemory,
     billing: enBilling,
+    cvCheck: enCvCheck,
   },
 });
 

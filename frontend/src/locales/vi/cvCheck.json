@@ -1,0 +1,68 @@
+{
+  "pageTitle": "Kiểm tra CV với AI (Gemini)",
+  "pageLede": "Đánh giá độ khớp giữa hồ sơ ứng viên và tin tuyển dụng (JD). Phân tích điểm mạnh, điểm yếu, chuẩn hóa câu mô tả STAR và gợi ý câu hỏi phỏng vấn.",
+  "intro": {
+    "title": "Khung đối soát hồ sơ CV PDF",
+    "desc": "Tải trực tiếp file CV PDF để xem trước toàn diện và trích xuất nội dung tự động bằng Apache PDFBox + Google Gemini 3.5 Flash."
+  },
+  "verdict": {
+    "excellent": "Rất phù hợp (Strong Fit)",
+    "good": "Tiềm năng tốt (Good Fit)",
+    "moderate": "Cần bổ sung (Moderate Fit)",
+    "poor": "Chưa phù hợp (Weak Fit)"
+  },
+  "actions": {
+    "loadSample": "Tải CV PDF mẫu",
+    "clearAll": "Xóa tất cả",
+    "uploadFile": "Tải file PDF",
+    "uploadPdf": "Tải file PDF",
+    "browsePdf": "Chọn file PDF",
+    "useSamplePdf": "Dùng CV PDF mẫu",
+    "changePdf": "Đổi PDF khác",
+    "removePdf": "Xóa file PDF",
+    "analyze": "Đánh giá CV ngay",
+    "analyzing": "Đang trích xuất & chấm điểm với Gemini..."
+  },
+  "form": {
+    "cvTitle": "Hồ sơ CV (Định dạng PDF)",
+    "cvPlaceholder": "Dán nội dung văn bản CV vào đây...",
+    "dropzoneTitle": "Kéo & thả file CV PDF vào đây",
+    "dropzoneDesc": "hoặc bấm để chọn file PDF từ máy tính của bạn (hỗ trợ .pdf tối đa 10MB)",
+    "dropzoneAria": "Khung tải lên file CV PDF",
+    "pdfPreviewTitle": "Xem trước CV PDF",
+    "jdTitle": "Bản mô tả công việc (JD)",
+    "jdPlaceholder": "Dán bản mô tả công việc (JD) mục tiêu vào đây (yêu cầu kỹ thuật, trách nhiệm công việc, quyền lợi)...",
+    "maxChars": "Tối đa 20.000 ký tự",
+    "maxCharsJd": "Tối đa 10.000 ký tự"
+  },
+  "results": {
+    "title": "Kết quả phân tích",
+    "overallScore": "Điểm phù hợp",
+    "strengths": "Điểm mạnh nổi bật",
+    "weaknesses": "Điểm cần cải thiện",
+    "missingKeywords": "Từ khóa kỹ năng còn thiếu trong CV"
+  },
+  "dimensions": {
+    "hardSkills": "Kỹ năng cốt lõi (Hard Skills)",
+    "experienceImpact": "Tác động & Thành tích (STAR)",
+    "softSkills": "Kỹ năng mềm & Văn hóa",
+    "atsCompliance": "Chuẩn ATS & Từ khóa",
+    "domainRelevance": "Độ phù hợp nghiệp vụ"
+  },
+  "tabs": {
+    "evaluation": "Điểm mạnh & Điểm yếu",
+    "bullets": "Tối ưu câu mô tả (STAR)",
+    "interview": "Dự đoán câu hỏi phỏng vấn"
+  },
+  "bullets": {
+    "original": "[Bản gốc]:",
+    "improved": "[Đề xuất STAR]:",
+    "empty": "Không có gợi ý viết lại nào."
+  },
+  "interview": {
+    "empty": "Không có câu hỏi phỏng vấn nào."
+  },
+  "error": {
+    "general": "Đã xảy ra lỗi khi phân tích CV. Vui lòng kiểm tra lại file PDF hoặc thử lại sau ít phút."
+  }
+}
