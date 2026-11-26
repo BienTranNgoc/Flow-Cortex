@@ -4,11 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,17 +13,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -42,7 +32,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
-@Import(WorkflowReportEndpointsIT.ShiftedClockConfig.class)
 class WorkflowReportEndpointsIT extends AbstractWorkflowHttpIT {
 
     private static final String WORKFLOWS = "/api/v1/workflows/";
@@ -51,9 +40,6 @@ class WorkflowReportEndpointsIT extends AbstractWorkflowHttpIT {
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @Autowired
-    private ShiftedClock clock;
 
     @Test
     void firstReportIsStoredPending() {
@@ -194,7 +180,8 @@ class WorkflowReportEndpointsIT extends AbstractWorkflowHttpIT {
         UUID sixth = publicWorkflow(owner);
         assertThat(report(token, sixth, "spam", null).getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 
-        clock.advance(Duration.ofMinutes(61));
+        jdbc.update("UPDATE workflow_report SET created_at = created_at - interval '61 minutes' WHERE reporter_id = ?",
+                reporter.id());
 
         assertThat(report(token, sixth, "spam", null).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(reportCount(sixth)).isEqualTo(1);
@@ -266,7 +253,6 @@ class WorkflowReportEndpointsIT extends AbstractWorkflowHttpIT {
 
     @AfterEach
     void cleanUp() {
-        clock.reset();
         for (UUID id : touched) {
             jdbc.update("DELETE FROM workflow_report WHERE workflow_id = ?", id);
             jdbc.update("UPDATE workflow SET moderation_status = 'visible' WHERE id = ?", id);
@@ -320,44 +306,5 @@ class WorkflowReportEndpointsIT extends AbstractWorkflowHttpIT {
         @SuppressWarnings("unchecked")
         Class<T> responseType = type != null ? type : (Class<T>) String.class;
         return restTemplate.exchange(path, method, new HttpEntity<>(body, headers), responseType);
-    }
-
-    /** System time plus an offset a test can move; every reader of the app's Clock sees it. */
-    static class ShiftedClock extends Clock {
-
-        private final AtomicReference<Duration> offset = new AtomicReference<>(Duration.ZERO);
-
-        void advance(Duration by) {
-            offset.updateAndGet(current -> current.plus(by));
-        }
-
-        void reset() {
-            offset.set(Duration.ZERO);
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            throw new UnsupportedOperationException("fixed to UTC");
-        }
-
-        @Override
-        public Instant instant() {
-            return Instant.now().plus(offset.get());
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class ShiftedClockConfig {
-
-        @Bean
-        @Primary
-        ShiftedClock shiftedClock() {
-            return new ShiftedClock();
-        }
     }
 }
