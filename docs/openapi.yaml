@@ -6463,6 +6463,58 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/users/{id}/identity:
+    get:
+      tags:
+      - user-identity-controller
+      operationId: revealUserIdentity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityResponse"
+  /api/v1/users/{id}/activity:
+    get:
+      tags:
+      - user-activity-controller
+      operationId: getUserActivity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityPageResponse"
   /api/v1/users/stats:
     get:
       tags:
@@ -8506,6 +8558,155 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/audit-log:
+    get:
+      tags:
+      - audit-log-controller
+      operationId: listAuditLog
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: resourceId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: actorUserId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - success
+          - failed
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogPage"
+  /api/v1/admin/audit-log/facets:
+    get:
+      tags:
+      - audit-log-controller
+      operationId: getAuditLogFacets
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogFacets"
+  /api/v1/admin/audit-log/export:
+    get:
+      tags:
+      - audit-log-controller
+      operationId: exportAuditLog
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: resourceId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: actorUserId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - success
+          - failed
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: byte
+            application/problem+json:
+              schema:
+                type: string
+                format: byte
   /api/v1/admin/assignees:
     get:
       tags:
@@ -9086,6 +9287,9 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - system.audit_log.view
+            - system.audit_log.export
+            - user.account.view_pii
         adminDisabled:
           type: boolean
         phoneVerificationRequired:
@@ -9632,6 +9836,9 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - system.audit_log.view
+            - system.audit_log.export
+            - user.account.view_pii
         permissionsVersion:
           type: integer
           format: int32
@@ -13010,6 +13217,59 @@ components:
       - page
       - size
       - total
+    IdentityResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+    ActivityItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source:
+          type: string
+          enum:
+          - admin_action
+          - auth
+          - workflow
+          - workflow_run
+          - support_request
+        action:
+          type: string
+        actorType:
+          type: string
+          enum:
+          - admin
+          - user
+        actorLabel:
+          type: string
+        objectType:
+          type: string
+        objectId:
+          type: string
+        objectLabel:
+          type: string
+        status:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+    ActivityPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItemResponse"
+        nextCursor:
+          type: string
     UserStats:
       type: object
       properties:
@@ -14826,6 +15086,9 @@ components:
           - payment.setting.view
           - payment.setting.update
           - user.account.export
+          - system.audit_log.view
+          - system.audit_log.export
+          - user.account.view_pii
         module:
           type: string
         feature:
@@ -15111,6 +15374,79 @@ components:
       - sections
       - seoMeta
       - version
+    AuditLogItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        actorUserId:
+          type: string
+          format: uuid
+        actorEmail:
+          type:
+          - string
+          - "null"
+        actorName:
+          type:
+          - string
+          - "null"
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceId:
+          type:
+          - string
+          - "null"
+        resourceLabel:
+          type:
+          - string
+          - "null"
+        changeSummary:
+          type: "null"
+          $ref: "#/components/schemas/JsonNode"
+        status:
+          type: string
+        errorCode:
+          type:
+          - string
+          - "null"
+        ip:
+          type:
+          - string
+          - "null"
+        userAgent:
+          type:
+          - string
+          - "null"
+        origin:
+          type: string
+    AuditLogPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+    AuditLogFacets:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            type: string
+        resourceTypes:
+          type: array
+          items:
+            type: string
     AdminAssignee:
       type: object
       properties:
