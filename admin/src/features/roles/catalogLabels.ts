@@ -26,6 +26,8 @@ export const ACTION_LABEL_KEYS = {
   'content.document.manage': 'roles.catalog.actions.content.document.manage',
   'content.media.view': 'roles.catalog.actions.content.media.view',
   'content.media.manage': 'roles.catalog.actions.content.media.manage',
+  'content.trend_template.view': 'roles.catalog.actions.content.trend_template.view',
+  'content.trend_template.manage': 'roles.catalog.actions.content.trend_template.manage',
   'platform.setting.view': 'roles.catalog.actions.platform.setting.view',
   'platform.setting.update': 'roles.catalog.actions.platform.setting.update',
   'platform.sms_outbox.view': 'roles.catalog.actions.platform.sms_outbox.view',

@@ -480,6 +480,102 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
+## Space entities (`V2026.11.26.501`)
+
+```mermaid
+erDiagram
+  space ||--o{ space_entity : "space_id (no FK)"
+  space_asset ||--o{ space_entity_part : "asset_id (no FK)"
+  workflow_run ||--o{ space_entity_run : "run_id (no FK)"
+  space_entity ||--o{ space_entity_part : "entity_id, ON DELETE CASCADE"
+  space_entity ||--o{ space_entity_tag : "entity_id, ON DELETE CASCADE"
+  space_entity ||--|{ space_entity_version : "entity_id, ON DELETE CASCADE"
+  space_entity ||--o{ space_entity_run : "entity_id, ON DELETE CASCADE"
+
+  space_entity {
+    uuid id PK
+    uuid space_id "owning space, no FK; UNIQUE (space_id, handle) WHERE deleted_at IS NULL"
+    varchar kind "brand | product | character | voice"
+    varchar handle "2-48 of a-z 0-9 hyphen"
+    text name "1-200 code points"
+    text search_key "normalised key of name, computed in Java"
+    jsonb fields "per-kind field values"
+    varchar category_label "NULL = no category; NULL exactly when category_key is"
+    text category_key
+    integer version "current version, 1 on create"
+    uuid created_by "no FK"
+    timestamptz created_at
+    timestamptz updated_at "INDEX (space_id, updated_at DESC, id) WHERE deleted_at IS NULL"
+    timestamptz deleted_at "trash; NULL exactly when deleted_by is, frees the handle"
+    uuid deleted_by "no FK"
+  }
+  space_entity_part {
+    uuid id PK
+    uuid entity_id FK "UNIQUE (entity_id, sort)"
+    uuid asset_id "library asset, no FK; INDEX"
+    varchar role "checked against the kind by the application"
+    varchar label "optional, up to 60 code points; NULL exactly when label_key is"
+    text label_key
+    integer sort "0-19"
+    timestamptz created_at
+  }
+  space_entity_tag {
+    uuid entity_id PK,FK
+    text tag_key PK "normalised key; INDEX"
+    varchar tag_label "40 code points, the space's first spelling"
+    timestamptz created_at
+  }
+  space_entity_version {
+    uuid entity_id PK,FK
+    integer version PK
+    jsonb snapshot "name, handle, fields, category, tags, parts; no URL"
+    jsonb changes "change codes of this version"
+    timestamptz created_at
+  }
+  space_entity_run {
+    uuid run_id PK "no FK"
+    uuid entity_id PK,FK
+    uuid space_id "no FK"
+    integer version "entity version at the time of the run"
+    uuid workflow_id "no FK"
+    text workflow_name "copied at recording"
+    timestamptz created_at
+    timestamptz completed_at "NULL while the run is open; partial INDEX (entity_id, completed_at DESC, run_id)"
+  }
+```
+
+An entity is trashed by stamping `deleted_at`/`deleted_by`, never deleted; the partial unique index on
+`handle` only covers live rows, so a trashed entity's handle is free again. `ON DELETE CASCADE` matters only
+for a future purge.
+
+## Trend taxonomy (`V2026.11.15.260`)
+
+```mermaid
+erDiagram
+  trend_category {
+    varchar key PK "derived from name_vi, 1-64 chars of a-z0-9 joined by single hyphens (CHECK); never changes after create"
+    varchar name_vi "varchar(60)"
+    varchar name_en "varchar(60)"
+    int display_order "ties are read in key order"
+    boolean visible "hidden categories stay stored"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  trend_tag {
+    uuid id PK "generated in the application"
+    varchar name_vi "varchar(30)"
+    varchar name_en "varchar(30)"
+    int display_order "ties are read in creation order"
+    boolean visible
+    timestamptz created_at
+    timestamptz updated_at
+  }
+```
+
+No relations yet: the template table and its category foreign key arrive with the template change. The
+migration seeds four categories (`nguoi`, `san-pham`, `thu-cung`, `nhay-chuyen-canh`) and the two
+`content.trend_template.*` permission keys.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |

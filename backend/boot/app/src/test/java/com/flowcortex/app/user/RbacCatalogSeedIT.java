@@ -70,7 +70,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key(),
                         Permission.CONTENT_DOCUMENT_VIEW.key(), Permission.CONTENT_DOCUMENT_MANAGE.key(),
                         Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key(),
-                        Permission.USER_ACCOUNT_EXPORT.key())
+                        Permission.USER_ACCOUNT_EXPORT.key(),
+                        Permission.CONTENT_TREND_TEMPLATE_VIEW.key(), Permission.CONTENT_TREND_TEMPLATE_MANAGE.key())
                 .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
@@ -80,7 +81,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE,
                 Permission.CONTENT_DOCUMENT_VIEW, Permission.CONTENT_DOCUMENT_MANAGE,
-                Permission.CONTENT_MEDIA_VIEW, Permission.CONTENT_MEDIA_MANAGE));
+                Permission.CONTENT_MEDIA_VIEW, Permission.CONTENT_MEDIA_MANAGE,
+                Permission.CONTENT_TREND_TEMPLATE_VIEW, Permission.CONTENT_TREND_TEMPLATE_MANAGE));
         assertThat(keysOf("PLATFORM_OPERATOR")).isEqualTo(keys(
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,

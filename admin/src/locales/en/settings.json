@@ -18,8 +18,15 @@
   "changedAt": "Changed at {{at}}",
   "vetoedNote": "Turned off by the server configuration; the stored value applies once it is lifted.",
   "degradedNote": "The settings store is unavailable, so a safe fallback applies.",
+  "lowerValue": {
+    "title": "Lower the versions kept?",
+    "message": "Lowering from {{from}} to {{to}} removes each project's older versions beyond {{to}} at its next save. They cannot be restored.",
+    "confirm": "Lower and save",
+    "cancel": "Cancel"
+  },
   "groups": {
     "support": "Help Center",
+    "media": "Media and video editor",
     "user": "Accounts",
     "workflow": "Workflows"
   },
@@ -47,6 +54,46 @@
     "older": "Older"
   },
   "keys": {
+    "media": {
+      "editor": {
+        "project_max_versions": {
+          "label": "Versions kept per project",
+          "help": "Older versions beyond this number are removed when a project is saved. 1 to 200."
+        },
+        "project_max_bytes": {
+          "label": "Largest project document (bytes)",
+          "help": "The editor refuses to save a project document larger than this. 100000 to 10000000 bytes."
+        },
+        "batch_max_items": {
+          "label": "Scenes per batch",
+          "help": "The editor refuses an AI batch or scene split with more scenes than this. 1 to 12."
+        },
+        "take_check_daily_max": {
+          "label": "Take checks per member per day",
+          "help": "A member who has used this many take checks today is refused until the next Vietnam day. 1 to 200."
+        },
+        "stems_max_duration_sec": {
+          "label": "Longest clip for voice and music separation (seconds)",
+          "help": "The editor refuses to separate voice and music from a clip longer than this. 60 to 3600 seconds."
+        },
+        "speakers_max_duration_sec": {
+          "label": "Longest clip for speaker separation (seconds)",
+          "help": "The editor refuses to separate speakers in a clip longer than this. 60 to 1800 seconds."
+        },
+        "derive_max_duration_sec": {
+          "label": "Longest clip for deriving a version (seconds)",
+          "help": "The editor refuses to derive a new clip from a source longer than this. 10 to 3600 seconds."
+        },
+        "beats_max_duration_sec": {
+          "label": "Longest clip for beat analysis (seconds)",
+          "help": "The editor refuses to analyse the beats of a clip longer than this. 30 to 1200 seconds."
+        },
+        "audio_tools_max_duration_sec": {
+          "label": "Longest track for audio tools (seconds)",
+          "help": "The editor refuses to extract the audio of a track longer than this. 60 to 14400 seconds."
+        }
+      }
+    },
     "user": {
       "pw_reset": {
         "enabled": {
