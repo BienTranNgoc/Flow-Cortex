@@ -10,12 +10,28 @@
     "new": "Cuộc trò chuyện mới",
     "loading": "Đang tải các cuộc trò chuyện…",
     "empty": "Chưa có cuộc trò chuyện nào. Hãy bắt đầu một cuộc mới.",
+    "recentEmpty": "Không có cuộc trò chuyện nào ngoài thư mục.",
     "loadFailed": "Không tải được các cuộc trò chuyện của bạn.",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "history": "Lịch sử",
+    "pinned": "Đã ghim",
+    "folders": "Thư mục",
+    "recent": "Gần đây",
+    "loadMore": "Tải thêm",
+    "loadingMore": "Đang tải…",
+    "loadMoreFailed": "Không tải thêm được cuộc trò chuyện."
   },
   "row": {
     "rename": "Đổi tên",
     "delete": "Xoá",
+    "actions": "Thao tác",
+    "pin": "Ghim",
+    "unpin": "Bỏ ghim",
+    "move": "Chuyển vào thư mục",
+    "time": {
+      "todayAt": "Hôm nay {{time}}",
+      "yesterday": "Hôm qua"
+    },
     "renameLabel": "Tên cuộc trò chuyện",
     "save": "Lưu",
     "cancel": "Huỷ",
@@ -23,6 +39,60 @@
     "titleEmpty": "Hãy đặt tên cho cuộc trò chuyện.",
     "titleTooLong": "Tên tối đa {{max}} ký tự.",
     "renameFailed": "Không thể đổi tên cuộc trò chuyện."
+  },
+  "folders": {
+    "new": "Thư mục mới",
+    "loading": "Đang tải thư mục…",
+    "loadFailed": "Không tải được thư mục của bạn.",
+    "retry": "Thử lại",
+    "empty": "Chưa có thư mục nào.",
+    "folderEmpty": "Thư mục này trống.",
+    "createTitle": "Thư mục mới",
+    "renameTitle": "Đổi tên thư mục",
+    "nameLabel": "Tên thư mục",
+    "counter": "{{length}}/{{max}}",
+    "nameEmpty": "Hãy đặt tên cho thư mục.",
+    "nameTooLong": "Tên thư mục tối đa {{max}} ký tự.",
+    "create": "Tạo",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Huỷ",
+    "limit": "Bạn đã đạt giới hạn thư mục. Hãy xoá một thư mục để thêm mới.",
+    "gone": "Thư mục này không còn tồn tại."
+  },
+  "move": {
+    "title": "Chuyển vào thư mục",
+    "text": "Chọn nơi đặt “{{title}}”.",
+    "none": "Không thư mục",
+    "current": "Hiện tại",
+    "moving": "Đang chuyển…",
+    "cancel": "Huỷ"
+  },
+  "history": {
+    "title": "Lịch sử trò chuyện",
+    "toChat": "Quay lại trò chuyện",
+    "back": "Tất cả cuộc trò chuyện",
+    "searchLabel": "Tìm cuộc trò chuyện",
+    "search": "Tìm",
+    "clear": "Xoá tìm kiếm",
+    "sortLabel": "Sắp xếp",
+    "sortNewest": "Mới nhất trước",
+    "sortOldest": "Cũ nhất trước",
+    "noMatch": "Không có cuộc trò chuyện nào khớp với “{{q}}”.",
+    "group": {
+      "today": "Hôm nay",
+      "last7": "7 ngày qua",
+      "earlier": "Trước đó"
+    },
+    "folderCount_one": "{{count}} cuộc trò chuyện",
+    "folderCount_other": "{{count}} cuộc trò chuyện",
+    "renameFolder": "Đổi tên thư mục {{name}}",
+    "deleteFolder": "Xoá thư mục {{name}}",
+    "deleteFolderDialog": {
+      "title": "Xoá thư mục này?",
+      "text": "Thư mục “{{name}}” sẽ bị xoá. Các cuộc trò chuyện trong đó được giữ lại và quay về mục Gần đây.",
+      "failed": "Không thể xoá thư mục."
+    }
   },
   "delete": {
     "title": "Xoá cuộc trò chuyện này?",

@@ -162,7 +162,8 @@
         "help_topic": "Chủ đề hướng dẫn",
         "help_article": "Bài hướng dẫn",
         "document": "Tài liệu",
-        "media": "Thư viện media"
+        "media": "Thư viện media",
+        "trend_template": "Mẫu trend"
       },
       "platform": {
         "setting": "Cài đặt",
@@ -227,6 +228,10 @@
         "media": {
           "view": "Xem thư viện media",
           "manage": "Quản lý thư viện media"
+        },
+        "trend_template": {
+          "view": "Xem mẫu trend",
+          "manage": "Quản lý mẫu trend"
         }
       },
       "platform": {

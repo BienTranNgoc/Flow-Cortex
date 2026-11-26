@@ -1,0 +1,65 @@
+package com.flowcortex.trend.web;
+
+import com.flowcortex.shared.web.LocalizedMessage;
+import com.flowcortex.shared.web.LocalizedProblem;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+
+/**
+ * A trend refusal rendered as RFC 9457 problem {@code https://flow-cortex.dev/problems/<code>}, with optional
+ * extra members (for example {@code templateCount}) and field {@code errors}. The detail and every field error
+ * are message bundle keys, put into the request's language by {@link TrendProblemHandler}; clients still map
+ * the code to their own copy.
+ */
+public class TrendProblemException extends RuntimeException implements LocalizedProblem {
+
+    private final HttpStatus status;
+    private final String code;
+    private final LocalizedMessage detail;
+    private final Map<String, Object> properties = new LinkedHashMap<>();
+    private final Map<String, LocalizedMessage> fieldErrors = new LinkedHashMap<>();
+
+    public TrendProblemException(HttpStatus status, String code, LocalizedMessage detail) {
+        super(detail.toString());
+        this.status = status;
+        this.code = code;
+        this.detail = detail;
+    }
+
+    public TrendProblemException with(String name, Object value) {
+        properties.put(name, value);
+        return this;
+    }
+
+    public TrendProblemException withFieldErrors(Map<String, LocalizedMessage> errors) {
+        fieldErrors.putAll(errors);
+        return this;
+    }
+
+    public HttpStatus status() {
+        return status;
+    }
+
+    public String code() {
+        return code;
+    }
+
+    public LocalizedMessage detail() {
+        return detail;
+    }
+
+    @Override
+    public LocalizedMessage localizedDetail() {
+        return detail;
+    }
+
+    public Map<String, Object> properties() {
+        return Collections.unmodifiableMap(properties);
+    }
+
+    public Map<String, LocalizedMessage> fieldErrors() {
+        return Collections.unmodifiableMap(fieldErrors);
+    }
+}
