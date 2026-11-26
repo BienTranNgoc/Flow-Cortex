@@ -726,6 +726,9 @@ flowcortex:
     # budget is the share thinking may use and must stay below it.
     max-output-tokens: ${FLOWCORTEX_CHAT_MAX_OUTPUT_TOKENS:8192}
     thinking-budget: ${FLOWCORTEX_CHAT_THINKING_BUDGET:1024}
+    # Conversation history. max-folders is the most folders one member holds; the sidebar reads them all.
+    history:
+      max-folders: ${FLOWCORTEX_CHAT_MAX_FOLDERS:100}
   # Media engine: the one home of every media timeout and limit (MediaProperties
   # has no code defaults). The kill switch works like the workflow one above —
   # env var + restart. S3_* is provider-neutral, so another S3-compatible store
