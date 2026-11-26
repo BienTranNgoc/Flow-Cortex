@@ -65,6 +65,28 @@ afterEach(() => {
 });
 
 describe('RequestDetailPage', () => {
+  it('tags an assistant turn that was handed to the support team', async () => {
+    stubApi({
+      [`GET ${DETAIL_PATH}`]: {
+        status: 200,
+        body: detail({
+          conversation: [
+            { role: 'user', text: 'Tôi bị trừ tiền 2 lần', createdAt: '2026-11-04T02:50:00Z' },
+            {
+              role: 'assistant',
+              text: 'Câu hỏi này cần đội ngũ hỗ trợ xử lý',
+              outcome: 'handoff',
+              createdAt: '2026-11-04T02:50:05Z',
+            },
+          ],
+        }),
+      },
+    });
+    renderDetail();
+
+    expect(await screen.findByText('The question was sent to the support team')).toBeInTheDocument();
+  });
+
   it('counts a trailing no-break space in a reply as the server does', async () => {
     const calls = stubApi({ [`GET ${DETAIL_PATH}`]: { status: 200, body: detail() } });
     const user = userEvent.setup();

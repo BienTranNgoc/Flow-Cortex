@@ -8,9 +8,12 @@ import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.WorkflowView;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import com.flowcortex.workflow.infrastructure.WorkflowDataEntryRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Copies a workflow another member shared into the caller's own drafts. The copy carries the steps the caller is
  * served (their pin, else the published version) under the name the caller sees; it takes no lock on the source, so
- * it holds what was served at read time while the source's count moves by one atomic update.
+ * it holds what was served at read time while the source's count moves by one atomic update. The source's template rows
+ * of the data store are copied as they are then (the store keeps no versions), and a source whose {@code workflow.call} step names a
+ * workflow the caller cannot read is refused, since the copy would fail at that step.
  */
 @Service
 public class WorkflowForkService {
@@ -28,18 +33,25 @@ public class WorkflowForkService {
     private final WorkflowStepRepository workflowStepRepository;
     private final ServedDefinitions servedDefinitions;
     private final StepExecutorRegistry registry;
+    private final WorkflowDataEntryRepository dataEntryRepository;
+    private final WorkflowDataStore dataStore;
 
     WorkflowForkService(WorkflowRepository workflowRepository, WorkflowStepRepository workflowStepRepository,
-            ServedDefinitions servedDefinitions, StepExecutorRegistry registry) {
+            ServedDefinitions servedDefinitions, StepExecutorRegistry registry,
+            WorkflowDataEntryRepository dataEntryRepository, WorkflowDataStore dataStore) {
         this.workflowRepository = workflowRepository;
         this.workflowStepRepository = workflowStepRepository;
         this.servedDefinitions = servedDefinitions;
         this.registry = registry;
+        this.dataEntryRepository = dataEntryRepository;
+        this.dataStore = dataStore;
     }
 
     /**
      * @throws NotFoundException the workflow is not visible to the caller
      * @throws UnprocessableEntityException the caller owns the workflow ({@code CANNOT_FORK_OWN})
+     * @throws UnprocessableEntityException also {@code FORK_REFERENCE_UNRESOLVED}: a call step names a workflow the
+     *         caller cannot read
      * @throws ConflictException the workflow is the fixed Product Video workflow
      * @throws LocalizedStatusException 403: the owner has not allowed forking
      * @throws UnprocessableEntityException the served steps hold a connector call
@@ -54,14 +66,30 @@ public class WorkflowForkService {
                 .anyMatch(step -> ConnectorStepOwnerGuard.isConnectorCall(step.type()));
         ForkEligibility.refusal(source.getId(), source.getOwnerId(), source.isAllowFork(), holdsConnectorCall,
                 callerId).ifPresent(WorkflowForkService::refuse);
+        refuseUnresolvedCalls(served, callerId);
 
         Workflow fork = workflowRepository.save(
                 Workflow.forkOf(UUID.randomUUID(), callerId, source.getName(), source.getId()));
         List<WorkflowStep> steps = workflowStepRepository.saveAll(WorkflowCarry.copySteps(served, fork.getId()));
+        dataStore.seed(fork.getId(), WorkflowCarry.seedsOf(WorkflowCarry.sharedWithRunners(
+                dataEntryRepository.findByWorkflowIdOrderByUpdatedAtDesc(source.getId()))));
         workflowRepository.incrementForkCount(source.getId());
 
         return WorkflowMapper.toWorkflowView(fork, steps, registry::isRemote, registry::isAvailable,
                 registry::snapshotsRunInputs);
+    }
+
+    /** A {@code workflow.call} step would fail at run time if the new owner cannot read the workflow it names. */
+    private void refuseUnresolvedCalls(List<StepDefinition> served, UUID callerId) {
+        List<Integer> unresolved = WorkflowCallReferences.unresolved(served, callerId, workflowRepository);
+        if (unresolved.isEmpty()) {
+            return;
+        }
+        Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
+        unresolved.forEach(order -> errors.put("step" + order + ".config",
+                new LocalizedMessage("workflow.artifact.issue.reference_unresolved", order)));
+        throw new UnprocessableEntityException(new LocalizedMessage("workflow.fork.referenceUnresolved"),
+                "FORK_REFERENCE_UNRESOLVED", errors);
     }
 
     private static void refuse(ForkEligibility.Refusal refusal) {

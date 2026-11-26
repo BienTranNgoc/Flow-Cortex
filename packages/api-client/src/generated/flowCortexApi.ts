@@ -389,6 +389,8 @@ export const SupportConversationMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportConversationMessage {
@@ -597,6 +599,36 @@ export interface RoleResponse {
   permissions: RoleResponsePermissionsItem[];
   permissionsVersion: number;
   accountCount: number;
+}
+
+export interface RbacRuntimeUpdate {
+  mutationsEnabled: boolean;
+  /**
+   * @minLength 0
+   * @maxLength 2000
+   */
+  reason?: string;
+}
+
+export type RbacRuntimeSource = (typeof RbacRuntimeSource)[keyof typeof RbacRuntimeSource];
+
+export const RbacRuntimeSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface RbacRuntime {
+  mutationsEnabled: boolean;
+  source: RbacRuntimeSource;
+  /** @nullable */
+  configuredValue?: boolean | null;
+  /** @nullable */
+  updatedBy?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
 }
 
 export interface PaymentSettingUpdate {
@@ -1275,6 +1307,27 @@ export interface SupportAssistantQuestion {
   question: string;
 }
 
+/**
+ * @nullable
+ */
+export type SupportAssistantHandoffTopic =
+  (typeof SupportAssistantHandoffTopic)[keyof typeof SupportAssistantHandoffTopic] | null;
+
+export const SupportAssistantHandoffTopic = {
+  money: 'money',
+  security: 'security',
+  personal_data: 'personal_data',
+  legal: 'legal',
+  violation: 'violation',
+} as const;
+
+export interface SupportAssistantHandoff {
+  /** @nullable */
+  topic: SupportAssistantHandoffTopic;
+  subject?: string;
+  description?: string;
+}
+
 export interface SupportAssistantQuota {
   remaining: number;
   resetsAt: string;
@@ -1294,6 +1347,8 @@ export const SupportAssistantReplyMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportAssistantSource {
@@ -1306,6 +1361,7 @@ export interface SupportAssistantReplyMessage {
   text: string;
   outcome: SupportAssistantReplyMessageOutcome;
   sources: SupportAssistantSource[];
+  handoff?: SupportAssistantHandoff;
 }
 
 export interface SupportAssistantReply {
@@ -2182,8 +2238,16 @@ export interface WorkflowArtifactWorkflow {
   name: string;
 }
 
+/**
+ * @nullable
+ */
+export type WorkflowArtifactStepConfig = { [key: string]: unknown } | null;
+
 export interface WorkflowArtifactStep {
-  /** @minimum 1 */
+  /**
+   * @minimum 1
+   * @maximum 32767
+   */
   stepOrder: number;
   /**
    * @maxLength 255
@@ -2201,7 +2265,14 @@ export interface WorkflowArtifactStep {
    */
   inputRef: string | null;
   /** @nullable */
-  config: string | null;
+  config: WorkflowArtifactStepConfig;
+}
+
+export interface WorkflowArtifactDataEntry {
+  key: string;
+  dataType: string;
+  /** Any JSON value */
+  value: unknown;
 }
 
 export interface WorkflowArtifact {
@@ -2213,6 +2284,8 @@ export interface WorkflowArtifact {
   exportedAt: string;
   workflow: WorkflowArtifactWorkflow;
   steps: WorkflowArtifactStep[];
+  /** The workflow's data-store entries; absent when it has none */
+  dataStore?: WorkflowArtifactDataEntry[];
 }
 
 export type ImportIssueResponseSeverity =
@@ -3030,6 +3103,8 @@ export const SupportAssistantHistoryMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportAssistantHistoryMessage {
@@ -3037,6 +3112,7 @@ export interface SupportAssistantHistoryMessage {
   text: string;
   outcome?: SupportAssistantHistoryMessageOutcome;
   sources: SupportAssistantSource[];
+  handoff?: SupportAssistantHandoff;
   createdAt: string;
 }
 
@@ -3523,6 +3599,18 @@ export interface BalanceResponse {
   granted?: number;
 }
 
+export interface LegalIndexEntry {
+  /** The document slug, e.g. legal-privacy */
+  slug: string;
+  /** The member page path, e.g. /legal/privacy */
+  path: string;
+  label: LocalizedText;
+}
+
+export interface LegalIndex {
+  items: LegalIndexEntry[];
+}
+
 export interface ContentDocumentHistoryEntry {
   revisionId: string;
   publishedAt: string;
@@ -3917,6 +4005,16 @@ export const AdminSupportRequestSummaryStatus = {
   closed: 'closed',
 } as const;
 
+export type AdminSupportRequestSummarySlaLevel =
+  (typeof AdminSupportRequestSummarySlaLevel)[keyof typeof AdminSupportRequestSummarySlaLevel];
+
+export const AdminSupportRequestSummarySlaLevel = {
+  ok: 'ok',
+  due_soon: 'due_soon',
+  overdue: 'overdue',
+  paused: 'paused',
+} as const;
+
 export interface AdminSupportRequestSummary {
   number: number;
   type: AdminSupportRequestSummaryType;
@@ -3926,6 +4024,7 @@ export interface AdminSupportRequestSummary {
   assignee?: SupportAssignee;
   createdAt: string;
   lastActivityAt: string;
+  slaLevel: AdminSupportRequestSummarySlaLevel;
 }
 
 export interface AdminSupportRequestPage {
@@ -3933,6 +4032,11 @@ export interface AdminSupportRequestPage {
   page: number;
   size: number;
   total: number;
+}
+
+export interface AdminSupportSlaSummary {
+  overdue: number;
+  dueSoon: number;
 }
 
 export interface SupportAssigneeCount {
@@ -4036,6 +4140,19 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
+/**
+ * none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned
+ */
+export type AdminPhoneVerificationStatusCarrierCredential =
+  (typeof AdminPhoneVerificationStatusCarrierCredential)[keyof typeof AdminPhoneVerificationStatusCarrierCredential];
+
+export const AdminPhoneVerificationStatusCarrierCredential = {
+  none: 'none',
+  active: 'active',
+  reseed_required: 'reseed_required',
+  unseeded: 'unseeded',
+} as const;
+
 export interface AdminPhoneVerificationStatus {
   verificationEnabled: boolean;
   /** none when no SMS sender is wired; the configured sender when it is a known one; else custom */
@@ -4047,6 +4164,8 @@ export interface AdminPhoneVerificationStatus {
   globalSendsPerDay: number;
   /** Codes sent in the last 24 hours */
   sentLast24h: number;
+  /** none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned */
+  carrierCredential: AdminPhoneVerificationStatusCarrierCredential;
 }
 
 export type PermissionCatalogEntryKey =
@@ -4148,6 +4267,17 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export interface AdminFeature {
+  name: string;
+  /** @nullable */
+  settingKey?: string | null;
+  value: boolean;
+}
+
+export interface AdminFeatureList {
+  items: AdminFeature[];
+}
+
 export interface PageViewContentMediaItem {
   items: ContentMediaItem[];
   page: number;
@@ -4160,6 +4290,8 @@ export interface ContentDocumentSummary {
   title: LocalizedText;
   sectionTypes: string[];
   publicHistory: boolean;
+  minSections: number;
+  maxSections: number;
   draftVersion: number;
   /** @nullable */
   draftUpdatedAt?: string | null;
@@ -4376,6 +4508,18 @@ export const ListUsersSort = {
 } as const;
 
 export type RevokeOAuthToken200 = { [key: string]: unknown };
+
+export type MarkAllNotificationsReadParams = {
+  audience?: MarkAllNotificationsReadAudience;
+};
+
+export type MarkAllNotificationsReadAudience =
+  (typeof MarkAllNotificationsReadAudience)[keyof typeof MarkAllNotificationsReadAudience];
+
+export const MarkAllNotificationsReadAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
 
 export type UnsubscribeEmailLinkParams = {
   src?: string;
@@ -4704,10 +4848,31 @@ export type CheckOAuthAuthorizationParams = {
 };
 
 export type ListNotificationsParams = {
+  audience?: ListNotificationsAudience;
   filter?: string;
   page?: string;
   size?: string;
 };
+
+export type ListNotificationsAudience =
+  (typeof ListNotificationsAudience)[keyof typeof ListNotificationsAudience];
+
+export const ListNotificationsAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export type GetUnreadNotificationCountParams = {
+  audience?: GetUnreadNotificationCountAudience;
+};
+
+export type GetUnreadNotificationCountAudience =
+  (typeof GetUnreadNotificationCountAudience)[keyof typeof GetUnreadNotificationCountAudience];
+
+export const GetUnreadNotificationCountAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
 
 export type ListDriveSuggestionsParams = {
   /**
@@ -4964,6 +5129,10 @@ export type ListAdminSupportRequestsParams = {
    * @maxLength 100
    */
   q?: string;
+  /**
+   * Keeps only due-soon and overdue requests
+   */
+  sla?: ListAdminSupportRequestsSla;
   sort?: ListAdminSupportRequestsSort;
   /**
    * @minimum 0
@@ -5004,12 +5173,65 @@ export const ListAdminSupportRequestsCreated = {
   older: 'older',
 } as const;
 
+export type ListAdminSupportRequestsSla =
+  (typeof ListAdminSupportRequestsSla)[keyof typeof ListAdminSupportRequestsSla];
+
+export const ListAdminSupportRequestsSla = {
+  at_risk: 'at_risk',
+} as const;
+
 export type ListAdminSupportRequestsSort =
   (typeof ListAdminSupportRequestsSort)[keyof typeof ListAdminSupportRequestsSort];
 
 export const ListAdminSupportRequestsSort = {
   newest: 'newest',
   oldest: 'oldest',
+} as const;
+
+export type GetAdminSupportSlaSummaryParams = {
+  status?: GetAdminSupportSlaSummaryStatus;
+  type?: GetAdminSupportSlaSummaryType;
+  /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: GetAdminSupportSlaSummaryCreated;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type GetAdminSupportSlaSummaryStatus =
+  (typeof GetAdminSupportSlaSummaryStatus)[keyof typeof GetAdminSupportSlaSummaryStatus];
+
+export const GetAdminSupportSlaSummaryStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type GetAdminSupportSlaSummaryType =
+  (typeof GetAdminSupportSlaSummaryType)[keyof typeof GetAdminSupportSlaSummaryType];
+
+export const GetAdminSupportSlaSummaryType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type GetAdminSupportSlaSummaryCreated =
+  (typeof GetAdminSupportSlaSummaryCreated)[keyof typeof GetAdminSupportSlaSummaryCreated];
+
+export const GetAdminSupportSlaSummaryCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
 } as const;
 
 export type GetAdminSupportRequestFacetsParams = {
@@ -6906,6 +7128,74 @@ export const replaceAdminRolePermissions = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(replacePermissionsRequest),
+  });
+};
+
+export type getRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type getRbacRuntimeResponseSuccess = getRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type getRbacRuntimeResponse = getRbacRuntimeResponseSuccess;
+
+export const getGetRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const getRbacRuntime = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRbacRuntimeResponse> => {
+  return customFetch<getRbacRuntimeResponse>(getGetRbacRuntimeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type updateRbacRuntimeResponseSuccess = updateRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type updateRbacRuntimeResponse = updateRbacRuntimeResponseSuccess;
+
+export const getUpdateRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const updateRbacRuntime = async (
+  rbacRuntimeUpdate: RbacRuntimeUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateRbacRuntimeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateRbacRuntimeResponse>(getUpdateRbacRuntimeUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rbacRuntimeUpdate),
   });
 };
 
@@ -10910,19 +11200,42 @@ export type markAllNotificationsReadResponse200 = {
   status: 200;
 };
 
+export type markAllNotificationsReadResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type markAllNotificationsReadResponseSuccess = markAllNotificationsReadResponse200 & {
   headers: Headers;
 };
-export type markAllNotificationsReadResponse = markAllNotificationsReadResponseSuccess;
+export type markAllNotificationsReadResponseError = markAllNotificationsReadResponse400 & {
+  headers: Headers;
+};
 
-export const getMarkAllNotificationsReadUrl = () => {
-  return `/api/v1/notifications/read-all`;
+export type markAllNotificationsReadResponse =
+  markAllNotificationsReadResponseSuccess | markAllNotificationsReadResponseError;
+
+export const getMarkAllNotificationsReadUrl = (params?: MarkAllNotificationsReadParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications/read-all?${stringifiedParams}`
+    : `/api/v1/notifications/read-all`;
 };
 
 export const markAllNotificationsRead = async (
+  params?: MarkAllNotificationsReadParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<markAllNotificationsReadResponse> => {
-  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(), {
+  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(params), {
     ...options,
     method: 'POST',
   });
@@ -11054,10 +11367,19 @@ export type sendCodeResponse200 = {
   status: 200;
 };
 
+export type sendCodeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type sendCodeResponseSuccess = sendCodeResponse200 & {
   headers: Headers;
 };
-export type sendCodeResponse = sendCodeResponseSuccess;
+export type sendCodeResponseError = sendCodeResponse503 & {
+  headers: Headers;
+};
+
+export type sendCodeResponse = sendCodeResponseSuccess | sendCodeResponseError;
 
 export const getSendCodeUrl = () => {
   return `/api/v1/me/phone/send-code`;
@@ -11190,6 +11512,11 @@ export type changeStartResponse429 = {
   status: 429;
 };
 
+export type changeStartResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type changeStartResponseSuccess = changeStartResponse200 & {
   headers: Headers;
 };
@@ -11199,6 +11526,7 @@ export type changeStartResponseError = (
   | changeStartResponse409
   | changeStartResponse422
   | changeStartResponse429
+  | changeStartResponse503
 ) & {
   headers: Headers;
 };
@@ -17322,19 +17650,42 @@ export type getUnreadNotificationCountResponse200 = {
   status: 200;
 };
 
+export type getUnreadNotificationCountResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type getUnreadNotificationCountResponseSuccess = getUnreadNotificationCountResponse200 & {
   headers: Headers;
 };
-export type getUnreadNotificationCountResponse = getUnreadNotificationCountResponseSuccess;
+export type getUnreadNotificationCountResponseError = getUnreadNotificationCountResponse400 & {
+  headers: Headers;
+};
 
-export const getGetUnreadNotificationCountUrl = () => {
-  return `/api/v1/notifications/unread-count`;
+export type getUnreadNotificationCountResponse =
+  getUnreadNotificationCountResponseSuccess | getUnreadNotificationCountResponseError;
+
+export const getGetUnreadNotificationCountUrl = (params?: GetUnreadNotificationCountParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications/unread-count?${stringifiedParams}`
+    : `/api/v1/notifications/unread-count`;
 };
 
 export const getUnreadNotificationCount = async (
+  params?: GetUnreadNotificationCountParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getUnreadNotificationCountResponse> => {
-  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(), {
+  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -17625,6 +17976,29 @@ export const getContentMedia = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getContentMediaResponse> => {
   return customFetch<getContentMediaResponse>(getGetContentMediaUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getLegalIndexResponse200 = {
+  data: LegalIndex;
+  status: 200;
+};
+
+export type getLegalIndexResponseSuccess = getLegalIndexResponse200 & {
+  headers: Headers;
+};
+export type getLegalIndexResponse = getLegalIndexResponseSuccess;
+
+export const getGetLegalIndexUrl = () => {
+  return `/api/v1/content/legal-index`;
+};
+
+export const getLegalIndex = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getLegalIndexResponse> => {
+  return customFetch<getLegalIndexResponse>(getGetLegalIndexUrl(), {
     ...options,
     method: 'GET',
   });
@@ -18594,6 +18968,52 @@ export const getAdminSupportRequest = async (
   });
 };
 
+export type getAdminSupportSlaSummaryResponse200 = {
+  data: AdminSupportSlaSummary;
+  status: 200;
+};
+
+export type getAdminSupportSlaSummaryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getAdminSupportSlaSummaryResponseSuccess = getAdminSupportSlaSummaryResponse200 & {
+  headers: Headers;
+};
+export type getAdminSupportSlaSummaryResponseError = getAdminSupportSlaSummaryResponse400 & {
+  headers: Headers;
+};
+
+export type getAdminSupportSlaSummaryResponse =
+  getAdminSupportSlaSummaryResponseSuccess | getAdminSupportSlaSummaryResponseError;
+
+export const getGetAdminSupportSlaSummaryUrl = (params?: GetAdminSupportSlaSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/support/requests/sla-summary?${stringifiedParams}`
+    : `/api/v1/admin/support/requests/sla-summary`;
+};
+
+export const getAdminSupportSlaSummary = async (
+  params?: GetAdminSupportSlaSummaryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportSlaSummaryResponse> => {
+  return customFetch<getAdminSupportSlaSummaryResponse>(getGetAdminSupportSlaSummaryUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type countOpenSupportRequestsResponse200 = {
   data: SupportCount;
   status: 200;
@@ -19030,6 +19450,29 @@ export const listAdminMediaJobs = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminFeaturesResponse200 = {
+  data: AdminFeatureList;
+  status: 200;
+};
+
+export type listAdminFeaturesResponseSuccess = listAdminFeaturesResponse200 & {
+  headers: Headers;
+};
+export type listAdminFeaturesResponse = listAdminFeaturesResponseSuccess;
+
+export const getListAdminFeaturesUrl = () => {
+  return `/api/v1/admin/features`;
+};
+
+export const listAdminFeatures = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminFeaturesResponse> => {
+  return customFetch<listAdminFeaturesResponse>(getListAdminFeaturesUrl(), {
     ...options,
     method: 'GET',
   });

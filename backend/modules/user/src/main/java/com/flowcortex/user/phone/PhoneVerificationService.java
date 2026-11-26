@@ -21,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,6 +42,9 @@ class PhoneVerificationService {
     static final Duration CODE_TTL = Duration.ofMinutes(5);
     static final LocalizedMessage NUMBER_TAKEN = new LocalizedMessage("phone.numberTaken");
     static final String LOCK = "SELECT pg_advisory_xact_lock(hashtext(?))";
+    static final String GLOBAL_LOCK_KEY = "phone-send-global";
+    /** One cooldown step, the first wait of the member ladder. */
+    static final long SMS_RETRY_AFTER_SECONDS = 60;
 
     private static final Logger LOG = LoggerFactory.getLogger(PhoneVerificationService.class);
     private static final String VERIFIED_NUMBER_UNIQUE_INDEX = "uq_user_phone_verified_number";
@@ -59,7 +61,6 @@ class PhoneVerificationService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final Clock clock;
-    private final MessageSource messages;
     private final RequestLocale requestLocale;
     private final PhoneTelemetry telemetry;
     private final SecureRandom random = new SecureRandom();
@@ -70,9 +71,8 @@ class PhoneVerificationService {
             @Value("${flowcortex.phone-verification.enabled:false}") boolean enabled,
             PhoneSendAttemptStore attempts, PhoneNumberHasher phoneHasher, PhoneSendIpLimiter ipLimiter,
             PhoneSendLimits limits, PasswordEncoder passwordEncoder, JdbcTemplate jdbc,
-            PlatformTransactionManager transactionManager, Clock clock, MessageSource messages,
-            RequestLocale requestLocale, PhoneTelemetry telemetry) {
-        this.messages = messages;
+            PlatformTransactionManager transactionManager, Clock clock, RequestLocale requestLocale,
+            PhoneTelemetry telemetry) {
         this.telemetry = telemetry;
         this.requestLocale = requestLocale;
         this.smsSender = smsSenders.getIfAvailable();
@@ -132,47 +132,101 @@ class PhoneVerificationService {
     }
 
     /**
-     * Runs {@link PhoneSendPolicies#ORDER} under the locks and records the attempt, refused or not.
-     * A refusal is thrown only after that row commits; an allowed request invalidates the member's
-     * open code, then stores and sends the new one. {@code phone} is already normalised.
+     * Sends one code in three steps. The code and its hash are made before any lock. One transaction
+     * takes the member and number locks, runs {@link PhoneSendPolicies#ORDER} and records the attempt,
+     * refused or not; only a send every check allowed then takes the global lock, re-reads the budget
+     * alone, and stores the code. The carrier is called after that commit, so no lock or connection is
+     * held across it; a carrier failure gives the attempt and the code back in a second transaction.
+     * A refusal is thrown only after its row commits. {@code phone} is already normalised.
      */
     SentCode sendChallenge(UUID userId, String phone, String clientIp, Purpose purpose) {
+        SmsSender sender = sender();
         String phoneHash = phoneHasher.hash(phone);
         Instant now = now();
-        SendResult result = transaction.execute(status -> {
-            jdbc.query(LOCK, (RowCallbackHandler) row -> { }, memberLockKey(userId));
-            jdbc.query(LOCK, (RowCallbackHandler) row -> { }, phone);
-            Instant since = now.minus(PhoneSendPolicies.DAY);
-            List<Instant> pairSends = new ArrayList<>(challenges.findSendTimesByUserSince(userId, phone, since));
-            SendFacts facts = new SendFacts(phone, phoneHash, now,
-                    attempts.countedByUserSince(userId, since),
-                    () -> ipLimiter.tryAcquire(clientIp),
-                    attempts.nthNewestSendSince(since, limits.globalSendsPerDay()),
-                    phones.existsByPhoneE164AndVerifiedAtIsNotNullAndUserIdNot(phone, userId),
-                    challenges.findSendTimesSince(phone, since),
-                    pairSends);
-            Optional<Verdict> refusal = PhoneSendPolicies.firstRefusal(facts, limits);
-            attempts.record(userId, phoneHash, clientIp,
-                    refusal.map(verdict -> outcomeOf(verdict.refusal())).orElse(PhoneSendAttemptStore.SENT), now);
-            if (refusal.isPresent()) {
-                return new SendResult(refusal.get(), 0);
-            }
-            challenges.invalidateOpen(userId, now);
-            String code = String.format("%06d", random.nextInt(1_000_000));
-            challenges.save(new PhoneChallenge(UUID.randomUUID(), userId, phone, passwordEncoder.encode(code),
-                    now.plus(CODE_TTL), now, purpose));
-            sender().send(phone, messages.getMessage(new LocalizedMessage("sms.otp.body", code),
-                    requestLocale.current()));
-            pairSends.add(now);
-            return new SendResult(null, OtpSendPolicy.decide(pairSends, now).retryAfterSeconds());
-        });
-        if (result.refusal() != null) {
-            telemetry.send(outcomeOf(result.refusal().refusal()));
-            throw refusal(userId, phone, result.refusal());
+        String code = String.format("%06d", random.nextInt(1_000_000));
+        String codeHash = passwordEncoder.encode(code);
+        Decision decision = transaction.execute(status ->
+                decide(userId, phone, phoneHash, clientIp, purpose, now, codeHash));
+        if (decision.refusal() != null) {
+            telemetry.send(outcomeOf(decision.refusal().refusal()));
+            throw refusal(userId, phone, decision.refusal());
+        }
+        SmsMessage message = new SmsMessage(phone, SmsMessage.Kind.OTP, code, requestLocale.current(),
+                decision.attemptId().toString());
+        SmsDelivery delivery;
+        try {
+            delivery = sender.send(message);
+        } catch (SmsSendFailure failure) {
+            throw carrierFailed(userId, phone, decision, failure.reason());
+        } catch (RuntimeException failure) {
+            LOG.warn("Phone code sender failed: userId={} phone={} error={}", userId, PhoneNumbers.forLog(phone),
+                    failure.getClass().getName());
+            throw carrierFailed(userId, phone, decision, SmsSendFailure.Reason.UNAVAILABLE);
         }
         telemetry.send(PhoneSendAttemptStore.SENT);
-        LOG.info("Phone code sent: userId={} phone={} outcome=sent", userId, PhoneNumbers.forLog(phone));
-        return new SentCode(PhoneNumbers.mask(phone), result.resendAfterSeconds(), now.plus(CODE_TTL));
+        LOG.info("Phone code sent: userId={} phone={} outcome=sent delivery={}", userId, PhoneNumbers.forLog(phone),
+                delivery);
+        return new SentCode(PhoneNumbers.mask(phone), decision.resendAfterSeconds(), now.plus(CODE_TTL));
+    }
+
+    private Decision decide(UUID userId, String phone, String phoneHash, String clientIp, Purpose purpose,
+            Instant now, String codeHash) {
+        jdbc.query(LOCK, (RowCallbackHandler) row -> { }, memberLockKey(userId));
+        jdbc.query(LOCK, (RowCallbackHandler) row -> { }, phone);
+        Instant since = now.minus(PhoneSendPolicies.DAY);
+        List<Instant> pairSends = new ArrayList<>(challenges.findSendTimesByUserSince(userId, phone, since));
+        SendFacts facts = new SendFacts(phone, phoneHash, now,
+                attempts.countedByUserSince(userId, since),
+                () -> ipLimiter.tryAcquire(clientIp),
+                attempts.nthNewestSendSince(since, limits.globalSendsPerDay()),
+                phones.existsByPhoneE164AndVerifiedAtIsNotNullAndUserIdNot(phone, userId),
+                challenges.findSendTimesSince(phone, since),
+                pairSends);
+        Optional<Verdict> refusal = PhoneSendPolicies.firstRefusal(facts, limits);
+        if (refusal.isEmpty()) {
+            jdbc.query(LOCK, (RowCallbackHandler) row -> { }, GLOBAL_LOCK_KEY);
+            SendFacts budget = new SendFacts(phone, phoneHash, now, List.of(), () -> Duration.ZERO,
+                    attempts.nthNewestSendSince(since, limits.globalSendsPerDay()), false, List.of(), List.of());
+            refusal = PhoneSendPolicies.globalBudget(budget, limits);
+        }
+        UUID attemptId = attempts.record(userId, phoneHash, clientIp,
+                refusal.map(verdict -> outcomeOf(verdict.refusal())).orElse(PhoneSendAttemptStore.SENT), now);
+        if (refusal.isPresent()) {
+            return new Decision(refusal.get(), null, null, 0);
+        }
+        challenges.invalidateOpen(userId, now);
+        PhoneChallenge challenge = new PhoneChallenge(UUID.randomUUID(), userId, phone, codeHash,
+                now.plus(CODE_TTL), now, purpose);
+        challenges.save(challenge);
+        pairSends.add(now);
+        return new Decision(null, attemptId, challenge.getId(), OtpSendPolicy.decide(pairSends, now).retryAfterSeconds());
+    }
+
+    /**
+     * Gives the attempt and the code back, so the failed send spends no quota but the IP bucket and
+     * leaves no usable code, and returns the answer. A failed give-back is logged; the carrier answer
+     * is still returned and the member waits the cooldown.
+     */
+    private RuntimeException carrierFailed(UUID userId, String phone, Decision decision,
+            SmsSendFailure.Reason reason) {
+        boolean undeliverable = reason == SmsSendFailure.Reason.NUMBER_REJECTED;
+        String outcome = undeliverable ? PhoneSendAttemptStore.PHONE_UNDELIVERABLE
+                : PhoneSendAttemptStore.SMS_UNAVAILABLE;
+        try {
+            transaction.executeWithoutResult(status -> {
+                attempts.markOutcome(decision.attemptId(), outcome);
+                challenges.deleteById(decision.challengeId());
+            });
+        } catch (RuntimeException failure) {
+            LOG.warn("Phone code give-back failed: userId={} phone={} outcome=release_failed error={}", userId,
+                    PhoneNumbers.forLog(phone), failure.getClass().getName());
+        }
+        telemetry.send(outcome);
+        LOG.info("Phone code send refused: userId={} phone={} outcome={}", userId, PhoneNumbers.forLog(phone), outcome);
+        return undeliverable
+                ? new UnprocessableEntityException(new LocalizedMessage("phone.send.undeliverable"),
+                        "PHONE_UNDELIVERABLE")
+                : new SmsUnavailableException(SMS_RETRY_AFTER_SECONDS);
     }
 
     private SmsSender sender() {
@@ -389,7 +443,7 @@ class PhoneVerificationService {
     record Verification(Result result, String phone, int triesLeft) {
     }
 
-    /** {@code refusal} is null when the code was sent. */
-    private record SendResult(Verdict refusal, long resendAfterSeconds) {
+    /** {@code refusal} is null when the code was stored; then the attempt and challenge ids name what to give back. */
+    private record Decision(Verdict refusal, UUID attemptId, UUID challengeId, long resendAfterSeconds) {
     }
 }

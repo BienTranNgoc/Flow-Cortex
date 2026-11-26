@@ -1,6 +1,7 @@
 package com.flowcortex.workflow.application;
 
 import com.flowcortex.media.api.MediaJobs;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
@@ -15,7 +16,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,12 +42,11 @@ public class RunCancellation {
     private final RunUpdates runUpdates;
     private final ChildRuns childRuns;
     private final RunStepTransactions transactions;
-    private final boolean enabled;
+    private final Settings settings;
 
     RunCancellation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             StepExecutorRegistry registry, MediaJobs mediaJobs, Clock clock, RunUpdates runUpdates,
-            ChildRuns childRuns, RunStepTransactions transactions,
-            @Value("${flowcortex.workflow.cancel.enabled:false}") boolean enabled) {
+            ChildRuns childRuns, RunStepTransactions transactions, Settings settings) {
         this.runUpdates = runUpdates;
         this.childRuns = childRuns;
         this.transactions = transactions;
@@ -56,7 +55,7 @@ public class RunCancellation {
         this.registry = registry;
         this.mediaJobs = mediaJobs;
         this.clock = clock;
-        this.enabled = enabled;
+        this.settings = settings;
     }
 
     /**
@@ -68,7 +67,7 @@ public class RunCancellation {
      */
     @Transactional
     public RunView cancelRun(UUID currentUserId, UUID runId) {
-        if (!enabled) {
+        if (!settings.get(WorkflowSettingKeys.RUN_CANCELLATION_ENABLED).effective()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("feature.turnedOff"));
         }
         stop(currentUserId, runId, "member", currentUserId);
