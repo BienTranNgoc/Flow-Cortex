@@ -72,7 +72,7 @@ def test_template_prompts_and_scene_directives() -> None:
     assert "CRITICAL LIP-SYNC SAFETY" in MC_STORYBOARD_SYSTEM_PROMPT
     assert "keyframePrompt" not in MC_STORYBOARD_SYSTEM_PROMPT
     directive = scene_setting_instruction("bg-luxury-dark", "đèn vàng ấm hơn")
-    assert "dark slate stone" in directive
+    assert "minimalist luxury gallery" in directive
     assert "đèn vàng ấm hơn" in directive
 
 
@@ -466,7 +466,7 @@ def test_openai_storyboard_includes_scene_preset_and_note(monkeypatch: pytest.Mo
         )
     )
     assert "CRITICAL LIP-SYNC SAFETY" in str(captured["system_prompt"])
-    assert "dark slate stone" in str(captured["user_message"])
+    assert "minimalist luxury gallery" in str(captured["user_message"])
     assert "Ánh đèn vàng ấm hơn" in str(captured["user_message"])
 
 

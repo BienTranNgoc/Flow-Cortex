@@ -319,6 +319,11 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
               fileName={fileName}
               isProductVideo={isProductVideo}
               isMcTemplate={isMcTemplate}
+              isSingleShot={
+                isProductVideo &&
+                !isMcTemplate &&
+                steps.filter((s) => s.type === 'generate_video').length === 1
+              }
               keyframeStep={keyframeStep}
               stepTitle={stepLabel(selected, t, steps, isProductVideo)}
               productName={brief?.productName}

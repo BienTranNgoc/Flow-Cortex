@@ -302,6 +302,8 @@
   },
   "storyboard": {
     "heading": "Bảng phân cảnh 2 cảnh",
+    "singleShotHeading": "Phân cảnh 1 cú máy liên hoàn",
+    "singleShotTitle": "Cú máy liên hoàn (8–10 giây)",
     "scene1Title": "Cảnh 1 · Giới thiệu sản phẩm (0s – 5s)",
     "scene2Title": "Cảnh 2 · Điểm nhấn & Chốt đơn (5s – 10s)",
     "referenceImage": "Ảnh tham chiếu gốc",
@@ -389,7 +391,7 @@
     "sceneNotePlaceholder": "VD: Quầy gỗ đèn vàng ấm, nền tối sang trọng...",
     "previewMetaTemplate": "Mẫu:",
     "previewMetaTemplateMc": "MC (5s MC + 5s SP)",
-    "previewMetaTemplateShowroom": "Showroom (2 × 5s SP)",
+    "previewMetaTemplateShowroom": "Showroom (8–10s liên hoàn)",
     "previewMetaImages": "Ảnh sản phẩm:",
     "previewMetaImagesValue": "{{count}}/3 ảnh",
     "previewMetaMc": "Nhân vật MC:",

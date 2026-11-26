@@ -49,6 +49,7 @@ interface StepDetailProps {
   fileName: string | undefined;
   isProductVideo?: boolean | undefined;
   isMcTemplate?: boolean | undefined;
+  isSingleShot?: boolean | undefined;
   keyframeStep?: RunStepResponse | undefined;
   stepTitle?: string | undefined;
   productName?: string | undefined;
@@ -86,6 +87,7 @@ export function StepDetail({
   fileName,
   isProductVideo = false,
   isMcTemplate = false,
+  isSingleShot = false,
   keyframeStep,
   stepTitle,
   productName,
@@ -156,7 +158,7 @@ export function StepDetail({
           <StepProgress step={step} />
         )}
         {status === 'completed' && storyboard ? (
-          <StoryboardOutputView storyboard={storyboard} />
+          <StoryboardOutputView storyboard={storyboard} isSingleShot={isSingleShot} />
         ) : (
           status === 'completed' &&
           step.output && <StepOutput output={step.output} hideRaw={isProductVideo} />

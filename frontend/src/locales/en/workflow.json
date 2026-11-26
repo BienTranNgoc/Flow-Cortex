@@ -302,6 +302,8 @@
   },
   "storyboard": {
     "heading": "2-scene storyboard",
+    "singleShotHeading": "Continuous shot storyboard",
+    "singleShotTitle": "Continuous master shot (8–10s)",
     "scene1Title": "Scene 1 · Product hook (0s – 5s)",
     "scene2Title": "Scene 2 · Feature & close (5s – 10s)",
     "referenceImage": "Source product image",
@@ -389,7 +391,7 @@
     "sceneNotePlaceholder": "e.g. Warm wooden counter with golden light, luxury dark backdrop...",
     "previewMetaTemplate": "Template:",
     "previewMetaTemplateMc": "MC (5s MC + 5s product)",
-    "previewMetaTemplateShowroom": "Showroom (2 × 5s product)",
+    "previewMetaTemplateShowroom": "Showroom (8–10s continuous)",
     "previewMetaImages": "Product photos:",
     "previewMetaImagesValue": "{{count}}/3 photos",
     "previewMetaMc": "MC presenter:",

@@ -12,8 +12,9 @@ SCENE_PRESET_DIRECTIVES: dict[str, str] = {
         "light, and soft contemporary interior bokeh."
     ),
     "bg-luxury-dark": (
-        "High-end luxury dark slate stone surface with subtle warm golden rim lighting and "
-        "refined dark charcoal architectural bokeh."
+        "Pitch-dark minimalist luxury gallery with overhead circular ceiling spotlight beams, "
+        "sleek matte black cylindrical pedestals with thin glowing white LED rings, subtle floor "
+        "reflections, and deep dark architectural shadows."
     ),
     "bg-cafe-modern": (
         "Cozy modern specialty cafe setting with a warm walnut wood tabletop, soft afternoon "

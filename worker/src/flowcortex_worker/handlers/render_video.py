@@ -30,6 +30,7 @@ HEIGHT = 854
 VIDEO_PRESET = "medium"
 VIDEO_CRF = "20"
 MAX_IMAGES = 10
+_FASTSTART_FLAG = "+faststart"
 
 
 def handle(
@@ -48,34 +49,60 @@ def handle(
     raise PermanentError("contract_violation", f"render_video requires profile {allowed}")
 
 
-def _render_product_video(
-    job: MediaJob,
-    inputs: Mapping[str, Path],
-    processes: ProcessRunner,
-) -> HandlerOutcome:
-    image_count, speech, generated_video_1, generated_video_2 = _validate_inputs(job, inputs)
-    if not speech.is_file() or speech.stat().st_size == 0:
-        raise PermanentError("contract_violation", "render_video requires a non-empty speech input")
-    for generated_video in (generated_video_1, generated_video_2):
-        if not generated_video.is_file() or generated_video.stat().st_size == 0:
-            raise PermanentError(
-                "contract_violation", "render_video requires two non-empty generated videos"
-            )
-    video = speech.parent / VIDEO_NAME
-    audio_mode = extract_audio_mode(speech.read_bytes())
-    bgm = write_luxury_bgm_wav(speech.parent / "luxury_bgm.wav", float(TARGET_DURATION_SECONDS))
+def _build_single_clip_compose(
+    generated_video_1: Path,
+    speech: Path,
+    bgm: Path,
+    audio_mode: str | None,
+    target_dur: float,
+) -> tuple[list[str], str]:
+    fade_dur = 0.35
+    fade_start = round(max(0.0, target_dur - fade_dur), 3)
+    video_filter = (
+        f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
+        f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
+        f"format=yuv420p,tpad=stop_mode=clone:stop_duration={target_dur},"
+        f"trim=duration={target_dur},setpts=PTS-STARTPTS,fps=30,"
+        f"fade=t=out:st={fade_start}:d={fade_dur}[v];"
+    )
+    if audio_mode == "music_only":
+        audio_filter = (
+            f"[2:a]volume=0.82,apad=whole_dur={target_dur},"
+            f"atrim=duration={target_dur},asetpts=PTS-STARTPTS,"
+            f"afade=t=out:st={fade_start}:d={fade_dur}[a]"
+        )
+    else:
+        audio_filter = (
+            f"[1:a]volume=0.92,apad=whole_dur={target_dur},"
+            f"atrim=duration={target_dur},asetpts=PTS-STARTPTS[voice];"
+            f"[2:a]volume=0.13,apad=whole_dur={target_dur},"
+            f"atrim=duration={target_dur},asetpts=PTS-STARTPTS[bgm];"
+            "[voice][bgm]amix=inputs=2:duration=first:normalize=0,"
+            "alimiter=limit=0.95:attack=5:release=50:level=0,"
+            f"afade=t=out:st={fade_start}:d={fade_dur}[a]"
+        )
+    input_args = ["-i", str(generated_video_1), "-i", str(speech), "-i", str(bgm)]
+    return input_args, f"{video_filter}{audio_filter}"
+
+
+def _build_two_clip_compose(
+    generated_video_1: Path,
+    generated_video_2: Path,
+    speech: Path,
+    bgm: Path,
+    image_count: int,
+    audio_mode: str | None,
+) -> tuple[list[str], str]:
     dissolve_dur = 0.55
     if image_count >= 2:
-        # 3-beat choreography: Scene 1 (0-4.3s) -> dissolve 0.55s -> Scene 2 (3.75-8.2s)
-        # -> dissolve 0.25s -> Split-screen top/bottom finale (7.95-10.0s).
         divider_h = 2
         half_h = (HEIGHT - divider_h) // 2
         scene1_len = 4.3
         scene2_len = 4.45
         split_len = 2.05
-        offset_1 = round(scene1_len - dissolve_dur, 3)  # 3.75
+        offset_1 = round(scene1_len - dissolve_dur, 3)
         split_fade = 0.25
-        offset_2 = round(offset_1 + scene2_len - split_fade, 3)  # 7.95
+        offset_2 = round(offset_1 + scene2_len - split_fade, 3)
         video_filter = (
             f"[0:v]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
@@ -125,6 +152,48 @@ def _render_product_video(
             "[voice][bgm]amix=inputs=2:duration=first:normalize=0,"
             "alimiter=limit=0.95:attack=5:release=50:level=0[a]"
         )
+    input_args = [
+        "-i",
+        str(generated_video_1),
+        "-i",
+        str(generated_video_2),
+        "-i",
+        str(speech),
+        "-i",
+        str(bgm),
+    ]
+    return input_args, f"{video_filter}{audio_filter}"
+
+
+def _require_non_empty_file(path: Path, message: str) -> None:
+    if not path.is_file() or path.stat().st_size == 0:
+        raise PermanentError("contract_violation", message)
+
+
+def _render_product_video(
+    job: MediaJob,
+    inputs: Mapping[str, Path],
+    processes: ProcessRunner,
+) -> HandlerOutcome:
+    image_count, speech, generated_video_1, generated_video_2 = _validate_inputs(job, inputs)
+    _require_non_empty_file(speech, "render_video requires a non-empty speech input")
+    _require_non_empty_file(generated_video_1, "render_video requires a non-empty generated video")
+    if generated_video_2 is not None:
+        _require_non_empty_file(
+            generated_video_2, "render_video requires two non-empty generated videos"
+        )
+    video = speech.parent / VIDEO_NAME
+    audio_mode = extract_audio_mode(speech.read_bytes())
+    target_dur = float(TARGET_DURATION_SECONDS)
+    bgm = write_luxury_bgm_wav(speech.parent / "luxury_bgm.wav", target_dur)
+    if generated_video_2 is None:
+        input_args, filter_graph = _build_single_clip_compose(
+            generated_video_1, speech, bgm, audio_mode, target_dur
+        )
+    else:
+        input_args, filter_graph = _build_two_clip_compose(
+            generated_video_1, generated_video_2, speech, bgm, image_count, audio_mode
+        )
     try:
         completed = processes.run(
             [
@@ -134,22 +203,15 @@ def _render_product_video(
                 "-loglevel",
                 "error",
                 "-y",
-                "-i",
-                str(generated_video_1),
-                "-i",
-                str(generated_video_2),
-                "-i",
-                str(speech),
-                "-i",
-                str(bgm),
+                *input_args,
                 "-filter_complex",
-                f"{video_filter}{audio_filter}",
+                filter_graph,
                 "-map",
                 "[v]",
                 "-map",
                 "[a]",
                 "-t",
-                str(TARGET_DURATION_SECONDS),
+                str(target_dur),
                 "-c:v",
                 "libx264",
                 "-preset",
@@ -171,7 +233,7 @@ def _render_product_video(
                 "-map_metadata",
                 "-1",
                 "-movflags",
-                "+faststart",
+                _FASTSTART_FLAG,
                 str(video),
             ]
         )
@@ -189,7 +251,7 @@ def _render_product_video(
             "the generated Product Video could not be composed",
         )
 
-    duration_seconds = _verify_video(video, processes)
+    duration_seconds = _verify_video(video, processes, expected_duration=target_dur)
 
     manifest = {
         "aspectRatio": "9:16",
@@ -220,18 +282,19 @@ _OPTIONAL_AUX_KEYS = frozenset({"mc", "background"})
 
 def _validate_inputs(
     job: MediaJob, inputs: Mapping[str, Path]
-) -> tuple[int, Path, Path, Path]:
+) -> tuple[int, Path, Path, Path | None]:
     keys = [ref.key for ref in job.inputs]
     if len(keys) != len(set(keys)):
         raise PermanentError("contract_violation", "render_video input keys must be unique")
 
     image_keys = [key for key in keys if key.startswith("image_")]
     expected_images = [f"image_{position}" for position in range(1, len(image_keys) + 1)]
+    has_second_video = "generated_video_2" in keys
     expected_keys = {
         *expected_images,
         "speech",
         "generated_video_1",
-        "generated_video_2",
+        *(("generated_video_2",) if has_second_video else ()),
     }
     if not 1 <= len(image_keys) <= MAX_IMAGES:
         raise PermanentError(
@@ -242,7 +305,7 @@ def _validate_inputs(
     if image_keys != expected_images or effective_keys != expected_keys:
         raise PermanentError(
             "contract_violation",
-            "render_video requires contiguous images, speech and two generated videos",
+            "render_video requires contiguous images, speech and one or two generated videos",
         )
     if (set(inputs) - _OPTIONAL_AUX_KEYS) != expected_keys:
         raise PermanentError(
@@ -253,7 +316,7 @@ def _validate_inputs(
         len(image_keys),
         inputs["speech"],
         inputs["generated_video_1"],
-        inputs["generated_video_2"],
+        inputs["generated_video_2"] if has_second_video else None,
     )
 
 
@@ -308,7 +371,7 @@ def _render_product_video_v2(
             "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", VIDEO_CRF,
             "-pix_fmt", "yuv420p", "-r", "30",
             "-c:a", "aac", "-b:a", "128k", "-ar", "24000", "-ac", "1",
-            "-map_metadata", "-1", "-movflags", "+faststart",
+            "-map_metadata", "-1", "-movflags", _FASTSTART_FLAG,
             str(video),
         ]
     else:
@@ -326,7 +389,7 @@ def _render_product_video_v2(
             "-c:v", "libx264", "-preset", VIDEO_PRESET, "-crf", VIDEO_CRF,
             "-pix_fmt", "yuv420p", "-r", "30",
             "-c:a", "aac", "-b:a", "128k", "-ar", "24000", "-ac", "1",
-            "-map_metadata", "-1", "-movflags", "+faststart",
+            "-map_metadata", "-1", "-movflags", _FASTSTART_FLAG,
             str(video),
         ]
     completed = processes.run(cmd)
@@ -371,7 +434,7 @@ def _probe_media_duration(media: Path, processes: ProcessRunner) -> float:
         raise PermanentError("contract_violation", "media input could not be probed")
     try:
         return float(json.loads(completed.stdout)["format"]["duration"])
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         raise PermanentError("contract_violation", "media duration is invalid") from exc
 
 
@@ -404,7 +467,7 @@ def _verify_video(
         valid_duration = abs(duration - expected_duration) <= 0.15
         if not valid_size or len(audio_streams) != 1 or not valid_duration:
             raise ValueError
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         raise PermanentError(
             "contract_violation", "the rendered video does not meet the Product Video contract"
         ) from exc
