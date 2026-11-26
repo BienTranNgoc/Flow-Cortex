@@ -32,7 +32,10 @@ export function PagedCards<T>({
   const titleId = useId();
   const items = query.data?.items ?? [];
   const failed = query.isError;
-  const retry = () => void (query.isFetchNextPageError ? query.fetchNextPage() : query.refetch());
+  const retry = () => {
+    if (query.isFetchNextPageError) void query.fetchNextPage();
+    else void query.refetch();
+  };
 
   return (
     <section className="mp-section" aria-labelledby={titleId} aria-busy={query.isPending}>

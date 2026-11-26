@@ -18,8 +18,10 @@ export interface ExploreState {
   readonly tab: ExploreTab;
 }
 
+const SORT_NAMES: readonly string[] = EXPLORE_SORTS;
+
 const isSort = (value: string | null): value is ExploreSort =>
-  EXPLORE_SORTS.some((sort) => sort === value);
+  value !== null && SORT_NAMES.includes(value);
 
 const TERM = /\S+/gu;
 
@@ -75,7 +77,7 @@ export function hasFilters(state: ExploreState): boolean {
 const entriesOf = (params: URLSearchParams): string =>
   [...params.entries()]
     .map(([key, value]) => `${key}=${value}`)
-    .sort()
+    .sort((left, right) => left.localeCompare(right))
     .join('&');
 
 /** Whether the address already says exactly what the page reads from it, in any key order. */

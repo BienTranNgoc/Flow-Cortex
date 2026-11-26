@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import type { MarketplaceItem } from '@flow-cortex/api-client';
+import type { Item, MarketplaceItem } from '@flow-cortex/api-client';
 import { PageHeading } from '../../app/PageHeading';
 import { StatusBlock } from '../../app/StatusBlock';
 import { formatNumber } from '../../lib/format';
@@ -48,6 +48,9 @@ const TABS: readonly ExploreTab[] = ['discover', 'saved'];
 type Update = (patch: Partial<ExploreState>, replace?: boolean) => void;
 
 const itemKey = (item: MarketplaceItem) => item.workflow.id ?? item.workflow.name ?? '';
+const savedKey = (item: Item) => item.workflow.id ?? item.bookmarkedAt;
+const catalogueCard = (item: MarketplaceItem) => <MarketplaceCard item={item} />;
+const savedCard = (item: Item) => <MarketplaceCard saved={item} />;
 
 function SearchField({
   value,
@@ -232,7 +235,7 @@ function DiscoverPanel({ state, update }: Readonly<{ state: ExploreState; update
       <PagedCards
         query={results}
         heading={t('workflow.marketplace.results.heading')}
-        card={(item) => <MarketplaceCard item={item} />}
+        card={catalogueCard}
         itemKey={itemKey}
         empty={
           filtered ? (
@@ -257,8 +260,8 @@ function SavedPanel() {
     <PagedCards
       query={saved}
       heading={t('workflow.marketplace.results.savedHeading')}
-      card={(item) => <MarketplaceCard saved={item} />}
-      itemKey={(item) => item.workflow.id ?? item.bookmarkedAt}
+      card={savedCard}
+      itemKey={savedKey}
       empty={
         <StatusBlock
           kind="empty"
@@ -282,7 +285,7 @@ function ExploreTabs({
   const { t } = useTranslation();
   const buttons = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const current = TABS.indexOf(tab);
     let next: number;
     if (event.key === 'Home') next = 0;
@@ -296,12 +299,7 @@ function ExploreTabs({
   };
 
   return (
-    <div
-      role="tablist"
-      className="mp-tabs"
-      aria-label={t('workflow.marketplace.tabs.label')}
-      onKeyDown={onKeyDown}
-    >
+    <div role="tablist" className="mp-tabs" aria-label={t('workflow.marketplace.tabs.label')}>
       {TABS.map((name, index) => {
         const count = counts[name];
         return (
@@ -318,6 +316,7 @@ function ExploreTabs({
             tabIndex={tab === name ? 0 : -1}
             className={`mp-tabs__tab${tab === name ? ' is-selected' : ''}`}
             onClick={() => onSelect(name)}
+            onKeyDown={onKeyDown}
           >
             {t(`workflow.marketplace.tabs.${name}`)}
             {count !== undefined && (
