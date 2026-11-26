@@ -464,5 +464,96 @@
       "runs": "Runs",
       "failed": "Failed"
     }
+  },
+  "marketplace": {
+    "heading": "Explore",
+    "lede": "Find a workflow other members built, save it and run it yourself.",
+    "totals": "{{workflows}} from {{builders}}",
+    "workflowCount_one": "{{n}} workflow",
+    "workflowCount_other": "{{n}} workflows",
+    "builderCount_one": "{{n}} builder",
+    "builderCount_other": "{{n}} builders",
+    "tabs": {
+      "label": "Explore sections",
+      "discover": "Explore",
+      "saved": "Saved"
+    },
+    "search": {
+      "label": "Search workflows",
+      "placeholder": "Search by name…"
+    },
+    "filters": {
+      "legend": "Filter by step type",
+      "chip": "{{label}} ({{count}})"
+    },
+    "sort": {
+      "label": "Order",
+      "trending": "Trending",
+      "popular": "Most popular",
+      "newest": "Newest",
+      "topRated": "Top rated",
+      "name": "Name (A–Z)"
+    },
+    "rows": {
+      "recommended": "Recommended for you",
+      "trending": "Trending",
+      "popular": "Popular",
+      "seeAll": "See all",
+      "seeAllNamed": "See all in {{row}}"
+    },
+    "results": {
+      "heading": "All workflows",
+      "savedHeading": "Saved workflows",
+      "count_one": "{{n}} workflow",
+      "count_other": "{{n}} workflows",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "loading": "Loading workflows…",
+      "loadError": "Could not load the workflows.",
+      "empty": "No workflow is published yet.",
+      "savedEmpty": "You have not saved a workflow yet.",
+      "savedEmptyAction": "Explore workflows"
+    },
+    "card": {
+      "by": "By {{name}}",
+      "product": "Nodi",
+      "untitled": "Untitled workflow",
+      "credits": "About {{amount}} credits",
+      "noRating": "No ratings yet",
+      "rating": "{{average}} ({{count}})",
+      "ratingLabel_one": "Rated {{average}} out of 5 by {{count}} member",
+      "ratingLabel_other": "Rated {{average}} out of 5 by {{count}} members",
+      "members_one": "{{n}} member this month",
+      "members_other": "{{n}} members this month",
+      "save": "Save {{name}}",
+      "saveFailed": "Could not update your saved workflows."
+    },
+    "similar": {
+      "heading": "Similar workflows"
+    },
+    "stepTypes": {
+      "echo": "Echo",
+      "fail": "Deliberate failure",
+      "generate_script": "Write script",
+      "generate_storyboard": "Storyboard",
+      "generate_speech": "Voice-over",
+      "generate_video": "Video clip",
+      "fetch_video": "Fetch video",
+      "ingest_video": "Upload video",
+      "ingest_image": "Upload image",
+      "probe": "Inspect file",
+      "extract_audio": "Extract audio",
+      "align_audio": "Align audio",
+      "render_video": "Final render",
+      "separate_audio": "Separate audio",
+      "translate": "Translate",
+      "tts": "Text to speech",
+      "load_template": "Load template",
+      "workflow_call": "Run a workflow",
+      "connector_call": "Call a connector",
+      "iterate": "Repeat over a list",
+      "APPROVAL_CHECKPOINT": "Review",
+      "qa_review": "QA review"
+    }
   }
 }

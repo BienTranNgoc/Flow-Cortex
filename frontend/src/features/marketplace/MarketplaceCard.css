@@ -1,0 +1,134 @@
+.mp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.mp-card:hover,
+.mp-card:focus-within {
+  border-color: var(--primary);
+}
+
+.mp-card:has(.mp-card__link:focus-visible) {
+  box-shadow: var(--focus-ring), var(--shadow-sm);
+}
+
+.mp-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.mp-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.mp-card__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+/* The link stretches over the whole card; the save toggle sits above it. */
+.mp-card__link {
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.mp-card__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.mp-card__link:focus-visible {
+  outline: none;
+}
+
+.mp-card__save {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--target-min);
+  min-height: var(--target-min);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.mp-card__save:hover {
+  border-color: var(--primary);
+}
+
+.mp-card__save.is-pressed {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.mp-card__save[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.mp-card__author {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.85rem;
+}
+
+.mp-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mp-card__meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-full);
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mp-card__meta .mp-card__rating {
+  color: var(--ink);
+}
+
+.mp-card__error {
+  margin: 0;
+  font-size: 0.85rem;
+}

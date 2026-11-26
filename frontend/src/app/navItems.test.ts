@@ -1,6 +1,7 @@
 import {
   BookOpen,
   ChatsCircle,
+  Compass,
   FlowArrow,
   HardDrives,
   House,
@@ -16,17 +17,17 @@ describe('primaryNavItems', () => {
     vi.unstubAllEnvs();
   });
 
-  it('lists Home, Workflows and Runs while the demo pages flag is off', () => {
+  it('lists Home, Explore, Workflows and Runs while the demo pages flag is off', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
-    expect(labels()).toEqual(['Home', 'Workflows', 'Runs']);
+    expect(labels()).toEqual(['Home', 'Explore', 'Workflows', 'Runs']);
   });
 
   it('adds Integrations once the flag turns on, without re-importing the module', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
-    expect(labels()).toEqual(['Home', 'Workflows', 'Runs']);
+    expect(labels()).toEqual(['Home', 'Explore', 'Workflows', 'Runs']);
 
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'true');
-    expect(labels()).toEqual(['Home', 'Workflows', 'Runs', 'Integrations']);
+    expect(labels()).toEqual(['Home', 'Explore', 'Workflows', 'Runs', 'Integrations']);
   });
 
   it('gives every entry its icon, and Docs the shared docs icon', () => {
@@ -34,6 +35,7 @@ describe('primaryNavItems', () => {
 
     expect(primaryNavItems().map((item) => [item.label, item.icon])).toEqual([
       ['Home', House],
+      ['Explore', Compass],
       ['Workflows', FlowArrow],
       ['Runs', Play],
       ['Integrations', PlugsConnected],
@@ -46,6 +48,7 @@ describe('primaryNavItems', () => {
     const withChat = primaryNavItems(undefined, { chat: true });
     expect(withChat.map((item) => item.label)).toEqual([
       'Home',
+      'Explore',
       'Workflows',
       'Runs',
       'Chat',

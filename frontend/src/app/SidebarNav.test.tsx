@@ -35,7 +35,7 @@ describe('SidebarNav', () => {
     renderNav('/');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Chat']);
+    expect(names(nav)).toEqual(['Home', 'Explore', 'Workflows', 'Runs', 'Chat']);
     expect(within(nav).getByRole('link', { name: 'Chat' })).toHaveAttribute('href', '/chat');
   });
 
@@ -46,7 +46,7 @@ describe('SidebarNav', () => {
     renderNav('/');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Drive']);
+    expect(names(nav)).toEqual(['Home', 'Explore', 'Workflows', 'Runs', 'Drive']);
     expect(within(nav).getByRole('link', { name: 'Drive' })).toHaveAttribute('href', '/drive');
   });
 
@@ -58,16 +58,16 @@ describe('SidebarNav', () => {
     renderNav('/');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Chat', 'Drive']);
+    expect(names(nav)).toEqual(['Home', 'Explore', 'Workflows', 'Runs', 'Chat', 'Drive']);
   });
 
-  it('lists Home, Workflows, Runs and the Docs group while the demo pages flag is off', () => {
+  it('lists Home, Explore, Workflows, Runs and the Docs group while the demo pages flag is off', () => {
     vi.stubEnv('VITE_DEMO_PAGES_ENABLED', 'false');
 
     renderNav('/');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs']);
+    expect(names(nav)).toEqual(['Home', 'Explore', 'Workflows', 'Runs']);
     expect(within(nav).getByRole('button', { name: 'Docs' })).toHaveAttribute(
       'aria-expanded',
       'false',
@@ -94,7 +94,7 @@ describe('SidebarNav', () => {
     renderNav('/integrations');
 
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
-    expect(names(nav)).toEqual(['Home', 'Workflows', 'Runs', 'Integrations']);
+    expect(names(nav)).toEqual(['Home', 'Explore', 'Workflows', 'Runs', 'Integrations']);
     expect(within(nav).getByRole('link', { name: 'Integrations' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -171,6 +171,7 @@ describe('SidebarNav', () => {
 
     await user.tab();
     await user.tab();
+    await user.tab();
 
     const workflows = screen.getByRole('link', { name: 'Workflows' });
     expect(workflows).toHaveFocus();
@@ -190,6 +191,7 @@ describe('SidebarNav', () => {
 
       const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' });
       expect(within(nav).getByRole('link', { name: 'Trang chủ' })).toBeInTheDocument();
+      expect(within(nav).getByRole('link', { name: 'Khám phá' })).toBeInTheDocument();
       expect(within(nav).getByRole('link', { name: 'Quy trình' })).toBeInTheDocument();
       expect(within(nav).getByRole('button', { name: 'Tài liệu' })).toBeInTheDocument();
       expect(within(nav).getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
