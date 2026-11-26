@@ -40,6 +40,7 @@ HANDLER_MODULES: dict[str, str] = {
     "reframe": "flowcortex_worker.handlers.reframe",
     "derive": "flowcortex_worker.handlers.derive",
     "grade_match": "flowcortex_worker.handlers.grade_match",
+    "role_suggest": "flowcortex_worker.handlers.role_suggest",
 }
 
 

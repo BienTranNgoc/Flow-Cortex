@@ -14,6 +14,7 @@
                 "settings :: api",
                 "mail :: api",
                 "notification :: api",
+                "realtime :: api",
                 "shared :: web",
                 "shared :: security",
                 "shared :: ratelimit"
