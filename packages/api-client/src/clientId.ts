@@ -4,6 +4,8 @@ export const CLIENT_HEADER = 'X-FlowCortex-Client';
 /** The calls that read or write the refresh cookie; every other call is left unmarked. */
 const COOKIE_PATHS = [
   '/api/v1/auth/login',
+  '/api/v1/auth/login/totp',
+  '/api/v1/auth/totp/enable',
   '/api/v1/auth/register',
   '/api/v1/auth/refresh',
   '/api/v1/auth/logout',

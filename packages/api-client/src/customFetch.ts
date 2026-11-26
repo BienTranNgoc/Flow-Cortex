@@ -8,6 +8,7 @@ import { REFRESH_PATH, refreshAccessToken } from './session';
 /** A 401 from these is an answer, not an expired session — never refreshed or replayed. */
 const NO_REFRESH_PATHS = [
   '/api/v1/auth/login',
+  '/api/v1/auth/login/totp',
   '/api/v1/auth/register',
   REFRESH_PATH,
   '/api/v1/auth/logout',

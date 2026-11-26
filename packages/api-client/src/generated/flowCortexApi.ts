@@ -118,6 +118,7 @@ export interface UserResponse {
   signInMethods?: string[];
   adminDisabled?: boolean;
   staffTarget?: boolean;
+  totpEnabled?: boolean;
 }
 
 export interface UploadedImageRequest {
@@ -234,6 +235,12 @@ export const MeResponsePermissionsItem = {
   useraccountexport: 'user.account.export',
 } as const;
 
+export interface TotpState {
+  enabled: boolean;
+  required: boolean;
+  verified: boolean;
+}
+
 export interface MeResponse {
   id?: string;
   email?: string;
@@ -246,6 +253,7 @@ export interface MeResponse {
   permissions: MeResponsePermissionsItem[];
   adminDisabled: boolean;
   phoneVerificationRequired: boolean;
+  totp: TotpState;
 }
 
 export interface UsernameRequest {
@@ -1968,6 +1976,31 @@ export interface ChatCardConfirmed {
   card?: ChatMessage;
 }
 
+export interface TotpSetupResponse {
+  secret: string;
+  otpauthUri: string;
+  qrDataUrl: string;
+}
+
+export interface TotpCodeRequest {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   * @pattern ^[0-9 ]{6,7}$|^[A-Za-z2-7 -]{10,13}$
+   */
+  code: string;
+}
+
+export interface TotpRecoveryCodesResponse {
+  recoveryCodes: string[];
+}
+
+export interface TotpEnableResponse {
+  recoveryCodes: string[];
+  accessToken: string;
+  expiresIn: number;
+}
+
 export interface ResetPasswordRequest {
   /**
    * @minLength 0
@@ -2039,6 +2072,13 @@ export interface ConfirmEmailResponse {
   passwordSetupToken?: string;
 }
 
+export interface TotpLinkChallengeResponse {
+  status: string;
+  expiresIn: number;
+  passwordSetupRequired: boolean;
+  passwordSetupToken?: string;
+}
+
 export interface LoginRequest {
   /**
    * @minLength 0
@@ -2048,6 +2088,17 @@ export interface LoginRequest {
   /** @minLength 1 */
   password: string;
   rememberMe?: boolean;
+}
+
+export interface TotpChallengeResponse {
+  status: string;
+  expiresIn: number;
+}
+
+export interface TotpSignInResponse {
+  accessToken: string;
+  expiresIn: number;
+  persistent: boolean;
 }
 
 export interface ForgotPasswordRequest {
@@ -3588,6 +3639,15 @@ export interface TransactionDetailResponse {
   /** @nullable */
   outcomeCode: string | null;
   timeline: TransactionTimelineEvent[];
+}
+
+export interface TotpStatusResponse {
+  enabled: boolean;
+  pending: boolean;
+  required: boolean;
+  verified: boolean;
+  recoveryCodesLeft: number;
+  lockedUntil?: string;
 }
 
 /**
@@ -7957,6 +8017,30 @@ export const createUser = async (
   });
 };
 
+export type resetUserTotpResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type resetUserTotpResponseSuccess = resetUserTotpResponse204 & {
+  headers: Headers;
+};
+export type resetUserTotpResponse = resetUserTotpResponseSuccess;
+
+export const getResetUserTotpUrl = (id: string) => {
+  return `/api/v1/users/${id}/totp/reset`;
+};
+
+export const resetUserTotp = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resetUserTotpResponse> => {
+  return customFetch<resetUserTotpResponse>(getResetUserTotpUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type requestUploadResponse201 = {
   data: UploadResponse;
   status: 201;
@@ -11135,6 +11219,239 @@ export const recordPaymentJourneyEvent = async (
   });
 };
 
+export type startTotpSetupResponse200 = {
+  data: TotpSetupResponse;
+  status: 200;
+};
+
+export type startTotpSetupResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type startTotpSetupResponseSuccess = startTotpSetupResponse200 & {
+  headers: Headers;
+};
+export type startTotpSetupResponseError = startTotpSetupResponse409 & {
+  headers: Headers;
+};
+
+export type startTotpSetupResponse = startTotpSetupResponseSuccess | startTotpSetupResponseError;
+
+export const getStartTotpSetupUrl = () => {
+  return `/api/v1/auth/totp/setup`;
+};
+
+export const startTotpSetup = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<startTotpSetupResponse> => {
+  return customFetch<startTotpSetupResponse>(getStartTotpSetupUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type regenerateTotpRecoveryCodesResponse200 = {
+  data: TotpRecoveryCodesResponse;
+  status: 200;
+};
+
+export type regenerateTotpRecoveryCodesResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type regenerateTotpRecoveryCodesResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type regenerateTotpRecoveryCodesResponse423 = {
+  data: ProblemDetail;
+  status: 423;
+};
+
+export type regenerateTotpRecoveryCodesResponseSuccess = regenerateTotpRecoveryCodesResponse200 & {
+  headers: Headers;
+};
+export type regenerateTotpRecoveryCodesResponseError = (
+  | regenerateTotpRecoveryCodesResponse409
+  | regenerateTotpRecoveryCodesResponse422
+  | regenerateTotpRecoveryCodesResponse423
+) & {
+  headers: Headers;
+};
+
+export type regenerateTotpRecoveryCodesResponse =
+  regenerateTotpRecoveryCodesResponseSuccess | regenerateTotpRecoveryCodesResponseError;
+
+export const getRegenerateTotpRecoveryCodesUrl = () => {
+  return `/api/v1/auth/totp/recovery-codes`;
+};
+
+export const regenerateTotpRecoveryCodes = async (
+  totpCodeRequest: TotpCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<regenerateTotpRecoveryCodesResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<regenerateTotpRecoveryCodesResponse>(getRegenerateTotpRecoveryCodesUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(totpCodeRequest),
+  });
+};
+
+export type enableTotpResponse200 = {
+  data: TotpEnableResponse;
+  status: 200;
+};
+
+export type enableTotpResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type enableTotpResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type enableTotpResponse423 = {
+  data: ProblemDetail;
+  status: 423;
+};
+
+export type enableTotpResponseSuccess = enableTotpResponse200 & {
+  headers: Headers;
+};
+export type enableTotpResponseError = (
+  enableTotpResponse409 | enableTotpResponse422 | enableTotpResponse423
+) & {
+  headers: Headers;
+};
+
+export type enableTotpResponse = enableTotpResponseSuccess | enableTotpResponseError;
+
+export const getEnableTotpUrl = () => {
+  return `/api/v1/auth/totp/enable`;
+};
+
+export const enableTotp = async (
+  totpCodeRequest: TotpCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<enableTotpResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<enableTotpResponse>(getEnableTotpUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(totpCodeRequest),
+  });
+};
+
+export type disableTotpResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type disableTotpResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type disableTotpResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type disableTotpResponse423 = {
+  data: ProblemDetail;
+  status: 423;
+};
+
+export type disableTotpResponseSuccess = disableTotpResponse204 & {
+  headers: Headers;
+};
+export type disableTotpResponseError = (
+  disableTotpResponse409 | disableTotpResponse422 | disableTotpResponse423
+) & {
+  headers: Headers;
+};
+
+export type disableTotpResponse = disableTotpResponseSuccess | disableTotpResponseError;
+
+export const getDisableTotpUrl = () => {
+  return `/api/v1/auth/totp/disable`;
+};
+
+export const disableTotp = async (
+  totpCodeRequest: TotpCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<disableTotpResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<disableTotpResponse>(getDisableTotpUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(totpCodeRequest),
+  });
+};
+
 export type resetPasswordResponse200 = {
   data: PasswordResetResponse;
   status: 200;
@@ -11326,12 +11643,19 @@ export type openPasswordLinkResponse200 = {
   status: 200;
 };
 
+export type openPasswordLinkResponse202 = {
+  data: TotpLinkChallengeResponse;
+  status: 202;
+};
+
 export type openPasswordLinkResponse422 = {
   data: ProblemDetail;
   status: 422;
 };
 
-export type openPasswordLinkResponseSuccess = openPasswordLinkResponse200 & {
+export type openPasswordLinkResponseSuccess = (
+  openPasswordLinkResponse200 | openPasswordLinkResponse202
+) & {
   headers: Headers;
 };
 export type openPasswordLinkResponseError = openPasswordLinkResponse422 & {
@@ -11404,7 +11728,12 @@ export type loginResponse200 = {
   status: 200;
 };
 
-export type loginResponseSuccess = loginResponse200 & {
+export type loginResponse202 = {
+  data: TotpChallengeResponse;
+  status: 202;
+};
+
+export type loginResponseSuccess = (loginResponse200 | loginResponse202) & {
   headers: Headers;
 };
 export type loginResponse = loginResponseSuccess;
@@ -11441,6 +11770,73 @@ export const login = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(loginRequest),
+  });
+};
+
+export type completeTotpSignInResponse200 = {
+  data: TotpSignInResponse;
+  status: 200;
+};
+
+export type completeTotpSignInResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type completeTotpSignInResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type completeTotpSignInResponse423 = {
+  data: ProblemDetail;
+  status: 423;
+};
+
+export type completeTotpSignInResponseSuccess = completeTotpSignInResponse200 & {
+  headers: Headers;
+};
+export type completeTotpSignInResponseError = (
+  completeTotpSignInResponse401 | completeTotpSignInResponse422 | completeTotpSignInResponse423
+) & {
+  headers: Headers;
+};
+
+export type completeTotpSignInResponse =
+  completeTotpSignInResponseSuccess | completeTotpSignInResponseError;
+
+export const getCompleteTotpSignInUrl = () => {
+  return `/api/v1/auth/login/totp`;
+};
+
+export const completeTotpSignIn = async (
+  totpCodeRequest: TotpCodeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<completeTotpSignInResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<completeTotpSignInResponse>(getCompleteTotpSignInUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(totpCodeRequest),
   });
 };
 
@@ -11503,12 +11899,17 @@ export type confirmEmailResponse200 = {
   status: 200;
 };
 
+export type confirmEmailResponse202 = {
+  data: TotpLinkChallengeResponse;
+  status: 202;
+};
+
 export type confirmEmailResponse422 = {
   data: ProblemDetail;
   status: 422;
 };
 
-export type confirmEmailResponseSuccess = confirmEmailResponse200 & {
+export type confirmEmailResponseSuccess = (confirmEmailResponse200 | confirmEmailResponse202) & {
   headers: Headers;
 };
 export type confirmEmailResponseError = confirmEmailResponse422 & {
@@ -16605,6 +17006,29 @@ export const getBillingTransactionByOrder = async (
       method: 'GET',
     },
   );
+};
+
+export type getTotpStatusResponse200 = {
+  data: TotpStatusResponse;
+  status: 200;
+};
+
+export type getTotpStatusResponseSuccess = getTotpStatusResponse200 & {
+  headers: Headers;
+};
+export type getTotpStatusResponse = getTotpStatusResponseSuccess;
+
+export const getGetTotpStatusUrl = () => {
+  return `/api/v1/auth/totp`;
+};
+
+export const getTotpStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getTotpStatusResponse> => {
+  return customFetch<getTotpStatusResponse>(getGetTotpStatusUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type getAccountPreferencesResponse200 = {
