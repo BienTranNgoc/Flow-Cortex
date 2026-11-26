@@ -6,6 +6,7 @@ import com.flowcortex.billing.ledger.LedgerDecision.Decision;
 import com.flowcortex.billing.ledger.LedgerDecision.Refused;
 import com.flowcortex.billing.ledger.LedgerDecision.Skipped;
 import com.flowcortex.billing.ledger.LedgerDecision.TransactionSnapshot;
+import com.flowcortex.billing.ledger.ProviderAnswerApplier.AnswerApplication;
 import com.flowcortex.billing.payment.PaymentProviderEvent;
 import java.time.Clock;
 import java.time.Duration;
@@ -13,14 +14,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.dao.TransientDataAccessResourceException;
-import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,38 +24,33 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Applies accepted provider callbacks to payments. Each callback is decided in one transaction that holds
  * its inbox row and then its payment row, so concurrent passes and instances decide a callback once and two
  * callbacks for one payment one after the other. A callback that fails for any reason but a refusal is held
- * back with a growing wait and the pass goes on, so one bad callback never stops the others. A move to
- * {@code succeeded} also runs every {@link SettledPlanPurchase} in that transaction, so its effects commit with it.
+ * back with a growing wait and the pass goes on, so one bad callback never stops the others.
  */
 @Component
 @EnableConfigurationProperties(LedgerApplyProperties.class)
 public class LedgerApplier {
 
-    private static final int MAX_CAUSE_DEPTH = 10;
-
     private enum Step { IDLE, HANDLED, ABORTED }
 
-    private record Taken(Claimed claimed, Optional<PaymentProviderEvent> event, Decision decision, UUID paymentId) {
+    private record Taken(Claimed claimed, Optional<PaymentProviderEvent> event, Decision decision, UUID paymentId,
+            Optional<MoneyStatus> statusBefore) {
     }
 
     private final CallbackInbox inbox;
-    private final PaymentTransactionRepository payments;
+    private final ProviderAnswerApplier answers;
     private final LedgerTelemetry telemetry;
     private final LedgerApplyProperties properties;
     private final Clock clock;
     private final TransactionTemplate transactions;
-    private final ObjectProvider<SettledPlanPurchase> settledEffects;
 
-    LedgerApplier(CallbackInbox inbox, PaymentTransactionRepository payments, LedgerTelemetry telemetry,
-            LedgerApplyProperties properties, Clock clock, PlatformTransactionManager transactionManager,
-            ObjectProvider<SettledPlanPurchase> settledEffects) {
+    LedgerApplier(CallbackInbox inbox, ProviderAnswerApplier answers, LedgerTelemetry telemetry,
+            LedgerApplyProperties properties, Clock clock, PlatformTransactionManager transactionManager) {
         this.inbox = inbox;
-        this.payments = payments;
+        this.answers = answers;
         this.telemetry = telemetry;
         this.properties = properties;
         this.clock = clock;
         this.transactions = new TransactionTemplate(transactionManager);
-        this.settledEffects = settledEffects;
     }
 
     /** One timed pass, unless the applier is switched off. */
@@ -102,7 +93,7 @@ public class LedgerApplier {
             return Step.IDLE;
         }
         telemetry.decided(taken.claimed().id(), taken.claimed().provider(), taken.decision(), taken.event(),
-                taken.paymentId());
+                taken.paymentId(), taken.statusBefore());
         return Step.HANDLED;
     }
 
@@ -116,27 +107,17 @@ public class LedgerApplier {
         Claimed claimed = next.get();
         claimedOut.set(claimed);
         Optional<PaymentProviderEvent> event = inbox.readEvent(claimed.eventJson());
-        Optional<TransactionSnapshot> snapshot = event.flatMap(
-                stated -> payments.lockByOrderRef(claimed.provider(), stated.reference().operationRef()));
-        Decision decision = LedgerDecision.decide(event, snapshot);
-        UUID paymentId = snapshot.map(TransactionSnapshot::id).orElse(null);
+        AnswerApplication application = answers.apply(claimed.provider(), event, claimed.id().toString(), now);
+        Decision decision = application.decision();
+        UUID paymentId = application.before().map(TransactionSnapshot::id).orElse(null);
         switch (decision) {
-            case Applied applied -> {
-                String resultCode = applied.facts().resultCode();
-                if (payments.applyMove(paymentId, applied.from(), applied.to(), applied.facts(), now) != 1) {
-                    throw new IllegalStateException("The payment no longer holds the status the decision read");
-                }
-                payments.insertHistory(paymentId, applied.from(), applied.to(), "provider_code:" + resultCode,
-                        resultCode, claimed.id().toString(), applied.facts().providerTimestamp(), now);
-                if (applied.to() == MoneyStatus.SUCCEEDED) {
-                    settledEffects.orderedStream().forEach(effect -> effect.onSucceeded(paymentId, now));
-                }
-                mark(claimed, "applied", "provider_code:" + resultCode, paymentId, now);
-            }
+            case Applied applied ->
+                    mark(claimed, "applied", "provider_code:" + applied.facts().resultCode(), paymentId, now);
             case Skipped skipped -> mark(claimed, "skipped", skipped.reason(), paymentId, now);
             case Refused refused -> mark(claimed, "refused", refused.reason(), paymentId, now);
         }
-        return new Taken(claimed, event, decision, paymentId);
+        return new Taken(claimed, event, decision, paymentId,
+                application.before().map(TransactionSnapshot::status));
     }
 
     private void mark(Claimed claimed, String outcome, String reason, UUID paymentId, Instant now) {
@@ -152,7 +133,7 @@ public class LedgerApplier {
      */
     private Step afterFailure(Claimed claimed, RuntimeException failure) {
         telemetry.applyFailed(claimed == null ? null : claimed.id(), failure);
-        if (claimed == null || isConnectionClass(failure)) {
+        if (claimed == null || ConnectionFailure.isConnectionClass(failure)) {
             return Step.ABORTED;
         }
         try {
@@ -175,18 +156,5 @@ public class LedgerApplier {
         if (marked != null && marked == 1) {
             telemetry.exhausted(claimed.id(), claimed.provider(), inbox.readEvent(claimed.eventJson()));
         }
-    }
-
-    private static boolean isConnectionClass(Throwable failure) {
-        Throwable cause = failure;
-        for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++, cause = cause.getCause()) {
-            if (cause instanceof DataAccessResourceFailureException
-                    || cause instanceof CannotGetJdbcConnectionException
-                    || cause instanceof TransientDataAccessResourceException
-                    || cause instanceof CannotCreateTransactionException) {
-                return true;
-            }
-        }
-        return false;
     }
 }

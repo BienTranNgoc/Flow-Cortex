@@ -55,11 +55,16 @@ final class MoneyDerivation {
 
     /** Whether the provider's own table reads this code as a successful payment, whatever else is wrong. */
     static boolean meansSuccess(String provider, String resultCode) {
-        return resultCode != null
-                && ProviderCodeTables.forProvider(provider)
-                        .flatMap(table -> table.apply(resultCode))
-                        .flatMap(CodeRule::money)
-                        .filter(MoneyStatus.SUCCEEDED::equals)
-                        .isPresent();
+        return codeMoney(provider, resultCode).filter(MoneyStatus.SUCCEEDED::equals).isPresent();
+    }
+
+    /** The money status the provider's own table gives this code, empty when it has none or says nothing about money. */
+    static Optional<MoneyStatus> codeMoney(String provider, String resultCode) {
+        if (resultCode == null) {
+            return Optional.empty();
+        }
+        return ProviderCodeTables.forProvider(provider)
+                .flatMap(table -> table.apply(resultCode))
+                .flatMap(CodeRule::money);
     }
 }

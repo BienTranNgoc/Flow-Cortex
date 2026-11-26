@@ -3,6 +3,7 @@ package com.flowcortex.app.billing;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.AbstractPostgresBootTest;
+import com.flowcortex.billing.api.PaymentStatusChangedEvent;
 import com.flowcortex.billing.ledger.LedgerApplier;
 import com.flowcortex.billing.ledger.OpenPayment;
 import com.flowcortex.billing.ledger.OpenedPayment;
@@ -22,18 +23,48 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @SpringBootTest
+@ExtendWith(OutputCaptureExtension.class)
+@Import(LedgerApplierIT.Recorder.class)
 class LedgerApplierIT extends AbstractPostgresBootTest {
+
+    private static final List<PaymentStatusChangedEvent> RECEIVED_EVENTS = new CopyOnWriteArrayList<>();
+
+    /** Stands for a listener in another module: it gets the event after the move's transaction commits. */
+    @TestConfiguration
+    static class Recorder {
+
+        @Bean
+        StatusListener statusListener() {
+            return new StatusListener();
+        }
+    }
+
+    static class StatusListener {
+
+        @TransactionalEventListener
+        void on(PaymentStatusChangedEvent event) {
+            RECEIVED_EVENTS.add(event);
+        }
+    }
 
     private static final String PROVIDER = "momo";
     private static final String MERCHANT = "MOMOBKUN20180529";
@@ -231,6 +262,71 @@ class LedgerApplierIT extends AbstractPostgresBootTest {
                 .containsEntry("application_reason", "undeclared_transition")
                 .containsEntry("transaction_id", opened.transactionId());
         assertThat(count("payment.ledger.unapplied_money")).isEqualTo(before + 1);
+    }
+
+    private List<PaymentStatusChangedEvent> eventsOf(UUID transactionId) {
+        return RECEIVED_EVENTS.stream().filter(event -> event.transactionId().equals(transactionId)).toList();
+    }
+
+    @Test
+    void aMovedPaymentPublishesOneStatusEventAfterCommit() {
+        OpenedPayment opened = open();
+        UUID callbackId = accept(event(opened.orderRef(), "0", 50_000L, PAID_AT), RECEIVED);
+
+        applier.applyPending();
+
+        assertThat(eventsOf(opened.transactionId())).singleElement().satisfies(published -> {
+            assertThat(published.fromStatus()).isEqualTo("pending");
+            assertThat(published.toStatus()).isEqualTo("succeeded");
+            assertThat(published.amountVnd()).isEqualTo(50_000L);
+            assertThat(published.evidenceRef()).isEqualTo(callbackId.toString());
+            assertThat(published.userId()).isEqualTo(user);
+            assertThat(published.kind()).isEqualTo("topup");
+            assertThat(published.itemRef()).isEqualTo("pkg-50k");
+        });
+    }
+
+    @Test
+    void aRedeliveryPublishesNothing() {
+        OpenedPayment opened = open();
+        accept(event(opened.orderRef(), "0", 50_000L, PAID_AT), RECEIVED);
+        applier.applyPending();
+        accept(event(opened.orderRef(), "0", 50_000L, PAID_AT.plusSeconds(30)), RECEIVED.plusSeconds(1));
+
+        applier.applyPending();
+
+        assertThat(eventsOf(opened.transactionId())).hasSize(1);
+    }
+
+    @Test
+    void aMoveWhoseHistoryInsertFailsPublishesNothing() {
+        OpenedPayment opened = open();
+        UUID failing = accept(event(opened.orderRef(), "0", 50_000L, PAID_AT), RECEIVED);
+        failHistoryInsertsFor(failing);
+
+        applier.applyPending();
+
+        assertThat(payment(opened.transactionId())).containsEntry("status", "pending");
+        assertThat(eventsOf(opened.transactionId())).isEmpty();
+    }
+
+    @Test
+    void aLateSuccessCallbackAfterThePaymentSettledIsAWarningNotUnappliedMoney(CapturedOutput output) {
+        OpenedPayment opened = open();
+        accept(event(opened.orderRef(), "0", 50_000L, PAID_AT), RECEIVED);
+        applier.applyPending();
+        double before = count("payment.ledger.unapplied_money");
+        UUID late = accept(event(opened.orderRef(), "0", 50_000L, PAID_AT.minusSeconds(60)),
+                RECEIVED.plusSeconds(1));
+
+        applier.applyPending();
+
+        assertThat(callback(late)).containsEntry("application_outcome", "refused")
+                .containsEntry("application_reason", "stale_event");
+        assertThat(count("payment.ledger.unapplied_money")).isEqualTo(before);
+        assertThat(output.getAll().lines().filter(line -> line.contains(late.toString())))
+                .anySatisfy(line -> assertThat(line).contains("WARN").contains("payment.ledger.refused"))
+                .noneMatch(line -> line.contains("payment.ledger.unapplied_money"));
     }
 
     @Test

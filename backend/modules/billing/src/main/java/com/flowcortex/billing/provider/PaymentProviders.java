@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -29,5 +30,10 @@ public class PaymentProviders {
 
     public Optional<PaymentProvider> find(String key) {
         return Optional.ofNullable(byKey.get(key));
+    }
+
+    /** The keys of the providers present, empty when none is enabled. */
+    public Set<String> keys() {
+        return Set.copyOf(byKey.keySet());
     }
 }

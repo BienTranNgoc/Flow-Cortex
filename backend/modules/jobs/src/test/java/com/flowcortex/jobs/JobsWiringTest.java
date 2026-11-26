@@ -10,6 +10,8 @@ import com.flowcortex.jobs.application.ClusterJobRunner;
 import com.flowcortex.jobs.application.PublicationRetryPolicies;
 import com.flowcortex.jobs.infrastructure.FailedPublicationResubmitter;
 import com.flowcortex.jobs.infrastructure.ScheduledJobRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -28,6 +30,7 @@ class JobsWiringTest {
             .withBean(FailedEventPublications.class, () -> mock(FailedEventPublications.class))
             .withBean(EventPublicationRepository.class, () -> mock(EventPublicationRepository.class))
             .withBean(ScheduledJobRepository.class, () -> mock(ScheduledJobRepository.class))
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
             .withBean("probeJob", ClusterJob.class, JobsWiringTest::probeJob)
             .withBean("probePolicy", PublicationRetryPolicy.class, JobsWiringTest::probePolicy)
             .withUserConfiguration(ClusterJobRegistry.class, PublicationRetryPolicies.class,

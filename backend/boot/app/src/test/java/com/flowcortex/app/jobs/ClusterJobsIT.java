@@ -330,7 +330,10 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     Map.entry("support.sla-sweep", 300_000L),
                     Map.entry("asset.registration-sweep", 120_000L),
                     Map.entry("user.mcp-oauth-retention", 3_600_000L),
-                    Map.entry("billing.catalogue-check", 86_400_000L));
+                    Map.entry("billing.catalogue-check", 86_400_000L),
+                    Map.entry("billing.plan-activation", 300_000L),
+                    Map.entry("billing.payment-reconcile-ageing", 300_000L),
+                    Map.entry("billing.payment-reconcile-daily", 600_000L));
 
             await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
                 Map<String, Long> stored = rows.queryForList(

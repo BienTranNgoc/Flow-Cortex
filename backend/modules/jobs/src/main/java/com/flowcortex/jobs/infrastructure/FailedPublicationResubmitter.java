@@ -4,6 +4,7 @@ import com.flowcortex.jobs.api.ClusterJob;
 import com.flowcortex.jobs.api.PublicationRetryPolicy;
 import com.flowcortex.jobs.application.PublicationRetryPolicies;
 import com.flowcortex.jobs.application.RetryDecision;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,19 +44,21 @@ public class FailedPublicationResubmitter implements ClusterJob {
     private final FailedEventPublications failed;
     private final EventPublicationRepository publications;
     private final PublicationRetryPolicies policies;
+    private final MeterRegistry meters;
     private final Clock clock;
 
     @Autowired
     FailedPublicationResubmitter(FailedEventPublications failed, EventPublicationRepository publications,
-            PublicationRetryPolicies policies) {
-        this(failed, publications, policies, Clock.systemUTC());
+            PublicationRetryPolicies policies, MeterRegistry meters) {
+        this(failed, publications, policies, meters, Clock.systemUTC());
     }
 
     FailedPublicationResubmitter(FailedEventPublications failed, EventPublicationRepository publications,
-            PublicationRetryPolicies policies, Clock clock) {
+            PublicationRetryPolicies policies, MeterRegistry meters, Clock clock) {
         this.failed = failed;
         this.publications = publications;
         this.policies = policies;
+        this.meters = meters;
         this.clock = clock;
     }
 
@@ -83,7 +86,7 @@ public class FailedPublicationResubmitter implements ClusterJob {
                     return switch (RetryDecision.of(policy, publication, now)) {
                         case DUE -> accepted.incrementAndGet() <= RESUBMIT_LIMIT;
                         case EXHAUSTED -> {
-                            exhausted.put(publication.getIdentifier(), Exhausted.of(publication));
+                            exhausted.put(publication.getIdentifier(), Exhausted.of(publication, policy));
                             yield false;
                         }
                         case WAIT -> false;
@@ -94,15 +97,25 @@ public class FailedPublicationResubmitter implements ClusterJob {
             return;
         }
         publications.deletePublications(List.copyOf(exhausted.keySet()));
-        exhausted.forEach((id, row) -> LOG.warn("outbox outcome=gave_up publication={} event={} attempts={}",
-                id, row.event(), row.attempts()));
+        exhausted.forEach((id, row) -> {
+            meters.counter("outbox.publication.gave_up", "event", row.event()).increment();
+            String detail = row.detail().isEmpty() ? "" : " " + row.detail();
+            if (row.critical()) {
+                LOG.error("outbox outcome=gave_up publication={} event={} attempts={}{}", id, row.event(),
+                        row.attempts(), detail);
+            } else {
+                LOG.warn("outbox outcome=gave_up publication={} event={} attempts={}{}", id, row.event(),
+                        row.attempts(), detail);
+            }
+        });
     }
 
-    private record Exhausted(String event, int attempts) {
+    private record Exhausted(String event, int attempts, boolean critical, String detail) {
 
-        static Exhausted of(EventPublication publication) {
-            return new Exhausted(publication.getEvent().getClass().getSimpleName(),
-                    publication.getCompletionAttempts());
+        static Exhausted of(EventPublication publication, PublicationRetryPolicy policy) {
+            Object event = publication.getEvent();
+            return new Exhausted(event.getClass().getSimpleName(), publication.getCompletionAttempts(),
+                    policy.critical(), policy.describe(event));
         }
     }
 }
