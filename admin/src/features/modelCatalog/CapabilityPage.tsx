@@ -230,9 +230,6 @@ function DeleteDialog({
       className="cortex-admin-account-dialog model-catalog-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) dialogRef.current?.close();
-      }}
     >
       <div className="model-catalog-dialog__body">
         <h2 id={titleId}>{t('modelCatalog.delete.title', { name: entry.modelKey })}</h2>

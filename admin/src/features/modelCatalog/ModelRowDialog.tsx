@@ -217,9 +217,6 @@ export function ModelRowDialog({ capability, entry, onSaved, onClose }: ModelRow
       className="cortex-admin-account-dialog model-catalog-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) dialogRef.current?.close();
-      }}
     >
       <form className="model-catalog-dialog__body" onSubmit={submit} noValidate>
         <h2 id={titleId}>
