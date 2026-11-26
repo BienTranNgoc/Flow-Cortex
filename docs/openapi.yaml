@@ -5406,6 +5406,117 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/{transactionId}/refund-request:
+    get:
+      tags:
+      - refund-requests-controller
+      summary: Read the latest refund request on a payment
+      operationId: getLatestRefundRequest
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "The latest request, or null when there is none"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LatestRefundRequestResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - refund-requests-controller
+      summary: Ask for the change-of-mind refund of a payment
+      description: Answers the payment's pending request when there is one; otherwise
+        records a pending request when the right is permitted.
+      operationId: requestRefund
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRequestBody"
+      responses:
+        "200":
+          description: The pending request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefundRequestView"
+        "400":
+          description: The reason is present and not 10 to 2000 characters (code validation-failed)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "The right is refused (code refund_not_eligible, with refusal)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: More than 10 requests or cancels in a minute; Retry-After gives
+            the wait
+  /api/v1/billing/transactions/{transactionId}/refund-request/cancel:
+    post:
+      tags:
+      - refund-requests-controller
+      summary: Cancel the pending refund request of a payment
+      operationId: cancelRefundRequest
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The cancelled request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefundRequestView"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: No pending request (code refund_request_not_cancellable)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: More than 10 requests or cancels in a minute; Retry-After gives
+            the wait
   /api/v1/billing/journey-events:
     post:
       tags:
@@ -10386,6 +10497,33 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/{transactionId}/refund-eligibility:
+    get:
+      tags:
+      - refund-requests-controller
+      summary: Read the refund right over one of the member's payments
+      operationId: getRefundEligibility
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "The verdict, the turn standing and the latest request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefundEligibilityResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/billing/transactions/by-order/{orderRef}:
     get:
       tags:
@@ -10413,6 +10551,24 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/change-of-mind:
+    get:
+      tags:
+      - refund-requests-controller
+      summary: Read the change-of-mind right of the latest plan purchase
+      description: "With the surface switch off nothing is computed. Otherwise the\
+        \ verdict of the member's newest collected plan purchase, with its latest\
+        \ request, and the member's turn standing."
+      operationId: getChangeOfMindRight
+      responses:
+        "200":
+          description: "The right, or none"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeOfMindResponse"
+        "401":
+          description: Not signed in
   /api/v1/batches:
     get:
       tags:
@@ -15895,6 +16051,70 @@ components:
           format: uuid
         card:
           $ref: "#/components/schemas/ChatMessage"
+    RefundRequestBody:
+      type: object
+      properties:
+        reason:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+          minLength: 10
+    RefundRequestView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - auto_approved
+          - approved
+          - rejected
+          - cancelled
+        reason:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        decisionNote:
+          type:
+          - string
+          - "null"
+        processingAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        rejectedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        rejectionReason:
+          type:
+          - string
+          - "null"
+      required:
+      - code
+      - decidedAt
+      - decisionNote
+      - id
+      - processingAt
+      - reason
+      - rejectedAt
+      - rejectionReason
+      - requestedAt
+      - status
     ResetPasswordRequest:
       type: object
       properties:
@@ -19287,6 +19507,206 @@ components:
       - at
       - code
       - kind
+    LatestRefundRequestResponse:
+      type: object
+      properties:
+        request:
+          type: "null"
+          $ref: "#/components/schemas/RefundRequestView"
+      required:
+      - request
+    RefundEligibilityResponse:
+      type: object
+      properties:
+        right:
+          $ref: "#/components/schemas/RightView"
+        turns:
+          $ref: "#/components/schemas/TurnsView"
+        paidAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        daysElapsed:
+          type:
+          - integer
+          - "null"
+          format: int32
+        request:
+          type: "null"
+          $ref: "#/components/schemas/RefundRequestView"
+        cancellable:
+          type: boolean
+      required:
+      - cancellable
+      - daysElapsed
+      - paidAt
+      - request
+      - right
+      - turns
+    RightView:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        amountVnd:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        cycle:
+          type: string
+          enum:
+          - monthly
+          - yearly
+        windowDays:
+          type: integer
+          format: int32
+        deadlineAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        daysRemaining:
+          type: integer
+          format: int32
+        verdict:
+          type: string
+          enum:
+          - permitted
+          - refused
+        refusal:
+          type:
+          - string
+          - "null"
+          enum:
+          - already_refunded
+          - not_settled
+          - previously_rejected
+          - window_elapsed
+          - turn_limit_reached
+      required:
+      - amountVnd
+      - currency
+      - cycle
+      - daysRemaining
+      - deadlineAt
+      - kind
+      - refusal
+      - transactionId
+      - verdict
+      - windowDays
+    TurnsView:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        used:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        windowMonths:
+          type: integer
+          format: int32
+        nextTurnAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - enabled
+      - limit
+      - nextTurnAt
+      - used
+      - windowMonths
+    ChangeOfMindResponse:
+      type: object
+      properties:
+        surfaceEnabled:
+          type: boolean
+        available:
+          type: boolean
+        right:
+          type: "null"
+          $ref: "#/components/schemas/ChangeOfMindRightView"
+        turns:
+          type: "null"
+          $ref: "#/components/schemas/TurnsView"
+      required:
+      - available
+      - right
+      - surfaceEnabled
+      - turns
+    ChangeOfMindRightView:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        amountVnd:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        cycle:
+          type: string
+          enum:
+          - monthly
+          - yearly
+        windowDays:
+          type: integer
+          format: int32
+        deadlineAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        daysRemaining:
+          type: integer
+          format: int32
+        verdict:
+          type: string
+          enum:
+          - permitted
+          - refused
+        refusal:
+          type:
+          - string
+          - "null"
+          enum:
+          - already_refunded
+          - not_settled
+          - previously_rejected
+          - window_elapsed
+          - turn_limit_reached
+        request:
+          type: "null"
+          $ref: "#/components/schemas/RefundRequestView"
+      required:
+      - amountVnd
+      - currency
+      - cycle
+      - daysRemaining
+      - deadlineAt
+      - kind
+      - refusal
+      - request
+      - transactionId
+      - verdict
+      - windowDays
     PageViewBatchResponse:
       type: object
       properties:

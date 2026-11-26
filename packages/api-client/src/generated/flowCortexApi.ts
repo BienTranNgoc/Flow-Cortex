@@ -2658,6 +2658,44 @@ export interface ChatCardConfirmed {
   card?: ChatMessage;
 }
 
+export interface RefundRequestBody {
+  /**
+   * @minLength 10
+   * @maxLength 2000
+   * @nullable
+   */
+  reason?: string | null;
+}
+
+export type RefundRequestViewStatus =
+  (typeof RefundRequestViewStatus)[keyof typeof RefundRequestViewStatus];
+
+export const RefundRequestViewStatus = {
+  pending: 'pending',
+  auto_approved: 'auto_approved',
+  approved: 'approved',
+  rejected: 'rejected',
+  cancelled: 'cancelled',
+} as const;
+
+export interface RefundRequestView {
+  id: string;
+  code: string;
+  status: RefundRequestViewStatus;
+  reason: string;
+  requestedAt: string;
+  /** @nullable */
+  decidedAt: string | null;
+  /** @nullable */
+  decisionNote: string | null;
+  /** @nullable */
+  processingAt: string | null;
+  /** @nullable */
+  rejectedAt: string | null;
+  /** @nullable */
+  rejectionReason: string | null;
+}
+
 export interface ResetPasswordRequest {
   /**
    * @minLength 0
@@ -4671,6 +4709,145 @@ export interface TransactionDetailResponse {
   /** @nullable */
   outcomeCode: string | null;
   timeline: TransactionTimelineEvent[];
+}
+
+export interface LatestRefundRequestResponse {
+  /** @nullable */
+  request: RefundRequestView;
+}
+
+export type RightViewKind = (typeof RightViewKind)[keyof typeof RightViewKind];
+
+export const RightViewKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type RightViewCycle = (typeof RightViewCycle)[keyof typeof RightViewCycle];
+
+export const RightViewCycle = {
+  monthly: 'monthly',
+  yearly: 'yearly',
+} as const;
+
+export type RightViewVerdict = (typeof RightViewVerdict)[keyof typeof RightViewVerdict];
+
+export const RightViewVerdict = {
+  permitted: 'permitted',
+  refused: 'refused',
+} as const;
+
+/**
+ * @nullable
+ */
+export type RightViewRefusal = (typeof RightViewRefusal)[keyof typeof RightViewRefusal] | null;
+
+export const RightViewRefusal = {
+  already_refunded: 'already_refunded',
+  not_settled: 'not_settled',
+  previously_rejected: 'previously_rejected',
+  window_elapsed: 'window_elapsed',
+  turn_limit_reached: 'turn_limit_reached',
+} as const;
+
+export interface RightView {
+  transactionId: string;
+  amountVnd: number;
+  currency: string;
+  kind: RightViewKind;
+  cycle: RightViewCycle;
+  windowDays: number;
+  /** @nullable */
+  deadlineAt: string | null;
+  daysRemaining: number;
+  verdict: RightViewVerdict;
+  /** @nullable */
+  refusal: RightViewRefusal;
+}
+
+export interface TurnsView {
+  enabled: boolean;
+  used: number;
+  limit: number;
+  windowMonths: number;
+  /** @nullable */
+  nextTurnAt: string | null;
+}
+
+export interface RefundEligibilityResponse {
+  right: RightView;
+  turns: TurnsView;
+  /** @nullable */
+  paidAt: string | null;
+  /** @nullable */
+  daysElapsed: number | null;
+  /** @nullable */
+  request: RefundRequestView;
+  cancellable: boolean;
+}
+
+export type ChangeOfMindRightViewKind =
+  (typeof ChangeOfMindRightViewKind)[keyof typeof ChangeOfMindRightViewKind];
+
+export const ChangeOfMindRightViewKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type ChangeOfMindRightViewCycle =
+  (typeof ChangeOfMindRightViewCycle)[keyof typeof ChangeOfMindRightViewCycle];
+
+export const ChangeOfMindRightViewCycle = {
+  monthly: 'monthly',
+  yearly: 'yearly',
+} as const;
+
+export type ChangeOfMindRightViewVerdict =
+  (typeof ChangeOfMindRightViewVerdict)[keyof typeof ChangeOfMindRightViewVerdict];
+
+export const ChangeOfMindRightViewVerdict = {
+  permitted: 'permitted',
+  refused: 'refused',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ChangeOfMindRightViewRefusal =
+  (typeof ChangeOfMindRightViewRefusal)[keyof typeof ChangeOfMindRightViewRefusal] | null;
+
+export const ChangeOfMindRightViewRefusal = {
+  already_refunded: 'already_refunded',
+  not_settled: 'not_settled',
+  previously_rejected: 'previously_rejected',
+  window_elapsed: 'window_elapsed',
+  turn_limit_reached: 'turn_limit_reached',
+} as const;
+
+export interface ChangeOfMindRightView {
+  transactionId: string;
+  amountVnd: number;
+  currency: string;
+  kind: ChangeOfMindRightViewKind;
+  cycle: ChangeOfMindRightViewCycle;
+  windowDays: number;
+  /** @nullable */
+  deadlineAt: string | null;
+  daysRemaining: number;
+  verdict: ChangeOfMindRightViewVerdict;
+  /** @nullable */
+  refusal: ChangeOfMindRightViewRefusal;
+  /** @nullable */
+  request: RefundRequestView;
+}
+
+export interface ChangeOfMindResponse {
+  surfaceEnabled: boolean;
+  available: boolean;
+  /** @nullable */
+  right: ChangeOfMindRightView;
+  /** @nullable */
+  turns: TurnsView;
 }
 
 export interface PageViewBatchResponse {
@@ -15330,6 +15507,192 @@ export const confirmChatCard = async (
   });
 };
 
+export type getLatestRefundRequestResponse200 = {
+  data: LatestRefundRequestResponse;
+  status: 200;
+};
+
+export type getLatestRefundRequestResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getLatestRefundRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getLatestRefundRequestResponseSuccess = getLatestRefundRequestResponse200 & {
+  headers: Headers;
+};
+export type getLatestRefundRequestResponseError = (
+  getLatestRefundRequestResponse401 | getLatestRefundRequestResponse404
+) & {
+  headers: Headers;
+};
+
+export type getLatestRefundRequestResponse =
+  getLatestRefundRequestResponseSuccess | getLatestRefundRequestResponseError;
+
+export const getGetLatestRefundRequestUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}/refund-request`;
+};
+
+/**
+ * @summary Read the latest refund request on a payment
+ */
+export const getLatestRefundRequest = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getLatestRefundRequestResponse> => {
+  return customFetch<getLatestRefundRequestResponse>(getGetLatestRefundRequestUrl(transactionId), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type requestRefundResponse200 = {
+  data: RefundRequestView;
+  status: 200;
+};
+
+export type requestRefundResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type requestRefundResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type requestRefundResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type requestRefundResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type requestRefundResponse429 = {
+  data: void;
+  status: 429;
+};
+
+export type requestRefundResponseSuccess = requestRefundResponse200 & {
+  headers: Headers;
+};
+export type requestRefundResponseError = (
+  | requestRefundResponse400
+  | requestRefundResponse401
+  | requestRefundResponse404
+  | requestRefundResponse409
+  | requestRefundResponse429
+) & {
+  headers: Headers;
+};
+
+export type requestRefundResponse = requestRefundResponseSuccess | requestRefundResponseError;
+
+export const getRequestRefundUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}/refund-request`;
+};
+
+/**
+ * Answers the payment's pending request when there is one; otherwise records a pending request when the right is permitted.
+ * @summary Ask for the change-of-mind refund of a payment
+ */
+export const requestRefund = async (
+  transactionId: string,
+  refundRequestBody?: RefundRequestBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestRefundResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestRefundResponse>(getRequestRefundUrl(transactionId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(refundRequestBody),
+  });
+};
+
+export type cancelRefundRequestResponse200 = {
+  data: RefundRequestView;
+  status: 200;
+};
+
+export type cancelRefundRequestResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type cancelRefundRequestResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type cancelRefundRequestResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelRefundRequestResponse429 = {
+  data: void;
+  status: 429;
+};
+
+export type cancelRefundRequestResponseSuccess = cancelRefundRequestResponse200 & {
+  headers: Headers;
+};
+export type cancelRefundRequestResponseError = (
+  | cancelRefundRequestResponse401
+  | cancelRefundRequestResponse404
+  | cancelRefundRequestResponse409
+  | cancelRefundRequestResponse429
+) & {
+  headers: Headers;
+};
+
+export type cancelRefundRequestResponse =
+  cancelRefundRequestResponseSuccess | cancelRefundRequestResponseError;
+
+export const getCancelRefundRequestUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}/refund-request/cancel`;
+};
+
+/**
+ * @summary Cancel the pending refund request of a payment
+ */
+export const cancelRefundRequest = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelRefundRequestResponse> => {
+  return customFetch<cancelRefundRequestResponse>(getCancelRefundRequestUrl(transactionId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type recordPaymentJourneyEventResponse204 = {
   data: void;
   status: 204;
@@ -22430,6 +22793,50 @@ export const getBillingTransaction = async (
   });
 };
 
+export type getRefundEligibilityResponse200 = {
+  data: RefundEligibilityResponse;
+  status: 200;
+};
+
+export type getRefundEligibilityResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getRefundEligibilityResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getRefundEligibilityResponseSuccess = getRefundEligibilityResponse200 & {
+  headers: Headers;
+};
+export type getRefundEligibilityResponseError = (
+  getRefundEligibilityResponse401 | getRefundEligibilityResponse404
+) & {
+  headers: Headers;
+};
+
+export type getRefundEligibilityResponse =
+  getRefundEligibilityResponseSuccess | getRefundEligibilityResponseError;
+
+export const getGetRefundEligibilityUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}/refund-eligibility`;
+};
+
+/**
+ * @summary Read the refund right over one of the member's payments
+ */
+export const getRefundEligibility = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRefundEligibilityResponse> => {
+  return customFetch<getRefundEligibilityResponse>(getGetRefundEligibilityUrl(transactionId), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type getBillingTransactionByOrderResponse200 = {
   data: TransactionDetailResponse;
   status: 200;
@@ -22476,6 +22883,43 @@ export const getBillingTransactionByOrder = async (
       method: 'GET',
     },
   );
+};
+
+export type getChangeOfMindRightResponse200 = {
+  data: ChangeOfMindResponse;
+  status: 200;
+};
+
+export type getChangeOfMindRightResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getChangeOfMindRightResponseSuccess = getChangeOfMindRightResponse200 & {
+  headers: Headers;
+};
+export type getChangeOfMindRightResponseError = getChangeOfMindRightResponse401 & {
+  headers: Headers;
+};
+
+export type getChangeOfMindRightResponse =
+  getChangeOfMindRightResponseSuccess | getChangeOfMindRightResponseError;
+
+export const getGetChangeOfMindRightUrl = () => {
+  return `/api/v1/billing/change-of-mind`;
+};
+
+/**
+ * With the surface switch off nothing is computed. Otherwise the verdict of the member's newest collected plan purchase, with its latest request, and the member's turn standing.
+ * @summary Read the change-of-mind right of the latest plan purchase
+ */
+export const getChangeOfMindRight = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getChangeOfMindRightResponse> => {
+  return customFetch<getChangeOfMindRightResponse>(getGetChangeOfMindRightUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type listBatchesResponse200 = {
