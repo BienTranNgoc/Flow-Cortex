@@ -127,7 +127,7 @@ class AdminAuditUserRoutesIT extends AbstractUserModuleIT {
         Map<String, Object> row = onlyRow(admin, "user.create");
         assertThat(row.get("resource_type")).isEqualTo("user");
         assertThat(row.get("resource_id")).isEqualTo(response.getBody().id().toString());
-        assertThat(row.get("resource_label")).isEqualTo("Người Mới");
+        assertThat(row.get("resource_label")).isEqualTo("N*** M***");
         assertThat(summaryOf(row)).isEqualTo(JSON.readTree("{\"role\":\"MEMBER\"}"));
         assertThat(row.get("summary_text").toString()).doesNotContain(PASSWORD).doesNotContain(email);
     }

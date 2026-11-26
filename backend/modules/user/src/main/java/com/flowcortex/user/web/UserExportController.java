@@ -10,6 +10,7 @@ import com.flowcortex.user.domain.AccountState;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * {@code GET /api/v1/users/export} — the filtered users list as a CSV file. A separate class from the
  * JSON users controller so the route has its own permission posture and content types. The service
- * finishes before any header is set, so a refusal is an ordinary problem response.
+ * finishes before any header is set, so a refusal is an ordinary problem response. The client address
+ * and user agent go to the service as plain strings for the audit row of an unmasked export.
  */
 @RestController
 @RequestMapping("/api/v1/users")
@@ -58,11 +60,13 @@ class UserExportController {
             @RequestParam(required = false)
             @Pattern(regexp = "active|pending_confirmation|locked|suspended") String state,
             @Parameter(schema = @Schema(allowableValues = {"newest", "oldest", "email", "name"}))
-            @RequestParam(defaultValue = "newest") @Pattern(regexp = "newest|oldest|email|name") String sort) {
+            @RequestParam(defaultValue = "newest") @Pattern(regexp = "newest|oldest|email|name") String sort,
+            HttpServletRequest request) {
         UserQuery query = new UserQuery(q, Optional.ofNullable(role),
                 Optional.ofNullable(state).flatMap(AccountState::fromWire),
                 Sort.valueOf(sort.toUpperCase(Locale.ROOT)));
-        byte[] file = exportService.export(UUID.fromString(jwt.getSubject()), query);
+        byte[] file = exportService.export(UUID.fromString(jwt.getSubject()), query, request.getRemoteAddr(),
+                request.getHeader(HttpHeaders.USER_AGENT));
         return ResponseEntity.ok()
                 .contentType(CSV)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()

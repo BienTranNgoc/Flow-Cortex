@@ -10,6 +10,7 @@ import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserStats;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.domain.AccountState;
+import com.flowcortex.user.pii.PiiMask;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -80,7 +81,7 @@ class UsersController {
             @RequestParam(defaultValue = "newest") @Pattern(regexp = "newest|oldest|email|name") String sort) {
         UserQuery query = new UserQuery(q, Optional.ofNullable(role),
                 Optional.ofNullable(state).flatMap(AccountState::fromWire), Sort.valueOf(sort.toUpperCase(Locale.ROOT)));
-        return ResponseEntity.ok(userService.searchUsers(callerId(jwt), query, page, size).map(UserResponse::from));
+        return ResponseEntity.ok(userService.searchUsers(callerId(jwt), query, page, size).map(UserResponse::masked));
     }
 
     @Operation(operationId = "getUserStats")
@@ -101,14 +102,14 @@ class UsersController {
             @Valid @RequestBody CreateUserRequest request) {
         UserView created = userService.createUser(callerId(jwt), request.email(), request.password(),
                 request.name(), request.role());
-        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(created));
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.masked(created));
     }
 
     @RequirePermission(Permission.USER_ACCOUNT_VIEW)
     @Operation(operationId = "getUser")
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<UserResponse> get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return ResponseEntity.ok(UserResponse.from(userService.getUser(callerId(jwt), id)));
+        return ResponseEntity.ok(UserResponse.masked(userService.getUser(callerId(jwt), id)));
     }
 
     @RequirePermission(Permission.USER_ACCOUNT_UPDATE)
@@ -119,7 +120,7 @@ class UsersController {
             @Valid @RequestBody UpdateUserRequest request) {
         UserView updated = userService.updateUser(callerId(jwt), id, request.email(), request.name(),
                 request.role(), request.status());
-        return ResponseEntity.ok(UserResponse.from(updated));
+        return ResponseEntity.ok(UserResponse.masked(updated));
     }
 
     @RequirePermission(Permission.USER_ACCOUNT_DELETE)
@@ -154,7 +155,10 @@ class UsersController {
             @Pattern(regexp = "ACTIVE|SUSPENDED") String status) {
     }
 
-    /** Never carries {@code passwordHash} — {@link UserView} does not either. */
+    /**
+     * Never carries {@code passwordHash} — {@link UserView} does not either. Every admin response
+     * goes through {@link #masked}; the unmasked identity is only released by the audited reveal.
+     */
     record UserResponse(UUID id, String email, String name, String role,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String roleName, String status, Instant createdAt,
             Instant updatedAt, String username, String state, Instant emailConfirmedAt, Instant lockedUntil,
@@ -164,6 +168,15 @@ class UsersController {
                     view.status(), view.createdAt(), view.updatedAt(), view.username(), view.state(),
                     view.emailConfirmedAt(), view.lockedUntil(), view.signInMethods(), view.adminDisabled(),
                     view.staffTarget());
+        }
+
+        /** {@link #from} with only email and name masked; every other component is copied unchanged. */
+        static UserResponse masked(UserView view) {
+            UserResponse full = from(view);
+            return new UserResponse(full.id(), PiiMask.email(full.email()), PiiMask.name(full.name()), full.role(),
+                    full.roleName(), full.status(), full.createdAt(), full.updatedAt(), full.username(),
+                    full.state(), full.emailConfirmedAt(), full.lockedUntil(), full.signInMethods(),
+                    full.adminDisabled(), full.staffTarget());
         }
     }
 }
