@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class SupportSettingKeys {
 
+    public static final SettingKey<Boolean> HELP_CENTER_ENABLED = SettingKey.switchKey("support.help_center.enabled");
     public static final SettingKey<Boolean> ASSISTANT_ENABLED = SettingKey.switchKey("support.assistant.enabled");
     public static final SettingKey<Integer> DAILY_CEILING = SettingKey.integerKey("support.assistant.daily_ceiling");
     public static final SettingKey<Integer> MEMBER_DAILY_QUOTA =
@@ -21,6 +22,11 @@ public class SupportSettingKeys {
             SettingKey.integerKey("support.assistant.guest_daily_quota");
     public static final SettingKey<Integer> GUEST_NETWORK_DAILY_QUOTA =
             SettingKey.integerKey("support.assistant.guest_network_daily_quota");
+
+    @Bean
+    SettingDefinition<Boolean> helpCenterEnabledSetting(SupportProperties properties) {
+        return SettingDefinition.switchKey(HELP_CENTER_ENABLED.name(), true, properties::enabled);
+    }
 
     @Bean
     SettingDefinition<Boolean> assistantEnabledSetting(SupportProperties properties) {

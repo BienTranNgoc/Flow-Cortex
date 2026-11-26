@@ -14,6 +14,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import com.flowcortex.llm.api.LlmJsonResult;
 import com.flowcortex.llm.api.LlmJsonResult.Kind;
+import com.flowcortex.llm.api.LlmSlotRequest;
 import com.flowcortex.llm.api.LlmSpeechResult;
 import com.flowcortex.llm.gemini.GeminiSlotProperties.Slot;
 import com.sun.net.httpserver.HttpServer;
@@ -31,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +41,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,6 +66,8 @@ class GeminiChainClientTest {
     private static final String LITE_TTS = "gemini-3.8-flash-lite-tts";
     private static final String TRANSLATE = "dub-translate";
     private static final String SPEECH = "dub-speech";
+    private static final String ASSISTANT = "support-assistant";
+    private static final Function<Collection<String>, Map<String, Boolean>> NO_ENTRIES = models -> Map.of();
     private static final String SCHEMA = "{\"type\":\"ARRAY\",\"items\":{\"type\":\"STRING\"}}";
     private static final String TEXT = "Xin chào <long pause> Tạm biệt";
     private static final String QUOTA_BODY = "{\"error\":{\"code\":429,\"message\":\"Rate limit exceeded for model "
@@ -82,9 +87,10 @@ class GeminiChainClientTest {
 
     private static GeminiSlotProperties slots(List<Duration> retryWaits, Duration callTimeout) {
         int attempts = retryWaits.size() + 1;
-        return new GeminiSlotProperties(Map.of(
-                TRANSLATE, new Slot(List.of(LITE, FLASH), attempts, retryWaits, callTimeout),
-                SPEECH, new Slot(List.of(TTS, LITE_TTS), attempts, retryWaits, callTimeout)));
+        return GeminiSlotProperties.of(Map.of(
+                TRANSLATE, Slot.of(List.of(LITE, FLASH), attempts, retryWaits, callTimeout),
+                SPEECH, Slot.of(List.of(TTS, LITE_TTS), attempts, retryWaits, callTimeout),
+                ASSISTANT, new Slot(List.of(LITE, FLASH), 1, List.of(), callTimeout, "off", "BLOCK_ONLY_HIGH")));
     }
 
     private ObservationRegistry recording() {
@@ -105,17 +111,26 @@ class GeminiChainClientTest {
 
     private GeminiChainClient client(List<Duration> retryWaits) {
         return new GeminiChainClient(properties(KEY, BASE), slots(retryWaits, Duration.ofSeconds(60)),
-                timeout -> builder.build(), waits::add, new GeminiTelemetry(meters, recording()));
+                timeout -> builder.build(), waits::add, new GeminiTelemetry(meters, recording()), NO_ENTRIES);
     }
 
     private GeminiChainClient client() {
         return client(WAITS);
     }
 
+    private GeminiChainClient client(Map<String, Boolean> registry) {
+        return client(models -> registry);
+    }
+
+    private GeminiChainClient client(Function<Collection<String>, Map<String, Boolean>> activity) {
+        return new GeminiChainClient(properties(KEY, BASE), slots(WAITS, Duration.ofSeconds(60)),
+                timeout -> builder.build(), waits::add, new GeminiTelemetry(meters, recording()), activity);
+    }
+
     private GeminiChainClient overRealHttp(String base, Duration callTimeout) {
         return new GeminiChainClient(properties(KEY, base), slots(WAITS, callTimeout),
                 timeout -> GeminiAttempts.restClient(HttpClient.newBuilder().build(), timeout), waits::add,
-                new GeminiTelemetry(meters, recording()));
+                new GeminiTelemetry(meters, recording()), NO_ENTRIES);
     }
 
     /** Each attempt the client made, in order, as {@code model#attempt:outcome}. */
@@ -133,8 +148,29 @@ class GeminiChainClientTest {
                 .andExpect(jsonPath("$.contents[0].parts[0].text").value("translate these"))
                 .andExpect(jsonPath("$.generationConfig.responseMimeType").value("application/json"))
                 .andExpect(jsonPath("$.generationConfig.responseSchema.type").value("ARRAY"))
-                .andExpect(jsonPath("$.generationConfig.temperature").doesNotExist())
-                .andExpect(jsonPath("$.generationConfig.maxOutputTokens").doesNotExist());
+                .andExpect(jsonPath("$.generationConfig.temperature").doesNotExist());
+    }
+
+    private ResponseActions expectAssistant(String model) {
+        return server.expect(requestTo(BASE + "/models/" + model + ":generateContent"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.systemInstruction.parts[0].text").value("answer from the articles"))
+                .andExpect(jsonPath("$.contents[0].parts[0].text").value("how do I reset my password"))
+                .andExpect(jsonPath("$.generationConfig.temperature").value(0.2))
+                .andExpect(jsonPath("$.generationConfig.maxOutputTokens").value(65536))
+                .andExpect(jsonPath("$.safetySettings.length()").value(4))
+                .andExpect(jsonPath("$.safetySettings[0].category").value("HARM_CATEGORY_HARASSMENT"))
+                .andExpect(jsonPath("$.safetySettings[0].threshold").value("BLOCK_ONLY_HIGH"))
+                .andExpect(jsonPath("$.safetySettings[1].category").value("HARM_CATEGORY_HATE_SPEECH"))
+                .andExpect(jsonPath("$.safetySettings[1].threshold").value("BLOCK_ONLY_HIGH"))
+                .andExpect(jsonPath("$.safetySettings[2].category").value("HARM_CATEGORY_SEXUALLY_EXPLICIT"))
+                .andExpect(jsonPath("$.safetySettings[2].threshold").value("BLOCK_ONLY_HIGH"))
+                .andExpect(jsonPath("$.safetySettings[3].category").value("HARM_CATEGORY_DANGEROUS_CONTENT"))
+                .andExpect(jsonPath("$.safetySettings[3].threshold").value("BLOCK_ONLY_HIGH"));
+    }
+
+    private static LlmSlotRequest assistantQuestion() {
+        return new LlmSlotRequest(ASSISTANT, "answer from the articles", "how do I reset my password", SCHEMA, 0.2);
     }
 
     private ResponseActions expectSpeech(String model) {
@@ -171,12 +207,104 @@ class GeminiChainClientTest {
 
     @Test
     void translateSendsThePromptWithTheSchemaAndNoSamplingSettingsAndReturnsTheAnswer() {
-        expectTranslate(LITE).andRespond(withSuccess(candidate("[\"Xin chào\"]"), MediaType.APPLICATION_JSON));
+        expectTranslate(LITE)
+                .andExpect(jsonPath("$.systemInstruction").doesNotExist())
+                .andExpect(jsonPath("$.generationConfig.maxOutputTokens").value(65536))
+                .andExpect(jsonPath("$.generationConfig.thinkingConfig").doesNotExist())
+                .andExpect(jsonPath("$.safetySettings.length()").value(4))
+                .andExpect(jsonPath("$.safetySettings[0].threshold").value("BLOCK_MEDIUM_AND_ABOVE"))
+                .andRespond(withSuccess(candidate("[\"Xin chào\"]"), MediaType.APPLICATION_JSON));
 
         LlmJsonResult result = client().generateJson(TRANSLATE, "translate these", SCHEMA);
 
         assertThat(result).isEqualTo(new LlmJsonResult.Answered("[\"Xin chào\"]", LITE, 0, 0));
         assertThat(waits).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void anInactiveModelGetsNoRequestAndIsCounted() {
+        expectTranslate(FLASH).andRespond(withSuccess(candidate("[]"), MediaType.APPLICATION_JSON));
+        expectTranslate(FLASH).andRespond(withSuccess(candidate("[]"), MediaType.APPLICATION_JSON));
+        GeminiChainClient client = client(Map.of(LITE, false));
+
+        assertThat(client.generateJson(TRANSLATE, "translate these", SCHEMA))
+                .isEqualTo(new LlmJsonResult.Answered("[]", FLASH, 0, 0));
+        client.generateJson(TRANSLATE, "translate these", SCHEMA);
+
+        assertThat(meters.get("llm.slot.skipped").tag("slot", TRANSLATE).tag("model", LITE).counter().count())
+                .isEqualTo(2);
+        server.verify();
+    }
+
+    @Test
+    void everyModelInactiveSendsOneModelOnlyAndWarnsOnce(CapturedOutput output) {
+        expectTranslate(LITE).andRespond(withSuccess(candidate("[]"), MediaType.APPLICATION_JSON));
+
+        assertThat(client(Map.of(LITE, false, FLASH, false)).generateJson(TRANSLATE, "translate these", SCHEMA))
+                .isEqualTo(new LlmJsonResult.Answered("[]", LITE, 0, 0));
+
+        assertThat(output.getAll()).containsOnlyOnce("llm.slot.degraded").contains("slot=" + TRANSLATE)
+                .contains("reason=all_inactive").doesNotContain("translate these");
+        assertThat(meters.find("llm.slot.skipped").counter()).isNull();
+        server.verify();
+    }
+
+    @Test
+    void aRegistryFailureWalksTheConfiguredChainAndWarns(CapturedOutput output) {
+        expectTranslate(LITE).andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expectTranslate(FLASH).andRespond(withSuccess(candidate("[]"), MediaType.APPLICATION_JSON));
+        GeminiChainClient client = client(models -> {
+            throw new IllegalStateException("database down");
+        });
+
+        assertThat(client.generateJson(TRANSLATE, "translate these", SCHEMA))
+                .isEqualTo(new LlmJsonResult.Answered("[]", FLASH, 0, 0));
+
+        assertThat(output.getAll()).containsOnlyOnce("llm.slot.degraded").contains("slot=" + TRANSLATE)
+                .contains("reason=registry_unreadable").doesNotContain("database down");
+        server.verify();
+    }
+
+    @Test
+    void speechWithItsMainVoiceModelInactiveGivesTheNextModelEveryAttempt() {
+        byte[] wav = "RIFF".getBytes(StandardCharsets.US_ASCII);
+        expectSpeech(LITE_TTS).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        expectSpeech(LITE_TTS).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        expectSpeech(LITE_TTS).andRespond(withSuccess(speech(wav), MediaType.APPLICATION_JSON));
+
+        LlmSpeechResult result = client(Map.of(TTS, false)).speak(SPEECH, TEXT, "Kore");
+
+        assertThat(result).isInstanceOfSatisfying(LlmSpeechResult.Spoken.class, spoken -> {
+            assertThat(spoken.wav()).isEqualTo(wav);
+            assertThat(spoken.model()).isEqualTo(LITE_TTS);
+        });
+        assertThat(waits).containsExactly(Duration.ofSeconds(10), Duration.ofSeconds(30));
+        server.verify();
+    }
+
+    @Test
+    void theJsonBodyCarriesTheSafeguards() {
+        expectAssistant(LITE).andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("MINIMAL"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expectAssistant(FLASH).andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("LOW"))
+                .andRespond(withSuccess(candidate("[]"), MediaType.APPLICATION_JSON));
+
+        assertThat(client().generateJson(assistantQuestion()))
+                .isEqualTo(new LlmJsonResult.Answered("[]", FLASH, 0, 0));
+        server.verify();
+    }
+
+    @Test
+    void aSchemaGeminiRefusesThrowsBeforeAnyRequest() {
+        String schema = "{\"type\":\"OBJECT\",\"properties\":{\"duration_sec\":{\"type\":\"INTEGER\","
+                + "\"enum\":[1,2]}}}";
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> client().generateJson(TRANSLATE, "translate these", schema))
+                .withMessageContaining("duration_sec");
+
+        assertThat(meters.find("llm.requests").timer()).isNull();
         server.verify();
     }
 
@@ -373,7 +501,7 @@ class GeminiChainClientTest {
         GeminiChainClient interrupted = new GeminiChainClient(properties(KEY, BASE),
                 slots(WAITS, Duration.ofSeconds(60)), timeout -> builder.build(), wait -> {
                     throw new InterruptedException("shutting down");
-                }, new GeminiTelemetry(meters, ObservationRegistry.NOOP));
+                }, new GeminiTelemetry(meters, ObservationRegistry.NOOP), NO_ENTRIES);
         try {
             assertThatThrownBy(() -> interrupted.speak(SPEECH, TEXT, "Kore")).isInstanceOf(IllegalStateException.class);
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
@@ -467,7 +595,7 @@ class GeminiChainClientTest {
     void aBlankKeyFailsRejectedWithoutCallingGemini() {
         GeminiChainClient unconfigured = new GeminiChainClient(properties(" ", BASE),
                 slots(WAITS, Duration.ofSeconds(60)), timeout -> builder.build(), waits::add,
-                new GeminiTelemetry(meters, ObservationRegistry.NOOP));
+                new GeminiTelemetry(meters, ObservationRegistry.NOOP), NO_ENTRIES);
 
         assertThat(unconfigured.configured()).isFalse();
         assertThat(unconfigured.generateJson(TRANSLATE, "translate these", SCHEMA))

@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -29,12 +28,11 @@ public record SupportProperties(
     }
 
     /**
-     * The assistant's hard switch, model and daily limits: per member, per guest session, per guest
-     * network, and the ceiling over all questions.
+     * The assistant's hard switch and daily limits: per member, per guest session, per guest network,
+     * and the ceiling over all questions. Its models are the {@code support-assistant} slot's.
      */
     public record Assistant(
             boolean enabled,
-            @NotBlank String model,
             @Min(1) int dailyCeiling,
             @Min(1) int memberDailyQuota,
             @Min(1) int guestDailyQuota,
