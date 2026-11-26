@@ -23,7 +23,9 @@ public enum MailKey {
     SUPPORT_REQUEST_REPLIED("support-request-replied", MailCategory.TRANSACTIONAL, "support.mail.subject",
             "support.mail.body", 2),
     PHONE_CHANGED("phone-changed", MailCategory.TRANSACTIONAL, "email.phoneChanged.subject",
-            "email.phoneChanged.body", 1);
+            "email.phoneChanged.body", 1),
+    TRASH_EXPIRING("trash-expiring", MailCategory.TRANSACTIONAL, "trash.mail.expiring.subject",
+            "trash.mail.expiring.body", 3);
 
     private final String id;
     private final MailCategory category;

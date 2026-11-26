@@ -13,9 +13,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Refuses a run of another member's workflow that holds a connector call step: the run would send the
- * author's chosen request with the starter's connected credentials. A workflow row that no longer exists is left
- * to the start flow.
+ * Refuses a run of another member's workflow that holds a step reading a member connector (a connector call or a
+ * drive read): the run would act on the author's chosen request or folder with the starter's connected credentials.
+ * A workflow row that no longer exists is left to the start flow.
  */
 @Component
 @Order(0)
@@ -45,7 +45,7 @@ class ConnectorStepOwnerGuard implements RunStartGuard {
         }
     }
 
-    /** The order of the first connector call step when the starter is not the workflow's owner. */
+    /** The order of the first step reading a member connector when the starter is not the workflow's owner. */
     static Optional<Integer> firstRefusedStep(UUID starter, UUID workflowOwner, List<StepDef> steps) {
         if (mayAuthor(starter, workflowOwner)) {
             return Optional.empty();
@@ -54,18 +54,19 @@ class ConnectorStepOwnerGuard implements RunStartGuard {
     }
 
     /**
-     * Whether {@code person} may author a connector call step on, or run one from, a workflow owned by
-     * {@code workflowOwner}: the one whose credential sends the request is the one who chose it, so only the owner.
+     * Whether {@code person} may author a step reading a member connector on, or run one from, a workflow owned by
+     * {@code workflowOwner}: the one whose credential is used is the one who chose the action, so only the owner.
      */
     static boolean mayAuthor(UUID person, UUID workflowOwner) {
         return person.equals(workflowOwner);
     }
 
-    static boolean isConnectorCall(String stepType) {
-        return ConnectorCallStepExecutor.TYPE.equals(stepType);
+    /** Whether a step of this type acts with the credential of a connector its owner connected. */
+    static boolean readsMemberConnector(String stepType) {
+        return ConnectorCallStepExecutor.TYPE.equals(stepType) || DriveReadStepExecutor.TYPE.equals(stepType);
     }
 
     private static boolean callsConnector(StepDef step) {
-        return isConnectorCall(step.type());
+        return readsMemberConnector(step.type());
     }
 }

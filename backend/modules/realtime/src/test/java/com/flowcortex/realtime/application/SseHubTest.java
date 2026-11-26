@@ -3,6 +3,7 @@ package com.flowcortex.realtime.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.flowcortex.realtime.api.TopicAuthorizer;
 import com.flowcortex.realtime.application.RealtimeProperties.Publish;
 import com.flowcortex.realtime.application.RealtimeProperties.Replay;
 import com.flowcortex.realtime.application.SseHub.Admission;
@@ -11,6 +12,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -33,8 +35,12 @@ class SseHubTest {
     private SseHub hub;
 
     private SseHub hub(Duration heartbeat, int maxStreamsPerUser, int maxEvents) {
-        RealtimeProperties properties = new RealtimeProperties(heartbeat, new Replay(maxEvents, Duration.ofSeconds(120)),
-                maxStreamsPerUser, 8, 10_000, 2, new Publish(1000));
+        return hub(heartbeat, Duration.ofHours(1), maxStreamsPerUser, maxEvents);
+    }
+
+    private SseHub hub(Duration heartbeat, Duration recheckInterval, int maxStreamsPerUser, int maxEvents) {
+        RealtimeProperties properties = new RealtimeProperties(heartbeat, recheckInterval,
+                new Replay(maxEvents, Duration.ofSeconds(120)), maxStreamsPerUser, 8, 10_000, 2, new Publish(1000));
         hub = new SseHub(properties, Clock.systemUTC());
         return hub;
     }
@@ -232,6 +238,159 @@ class SseHubTest {
 
         await().atMost(WAIT).untilTrue(slow.completed);
         slow.block.countDown();
+    }
+
+    private static final Duration RECHECK = Duration.ofMillis(50);
+    private static final String STAFF_TOPIC = "support:request:42";
+
+    @Test
+    void aRevocableTopicTheAuthorizerNowRefusesCompletesTheStreamAndFreesItsSlot() {
+        SseHub hub = hub(Duration.ofHours(1), RECHECK, 1, 100);
+        RecordingAuthorizer authorizer = new RecordingAuthorizer();
+        RecordingSink sink = new RecordingSink();
+        assertThat(hub.register(user, Set.of(STAFF_TOPIC), Map.of(STAFF_TOPIC, authorizer), FAR, null, sink))
+                .isEqualTo(Admission.OPENED);
+        await().atMost(WAIT).until(() -> authorizer.calls.get() >= 1);
+        assertThat(sink.completed.get()).isFalse();
+
+        authorizer.allow = false;
+
+        await().atMost(WAIT).untilTrue(sink.completed);
+        assertThat(sink.frames).noneMatch(frame -> "error".equals(frame.event()));
+        assertThat(authorizer.askedAbout).containsOnly(user);
+        assertThat(authorizer.askedTopics).containsOnly(STAFF_TOPIC);
+        assertThat(hub.register(user, Set.of(STAFF_TOPIC), FAR, null, new RecordingSink())).isEqualTo(Admission.OPENED);
+    }
+
+    @Test
+    void aRevocableTopicStillAllowedKeepsTheStreamOpen() {
+        SseHub hub = hub(Duration.ofHours(1), RECHECK, 5, 100);
+        RecordingAuthorizer authorizer = new RecordingAuthorizer();
+        RecordingSink sink = new RecordingSink();
+        hub.register(user, Set.of(STAFF_TOPIC), Map.of(STAFF_TOPIC, authorizer), FAR, null, sink);
+
+        await().atMost(WAIT).until(() -> authorizer.calls.get() >= 3);
+        hub.onEvent(STAFF_TOPIC, "support.request.changed", "{\"number\":42}");
+
+        await().atMost(WAIT).until(() -> sink.frames.size() == 1);
+        assertThat(sink.completed.get()).isFalse();
+        assertThat(authorizer.threads).allMatch(name -> name.equals("realtime-recheck"));
+    }
+
+    @Test
+    void anAuthorizerThatThrowsOnRecheckKeepsTheStreamUntilTheNextRecheck() {
+        SseHub hub = hub(Duration.ofHours(1), RECHECK, 5, 100);
+        RecordingAuthorizer authorizer = new RecordingAuthorizer();
+        authorizer.failWith = new IllegalStateException("database down");
+        RecordingSink sink = new RecordingSink();
+        hub.register(user, Set.of(STAFF_TOPIC), Map.of(STAFF_TOPIC, authorizer), FAR, null, sink);
+
+        await().atMost(WAIT).until(() -> authorizer.calls.get() >= 3);
+        assertThat(sink.completed.get()).isFalse();
+
+        authorizer.failWith = null;
+        authorizer.allow = false;
+
+        await().atMost(WAIT).untilTrue(sink.completed);
+    }
+
+    @Test
+    void aRefusalEndsTheStreamEvenWhenAnotherRevocableTopicThrows() {
+        SseHub hub = hub(Duration.ofHours(1), RECHECK, 5, 100);
+        RecordingAuthorizer failing = new RecordingAuthorizer();
+        failing.failWith = new IllegalStateException("database down");
+        RecordingAuthorizer refusing = new RecordingAuthorizer();
+        String otherTopic = "support:request:43";
+        RecordingSink sink = new RecordingSink();
+        hub.register(user, Set.of(STAFF_TOPIC, otherTopic), Map.of(STAFF_TOPIC, failing, otherTopic, refusing), FAR,
+                null, sink);
+        await().atMost(WAIT).until(() -> failing.calls.get() >= 2 && refusing.calls.get() >= 2);
+        assertThat(sink.completed.get()).isFalse();
+
+        refusing.allow = false;
+
+        await().atMost(WAIT).untilTrue(sink.completed);
+        assertThat(sink.frames).noneMatch(frame -> "error".equals(frame.event()));
+    }
+
+    @Test
+    void topicsWithoutARecheckAreNeverAskedAgain() {
+        SseHub hub = hub(Duration.ofHours(1), RECHECK, 5, 100);
+        RecordingAuthorizer runAuthorizer = new RecordingAuthorizer();
+        runAuthorizer.allow = false;
+        RecordingAuthorizer staffAuthorizer = new RecordingAuthorizer();
+        RecordingSink plain = new RecordingSink();
+        hub.register(user, RUN_A, FAR, null, plain);
+        hub.register(user, Set.of(STAFF_TOPIC), Map.of(STAFF_TOPIC, staffAuthorizer), FAR, null, new RecordingSink());
+
+        await().atMost(WAIT).until(() -> staffAuthorizer.calls.get() >= 3);
+
+        assertThat(runAuthorizer.calls.get()).isZero();
+        assertThat(plain.completed.get()).isFalse();
+    }
+
+    @Test
+    void aSlowRecheckDoesNotDelayHeartbeats() {
+        SseHub hub = hub(Duration.ofMillis(50), RECHECK, 5, 100);
+        RecordingAuthorizer authorizer = new RecordingAuthorizer();
+        authorizer.block = new CountDownLatch(1);
+        RecordingSink watcher = new RecordingSink();
+        RecordingSink other = new RecordingSink();
+        hub.register(user, Set.of(STAFF_TOPIC), Map.of(STAFF_TOPIC, authorizer), FAR, null, watcher);
+        hub.register(user, RUN_A, FAR, null, other);
+        await().atMost(WAIT).until(() -> authorizer.calls.get() >= 1);
+        int pingsBefore = pings(watcher);
+
+        await().atMost(WAIT).until(() -> pings(watcher) >= pingsBefore + 3 && pings(other) >= 3);
+
+        assertThat(authorizer.block.getCount()).isEqualTo(1);
+        assertThat(watcher.completed.get()).isFalse();
+        authorizer.block.countDown();
+    }
+
+    private static int pings(RecordingSink sink) {
+        return (int) sink.frames.stream().filter(frame -> "ping".equals(frame.comment())).count();
+    }
+
+    private static final class RecordingAuthorizer implements TopicAuthorizer {
+
+        final AtomicInteger calls = new AtomicInteger();
+        final List<UUID> askedAbout = new CopyOnWriteArrayList<>();
+        final List<String> askedTopics = new CopyOnWriteArrayList<>();
+        final List<String> threads = new CopyOnWriteArrayList<>();
+        volatile boolean allow = true;
+        volatile RuntimeException failWith;
+        volatile CountDownLatch block;
+
+        @Override
+        public boolean supports(String topic) {
+            return topic.startsWith("support:request:");
+        }
+
+        @Override
+        public boolean authorize(UUID userId, String topic) {
+            calls.incrementAndGet();
+            askedAbout.add(userId);
+            askedTopics.add(topic);
+            threads.add(Thread.currentThread().getName());
+            CountDownLatch latch = block;
+            if (latch != null) {
+                try {
+                    latch.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            if (failWith != null) {
+                throw failWith;
+            }
+            return allow;
+        }
+
+        @Override
+        public boolean revocable() {
+            return true;
+        }
     }
 
     private static final class RecordingSink implements StreamSink {

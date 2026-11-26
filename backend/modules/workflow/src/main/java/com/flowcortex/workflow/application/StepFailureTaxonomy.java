@@ -113,7 +113,7 @@ final class StepFailureTaxonomy {
         add(rows, Category.VALIDATION, Source.USER, "input_rejected", "probe_failed");
         add(rows, Category.VALIDATION, Source.SYSTEM, "duration_exceeded", "no_audio_stream", "speech_too_long",
                 "audio_alignment_out_of_range", "load_template_invalid_input", "load_template_missing_input",
-                "no_beats_detected");
+                "no_beats_detected", "drive_folder_missing", "drive_not_a_folder");
         add(rows, Category.HANDOFF, Source.SYSTEM, "input_unresolved", "iterate_source_not_list",
                 "iterate_item_field_missing");
         add(rows, Category.CONFIGURATION, Source.SYSTEM, "workflow_call_cycle", "workflow_call_too_deep",
@@ -134,7 +134,8 @@ final class StepFailureTaxonomy {
         add(rows, Category.QUOTA_EXCEEDED, Source.PROVIDER, "provider_quota_exceeded", "connector_rate_limited");
         add(rows, Category.UNAVAILABLE, Source.SYSTEM, "media_disabled", "dub_disabled", "provider_busy",
                 "workflow_call_unavailable", "connector_member_suspended", "connector_turned_off",
-                "connector_not_connected", "connector_usage_disabled", "connector_reconnect_needed");
+                "connector_not_connected", "connector_usage_disabled", "connector_reconnect_needed",
+                "drive_folder_no_access", "drive_reconnect_needed", "drive_scope_missing");
         add(rows, Category.PROCESSING, Source.SYSTEM, "audio_extraction_failed", "audio_alignment_failed",
                 "workflow_call_child_failed", "workflow_call_child_cancelled", "separation_failed",
                 "diarization_failed", "beat_detection_failed", "iterate_item_failed", "sibling_failed");

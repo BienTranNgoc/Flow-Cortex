@@ -212,6 +212,12 @@ class StepFailureTaxonomyTest {
     }
 
     @Test
+    void everyDriveReadCodeHasItsCategory() {
+        assertCategory("validation", "drive_folder_missing", "drive_not_a_folder");
+        assertCategory("unavailable", "drive_folder_no_access", "drive_reconnect_needed", "drive_scope_missing");
+    }
+
+    @Test
     void aClipCancelledBecauseItsSiblingFailedStaysRetryable() {
         RunStepFailure record = StepFailureTaxonomy.recordFor("sibling_failed");
 

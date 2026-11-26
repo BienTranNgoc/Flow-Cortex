@@ -8,7 +8,8 @@ import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
  * The routes a held member can still reach: the session, the phone flow itself, the password setup
- * that runs before it, the switches the app reads before it can draw the wall, help and error intake.
+ * that runs before it, the account deletion routes a held member may also need, the switches the app
+ * reads before it can draw the wall, help and error intake.
  */
 final class PhoneGateExemptions {
 
@@ -19,6 +20,8 @@ final class PhoneGateExemptions {
             "/api/v1/me/phone",
             "/api/v1/me/phone/**",
             "/api/v1/me/password",
+            "/api/v1/me/account-deletion",
+            "/api/v1/me/account-deletion/**",
             "/api/v1/features",
             "/api/v1/support/**",
             "/api/v1/client-errors")

@@ -94,6 +94,39 @@
   opacity: 0.6;
 }
 
+/* The shared dialog class sets position: relative, which a top-layer box computes to absolute:
+   the dialog then centres on the document origin and leaves the viewport once the page scrolls. */
+.settings-dialog[open] {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-dialog__body {
+  min-height: 0;
+  padding: 1.25rem 1.25rem 0.5rem;
+  overflow-y: auto;
+}
+
+.settings-dialog__body h2 {
+  margin: 0 0 0.5rem;
+}
+
+.settings-dialog__body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-dialog__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--admin-card-edge);
+}
+
 .settings-history {
   width: 100%;
 }
