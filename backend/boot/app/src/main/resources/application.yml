@@ -281,6 +281,8 @@ flowcortex:
   admin-audit:
     origin-retention: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:365d}
     retention-interval: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:1h}
+    # An audit export matching more rows than this is refused (422) instead of cut short.
+    export-max-rows: ${FLOWCORTEX_ADMIN_AUDIT_EXPORT_MAX_ROWS:10000}
   # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
   # gradually; over it answers 429 with Retry-After before the password is checked. Budgets are
   # shared by every backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
