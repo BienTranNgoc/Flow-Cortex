@@ -23,6 +23,9 @@ public class UserTotpRepository {
             rs.getInt("failed_attempts"),
             instant(rs.getTimestamp("locked_until")));
 
+    private static final String SELECT = "SELECT user_id, secret_encrypted, enabled_at, last_used_step, "
+            + "failed_attempts, locked_until FROM user_totp";
+
     private final JdbcTemplate jdbc;
 
     UserTotpRepository(JdbcTemplate jdbc) {
@@ -37,8 +40,15 @@ public class UserTotpRepository {
     }
 
     Optional<UserTotp> findByUserId(UUID userId) {
-        return jdbc.query("SELECT user_id, secret_encrypted, enabled_at, last_used_step, failed_attempts, "
-                + "locked_until FROM user_totp WHERE user_id = ?", ROW, userId).stream().findFirst();
+        return jdbc.query(SELECT + " WHERE user_id = ?", ROW, userId).stream().findFirst();
+    }
+
+    /**
+     * Reads the row and holds its lock until the surrounding transaction ends, so every check of a code
+     * against one account runs one after another and each sees the failures and the lock the one before wrote.
+     */
+    Optional<UserTotp> findForUpdate(UUID userId) {
+        return jdbc.query(SELECT + " WHERE user_id = ? FOR UPDATE", ROW, userId).stream().findFirst();
     }
 
     /** True when the account has TOTP on; a setup that is not confirmed yet does not count. */
@@ -65,11 +75,15 @@ public class UserTotpRepository {
                 + "WHERE user_id = ? AND enabled_at IS NULL", step, userId);
     }
 
-    /** Accepts {@code step} for an enabled account only if it is newer than the last accepted one; else 0. */
-    public int claimStep(UUID userId, long step) {
+    /**
+     * Accepts {@code step} for an enabled account only if it is newer than the last accepted one and the
+     * account is not locked at {@code now}; else 0.
+     */
+    public int claimStep(UUID userId, long step, Instant now) {
         return jdbc.update("UPDATE user_totp SET last_used_step = ?, updated_at = now() WHERE user_id = ? "
-                + "AND enabled_at IS NOT NULL AND (last_used_step IS NULL OR last_used_step < ?)",
-                step, userId, step);
+                + "AND enabled_at IS NOT NULL AND (last_used_step IS NULL OR last_used_step < ?) "
+                + "AND (locked_until IS NULL OR locked_until <= ?)",
+                step, userId, step, Timestamp.from(now));
     }
 
     /**

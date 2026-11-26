@@ -75,7 +75,7 @@ export type GrantFailure =
 /** What a refused grant means for the page, from its status and problem code. */
 export function grantFailure(status: number, code: string | undefined): GrantFailure {
   if (status === 403 && code === 'STEP_UP_REQUIRED') return 'stepUp';
-  if (status === 403 && code === 'PAT_NOT_ELIGIBLE') return 'notEligible';
+  if (status === 403 && (code === 'PAT_NOT_ELIGIBLE' || code === 'PAT_MFA_REQUIRED')) return 'notEligible';
   if (status === 409 && code === 'PAT_LIMIT_REACHED') return 'limitReached';
   if (status === 400) return 'invalidLink';
   if (status === 503) return 'unavailable';

@@ -38,8 +38,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The second factor of an account: enrolment, recovery codes, and the one check every code goes through.
  * A check runs in a fixed order, account lock, code shape, secret decrypt, match, claim, so a locked
  * account examines nothing and counts nothing, and an unreadable secret answers 503 without counting.
- * Every write that decides an outcome is one conditional statement of the repositories; a wrong code
- * is counted outside the transaction that its refusal rolls back.
+ * Every check of a code against an enabled account runs under that account's row lock in a transaction
+ * of its own, so concurrent guesses are examined one at a time and the one after a lock sees it. A wrong
+ * code is counted in that transaction, which commits before the refusal is thrown.
  */
 @Service
 public class TotpService {
@@ -138,7 +139,8 @@ public class TotpService {
             throw refused("enable", "already_enabled", userId, new AlreadyEnabled());
         }
         requireNotLocked(row, "enable");
-        long step = matchedStep(userId, row, code, "enable", ip, agent);
+        long step = stepOf(userId, row, code, "enable")
+                .orElseThrow(() -> wrongCode(userId, "enable", ip, agent));
         boolean rememberMe = presentedRefreshToken != null && sessions.rememberMeOf(userId, presentedRefreshToken);
         Instant now = now();
 
@@ -163,11 +165,11 @@ public class TotpService {
      */
     public void disable(UUID userId, String code, String ip, String agent) {
         AppUser user = requireUser(userId);
-        UserTotp row = requireEnabled(userId, "disable");
+        requireEnabled(userId, "disable");
         if (isRequired(user.getRole().code())) {
             throw refused("disable", "required_for_role", userId, new RequiredForRole());
         }
-        verify(userId, row, code, true, "disable", ip, agent);
+        verify(userId, code, true, "disable", ip, agent);
         deleteFor(userId);
         audit.write(AuthEventType.TOTP_DISABLED, userId, ip, agent, AuthEventType.userMetadata(userId));
         LOG.info("auth.totp op=disable outcome=disabled user={}", userId);
@@ -176,8 +178,8 @@ public class TotpService {
     /** Replaces every recovery code with ten new ones; only a TOTP code authorizes it, not a recovery code. */
     public List<String> regenerate(UUID userId, String code, String ip, String agent) {
         requireUser(userId);
-        UserTotp row = requireEnabled(userId, "regenerate");
-        verify(userId, row, code, false, "regenerate", ip, agent);
+        requireEnabled(userId, "regenerate");
+        verify(userId, code, false, "regenerate", ip, agent);
         List<String> codes = RecoveryCodes.generate(random);
         recoveryCodes.replaceAll(userId, hashed(codes));
         audit.write(AuthEventType.TOTP_RECOVERY_CODES_REGENERATED, userId, ip, agent,
@@ -191,9 +193,7 @@ public class TotpService {
      * @throws ChallengeInvalid when the account no longer has TOTP on
      */
     public Method verifyForSignIn(UUID userId, String code, String ip, String agent) {
-        UserTotp row = totps.findByUserId(userId).filter(UserTotp::isEnabled)
-                .orElseThrow(() -> refused("sign_in", "not_enabled", userId, new ChallengeInvalid()));
-        return verify(userId, row, code, true, "sign_in", ip, agent);
+        return verify(userId, code, true, "sign_in", ip, agent);
     }
 
     /**
@@ -209,36 +209,71 @@ public class TotpService {
         }));
     }
 
-    private Method verify(UUID userId, UserTotp row, String code, boolean allowRecovery, String op, String ip,
-            String agent) {
-        requireNotLocked(row, op);
-        if (TotpCodes.looksLikeCode(code)) {
-            long step = matchedStep(userId, row, code, op, ip, agent);
-            if (totps.claimStep(userId, step) == 0) {
-                throw wrongCode(userId, op, ip, agent);
-            }
-            totps.resetFailures(userId);
-            return Method.TOTP;
+    /** What one examination under the account's row lock decided, committed before the refusal is thrown. */
+    private sealed interface Verdict {
+
+        record Passed(Method method) implements Verdict {
         }
-        if (allowRecovery && RecoveryCodes.looksLikeRecoveryCode(code)) {
-            String normalized = RecoveryCodes.normalize(code);
-            for (String keyId : cipher.keyIds()) {
-                if (recoveryCodes.consume(userId, keyId, cipher.recoveryHash(keyId, normalized))) {
-                    totps.resetFailures(userId);
+
+        /** A wrong code was counted; the failure count and any lock it caused are already committed. */
+        record Counted(FailureCount failure) implements Verdict {
+        }
+    }
+
+    private Method verify(UUID userId, String code, boolean allowRecovery, String op, String ip, String agent) {
+        Verdict verdict = transaction.execute(status -> examine(userId, code, allowRecovery, op));
+        return switch (verdict) {
+            case Verdict.Passed passed -> {
+                if (passed.method() == Method.RECOVERY_CODE) {
                     audit.write(AuthEventType.TOTP_RECOVERY_CODE_USED, userId, ip, agent,
                             AuthEventType.metadata("userId", userId.toString(), "op", op));
                     LOG.info("auth.totp op={} outcome=recovery_code_used user={}", op, userId);
-                    return Method.RECOVERY_CODE;
+                }
+                yield passed.method();
+            }
+            case Verdict.Counted counted -> throw countedRefusal(counted.failure(), op, userId, ip, agent);
+        };
+    }
+
+    /**
+     * Holds the account's row lock from the lock check to the write that decides the outcome, so a request
+     * that starts after a lock was set sees it and a code is spent by one request at a time. A refusal that
+     * writes nothing (locked, not enabled, unreadable secret) throws and rolls back; a wrong code commits its
+     * count and is thrown by the caller.
+     */
+    private Verdict examine(UUID userId, String code, boolean allowRecovery, String op) {
+        UserTotp row = totps.findForUpdate(userId).filter(UserTotp::isEnabled)
+                .orElseThrow(() -> notEnabled(op, userId));
+        requireNotLocked(row, op);
+        Instant now = now();
+        if (TotpCodes.looksLikeCode(code)) {
+            OptionalLong step = stepOf(userId, row, code, op);
+            if (step.isPresent() && totps.claimStep(userId, step.getAsLong(), now) == 1) {
+                totps.resetFailures(userId);
+                return new Verdict.Passed(Method.TOTP);
+            }
+        } else if (allowRecovery && RecoveryCodes.looksLikeRecoveryCode(code)) {
+            String normalized = RecoveryCodes.normalize(code);
+            for (String keyId : cipher.keyIds()) {
+                if (recoveryCodes.consume(userId, keyId, cipher.recoveryHash(keyId, normalized), now)) {
+                    totps.resetFailures(userId);
+                    return new Verdict.Passed(Method.RECOVERY_CODE);
                 }
             }
         }
-        throw wrongCode(userId, op, ip, agent);
+        return new Verdict.Counted(totps.recordFailure(userId, properties.maxFailedAttempts(),
+                now.plus(properties.lockout()), now).orElseThrow(
+                        () -> new IllegalStateException("user_totp row of " + userId + " locked under its own lock")));
     }
 
-    /** Decrypts the secret and matches the code against it; a code that is not six digits is simply wrong. */
-    private long matchedStep(UUID userId, UserTotp row, String code, String op, String ip, String agent) {
+    /**
+     * Decrypts the secret and matches the code against it; empty for a wrong code, including one that is not
+     * six digits.
+     * @throws Unavailable when the stored secret cannot be decrypted
+     */
+    private OptionalLong stepOf(UUID userId, UserTotp row, String code, String op) {
         if (!TotpCodes.looksLikeCode(code)) {
-            throw wrongCode(userId, op, ip, agent);
+            return OptionalLong.empty();
         }
         String secret;
         try {
@@ -247,14 +282,13 @@ public class TotpService {
             LOG.warn("auth.totp op={} outcome=secret_unreadable user={}", op, userId);
             throw new Unavailable();
         }
-        OptionalLong step = TotpCodes.match(secret, code, now());
-        if (step.isEmpty()) {
-            throw wrongCode(userId, op, ip, agent);
-        }
-        return step.getAsLong();
+        return TotpCodes.match(secret, code, now());
     }
 
-    /** Counts one wrong code and returns the refusal: a lock when this was the one that locked the account. */
+    /**
+     * Counts one wrong code outside any transaction of this class and returns the refusal: a lock when this
+     * was the one that locked the account.
+     */
     private RuntimeException wrongCode(UUID userId, String op, String ip, String agent) {
         Instant now = now();
         FailureCount failure = totps.recordFailure(userId, properties.maxFailedAttempts(),
@@ -265,6 +299,10 @@ public class TotpService {
             LOG.info("auth.totp op={} outcome={} user={}", op, lockedUntil == null ? "wrong_code" : "locked", userId);
             return lockedUntil == null ? new InvalidCode() : new Locked(lockedUntil);
         }
+        return countedRefusal(failure, op, userId, ip, agent);
+    }
+
+    private RuntimeException countedRefusal(FailureCount failure, String op, UUID userId, String ip, String agent) {
         if ("sign_in".equals(op)) {
             audit.write(AuthEventType.LOGIN_FAILED_TOTP, userId, ip, agent, AuthEventType.userMetadata(userId));
         }
@@ -285,8 +323,13 @@ public class TotpService {
     }
 
     private UserTotp requireEnabled(UUID userId, String op) {
-        return totps.findByUserId(userId).filter(UserTotp::isEnabled)
-                .orElseThrow(() -> refused(op, "not_enabled", userId, new NotEnabled()));
+        return totps.findByUserId(userId).filter(UserTotp::isEnabled).orElseThrow(() -> notEnabled(op, userId));
+    }
+
+    /** A sign-in whose account lost TOTP has a dead challenge; any other operation is simply not enabled. */
+    private static RuntimeException notEnabled(String op, UUID userId) {
+        RuntimeException problem = "sign_in".equals(op) ? new ChallengeInvalid() : new NotEnabled();
+        return refused(op, "not_enabled", userId, problem);
     }
 
     private AppUser requireUser(UUID userId) {

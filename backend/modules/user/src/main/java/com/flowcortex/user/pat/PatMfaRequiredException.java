@@ -5,9 +5,9 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import org.springframework.http.HttpStatus;
 
 /** 403 with code {@code PAT_MFA_REQUIRED}: a token is minted only from a session that passed a second factor. */
-class PatMfaRequiredException extends LocalizedStatusException {
+public class PatMfaRequiredException extends LocalizedStatusException {
 
-    PatMfaRequiredException() {
+    public PatMfaRequiredException() {
         super(HttpStatus.FORBIDDEN, new LocalizedMessage("pat.mfaRequired"));
         getBody().setProperty("code", "PAT_MFA_REQUIRED");
     }

@@ -9,6 +9,8 @@ import static org.mockito.Mockito.doReturn;
 import com.flowcortex.user.application.GoogleIdTokenClaims;
 import com.flowcortex.user.application.GoogleOAuthClient;
 import com.flowcortex.user.application.OpaqueTokens;
+import com.flowcortex.user.totp.ChallengeOrigin;
+import com.flowcortex.user.totp.LoginChallengeRepository;
 import com.flowcortex.user.totp.TotpCodes;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -17,6 +19,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +36,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Signing in with a code over real HTTP and the real database: the challenge cookie, the code step for every
@@ -48,6 +53,12 @@ class TotpSignInIT extends AbstractTotpIT {
 
     @Autowired
     private GoogleOAuthClient google;
+
+    @Autowired
+    private LoginChallengeRepository challenges;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private void failTimes(Reply login, String wrong, int times) {
         for (int i = 0; i < times; i++) {
@@ -219,6 +230,83 @@ class TotpSignInIT extends AbstractTotpIT {
             go.await();
             return complete(login, code);
         };
+    }
+
+    /**
+     * Twenty wrong codes and the right code of three steps, each on a challenge of its own, are all in flight
+     * (blocked on the account's row) when the lock is written: none of them may open a session.
+     */
+    @Test
+    void aLockWrittenWhileGuessesAreInFlightStopsEveryOne() throws Exception {
+        Enrolment enrolment = enroll(member());
+        UUID id = enrolment.account().id();
+        long step = TotpCodes.stepOf(clock.instant());
+        List<String> codes = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            codes.add(wrongCode(enrolment.secret()));
+        }
+        for (long s = step - 1; s <= step + 1; s++) {
+            codes.add(TotpCodes.codeAt(enrolment.secret(), s));
+        }
+        List<String> challengeCookies = new ArrayList<>();
+        for (int i = 0; i < codes.size(); i++) {
+            String raw = OpaqueTokens.generateRawToken();
+            challenges.insert(id, OpaqueTokens.hash(raw), false, ChallengeOrigin.LINK, clock.instant().plusSeconds(300));
+            challengeCookies.add(raw);
+        }
+        Object stepBefore = totpRow(id).get("last_used_step");
+        ExecutorService pool = Executors.newFixedThreadPool(codes.size());
+        try {
+            List<Future<Reply>> replies = new ArrayList<>();
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                jdbc.queryForObject("SELECT user_id FROM user_totp WHERE user_id = ? FOR UPDATE", UUID.class, id);
+                for (int i = 0; i < codes.size(); i++) {
+                    Map<String, String> body = Map.of("code", codes.get(i));
+                    Map<String, String> cookies = Map.of(CHALLENGE_COOKIE, challengeCookies.get(i));
+                    replies.add(pool.submit(() -> call(HttpMethod.POST, COMPLETE, null, body, cookies, false)));
+                }
+                awaitBlockedOnTheAccount(codes.size(), replies);
+                jdbc.update("UPDATE user_totp SET locked_until = ?, failed_attempts = 0 WHERE user_id = ?",
+                        Timestamp.from(clock.instant().plus(15, ChronoUnit.MINUTES)), id);
+            });
+
+            for (Future<Reply> reply : replies) {
+                Reply done = reply.get(60, TimeUnit.SECONDS);
+                assertThat(done.status()).as("%s", done.body()).isEqualTo(423);
+                assertThat(done.setCookie(REFRESH_COOKIE)).isNull();
+            }
+            assertThat(totpRow(id).get("last_used_step")).isEqualTo(stepBefore);
+            assertThat(totpRow(id)).containsEntry("failed_attempts", 0);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private void awaitBlockedOnTheAccount(int expected, List<Future<Reply>> replies) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (System.nanoTime() < deadline) {
+            // The activity view is cached for the whole transaction this poll runs in.
+            jdbc.execute("SELECT pg_stat_clear_snapshot()");
+            Integer blocked = jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = "
+                    + "'Lock' AND cardinality(pg_blocking_pids(pid)) > 0", Integer.class);
+            if (blocked != null && blocked >= expected) {
+                return;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(ex);
+            }
+        }
+        throw new AssertionError("fewer than " + expected + " requests reached the account's row: "
+                + replies.stream().filter(Future::isDone).map(reply -> {
+                    try {
+                        return reply.get().status() + " " + reply.get().body();
+                    } catch (Exception ex) {
+                        return ex.toString();
+                    }
+                }).toList());
     }
 
     @Test

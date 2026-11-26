@@ -57,10 +57,10 @@ class TotpSchemaIT extends AbstractPostgresBootTest {
     void aStepIsClaimedOnce() {
         UUID user = enrolled();
 
-        assertThat(totp.claimStep(user, 100)).isEqualTo(1);
-        assertThat(totp.claimStep(user, 100)).isZero();
-        assertThat(totp.claimStep(user, 99)).isZero();
-        assertThat(totp.claimStep(user, 101)).isEqualTo(1);
+        assertThat(totp.claimStep(user, 100, NOW)).isEqualTo(1);
+        assertThat(totp.claimStep(user, 100, NOW)).isZero();
+        assertThat(totp.claimStep(user, 99, NOW)).isZero();
+        assertThat(totp.claimStep(user, 101, NOW)).isEqualTo(1);
     }
 
     @Test
@@ -68,7 +68,20 @@ class TotpSchemaIT extends AbstractPostgresBootTest {
         UUID user = user();
         totp.savePending(user, "k1.iv.tag.ct");
 
-        assertThat(totp.claimStep(user, 100)).isZero();
+        assertThat(totp.claimStep(user, 100, NOW)).isZero();
+    }
+
+    @Test
+    void aStepIsNotClaimedWhileTheAccountIsLocked() {
+        UUID user = enrolled();
+        Instant lockedUntil = NOW.plus(Duration.ofMinutes(15));
+        for (int i = 0; i < MAX_FAILED; i++) {
+            totp.recordFailure(user, MAX_FAILED, lockedUntil, NOW);
+        }
+
+        assertThat(totp.claimStep(user, 100, NOW)).isZero();
+        assertThat(totp.claimStep(user, 100, lockedUntil.minusSeconds(1))).isZero();
+        assertThat(totp.claimStep(user, 100, lockedUntil)).isEqualTo(1);
     }
 
     @Test
@@ -155,10 +168,24 @@ class TotpSchemaIT extends AbstractPostgresBootTest {
         recoveryCodes.replaceAll(user, List.of(new KeyedHash("k1", hash('a')), new KeyedHash("k1", hash('b'))));
 
         assertThat(recoveryCodes.countFor(user)).isEqualTo(2);
-        assertThat(recoveryCodes.consume(user, "k1", hash('a'))).isTrue();
-        assertThat(recoveryCodes.consume(user, "k1", hash('a'))).isFalse();
-        assertThat(recoveryCodes.consume(user, "k2", hash('b'))).isFalse();
+        assertThat(recoveryCodes.consume(user, "k1", hash('a'), NOW)).isTrue();
+        assertThat(recoveryCodes.consume(user, "k1", hash('a'), NOW)).isFalse();
+        assertThat(recoveryCodes.consume(user, "k2", hash('b'), NOW)).isFalse();
         assertThat(recoveryCodes.countFor(user)).isEqualTo(1);
+    }
+
+    @Test
+    void aRecoveryCodeIsNotSpentWhileTheAccountIsLocked() {
+        UUID user = enrolled();
+        recoveryCodes.replaceAll(user, List.of(new KeyedHash("k1", hash('a'))));
+        Instant lockedUntil = NOW.plus(Duration.ofMinutes(15));
+        for (int i = 0; i < MAX_FAILED; i++) {
+            totp.recordFailure(user, MAX_FAILED, lockedUntil, NOW);
+        }
+
+        assertThat(recoveryCodes.consume(user, "k1", hash('a'), NOW)).isFalse();
+        assertThat(recoveryCodes.countFor(user)).isEqualTo(1);
+        assertThat(recoveryCodes.consume(user, "k1", hash('a'), lockedUntil)).isTrue();
     }
 
     @Test
@@ -167,7 +194,7 @@ class TotpSchemaIT extends AbstractPostgresBootTest {
         UUID other = user();
         recoveryCodes.replaceAll(owner, List.of(new KeyedHash("k1", hash('a'))));
 
-        assertThat(recoveryCodes.consume(other, "k1", hash('a'))).isFalse();
+        assertThat(recoveryCodes.consume(other, "k1", hash('a'), NOW)).isFalse();
         assertThat(recoveryCodes.countFor(owner)).isEqualTo(1);
     }
 
@@ -178,7 +205,7 @@ class TotpSchemaIT extends AbstractPostgresBootTest {
 
         recoveryCodes.replaceAll(user, List.of(new KeyedHash("k1", hash('b')), new KeyedHash("k1", hash('c'))));
 
-        assertThat(recoveryCodes.consume(user, "k1", hash('a'))).isFalse();
+        assertThat(recoveryCodes.consume(user, "k1", hash('a'), NOW)).isFalse();
         assertThat(recoveryCodes.countFor(user)).isEqualTo(2);
         assertThat(recoveryCodes.deleteAll(user)).isEqualTo(2);
         assertThat(recoveryCodes.countFor(user)).isZero();

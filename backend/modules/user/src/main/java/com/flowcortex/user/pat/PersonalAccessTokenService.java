@@ -83,7 +83,7 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
 
     /**
      * Same lock, eligibility and cap path as {@link #create}, without a proof: the grant has checked the
-     * session. Both refusals come before any write and must not mark a caller's transaction
+     * session and its second factor. Both refusals come before any write and must not mark a caller's transaction
      * rollback-only: the code exchange catches them and still commits its redemption. The row is
      * flushed because the caller links it from a table of its own in the same transaction.
      */
@@ -134,14 +134,20 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
         return tokens.countLive(userId, clock.instant()) >= properties.maxLivePerUser();
     }
 
+    @Override
+    public boolean mfaSatisfied(boolean sessionMfa) {
+        return sessionMfa || !totpRequirement.adminRequired();
+    }
+
     /**
-     * The owner's row is locked first so two mints cannot both pass the cap. The OAuth grant passes
-     * {@code sessionMfa = true}: it does not carry the session's second-factor mark yet.
+     * The owner's row is locked first so two mints cannot both pass the cap. The code exchange passes
+     * {@code sessionMfa = true}: the code it redeems was granted only to a session that satisfied
+     * {@link #mfaSatisfied}.
      */
     private void lockEligibleBelowCap(UUID userId, Instant now, boolean sessionMfa) {
         AppUser owner = users.findByIdForUpdate(userId).orElseThrow(PatNotEligibleException::new);
         requireEligible(owner, now);
-        if (totpRequirement.adminRequired() && !sessionMfa) {
+        if (!mfaSatisfied(sessionMfa)) {
             throw new PatMfaRequiredException();
         }
         if (tokens.countLive(userId, now) >= properties.maxLivePerUser()) {

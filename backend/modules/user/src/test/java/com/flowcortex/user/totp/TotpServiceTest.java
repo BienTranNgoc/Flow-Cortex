@@ -71,10 +71,10 @@ class TotpServiceTest {
             Duration.ofMinutes(15), Duration.ofMinutes(5), 5, "Nodi", "");
     private final TotpSecretCipher cipher = new TotpSecretCipher(properties);
     private final AppUser member = user(Role.MEMBER);
+    private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
 
     private final TotpService service = new TotpService(totps, recovery, challenges, cipher, properties,
-            adminRequired::get, roles, users, sessions, audit, Clock.fixed(NOW, ZoneOffset.UTC),
-            mock(PlatformTransactionManager.class));
+            adminRequired::get, roles, users, sessions, audit, Clock.fixed(NOW, ZoneOffset.UTC), transactions);
 
     private static String key() {
         byte[] bytes = new byte[32];
@@ -137,6 +137,40 @@ class TotpServiceTest {
 
         assertThat(totps.rows.get(USER).lastUsedStep()).isEqualTo(STEP - 5);
         assertThat(totps.rows.get(USER).failedAttempts()).isZero();
+    }
+
+    @Test
+    void aLockSetWhileTheRequestWasInFlightIsSeenUnderTheRowLock() {
+        Enrolment e = enrolled();
+        totps.lockWhenRowIsLocked = NOW.plusSeconds(600);
+        String typed = e.recoveryCodes().get(0);
+
+        assertThatThrownBy(() -> service.verifyForSignIn(USER, TotpCodes.codeAt(e.secret(), STEP), IP, AGENT))
+                .isInstanceOfSatisfying(Locked.class,
+                        locked -> assertThat(locked.lockedUntil()).isEqualTo(NOW.plusSeconds(600)));
+        assertThatThrownBy(() -> service.verifyForSignIn(USER, typed, IP, AGENT)).isInstanceOf(Locked.class);
+        assertThatThrownBy(() -> service.disable(USER, TotpCodes.codeAt(e.secret(), STEP), IP, AGENT))
+                .isInstanceOf(Locked.class);
+
+        assertThat(totps.rows.get(USER).lastUsedStep()).isEqualTo(STEP - 5);
+        assertThat(totps.rows.get(USER).failedAttempts()).isZero();
+        assertThat(recovery.countFor(USER)).isEqualTo(10);
+        assertThat(totps.rows).containsKey(USER);
+    }
+
+    @Test
+    void aWrongCodeCommitsItsCountAndARefusalThatWroteNothingRollsBack() {
+        Enrolment e = enrolled();
+
+        assertThatThrownBy(() -> service.verifyForSignIn(USER, wrongCode(e.secret()), IP, AGENT))
+                .isInstanceOf(InvalidCode.class);
+
+        verify(transactions).commit(any());
+        verify(transactions, never()).rollback(any());
+        withFailures(0, NOW.plusSeconds(600));
+        assertThatThrownBy(() -> service.verifyForSignIn(USER, TotpCodes.codeAt(e.secret(), STEP), IP, AGENT))
+                .isInstanceOf(Locked.class);
+        verify(transactions).rollback(any());
     }
 
     @Test
@@ -365,7 +399,8 @@ class TotpServiceTest {
     @Test
     void statusReportsWhatTheAccountHas() {
         Enrolment e = enrolled();
-        recovery.consume(USER, "k1", cipher.recoveryHash("k1", RecoveryCodes.normalize(e.recoveryCodes().get(0))));
+        recovery.consume(USER, "k1", cipher.recoveryHash("k1", RecoveryCodes.normalize(e.recoveryCodes().get(0))),
+                NOW);
 
         TotpService.Status status = service.status(USER);
 
@@ -386,6 +421,8 @@ class TotpServiceTest {
 
         final Map<UUID, UserTotp> rows = new HashMap<>();
         boolean enableBehindTheBack;
+        /** A lock a concurrent request writes after the caller's first read and before it takes the row lock. */
+        Instant lockWhenRowIsLocked;
 
         FakeTotps() {
             super(null);
@@ -394,6 +431,16 @@ class TotpServiceTest {
         @Override
         Optional<UserTotp> findByUserId(UUID userId) {
             return Optional.ofNullable(rows.get(userId));
+        }
+
+        @Override
+        Optional<UserTotp> findForUpdate(UUID userId) {
+            UserTotp row = rows.get(userId);
+            if (row != null && lockWhenRowIsLocked != null) {
+                rows.put(userId, new UserTotp(userId, row.secretEncrypted(), row.enabledAt(), row.lastUsedStep(),
+                        row.failedAttempts(), lockWhenRowIsLocked));
+            }
+            return findByUserId(userId);
         }
 
         @Override
@@ -424,9 +471,10 @@ class TotpServiceTest {
         }
 
         @Override
-        public int claimStep(UUID userId, long step) {
+        public int claimStep(UUID userId, long step, Instant now) {
             UserTotp row = rows.get(userId);
-            if (row == null || !row.isEnabled() || (row.lastUsedStep() != null && row.lastUsedStep() >= step)) {
+            if (row == null || !row.isEnabled() || row.isLockedAt(now)
+                    || (row.lastUsedStep() != null && row.lastUsedStep() >= step)) {
                 return 0;
             }
             rows.put(userId, new UserTotp(userId, row.secretEncrypted(), row.enabledAt(), step, row.failedAttempts(),
@@ -476,7 +524,7 @@ class TotpServiceTest {
         }
 
         @Override
-        public boolean consume(UUID userId, String keyId, String hash) {
+        public boolean consume(UUID userId, String keyId, String hash, Instant now) {
             return codes.getOrDefault(userId, Set.of()).remove(new KeyedHash(keyId, hash));
         }
 

@@ -1,5 +1,7 @@
 package com.flowcortex.user.totp;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,10 +35,14 @@ public class RecoveryCodeRepository {
                 });
     }
 
-    /** True for exactly one of any number of simultaneous attempts with the same code. */
-    public boolean consume(UUID userId, String keyId, String hash) {
-        return jdbc.update("DELETE FROM user_recovery_code WHERE user_id = ? AND key_id = ? AND code_hash = ?",
-                userId, keyId, hash) == 1;
+    /**
+     * True for exactly one of any number of simultaneous attempts with the same code, and never while the
+     * account's second factor is locked at {@code now}.
+     */
+    public boolean consume(UUID userId, String keyId, String hash, Instant now) {
+        return jdbc.update("DELETE FROM user_recovery_code WHERE user_id = ? AND key_id = ? AND code_hash = ? "
+                + "AND NOT EXISTS (SELECT 1 FROM user_totp WHERE user_id = ? AND locked_until > ?)",
+                userId, keyId, hash, userId, Timestamp.from(now)) == 1;
     }
 
     public int countFor(UUID userId) {

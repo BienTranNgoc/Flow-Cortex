@@ -1157,7 +1157,8 @@ whichever change merges first takes it.
     including the programmatic check behind `/users/{id}` writes and support
     ticket closing, which reads the claim from the security context. Creating a
     personal access token needs a marked session too (`PAT_MFA_REQUIRED`, the
-    proof not spent). An un-enrolled console account still gets a session,
+    proof not spent), and so does granting an MCP authorization, whose consent
+    check reports the account as not eligible without it. An un-enrolled console account still gets a session,
     because enrollment needs an authenticated caller; every governed route
     refuses it and the console shows only the setup screen. Chat and member
     routes are not governed and stay open to it.
@@ -1173,7 +1174,12 @@ whichever change merges first takes it.
     `last_used_step` forward, so a replay or a second request with the same code
     loses. Ten consecutive wrong codes lock the account for 15 minutes, counted
     and locked by one `UPDATE`; a right code while locked is refused without
-    claiming its step. Ten recovery codes (50 bits each, shown once) are stored
+    claiming its step. Every check runs under the account's `user_totp` row lock
+    (`SELECT … FOR UPDATE`) in a transaction that commits a wrong code's count
+    before the refusal is thrown, so concurrent guesses are examined one at a
+    time and a request that starts after the lock sees it; the claim and the
+    recovery-code delete also refuse a locked account in their own statement.
+    Ten recovery codes (50 bits each, shown once) are stored
     as keyed HMACs and spent by deleting the row; regenerating them needs a TOTP
     code, never a recovery code. Disabling needs a code, not a password, so a
     Google-only account can turn it off, and is refused for a console account

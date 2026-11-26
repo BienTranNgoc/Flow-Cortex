@@ -3642,7 +3642,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
         "403":
-          description: "PAT_NOT_ELIGIBLE, STEP_UP_REQUIRED or PAT_NOT_ALLOWED"
+          description: "PAT_NOT_ELIGIBLE, PAT_MFA_REQUIRED, STEP_UP_REQUIRED or PAT_NOT_ALLOWED"
           content:
             application/problem+json:
               schema:

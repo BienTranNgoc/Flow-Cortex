@@ -188,6 +188,13 @@ class PersonalAccessTokenServiceTest {
     }
 
     @Test
+    void aSessionSatisfiesTheSecondFactorWhenMarkedOrWhenTheRequirementIsOff() {
+        assertThat(service(true, true).mfaSatisfied(true)).isTrue();
+        assertThat(service(true, true).mfaSatisfied(false)).isFalse();
+        assertThat(service(true, false).mfaSatisfied(false)).isTrue();
+    }
+
+    @Test
     void anIneligibleCallerWithoutMfaIsToldItIsNotEligibleFirst() {
         ownerIs(owner(Role.MEMBER, UserStatus.ACTIVE));
 
