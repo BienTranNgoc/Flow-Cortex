@@ -32,6 +32,7 @@ class AdminDeletionBlockConditionsIT extends AbstractUserModuleIT {
     private static final String RUN = "workflow.active_run";
     private static final String REQUEST = "support.open_request";
     private static final String BATCH = "workflow.open_batch";
+    private static final String SCHEDULE = "workflow.active_schedule";
     private static final URI PROBLEMS = URI.create("https://flow-cortex.dev/problems/");
 
     record Condition(String key, boolean enabled, int sortOrder, String messageVi, String messageEn,
@@ -96,13 +97,18 @@ class AdminDeletionBlockConditionsIT extends AbstractUserModuleIT {
         ResponseEntity<Condition[]> response = get(BASE, operatorToken, Condition[].class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).extracting(Condition::key).containsExactly(RUN, REQUEST, BATCH);
+        assertThat(response.getBody()).extracting(Condition::key).containsExactly(RUN, REQUEST, BATCH, SCHEDULE);
         Condition run = response.getBody()[0];
         assertThat(run.enabled()).isTrue();
         assertThat(run.sortOrder()).isZero();
         assertThat(run.messageEn()).startsWith("A workflow run is still in progress");
         assertThat(run.messageVi()).startsWith("Bạn có workflow đang chạy");
         assertThat(run.updatedBy()).isNull();
+        Condition schedule = response.getBody()[3];
+        assertThat(schedule.enabled()).isTrue();
+        assertThat(schedule.sortOrder()).isEqualTo(3);
+        assertThat(schedule.messageEn()).startsWith("A workflow schedule is still active");
+        assertThat(schedule.messageVi()).startsWith("Bạn có lịch chạy workflow đang bật");
     }
 
     @Test
@@ -111,7 +117,7 @@ class AdminDeletionBlockConditionsIT extends AbstractUserModuleIT {
 
         ResponseEntity<Condition[]> response = get(BASE, operatorToken, Condition[].class);
 
-        assertThat(response.getBody()).extracting(Condition::key).containsExactly(RUN, REQUEST, BATCH);
+        assertThat(response.getBody()).extracting(Condition::key).containsExactly(RUN, REQUEST, BATCH, SCHEDULE);
         assertThat(response.getBody()[1].enabled()).isTrue();
     }
 
@@ -150,7 +156,7 @@ class AdminDeletionBlockConditionsIT extends AbstractUserModuleIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().sortOrder()).isEqualTo(5);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM deletion_block_condition", Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM deletion_block_condition", Integer.class)).isEqualTo(4);
     }
 
     @Test

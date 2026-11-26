@@ -535,6 +535,9 @@ flowcortex:
     # Member-initiated run cancellation: off answers 503 and the app hides the stop button.
     cancel:
       enabled: ${FLOWCORTEX_WORKFLOW_CANCEL_ENABLED:false}
+    # Workflow schedules: off answers 503 on every schedule route, as no timer fires a schedule yet.
+    schedules:
+      enabled: ${FLOWCORTEX_WORKFLOW_SCHEDULES_ENABLED:false}
     # A picked-up step must report within this window (a heartbeat every 30 s)
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
