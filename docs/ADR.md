@@ -349,6 +349,16 @@ Format per entry: **Context → Decision → Consequences**.
   that path to `frontend:8080` without `encode`, whose default matcher includes
   `text/*`, while every other path keeps compression. No polling fallback is
   kept: two live paths for one thing is the debt this decision removes.
+- **Amendment (2026-11-15, support-realtime-gateway) — revocation and the admin
+  app:** a `TopicAuthorizer` may declare its topics revocable. The hub asks it
+  again about each of them every `flowcortex.realtime.recheck-interval` (60 s)
+  on its own `realtime-recheck` thread, never on the heartbeat and write threads,
+  and completes a stream it refuses without an error event, which frees the
+  user's slot; the client's reconnect then gets 404. An authorizer that throws
+  keeps the stream until the next recheck, so a database blip does not drop every
+  stream at once, and the token expiry still bounds the stream. Run, chat and
+  `user` topics are not revocable and are never rechecked. The admin app's nginx
+  and its Caddy site carry the stream the same way the member app's do.
 - **Consequences:**
   - Supersedes the ADR-0007 consequence that left run events to a later Kafka
     stream, and that Decision's naming of Kafka for it.
