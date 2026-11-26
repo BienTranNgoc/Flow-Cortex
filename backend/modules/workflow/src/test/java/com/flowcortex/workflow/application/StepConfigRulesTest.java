@@ -81,8 +81,27 @@ class StepConfigRulesTest {
                 .isEqualTo("only a remote step reads outputInputs; 'connector.call' runs inline");
     }
 
+    @Test
+    void driveReadConfigIsChecked() {
+        assertThat(StepConfigRules.fault("drive.read", "{\"folderFromInput\":true}")).isNull();
+        assertThat(StepConfigRules.fault("drive.read", "{}")).isEqualTo(DriveReadConfig.fault("{}")).isNotNull();
+        assertThat(StepConfigRules.fault("drive.read", null)).isNotNull();
+    }
+
+    @Test
+    void badDriveReadConfigIsOneViolationAtItsStep() {
+        Set<ConstraintViolation<KnownStepTypes.Definition>> violations = validator.validate(definition(
+                new NewWorkflowStep("a", "echo", null), new NewWorkflowStep("b", "drive.read", null, "{}")));
+
+        assertThat(violations).hasSize(1);
+        ConstraintViolation<KnownStepTypes.Definition> violation = violations.iterator().next();
+        assertThat(violation.getPropertyPath().toString()).isEqualTo("steps[1].config");
+        assertThat(violation.getMessage()).isEqualTo(DriveReadConfig.fault("{}"));
+    }
+
     private static KnownStepTypes.Definition definition(NewWorkflowStep... steps) {
-        return new KnownStepTypes.Definition(List.of(steps), Set.of("echo", "connector.call", "workflow.call"),
+        return new KnownStepTypes.Definition(List.of(steps),
+                Set.of("echo", "connector.call", "workflow.call", "drive.read"),
                 Set.of(), Set.of(), Set.of(), Set.of());
     }
 

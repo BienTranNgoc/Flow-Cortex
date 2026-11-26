@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":modules:drive"))
     implementation(project(":modules:profile"))
     implementation(project(":modules:asset"))
+    implementation(project(":modules:entity"))
     implementation(project(":modules:realtime"))
     implementation(project(":modules:onboarding"))
     implementation(project(":modules:notification"))
