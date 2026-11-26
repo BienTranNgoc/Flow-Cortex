@@ -78,7 +78,7 @@ class WorkflowRatingTotalsIT {
         POSTGRES.start();
     }
 
-    private static final String MIGRATION = "V2026.11.24.052__workflow_rating_total_backfill.sql";
+    private static final String MIGRATION = "V2026.11.26.802__workflow_rating_total_backfill.sql";
 
     @Autowired
     private WorkflowRepository workflowRepository;
