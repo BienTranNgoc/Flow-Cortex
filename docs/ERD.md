@@ -480,7 +480,7 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
-## Space entities (`V2026.11.15.270`)
+## Space entities (`V2026.11.26.501`)
 
 ```mermaid
 erDiagram
