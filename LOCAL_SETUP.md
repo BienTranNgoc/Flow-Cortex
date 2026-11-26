@@ -75,17 +75,31 @@ SPRING_PROFILES_ACTIVE=dev \
 curl http://localhost:8080/readyz
 # -> {"status":"UP"}
 
-# /api/v1/** is authenticated — log in first, then use the token:
-curl -s -XPOST http://localhost:8080/api/v1/auth/login \
+# /api/v1/** is authenticated — log in first, then use the token. admin1 has two-factor
+# sign-in on, so the password step answers 202 and sets a challenge cookie (-D prints the headers):
+curl -s -D - -XPOST http://localhost:8080/api/v1/auth/login \
   -H 'content-type: application/json' \
   -d '{"email":"admin1@flowcortex.dev","password":"AdminPass123!"}'
-# -> { "accessToken": "...", "expiresIn": 900 }  (the refresh token arrives as an HttpOnly cookie)
+# -> 202 { "status": "totp_required", "expiresIn": 300 }  and  Set-Cookie: totp_challenge=<value>; ...
+
+# Second step: the code of the dev secret JBSWY3DPEHPK3PXP. Add that secret to any
+# authenticator app, or compute the code here:
+python3 -c 'import base64,hmac,struct,time; k=base64.b32decode("JBSWY3DPEHPK3PXP"); h=hmac.new(k,struct.pack(">Q",int(time.time())//30),"sha1").digest(); o=h[-1]&15; print("%06d"%((struct.unpack(">I",h[o:o+4])[0]&0x7FFFFFFF)%1000000))'
+# The cookie is Secure, so over http://localhost send its value back as an explicit header:
+curl -s -XPOST http://localhost:8080/api/v1/auth/login/totp \
+  -H 'content-type: application/json' -H 'Cookie: totp_challenge=<value>' \
+  -d '{"code":"<code>"}'
+# -> { "accessToken": "...", "expiresIn": 900, "persistent": false }  (the refresh token arrives as an HttpOnly cookie)
 ```
 
 The `dev` profile seeds two admins, `admin1@flowcortex.dev` and
 `admin2@flowcortex.dev` (`AdminPass123!`), and one member, `member1@flowcortex.dev`
 (`MemberPass123!`), plus three shared demo workflows: "Echo Demo", "Failing Demo"
 and "Check a video file". These are dev-only credentials, never real passwords.
+`admin1` also has two-factor sign-in on, under the fixed dev secret `JBSWY3DPEHPK3PXP`
+(no recovery codes). The other seeded admins, `admin2` and `test@flowcortex.io`, are not
+enrolled, so their first console sign-in meets the two-factor setup screen. A code is
+accepted once: wait for the next 30-second step before signing `admin1` in again.
 An admin's **Users** page lists only the users that admin created: `member1`
 belongs to `admin1`, so sign in to the console as `admin1` to see it; `admin2`
 starts with no users of its own. The **Runs** and **Media jobs** pages list every

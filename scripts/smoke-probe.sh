@@ -7,6 +7,7 @@
 #   scripts/smoke-probe.sh
 #
 # Checks, in order:
+#   - admin1 signs in through the second step (the dev profile enrols it in TOTP);
 #   - a wrong byte count on the presigned PUT is refused with 403 (the
 #     content-length is signed);
 #   - a 1-second clip, generated inside the worker image, uploaded from this host
@@ -26,13 +27,16 @@
 # so the PUT and the download run here, not inside a container.
 # `docker compose` honours COMPOSE_FILE, COMPOSE_ENV_FILES and COMPOSE_PROJECT_NAME
 # as usual. Env: API_URL (default http://localhost:8080), POLL_SECONDS (default 120),
-# FLOWCORTEX_PRODUCT_VIDEO_ENABLED (default false). Needs bash, curl, jq and docker.
+# FLOWCORTEX_PRODUCT_VIDEO_ENABLED (default false), ADMIN_TOTP_SECRET (the base32 secret
+# the dev profile gives admin1, default JBSWY3DPEHPK3PXP). Needs bash, curl, jq, python3
+# and docker.
 
 set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:8080}"
 POLL_SECONDS="${POLL_SECONDS:-120}"
 PRODUCT_VIDEO="${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:-false}"
+ADMIN_TOTP_SECRET="${ADMIN_TOTP_SECRET:-JBSWY3DPEHPK3PXP}"
 WORKFLOW_NAME="Check a video file"
 
 cd "$(dirname "$0")/.."
@@ -42,11 +46,41 @@ trap 'rm -rf "$work"' EXIT
 pass() { echo "PASS  $*"; }
 fail() { echo "FAIL  $*" >&2; exit 1; }
 
+# The six-digit TOTP code (RFC 6238, SHA-1, 30 s step) of a base32 secret at this moment.
+totp_code() {
+  python3 -c 'import base64, hmac, struct, sys, time
+secret = sys.argv[1].upper()
+key = base64.b32decode(secret + "=" * (-len(secret) % 8))
+digest = hmac.new(key, struct.pack(">Q", int(time.time()) // 30), "sha1").digest()
+offset = digest[-1] & 15
+print("%06d" % ((struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % 1000000))' "$1"
+}
+
+# Prints the access token. An account with TOTP on answers 202 with a challenge
+# cookie: the code from the third argument's secret goes back to the completion
+# route with that cookie as an explicit header, because a Secure cookie over
+# http://localhost depends on a cookie jar's behaviour.
 login() {
-  local email=$1 password=$2
-  curl -sS --fail-with-body -H 'Content-Type: application/json' \
+  local email=$1 password=$2 secret=${3:-} status challenge
+  status="$(curl -sS -D "$work/login-headers" -o "$work/login-body" -w '%{http_code}' \
+    -H 'Content-Type: application/json' \
     -d "$(jq -n --arg e "$email" --arg p "$password" '{email: $e, password: $p}')" \
-    "$API_URL/api/v1/auth/login" | jq -er .accessToken
+    "$API_URL/api/v1/auth/login")" || return 1
+  if [[ "$status" == 202 ]]; then
+    [[ -n "$secret" ]] || { echo "login of $email asks for a code and no TOTP secret was given" >&2; return 1; }
+    challenge="$(tr -d '\r' <"$work/login-headers" \
+      | sed -n 's/^[Ss]et-[Cc]ookie: totp_challenge=\([^;]*\).*/\1/p')"
+    [[ -n "$challenge" ]] || { echo "login of $email answered 202 without a totp_challenge cookie" >&2; return 1; }
+    status="$(curl -sS -o "$work/login-body" -w '%{http_code}' \
+      -H 'Content-Type: application/json' -H "Cookie: totp_challenge=$challenge" \
+      -d "$(jq -n --arg c "$(totp_code "$secret")" '{code: $c}')" \
+      "$API_URL/api/v1/auth/login/totp")" || return 1
+  fi
+  if [[ "$status" != 200 ]]; then
+    echo "login of $email answered $status: $(cat "$work/login-body")" >&2
+    return 1
+  fi
+  jq -er .accessToken "$work/login-body"
 }
 
 # GET or POST (with a JSON body) as the given token; prints the response body.
@@ -102,7 +136,7 @@ await_run() {
 }
 
 member="$(login member1@flowcortex.dev 'MemberPass123!')" || fail "member1 login (is the dev profile on?)"
-admin="$(login admin1@flowcortex.dev 'AdminPass123!')" || fail "admin1 login"
+admin="$(login admin1@flowcortex.dev 'AdminPass123!' "$ADMIN_TOTP_SECRET")" || fail "admin1 login"
 workflow="$(api "$member" /api/v1/workflows \
   | jq -er --arg n "$WORKFLOW_NAME" 'first(.[] | select(.name == $n) | .id)')" \
   || fail "workflow \"$WORKFLOW_NAME\" not listed for member1"
