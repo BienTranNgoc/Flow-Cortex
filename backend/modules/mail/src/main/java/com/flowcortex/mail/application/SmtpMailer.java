@@ -1,5 +1,6 @@
 package com.flowcortex.mail.application;
 
+import com.flowcortex.mail.api.MailAttachment;
 import com.flowcortex.mail.api.MailCategory;
 import com.flowcortex.mail.api.MailKey;
 import com.flowcortex.mail.api.MailOutcome;
@@ -22,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.MessageSource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
@@ -135,6 +137,10 @@ class SmtpMailer implements Mailer {
         helper.setTo(mail.to());
         helper.setSubject(rendered.subject());
         helper.setText(rendered.text(), rendered.html());
+        for (MailAttachment attachment : mail.attachments()) {
+            helper.addAttachment(attachment.fileName(), new ByteArrayResource(attachment.content()),
+                    attachment.contentType());
+        }
         for (Map.Entry<String, String> header : rendered.headers().entrySet()) {
             message.addHeader(header.getKey(), header.getValue());
         }

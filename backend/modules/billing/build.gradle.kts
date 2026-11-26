@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     implementation(project(":modules:content"))
+    implementation(project(":modules:jobs"))
+    implementation(project(":modules:mail"))
     implementation(project(":modules:settings"))
     implementation(project(":modules:user"))
     implementation(project(":shared:web"))
@@ -19,6 +21,8 @@ dependencies {
     implementation("tools.jackson.core:jackson-databind")
     // The region gate counts each verdict.
     implementation("io.micrometer:micrometer-core")
+    // Draws the receipt PDF.
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
     // @RequestBody / @ApiResponse document the raw-body journey route; :boot:app brings springdoc at
     // runtime, so compile-only here.
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")

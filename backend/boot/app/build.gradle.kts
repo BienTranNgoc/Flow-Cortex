@@ -76,6 +76,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     // The publication ITs declare their own @ApplicationModuleListener probes.
     testImplementation("org.springframework.modulith:spring-modulith-events-api")
+    // The receipt ITs read the PDF text back.
+    testImplementation("org.apache.pdfbox:pdfbox:3.0.8")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testRuntimeOnly("org.flywaydb:flyway-database-postgresql")

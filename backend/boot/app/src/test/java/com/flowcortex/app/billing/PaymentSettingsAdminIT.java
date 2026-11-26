@@ -167,6 +167,19 @@ class PaymentSettingsAdminIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void theReceiptMailSwitchIsListedInItsGroupOnByDefault() {
+        PaymentSetting[] all = get(BASE, managerToken, PaymentSetting[].class).getBody();
+
+        PaymentSetting receipt = List.of(all).stream()
+                .filter(item -> item.key().equals("payment.receipt.email_enabled")).findFirst().orElseThrow();
+        assertThat(receipt.group()).isEqualTo("receipt");
+        assertThat(receipt.type()).isEqualTo("SWITCH");
+        assertThat(receipt.value()).isEqualTo(true);
+        assertThat(receipt.source()).isEqualTo("CONFIGURED");
+        assertThat(receipt.dangerous()).isFalse();
+    }
+
+    @Test
     void acceptedChangeStoresAndRecordsOneRowWithTrimmedReason() {
         ResponseEntity<PaymentSetting> response = put(MODE, "{\"value\":\"b\",\"reason\":\"  contract  \"}",
                 adminToken, PaymentSetting.class);

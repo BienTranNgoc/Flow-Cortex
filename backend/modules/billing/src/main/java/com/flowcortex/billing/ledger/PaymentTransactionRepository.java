@@ -4,6 +4,7 @@ import com.flowcortex.billing.ledger.LedgerDecision.ProviderFacts;
 import com.flowcortex.billing.ledger.LedgerDecision.TransactionSnapshot;
 import com.flowcortex.billing.provider.PaymentInstrument;
 import com.flowcortex.billing.provider.PaymentOrderLookup.RecordedOrder;
+import com.flowcortex.billing.receipt.ReceiptDeliveries;
 import com.flowcortex.billing.tax.StoredSplit;
 import com.flowcortex.billing.tax.VatRateAmbiguousException;
 import com.flowcortex.billing.tax.VatRateUnavailableException;
@@ -26,10 +27,13 @@ class PaymentTransactionRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final VatRates vatRates;
+    private final ReceiptDeliveries receiptDeliveries;
 
-    PaymentTransactionRepository(NamedParameterJdbcTemplate jdbc, VatRates vatRates) {
+    PaymentTransactionRepository(NamedParameterJdbcTemplate jdbc, VatRates vatRates,
+            ReceiptDeliveries receiptDeliveries) {
         this.jdbc = jdbc;
         this.vatRates = vatRates;
+        this.receiptDeliveries = receiptDeliveries;
     }
 
     /** {@code termsRevisionId} is the publication of the payment terms in force now, or null when none exists. */
@@ -102,12 +106,13 @@ class PaymentTransactionRepository {
      * set only by a move to {@code succeeded} and is kept by every later move. That move also writes the tax
      * split at the rate in force on the day of {@code now}: this is the one statement that moves a payment, so
      * every applier gets the split. A day with no single rate raises, and the caller's transaction keeps nothing.
+     * A move that collects the payment also queues its receipt mail in the same transaction.
      * Call it inside the transaction that locked the payment.
      */
     int applyMove(UUID id, MoneyStatus from, MoneyStatus to, ProviderFacts facts, Instant now) {
         boolean collected = to == MoneyStatus.SUCCEEDED;
         StoredSplit split = collected ? splitOf(id, now) : null;
-        return jdbc.update("""
+        int moved = jdbc.update("""
                 UPDATE payment_transaction SET status = :to, provider_result_code = :resultCode,
                     provider_message = :message, provider_transaction_id = :providerTransactionId,
                     provider_pay_type = :payType, provider_status_at = :providerTimestamp, updated_at = :now,
@@ -134,6 +139,10 @@ class PaymentTransactionRepository {
                         .addValue("rateId", split == null ? null : split.rateId())
                         .addValue("inclusive", split == null ? null : Boolean.TRUE)
                         .addValue("now", Timestamp.from(now)));
+        if (moved == 1 && collected) {
+            receiptDeliveries.openOnCollection(id, now);
+        }
+        return moved;
     }
 
     private StoredSplit splitOf(UUID id, Instant collectedAt) {

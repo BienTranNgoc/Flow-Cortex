@@ -41,7 +41,10 @@ class MailKeyCatalogTest {
             Map.entry(MailKey.GOOGLE_SIGN_IN_NOTICE, List.of("https://app.example/login")),
             Map.entry(MailKey.SUPPORT_REQUEST_REPLIED, List.of(42, "https://app.example/?help=request-42")),
             Map.entry(MailKey.PHONE_CHANGED, List.of("+84 9•• ••• 321")),
-            Map.entry(MailKey.TRASH_EXPIRING, List.of(2, "18/11/2026", "https://app.example/trash"))));
+            Map.entry(MailKey.TRASH_EXPIRING, List.of(2, "18/11/2026", "https://app.example/trash")),
+            Map.entry(MailKey.PAYMENT_RECEIPT, List.of("Nguyễn Văn A", "fc_0123456789abcdef0123456789abcdef",
+                    "01/01/2027 00:05 (GMT+7)", "100.000 ₫", "Nạp 1.000 credit",
+                    "https://app.example/billing/transactions/1/receipt"))));
 
     private final ResourceBundleMessageSource messages = messageSource();
 

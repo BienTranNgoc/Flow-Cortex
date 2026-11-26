@@ -25,7 +25,9 @@ public enum MailKey {
     PHONE_CHANGED("phone-changed", MailCategory.TRANSACTIONAL, "email.phoneChanged.subject",
             "email.phoneChanged.body", 1),
     TRASH_EXPIRING("trash-expiring", MailCategory.TRANSACTIONAL, "trash.mail.expiring.subject",
-            "trash.mail.expiring.body", 3);
+            "trash.mail.expiring.body", 3),
+    PAYMENT_RECEIPT("payment-receipt", MailCategory.TRANSACTIONAL, "billing.receipt.mail.subject",
+            "billing.receipt.mail.body", 6);
 
     private final String id;
     private final MailCategory category;

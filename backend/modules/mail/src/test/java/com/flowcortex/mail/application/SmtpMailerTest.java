@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.flowcortex.mail.api.MailAttachment;
 import com.flowcortex.mail.api.MailCategory;
 import com.flowcortex.mail.api.MailKey;
 import com.flowcortex.mail.api.MailOutcome;
@@ -25,12 +26,14 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.mail.BodyPart;
 import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -271,6 +274,75 @@ class SmtpMailerTest {
                 Locale.ENGLISH);
         assertThat(plain.getFirst()).isEqualTo(body);
         assertThat(sent.getValue().getHeader("List-Unsubscribe")).isNull();
+    }
+
+    @Test
+    void anAttachmentGoesOutAfterTheTextAndHtmlPartsWithItsNameTypeAndBytes() throws Exception {
+        byte[] pdf = new byte[2_048];
+        new Random(7).nextBytes(pdf);
+        MailAttachment attachment = new MailAttachment("bien-nhan-fc_0123.pdf", "application/pdf", pdf);
+
+        MailOutcome outcome = mailer.send(resetMailWith(attachment));
+
+        assertThat(outcome).isEqualTo(MailOutcome.SENT);
+        MimeMessage message = sentMessage();
+        List<String> plain = new ArrayList<>();
+        List<String> html = new ArrayList<>();
+        List<BodyPart> attachments = new ArrayList<>();
+        collect((Multipart) message.getContent(), plain, html);
+        collectAttachments((Multipart) message.getContent(), attachments);
+        assertThat(plain).hasSize(1);
+        assertThat(html).hasSize(1);
+        assertThat(attachments).hasSize(1);
+        BodyPart part = attachments.getFirst();
+        assertThat(part.getFileName()).isEqualTo("bien-nhan-fc_0123.pdf");
+        assertThat(part.getContentType()).startsWith("application/pdf");
+        assertThat(part.getInputStream().readAllBytes()).isEqualTo(pdf);
+    }
+
+    @Test
+    void anAttachmentWithoutBytesOrNameOrTypeIsRefusedAndNothingReachesTheTransport() {
+        byte[] bytes = {1, 2, 3};
+
+        assertThatThrownBy(() -> mailer.send(resetMailWith(new MailAttachment("a.pdf", "application/pdf", new byte[0]))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mailer.send(resetMailWith(new MailAttachment(" ", "application/pdf", bytes))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> mailer.send(resetMailWith(new MailAttachment("a.pdf", "", bytes))))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(transport);
+    }
+
+    @Test
+    void aMailBuiltWithoutAttachmentsCarriesNoAttachmentPart() throws Exception {
+        mailer.send(resetMail(Locale.ENGLISH));
+
+        List<BodyPart> attachments = new ArrayList<>();
+        collectAttachments((Multipart) sentMessage().getContent(), attachments);
+        assertThat(attachments).isEmpty();
+    }
+
+    private MimeMessage sentMessage() throws Exception {
+        ArgumentCaptor<MimeMessage> sent = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(transport).send(sent.capture());
+        sent.getValue().saveChanges();
+        return sent.getValue();
+    }
+
+    private OutgoingMail resetMailWith(MailAttachment attachment) {
+        return new OutgoingMail(MailKey.RESET_PASSWORD, memberId, ADDRESS, Locale.ENGLISH,
+                List.of(LINK, new LocalizedMessage("email.duration.hours", 1)), List.of(attachment));
+    }
+
+    private static void collectAttachments(Multipart multipart, List<BodyPart> attachments) throws Exception {
+        for (int index = 0; index < multipart.getCount(); index++) {
+            BodyPart part = multipart.getBodyPart(index);
+            if (part.getContent() instanceof Multipart nested) {
+                collectAttachments(nested, attachments);
+            } else if (Part.ATTACHMENT.equalsIgnoreCase(part.getDisposition())) {
+                attachments.add(part);
+            }
+        }
     }
 
     private static UnsubscribeLink careLink() {

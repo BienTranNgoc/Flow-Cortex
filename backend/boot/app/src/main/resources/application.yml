@@ -105,6 +105,10 @@ spring:
       "[mail.smtp.auth]": ${SPRING_MAIL_SMTP_AUTH:false}
       "[mail.smtp.starttls.enable]": ${SPRING_MAIL_SMTP_STARTTLS:false}
       "[mail.smtp.starttls.required]": ${SPRING_MAIL_SMTP_STARTTLS:false}
+      # JavaMail waits forever without these; a hung relay would hold a send past its job lease.
+      "[mail.smtp.connectiontimeout]": 10000
+      "[mail.smtp.timeout]": 30000
+      "[mail.smtp.writetimeout]": 30000
 
 server:
   port: 8080
@@ -490,6 +494,15 @@ flowcortex:
         enabled: ${FLOWCORTEX_BILLING_LEDGER_APPLY_ENABLED:true}
         interval: ${FLOWCORTEX_BILLING_LEDGER_APPLY_INTERVAL:PT5S}
         batch-size: ${FLOWCORTEX_BILLING_LEDGER_APPLY_BATCH_SIZE:100}
+    # Receipts: email-enabled is the configured layer of the console setting payment.receipt.email_enabled (a stored
+    # value wins). The seller is the provider printed on every receipt; blank leaves "details being set up".
+    receipt:
+      email-enabled: ${FLOWCORTEX_BILLING_RECEIPT_EMAIL_ENABLED:true}
+      seller:
+        legal-name: ${FLOWCORTEX_BILLING_RECEIPT_SELLER_LEGAL_NAME:}
+        tax-code: ${FLOWCORTEX_BILLING_RECEIPT_SELLER_TAX_CODE:}
+        address: ${FLOWCORTEX_BILLING_RECEIPT_SELLER_ADDRESS:}
+        email: ${FLOWCORTEX_BILLING_RECEIPT_SELLER_EMAIL:}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.
