@@ -30,10 +30,16 @@ class RunStartGuards {
     }
 
     void check(UUID ownerId, UUID workflowId, List<WorkflowStep> steps, StartContext context) {
-        checkDefs(ownerId, workflowId, steps.stream()
-                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
-                        step.getInputRef()))
-                .toList(), context);
+        checkDefs(ownerId, workflowId, defsOf(steps), context);
+    }
+
+    /** Runs only the readiness guard: whether the steps can start at all, with no cost or ownership check. */
+    void checkReadiness(UUID ownerId, UUID workflowId, List<WorkflowStep> steps) {
+        List<StepDef> defs = defsOf(steps);
+        StartContext context = new StartContext(false);
+        guards.stream()
+                .filter(WorkflowReadinessGuard.class::isInstance)
+                .forEach(guard -> guard.check(ownerId, workflowId, defs, context));
     }
 
     /** Runs every guard over {@code defs}, which may be only the steps a run retry re-executes. */
@@ -41,5 +47,12 @@ class RunStartGuards {
         for (RunStartGuard guard : guards) {
             guard.check(ownerId, workflowId, defs, context);
         }
+    }
+
+    private static List<StepDef> defsOf(List<WorkflowStep> steps) {
+        return steps.stream()
+                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
+                        step.getInputRef()))
+                .toList();
     }
 }
