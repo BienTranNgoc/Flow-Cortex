@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "types": {
+    "APPROVAL_CHECKPOINT": [],
+    "align_audio": ["aligned-speech.wav", "alignment-manifest.json"],
+    "caption_burn": ["preview.png", "video.mp4"],
+    "echo": [],
+    "extract_audio": ["source-audio.wav"],
+    "fail": [],
+    "fetch_video": ["audio", "video"],
+    "generate_script": [],
+    "generate_speech": ["manifest.json", "speech.wav"],
+    "generate_storyboard": [],
+    "generate_video": ["clip.mp4", "manifest.json"],
+    "probe": ["video-details.json"],
+    "qa.review": [],
+    "render_video": ["manifest.json", "video.mp4"],
+    "translate": [],
+    "tts": ["voice-manifest.json", "voice.wav"]
+  }
+}

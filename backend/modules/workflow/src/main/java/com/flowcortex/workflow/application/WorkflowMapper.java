@@ -14,6 +14,7 @@ import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowStepView;
 import com.flowcortex.workflow.api.WorkflowView;
 import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
@@ -121,7 +122,8 @@ final class WorkflowMapper {
                 step.getStartedAt(), step.getFinishedAt(), percent == null ? null : percent.intValue(),
                 step.getAttempt(), step.getErrorCode(), step.getDeliveryCount(), step.getPickedUpAt(),
                 outputs(step, isDownloadable), mode(step.getType(), isRemoteType),
-                children.stream().map(child -> toRunStepChildView(child, isDownloadable)).toList());
+                children.stream().map(child -> toRunStepChildView(child, isDownloadable)).toList(),
+                step.getStatus() == RunStepStatus.ERROR ? StepFailureTaxonomy.recordFor(step.getErrorCode()) : null);
     }
 
     private static RunStepChildView toRunStepChildView(RunStep child, Predicate<String> isDownloadable) {

@@ -18,6 +18,7 @@ import jakarta.validation.ValidatorFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -216,7 +217,7 @@ class StepExecutorRegistryTest {
                 "{\"child\":{\"type\":\"inline.extra\"}}");
         var definition = new KnownStepTypes.Definition(List.of(iterate),
                 Stream.concat(withExtra.knownTypes().stream(), Stream.of("iterate")).collect(Collectors.toSet()),
-                Set.of(), Set.of(), withExtra.ingestTypes(), withExtra.iterateChildTypes());
+                Set.of(), Set.of(), withExtra.ingestTypes(), withExtra.iterateChildTypes(), Map.of());
         try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
             Set<ConstraintViolation<KnownStepTypes.Definition>> violations = factory.getValidator().validate(definition);
 

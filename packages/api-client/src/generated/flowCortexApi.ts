@@ -1262,6 +1262,51 @@ export interface RunStepChildResponse {
   outputs: RunStepOutputResponse[];
 }
 
+export type RunStepFailureResponseCategory =
+  (typeof RunStepFailureResponseCategory)[keyof typeof RunStepFailureResponseCategory];
+
+export const RunStepFailureResponseCategory = {
+  validation: 'validation',
+  handoff: 'handoff',
+  configuration: 'configuration',
+  contract: 'contract',
+  review_rejected: 'review_rejected',
+  insufficient_credits: 'insufficient_credits',
+  timeout: 'timeout',
+  provider_error: 'provider_error',
+  quota_exceeded: 'quota_exceeded',
+  unavailable: 'unavailable',
+  processing: 'processing',
+  internal: 'internal',
+} as const;
+
+export type RunStepFailureResponseSource =
+  (typeof RunStepFailureResponseSource)[keyof typeof RunStepFailureResponseSource];
+
+export const RunStepFailureResponseSource = {
+  user: 'user',
+  provider: 'provider',
+  system: 'system',
+} as const;
+
+export type RunStepFailureResponseRecovery =
+  (typeof RunStepFailureResponseRecovery)[keyof typeof RunStepFailureResponseRecovery];
+
+export const RunStepFailureResponseRecovery = {
+  retry: 'retry',
+  top_up: 'top_up',
+  change_input: 'change_input',
+  edit_workflow: 'edit_workflow',
+  none: 'none',
+} as const;
+
+export interface RunStepFailureResponse {
+  category: RunStepFailureResponseCategory;
+  source: RunStepFailureResponseSource;
+  retryable: boolean;
+  recovery: RunStepFailureResponseRecovery;
+}
+
 export interface RunStepResponse {
   id?: string;
   stepOrder?: number;
@@ -1280,6 +1325,7 @@ export interface RunStepResponse {
   outputs: RunStepOutputResponse[];
   mode: RunStepResponseMode;
   children: RunStepChildResponse[];
+  failure?: RunStepFailureResponse;
 }
 
 export interface RunResponse {

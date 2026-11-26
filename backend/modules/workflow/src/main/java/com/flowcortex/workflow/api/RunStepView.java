@@ -12,19 +12,20 @@ import java.util.UUID;
  * outputs} is empty unless the step produced objects. {@code mode} is {@code inline} or {@code
  * remote}, read from the step's own type, so it holds even after the workflow is edited. {@code
  * children} holds an iterate step's items of its current attempt in item order and is empty for any
- * other step.
+ * other step. {@code failure} is derived from {@code errorCode} on every read and is {@code null}
+ * unless the step is in {@code error}.
  */
 public record RunStepView(
         UUID id, int stepOrder, String type, String status, String input, String output, String errorMessage,
         Instant startedAt, Instant finishedAt, Integer progressPercent, int attempt, String errorCode,
         int deliveryCount, Instant pickedUpAt, List<RunStepOutputView> outputs, String mode,
-        List<RunStepChildView> children) {
+        List<RunStepChildView> children, RunStepFailure failure) {
 
-    /** A step without items. */
+    /** A step without items or failure record. */
     public RunStepView(UUID id, int stepOrder, String type, String status, String input, String output,
             String errorMessage, Instant startedAt, Instant finishedAt, Integer progressPercent, int attempt,
             String errorCode, int deliveryCount, Instant pickedUpAt, List<RunStepOutputView> outputs, String mode) {
         this(id, stepOrder, type, status, input, output, errorMessage, startedAt, finishedAt, progressPercent,
-                attempt, errorCode, deliveryCount, pickedUpAt, outputs, mode, List.of());
+                attempt, errorCode, deliveryCount, pickedUpAt, outputs, mode, List.of(), null);
     }
 }

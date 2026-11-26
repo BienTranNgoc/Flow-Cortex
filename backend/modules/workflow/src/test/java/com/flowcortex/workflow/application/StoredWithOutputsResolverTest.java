@@ -9,6 +9,7 @@ import com.flowcortex.media.api.MediaJobInput;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 class StoredWithOutputsResolverTest {
@@ -50,19 +51,23 @@ class StoredWithOutputsResolverTest {
     @Test
     void rejectsMissingDuplicateAndForeignOutputs() {
         assertThatThrownBy(() -> resolver.resolve(STORED, CONFIG, Map.of(), RUN_ID, 4))
-                .isInstanceOf(StepFailedException.class)
+                .isInstanceOfSatisfying(StepFailedException.class, hasCode("input_unresolved"))
                 .hasMessageContaining("has no accepted outputs");
 
         String duplicates = "[" + output("speech.wav", validKey()) + "," + output("speech.wav", validKey()) + "]";
         assertThatThrownBy(() -> resolver.resolve(STORED, CONFIG, Map.of(3, duplicates), RUN_ID, 4))
-                .isInstanceOf(StepFailedException.class)
+                .isInstanceOfSatisfying(StepFailedException.class, hasCode("input_unresolved"))
                 .hasMessageContaining("exactly one output");
 
         String foreignKey = "runs/" + UUID.randomUUID() + "/steps/3/speech.wav";
         assertThatThrownBy(() -> resolver.resolve(STORED, CONFIG,
                 Map.of(3, outputs("speech.wav", foreignKey)), RUN_ID, 4))
-                .isInstanceOf(StepFailedException.class)
+                .isInstanceOfSatisfying(StepFailedException.class, hasCode("contract_violation"))
                 .hasMessageContaining("outside its run prefix");
+    }
+
+    private static Consumer<StepFailedException> hasCode(String code) {
+        return e -> assertThat(e.code()).isEqualTo(code);
     }
 
     @Test
@@ -145,13 +150,13 @@ class StoredWithOutputsResolverTest {
     }
 
     @Test
-    void aMissingObjectThatIsNotOptionalFailsWithContractViolationNamingTheStepAndTheName() {
+    void aMissingObjectThatIsNotOptionalFailsWithInputUnresolvedNamingTheStepAndTheName() {
         String vocals = "runs/" + RUN_ID + "/steps/6/attempts/1/vocals.wav";
 
         assertThatThrownBy(() -> resolver.resolve(UPLOAD, COMPOSE, Map.of(6, outputs("vocals.wav", vocals)),
                 RUN_ID, 8))
                 .isInstanceOfSatisfying(StepFailedException.class, e -> {
-                    assertThat(e.code()).isEqualTo("contract_violation");
+                    assertThat(e.code()).isEqualTo("input_unresolved");
                     assertThat(e.getMessage()).isEqualTo("Step 6 must have exactly one output named accompaniment.wav");
                 });
     }

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.workflow.api.RunStepChildView;
+import com.flowcortex.workflow.api.RunStepFailure;
 import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
 import com.flowcortex.workflow.api.RunView;
@@ -16,11 +17,17 @@ import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /** Entity -&gt; {@code api} view mapping, including the lowercase wire-status rule. */
@@ -217,6 +224,51 @@ class WorkflowMapperTest {
     }
 
     @Test
+    void anErrorStepCarriesTheRecordOfItsCode() {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        RunStep step = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "probe");
+        step.markRunning(Instant.now());
+        step.markError("in", "queue_timeout", "The job waited too long", Instant.now());
+
+        RunStepView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE)
+                .steps().get(0);
+
+        assertThat(view.failure()).isEqualTo(new RunStepFailure("timeout", "system", true, "retry"));
+    }
+
+    @Test
+    void anErrorStepWithoutACodeCarriesTheFallbackRecord() {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        RunStep step = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "echo");
+        step.markRunning(Instant.now());
+        step.markError("in", "boom", Instant.now());
+
+        RunStepView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE)
+                .steps().get(0);
+
+        assertThat(view.failure()).isEqualTo(new RunStepFailure("internal", "system", true, "retry"));
+    }
+
+    @Test
+    void aNonErrorStepCarriesNoRecord() {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        RunStep pending = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "echo");
+        RunStep running = new RunStep(UUID.randomUUID(), run.getId(), (short) 2, "echo");
+        running.markRunning(Instant.now());
+        RunStep completed = new RunStep(UUID.randomUUID(), run.getId(), (short) 3, "echo");
+        completed.markRunning(Instant.now());
+        completed.markCompleted("in", "out", Instant.now());
+
+        List<RunStepView> steps = WorkflowMapper
+                .toRunView(run, List.of(pending, running, completed), List.of(), type -> false, DOWNLOADABLE).steps();
+
+        assertThat(steps).extracting(RunStepView::failure).containsOnlyNulls();
+    }
+
+    @Test
     void pendingRunStepStatusIsLowercase() {
         RunStep step = new RunStep(UUID.randomUUID(), UUID.randomUUID(), (short) 1, "echo");
         assertThat(step.getStatus()).isEqualTo(RunStepStatus.PENDING);
@@ -226,6 +278,28 @@ class WorkflowMapperTest {
         RunView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE);
 
         assertThat(view.steps().get(0).status()).isEqualTo("pending");
+    }
+
+    @Test
+    void theResponseSchemaListsExactlyTheWireValuesOfTheFailureEnums() throws Exception {
+        Path source = Path.of(System.getProperty("flowcortex.backend.modules.dir"),
+                "workflow/src/main/java/com/flowcortex/workflow/web/RunStepResponse.java");
+        String text = Files.readString(source);
+        String failureRecord = text.substring(text.indexOf("record RunStepFailureResponse("));
+        List<List<String>> listed = new ArrayList<>();
+        Matcher allowable = Pattern.compile("allowableValues = \\{([^}]*)}").matcher(failureRecord);
+        while (allowable.find()) {
+            listed.add(Pattern.compile("\"([a-z_]+)\"").matcher(allowable.group(1)).results()
+                    .map(match -> match.group(1)).toList());
+        }
+
+        assertThat(listed).hasSize(3);
+        assertThat(listed.get(0)).containsExactlyInAnyOrderElementsOf(
+                Arrays.stream(StepFailureTaxonomy.Category.values()).map(StepFailureTaxonomy.Category::wire).toList());
+        assertThat(listed.get(1)).containsExactlyInAnyOrderElementsOf(
+                Arrays.stream(StepFailureTaxonomy.Source.values()).map(StepFailureTaxonomy.Source::wire).toList());
+        assertThat(listed.get(2)).containsExactlyInAnyOrderElementsOf(
+                Arrays.stream(StepFailureTaxonomy.Recovery.values()).map(StepFailureTaxonomy.Recovery::wire).toList());
     }
 
     @Test

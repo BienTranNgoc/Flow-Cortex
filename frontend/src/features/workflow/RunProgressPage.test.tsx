@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { onTestFinished } from 'vitest';
 import i18n from '../../lib/i18n';
+import enWorkflow from '../../locales/en/workflow.json';
 import viWorkflow from '../../locales/vi/workflow.json';
 import {
   renderRoute as renderRouteBare,
@@ -443,6 +444,53 @@ describe('RunProgressPage', () => {
     expect(alert).toHaveTextContent('This step took too long and was stopped. Try running again.');
     expect(alert.textContent?.toLowerCase()).not.toContain('file');
     expect(screen.getByRole('main').querySelector('.run-step-code')).toBeNull();
+  });
+
+  it('announces the retry advice with the sentence of a retryable failure', async () => {
+    renderRun(
+      run(
+        [
+          step({
+            type: 'probe',
+            mode: 'remote',
+            status: 'error',
+            pickedUpAt: '2026-10-01T10:00:01Z',
+            errorCode: 'lease_expired',
+            errorMessage: engineMessage,
+            failure: { category: 'timeout', source: 'system', retryable: true, recovery: 'retry' },
+          }),
+        ],
+        { status: 'error', errorMessage: engineMessage },
+      ),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(enWorkflow.stepError.lease_expired);
+    expect(alert).toHaveTextContent('You can run this step again.');
+  });
+
+  it('reads the category sentence and its advice for a code without its own sentence', async () => {
+    renderRun(
+      run(
+        [
+          step({
+            type: 'probe',
+            mode: 'remote',
+            status: 'error',
+            pickedUpAt: '2026-10-01T10:00:01Z',
+            errorCode: 'iterate_source_not_list',
+            errorMessage: engineMessage,
+            failure: { category: 'handoff', source: 'system', retryable: false, recovery: 'edit_workflow' },
+          }),
+        ],
+        { status: 'error', errorMessage: engineMessage },
+      ),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(enWorkflow.stepError.category.handoff);
+    expect(alert).toHaveTextContent('Fix this step in the workflow, then start a new run.');
+    expect(alert.textContent).not.toContain(engineMessage);
   });
 
   it('explains a run that failed with no failing step', async () => {

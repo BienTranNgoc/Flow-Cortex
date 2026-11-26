@@ -8,6 +8,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -102,7 +103,7 @@ class StepConfigRulesTest {
     private static KnownStepTypes.Definition definition(NewWorkflowStep... steps) {
         return new KnownStepTypes.Definition(List.of(steps),
                 Set.of("echo", "connector.call", "workflow.call", "drive.read"),
-                Set.of(), Set.of(), Set.of(), Set.of());
+                Set.of(), Set.of(), Set.of(), Set.of(), Map.of());
     }
 
     @Test
@@ -161,7 +162,8 @@ class StepConfigRulesTest {
     private Set<ConstraintViolation<KnownStepTypes.Definition>> validate(NewWorkflowStep step) {
         var definition = new KnownStepTypes.Definition(List.of(step),
                 Set.of("echo", "fail", "translate", "tts", "iterate", "workflow.call", "probe", "generate_video"),
-                Set.of(), Set.of("probe", "generate_video"), Set.of(), Set.of("echo", "fail", "translate", "tts"));
+                Set.of(), Set.of("probe", "generate_video"), Set.of(), Set.of("echo", "fail", "translate", "tts"),
+                Map.of());
         return validator.validate(definition);
     }
 }

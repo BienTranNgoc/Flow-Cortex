@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.workflow.api.RunStartGuard;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,17 +56,24 @@ class WorkflowReadinessGuard implements RunStartGuard {
                 .map(step -> new StepReferences.Step(UUID.randomUUID(), step.order(), step.name(), step.inputRef()))
                 .toList();
         Map<UUID, StepReferences.Problem> problems = StepReferences.analyze(referenceSteps);
+        Map<Integer, String> typeByOrder = new HashMap<>();
+        steps.forEach(step -> typeByOrder.put(step.order(), step.type()));
         Map<Integer, LocalizedMessage> faults = new LinkedHashMap<>();
         for (int i = 0; i < steps.size(); i++) {
             StepDef step = steps.get(i);
             StepReferences.Problem problem = problems.get(referenceSteps.get(i).id());
-            configReason(step).or(() -> referenceReason(step, problem))
+            configReason(step, typeByOrder).or(() -> referenceReason(step, problem))
                     .ifPresent(reason -> faults.put(step.order(), reason));
         }
         return faults;
     }
 
-    private Optional<LocalizedMessage> configReason(StepDef step) {
+    /**
+     * What is wrong with the config of {@code step}. A source step is found by its order in {@code typeByOrder},
+     * never by list position: a run retry checks only the steps it re-executes, and an entry whose source step is
+     * not among them reads a reused step, so it is not checked.
+     */
+    private Optional<LocalizedMessage> configReason(StepDef step, Map<Integer, String> typeByOrder) {
         if (step.config() != null && !step.config().isBlank()) {
             JsonNode config;
             try {
@@ -80,6 +88,12 @@ class WorkflowReadinessGuard implements RunStartGuard {
             if (profile != null && (!profile.isTextual() || profile.asText().isBlank())) {
                 return Optional.of(new LocalizedMessage("workflow.incomplete.profileEmpty"));
             }
+            return StepFileOutputs.firstUndeclared(step.config(), order -> {
+                        String sourceType = typeByOrder.get(order);
+                        return sourceType == null ? null : StepFileOutputs.declared(sourceType).orElse(null);
+                    })
+                    .map(undeclared -> new LocalizedMessage("workflow.incomplete.outputNotDeclared",
+                            undeclared.file(), undeclared.sourceOrder()));
         }
         return Optional.empty();
     }

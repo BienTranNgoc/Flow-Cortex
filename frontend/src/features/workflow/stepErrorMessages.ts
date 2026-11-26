@@ -86,9 +86,41 @@ const MESSAGE_DETAILS: Record<
 
 export const NO_MESSAGE = 'workflow.stepError.noMessage';
 
+/** The closed category set of the server's failure record. */
+const CATEGORIES: ReadonlySet<string> = new Set([
+  'validation',
+  'handoff',
+  'configuration',
+  'contract',
+  'review_rejected',
+  'insufficient_credits',
+  'timeout',
+  'provider_error',
+  'quota_exceeded',
+  'unavailable',
+  'processing',
+  'internal',
+]);
+
+/** Recoveries that come with advice; `none` has none. */
+const ADVISED_RECOVERIES: ReadonlySet<string> = new Set([
+  'retry',
+  'change_input',
+  'edit_workflow',
+  'top_up',
+]);
+
+/** The i18n key of the advice for a failure record's `recovery`, or null when there is none to give. */
+export function recoveryKey(recovery: string | undefined): string | null {
+  return recovery && ADVISED_RECOVERIES.has(recovery)
+    ? `workflow.stepError.recovery.${recovery}`
+    : null;
+}
+
 /**
- * Resolves a step failure into a member-facing sentence using one ordered rule table.
- * Unknown or missing codes fall back to `NO_MESSAGE` so raw server/worker errors never leak.
+ * Resolves a step failure into a member-facing sentence using one ordered rule table. A code without
+ * its own sentence reads the sentence of its failure `category`; only with no category either does it
+ * fall back to `NO_MESSAGE`, so raw server/worker errors never leak.
  */
 export function stepErrorSentence(
   code: string | undefined,
@@ -97,6 +129,7 @@ export function stepErrorSentence(
   t: TFunction,
   locale: Locale,
   stepType?: string,
+  category?: string,
 ): string {
   if (code && REAPED_CODES.has(code) && !remote) {
     return t(REAPED_INLINE);
@@ -119,6 +152,9 @@ export function stepErrorSentence(
   const key = code ? SENTENCE_KEYS[code] : undefined;
   if (key) {
     return t(key);
+  }
+  if (category && CATEGORIES.has(category)) {
+    return t(`workflow.stepError.category.${category}`);
   }
   return t(NO_MESSAGE);
 }

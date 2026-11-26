@@ -136,6 +136,45 @@ class WorkflowReadinessGuardTest {
         assertThatCode(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT)).doesNotThrowAnyException();
     }
 
+    private static StepDef reading(int order, String type, int sourceOrder, String outputName) {
+        return new StepDef(order, "Reader " + order, type, "{\"outputInputs\":[{\"stepOrder\":" + sourceOrder
+                + ",\"outputName\":\"" + outputName + "\",\"inputKey\":\"media\"}]}", null);
+    }
+
+    @Test
+    void aStepTakingAnUndeclaredFileRefusesTheStart() {
+        List<StepDef> steps = List.of(
+                FIRST,
+                new StepDef(2, "Speak", "generate_speech", null, null),
+                reading(3, "render_video", 2, "clip.mp4"));
+
+        assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("WORKFLOW_INCOMPLETE");
+                    assertThat(englishErrors(e)).containsExactly(
+                            Map.entry("step3", "Takes the file clip.mp4 from step 2, which never records it"));
+                });
+    }
+
+    @Test
+    void aDeclaredFileOrUndeclaredTypePasses() {
+        List<StepDef> steps = List.of(
+                FIRST,
+                new StepDef(2, "Speak", "generate_speech", null, null),
+                new StepDef(3, "Mystery", "mystery_capability", null, null),
+                reading(4, "render_video", 2, "speech.wav"),
+                reading(5, "render_video", 3, "anything.bin"));
+
+        assertThatCode(() -> guard.check(OWNER, WORKFLOW, steps, CONTEXT)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void aRetryTailWhoseSourceStepIsReusedPasses() {
+        List<StepDef> tail = List.of(reading(3, "render_video", 2, "video.mp4"));
+
+        assertThatCode(() -> guard.check(OWNER, WORKFLOW, tail, CONTEXT)).doesNotThrowAnyException();
+    }
+
     @Test
     void aWorkflowWithNoStepsIsRefusedAsIncomplete() {
         assertThatThrownBy(() -> guard.check(OWNER, WORKFLOW, List.of(), CONTEXT))

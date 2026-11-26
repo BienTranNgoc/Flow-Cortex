@@ -363,7 +363,7 @@ class RunAdvancerTest {
     }
 
     @Test
-    void aDeclaredObjectTheEarlierStepDidNotRecordFailsTheStepWithContractViolationAndPublishesNothing() {
+    void aDeclaredObjectTheEarlierStepDidNotRecordFailsTheStepWithInputUnresolvedAndPublishesNothing() {
         givenExtractAudioLimits();
         List<RunStep> steps = new java.util.ArrayList<>();
         for (int order = 1; order <= 5; order++) {
@@ -380,10 +380,53 @@ class RunAdvancerTest {
 
         advancer.advance(runId);
 
-        verify(runStepRepository).failIfRunning(compose.getId(), runId, (short) 1, "contract_violation",
+        verify(runStepRepository).failIfRunning(compose.getId(), runId, (short) 1, "input_unresolved",
                 "Step 6 must have exactly one output named accompaniment.wav", NOW);
         verify(mediaJobs, never()).enqueue(any());
         assertThat(run.getStatus().name()).isEqualTo("ERROR");
+    }
+
+    @Test
+    void anUnreadableReferenceFailsWithInputUnresolved() {
+        RunStep first = completed(1, UUID.randomUUID(), "{\"title\":\"A\"}");
+        RunStep second = new RunStep(UUID.randomUUID(), runId, (short) 2, "echo", null, null, "{step:1.body}");
+        givenRun(List.of(first, second));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).failIfRunning(eq(second.getId()), eq(runId), eq((short) 1),
+                eq("input_unresolved"), contains("body"), eq(NOW));
+        assertThat(run.getStatus().name()).isEqualTo("ERROR");
+    }
+
+    @Test
+    void aStepWithNoOutputToDefaultFromFailsWithInputUnresolved() {
+        RunStep second = new RunStep(UUID.randomUUID(), runId, (short) 2, "echo");
+        givenRun(List.of(second));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).failIfRunning(eq(second.getId()), eq(runId), eq((short) 1),
+                eq("input_unresolved"), contains("produced no output"), eq(NOW));
+    }
+
+    @Test
+    void runOptionsThatAreNotAnObjectKeepNoCode() {
+        WorkflowRun badOptions = new WorkflowRun(runId, workflowId, UUID.randomUUID(), "hello", "[1,2]", NOW);
+        RunStep step = pending(1, "echo");
+        givenRun(List.of(step));
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(badOptions));
+        when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
+        when(runStepRepository.failIfRunning(any(), any(), anyShort(), any(), any(), any())).thenReturn(1);
+
+        advancer.advance(runId);
+
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1), isNull(),
+                contains("options that are not a JSON object"), eq(NOW));
     }
 
     @Test
@@ -1116,7 +1159,7 @@ class RunAdvancerTest {
     }
 
     @Test
-    void anUnknownStepTypeErrorsTheStep() {
+    void anUnknownTypeFailsWithUnsupportedStepType() {
         RunStep step = pending(1, "nope");
         givenRun(List.of(step));
         when(runStepRepository.claimPending(any(), any(), any(), any())).thenReturn(1);
@@ -1124,8 +1167,8 @@ class RunAdvancerTest {
 
         advancer.on(new WorkflowRunStartedEvent(runId));
 
-        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1), isNull(),
-                contains("Unsupported step type: nope"), eq(NOW));
+        verify(runStepRepository).failIfRunning(eq(step.getId()), eq(runId), eq((short) 1),
+                eq("unsupported_step_type"), contains("Unsupported step type: nope"), eq(NOW));
     }
 
     @Test

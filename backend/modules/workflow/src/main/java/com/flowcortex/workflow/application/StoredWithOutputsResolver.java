@@ -50,7 +50,7 @@ final class StoredWithOutputsResolver {
                     if (optional) {
                         continue;
                     }
-                    throw invalid("Step " + sourceOrder + " has no accepted outputs");
+                    throw unresolved("Step " + sourceOrder + " has no accepted outputs");
                 }
                 List<MediaOutput> matches = json.readValue(encodedOutputs, OUTPUTS).stream()
                         .filter(output -> outputName.equals(output.name()))
@@ -59,7 +59,7 @@ final class StoredWithOutputsResolver {
                     continue;
                 }
                 if (matches.size() != 1) {
-                    throw invalid("Step " + sourceOrder + " must have exactly one output named " + outputName);
+                    throw unresolved("Step " + sourceOrder + " must have exactly one output named " + outputName);
                 }
                 MediaOutput output = matches.getFirst();
                 if (!MediaJob.isBelow(MediaJob.outputPrefix(runId, sourceOrder), output.objectKey())) {
@@ -217,6 +217,11 @@ final class StoredWithOutputsResolver {
         if (key == null || !keys.add(key)) {
             throw invalid("Combined input keys must be non-empty and unique");
         }
+    }
+
+    /** An output the config names that the source step did not record once: a handoff fault, not a broken config shape. */
+    private static StepFailedException unresolved(String message) {
+        return new StepFailedException("input_unresolved", message);
     }
 
     private static StepFailedException invalid(String message) {

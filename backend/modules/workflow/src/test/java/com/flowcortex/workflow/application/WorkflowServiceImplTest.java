@@ -641,6 +641,70 @@ class WorkflowServiceImplTest {
         verify(workflowStepRepository, never()).save(any());
     }
 
+    private static NewStep renderReading(String outputName, boolean optional) {
+        return new NewStep(null, "render_video", null, "{\"outputInputs\":[{\"stepOrder\":2,\"outputName\":\""
+                + outputName + "\",\"inputKey\":\"audio\"" + (optional ? ",\"optional\":true" : "") + "}]}");
+    }
+
+    private void assertAppendRefused(Workflow workflow, NewStep step, String message) {
+        assertThatThrownBy(() -> service.addStep(ANA, workflow.getId(), step))
+                .isInstanceOfSatisfying(ConstraintViolationException.class, e -> assertThat(e.getConstraintViolations())
+                        .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
+                        .containsExactly("steps[2].config " + message));
+        verify(workflowStepRepository, never()).save(any());
+    }
+
+    @Test
+    void appendRefusesAnOutputInputNamingAFileTheSourceTypeDoesNotRecord() {
+        Workflow workflow = stored(draft(ANA, false));
+        withSteps(workflow, "probe", "extract_audio");
+
+        assertAppendRefused(workflow, renderReading("audio.wav", false),
+                "outputInputs reads 'audio.wav' from step 2, which records only: source-audio.wav");
+    }
+
+    @Test
+    void appendAcceptsADeclaredFile() {
+        Workflow workflow = stored(draft(ANA, false));
+        withSteps(workflow, "probe", "extract_audio");
+
+        WorkflowStepView added = service.addStep(ANA, workflow.getId(), renderReading("source-audio.wav", false));
+
+        assertThat(added.stepOrder()).isEqualTo(3);
+        assertThat(added.type()).isEqualTo("render_video");
+    }
+
+    @Test
+    void anOptionalEntryNamingAFileOfATypeThatRecordsNoneIsRefused() {
+        Workflow workflow = stored(draft(ANA, false));
+        withSteps(workflow, "probe", "generate_script");
+
+        assertAppendRefused(workflow, renderReading("voice.wav", true),
+                "outputInputs reads 'voice.wav' from step 2, which records no files");
+    }
+
+    @Test
+    void anUndeclaredSourceTypeIsNotChecked() {
+        Clock clock = Clock.systemUTC();
+        StepExecutorRegistry withUndeclaredType = new StepExecutorRegistry(List.of(
+                new RemoteStepExecutor("probe", mediaJobs, clock),
+                new RemoteStepExecutor("mystery_capability", mediaJobs, clock),
+                new RemoteStepExecutor("render_video", mediaJobs, clock)));
+        WorkflowServiceImpl lenient = new WorkflowServiceImpl(workflowRepository, workflowStepRepository,
+                withUndeclaredType,
+                new WorkflowWriteAccess(workflowRepository, withUndeclaredType,
+                        Validation.buildDefaultValidatorFactory().getValidator()),
+                new VersionWriter(versionRepository, workflowRepository, workflowStepRepository),
+                new ServedDefinitions(workflowStepRepository, versionRepository),
+                mock(com.flowcortex.credit.api.CreditAccounts.class));
+        Workflow workflow = stored(draft(ANA, false));
+        withSteps(workflow, "probe", "mystery_capability");
+
+        WorkflowStepView added = lenient.addStep(ANA, workflow.getId(), renderReading("anything.bin", false));
+
+        assertThat(added.stepOrder()).isEqualTo(3);
+    }
+
     @Test
     void anEmptyStringClearsNameAndInputRef() {
         Workflow workflow = stored(draft(ANA, false));
@@ -899,7 +963,8 @@ class WorkflowServiceImplTest {
         when(workflowStepRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         String config = "{\"label\":\"x\",\"outputInputs\":["
                 + "{\"stepOrder\":2,\"outputName\":\"source-audio.wav\",\"inputKey\":\"audio\"},"
-                + "{\"stepOrder\":1,\"outputName\":\"voice.wav\",\"inputKey\":\"voice\",\"optional\":true}]}";
+                + "{\"stepOrder\":1,\"outputName\":\"video-details.json\",\"inputKey\":\"details\","
+                + "\"optional\":true}]}";
 
         service.createWorkflow(UUID.randomUUID(), "Declared inputs", false, List.of(
                 new NewWorkflowStep("probe", "probe", null),
@@ -1025,7 +1090,8 @@ class WorkflowServiceImplTest {
 
     @Test
     void createWorkflowRefusesAMediaStepAfterATextStepEvenWhenItNamesThatStepInOutputInputs() {
-        assertRefused("steps[1].type", NEEDS_UPLOAD,
+        assertRefusedAll(List.of("steps[1].type " + NEEDS_UPLOAD,
+                        "steps[1].config outputInputs reads 'video' from step 1, which records no files"),
                 new NewWorkflowStep("say", "echo", null),
                 new NewWorkflowStep("probe", "probe", null, PROBE_FROM_STEP_1));
     }
@@ -1051,7 +1117,8 @@ class WorkflowServiceImplTest {
     void createWorkflowRefusesOutputInputsThatNameAnInlineTextStepAfterALinkStep() {
         String fromEcho = "{\"outputInputs\":[{\"stepOrder\":2,\"outputName\":\"video\",\"inputKey\":\"media\"}]}";
 
-        assertRefused("steps[2].type", NEEDS_UPLOAD,
+        assertRefusedAll(List.of("steps[2].type " + NEEDS_UPLOAD,
+                        "steps[2].config outputInputs reads 'video' from step 2, which records no files"),
                 new NewWorkflowStep("fetch", "fetch_video", null),
                 new NewWorkflowStep("say", "echo", null),
                 new NewWorkflowStep("probe", "probe", null, fromEcho));
@@ -1089,11 +1156,15 @@ class WorkflowServiceImplTest {
     }
 
     private void assertRefused(String path, String message, NewWorkflowStep... steps) {
+        assertRefusedAll(List.of(path + " " + message), steps);
+    }
+
+    private void assertRefusedAll(List<String> pathsAndMessages, NewWorkflowStep... steps) {
         assertThatThrownBy(() -> service.createWorkflow(UUID.randomUUID(), "Refused", false, List.of(steps)))
                 .isInstanceOfSatisfying(ConstraintViolationException.class,
                         e -> assertThat(e.getConstraintViolations())
                                 .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
-                                .containsExactly(path + " " + message));
+                                .containsExactlyInAnyOrderElementsOf(pathsAndMessages));
 
         verify(workflowRepository, never()).save(any());
         verify(workflowStepRepository, never()).saveAll(any());

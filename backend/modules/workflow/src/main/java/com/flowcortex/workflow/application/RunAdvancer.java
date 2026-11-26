@@ -432,14 +432,14 @@ class RunAdvancer {
                 case STORED -> step.getInput();
                 case STORED_WITH_OUTPUTS -> storedWithOutputsResolver.resolve(step.getInput(),
                         stepConfig, assetOutputsByOrder, run.getId(), order);
-                case RESOLVED -> inputResolver.resolve(order, step.getInputRef(), run.getInput(), outputsByOrder);
+                case RESOLVED -> resolveReference(order, step, run, outputsByOrder);
             };
             StepContext built = new StepContext(run.getId(), step.getId(), order, step.getType(), step.getAttempt(),
                     resolvedInput, stepConfig, step.getInput(), options(run), new ArrayList<>());
             context = built;
             if (executor.isEmpty()) {
                 inClaim = () -> {
-                    throw new StepFailedException(null, "Unsupported step type: " + step.getType());
+                    throw new StepFailedException("unsupported_step_type", "Unsupported step type: " + step.getType());
                 };
             } else if (remote || executor.get().mode() == StepExecutor.Mode.NESTED
                     || executor.get().mode() == StepExecutor.Mode.FANOUT) {
@@ -693,6 +693,18 @@ class RunAdvancer {
     }
 
     /** The options the run was started with; a run started before runs kept options gets the defaults. */
+    /**
+     * Only a reference the resolver cannot read is a handoff fault; any other {@code IllegalStateException}
+     * of the dispatch (run options that are not an object, say) keeps no code.
+     */
+    private String resolveReference(int order, RunStep step, WorkflowRun run, Map<Integer, String> outputsByOrder) {
+        try {
+            return inputResolver.resolve(order, step.getInputRef(), run.getInput(), outputsByOrder);
+        } catch (IllegalStateException e) {
+            throw new StepFailedException("input_unresolved", e.getMessage(), e);
+        }
+    }
+
     private RunOptions options(WorkflowRun run) {
         if (run.getOptions() == null) {
             return RunOptions.DEFAULTS;

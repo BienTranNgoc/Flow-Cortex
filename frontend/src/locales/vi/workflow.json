@@ -42,7 +42,27 @@
     "load_template_missing_input": "Còn thiếu một số đầu vào bắt buộc của mẫu.",
     "load_template_missing_input_fields": "Còn thiếu đầu vào bắt buộc của mẫu: {{fields}}.",
     "reapedInline": "Bước này đã dừng trước khi hoàn tất. Hãy thử chạy lại.",
-    "noMessage": "Bước này đã dừng do gặp lỗi."
+    "noMessage": "Bước này đã dừng do gặp lỗi.",
+    "category": {
+      "validation": "Không thể dùng dữ liệu đầu vào của bước này.",
+      "handoff": "Bước này không đọc được kết quả của một bước trước đó.",
+      "configuration": "Bước này được thiết lập theo cách không thể chạy.",
+      "contract": "Bước này trả về kết quả mà hệ thống không dùng được.",
+      "review_rejected": "Buổi duyệt kết thúc mà không được chấp thuận nên lượt chạy đã dừng.",
+      "insufficient_credits": "Không đủ credit để chạy bước này.",
+      "timeout": "Bước này chạy quá lâu nên đã bị dừng.",
+      "provider_error": "Dịch vụ mà bước này sử dụng đã trả về lỗi.",
+      "quota_exceeded": "Dịch vụ mà bước này sử dụng đã chạm giới hạn sử dụng trong lúc này.",
+      "unavailable": "Bước này hiện chưa thể chạy.",
+      "processing": "Đã xảy ra lỗi khi bước này đang xử lý.",
+      "internal": "Đã xảy ra lỗi từ phía hệ thống."
+    },
+    "recovery": {
+      "retry": "Bạn có thể chạy lại bước này.",
+      "change_input": "Hãy bắt đầu một lượt chạy mới với tệp hoặc đầu vào khác.",
+      "edit_workflow": "Hãy sửa bước này trong quy trình, rồi bắt đầu một lượt chạy mới.",
+      "top_up": "Hãy nạp thêm credit, rồi chạy lại bước này."
+    }
   },
   "step": {
     "state": {

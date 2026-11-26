@@ -185,7 +185,7 @@ class RemoteStepRoundTripIT extends AbstractWorkflowHttpIT {
                         + "{\"stepOrder\":1,\"outputName\":\"video-details.json\",\"inputKey\":\"details\"},"
                         + "{\"stepOrder\":2,\"outputName\":\"" + StoringStepTestConfig.OBJECT_NAME
                         + "\",\"inputKey\":\"voice\"},"
-                        + "{\"stepOrder\":1,\"outputName\":\"accompaniment.wav\",\"inputKey\":\"music\","
+                        + "{\"stepOrder\":2,\"outputName\":\"accompaniment.wav\",\"inputKey\":\"music\","
                         + "\"optional\":true}]}"));
         UUID uploadId = UUID.randomUUID();
         String objectKey = user.id() + "/" + uploadId;

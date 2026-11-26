@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +17,8 @@ class KnownStepTypesTest {
 
     private List<String> violationsOf(NewWorkflowStep... steps) {
         Set<ConstraintViolation<KnownStepTypes.Definition>> violations = validator.validate(
-                new KnownStepTypes.Definition(List.of(steps), Set.of("echo"), Set.of(), Set.of(), Set.of(), Set.of()));
+                new KnownStepTypes.Definition(List.of(steps), Set.of("echo"), Set.of(), Set.of(), Set.of(), Set.of(),
+                        Map.of()));
         return violations.stream()
                 .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                 .sorted()
