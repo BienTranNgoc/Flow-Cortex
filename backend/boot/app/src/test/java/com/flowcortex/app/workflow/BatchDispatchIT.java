@@ -10,7 +10,6 @@ import com.flowcortex.jobs.api.ClusterJob;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
 import com.flowcortex.workflow.api.WorkflowView;
-import com.flowcortex.workflow.application.RunCancellation;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -41,7 +40,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -67,6 +65,7 @@ class BatchDispatchIT extends AbstractWorkflowHttpIT {
     private static final Duration TIMEOUT = Duration.ofSeconds(45);
     private static final Duration QUIET = Duration.ofMillis(1500);
     private static final Pattern PASS_MS = Pattern.compile("pass_ms=(\\d+)");
+    private static final String CANCELLATION_SETTING = "workflow.run_cancellation.enabled";
     private static final String DISPATCHER_LOG = "com.flowcortex.workflow.application.BatchDispatcher";
     private static final List<ILoggingEvent> PASSES = new CopyOnWriteArrayList<>();
 
@@ -611,9 +610,14 @@ class BatchDispatchIT extends AbstractWorkflowHttpIT {
         ReflectionTestUtils.setField(context.getBean("runStartPreflight"), "workflowEnabled", enabled);
     }
 
+    /** Run cancellation is a runtime setting read on every call; a stored value overrides the configured one. */
     private void setCancellationEnabled(boolean enabled) {
-        Object target = AopTestUtils.getUltimateTargetObject(context.getBean(RunCancellation.class));
-        ReflectionTestUtils.setField(target, "enabled", enabled);
+        jdbc.update("DELETE FROM app_setting_change WHERE key = ?", CANCELLATION_SETTING);
+        jdbc.update("DELETE FROM app_setting WHERE key = ?", CANCELLATION_SETTING);
+        if (!enabled) {
+            jdbc.update("INSERT INTO app_setting (key, value, updated_by, updated_at) VALUES (?, 'false', NULL, now())",
+                    CANCELLATION_SETTING);
+        }
     }
 
     private long count(String sql, Object... args) {
