@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
@@ -50,8 +52,23 @@ public class OutboundHttp {
         }
     }
 
-    /** A response of any status; {@code body} is cut at the character cap and {@code truncated} says so. */
-    public record Response(int status, String contentType, String body, boolean truncated) {
+    /**
+     * A response of any status; {@code body} is cut at the character cap and {@code truncated} says so.
+     * {@code retryAfter} is the {@code Retry-After} header in seconds, else {@code null}.
+     */
+    public record Response(int status, String contentType, String body, boolean truncated, Duration retryAfter) {
+    }
+
+    /**
+     * A response of any status read as bytes: {@code body} holds at most the asked {@code maxBytes} and
+     * {@code overLimit} says the answer was longer. {@code retryAfter} as in {@link Response}.
+     */
+    public record BytesResponse(int status, String contentType, byte[] body, boolean overLimit, Duration retryAfter) {
+
+        @Override
+        public String toString() {
+            return "BytesResponse[status=" + status + ", bytes=" + body.length + ", overLimit=" + overLimit + "]";
+        }
     }
 
     private final HttpClient client;
@@ -96,12 +113,33 @@ public class OutboundHttp {
      * @throws ConnectorException {@code UPSTREAM_UNAVAILABLE}, retryable when nothing was written
      */
     public Response execute(String connector, Request request) {
+        return retrying(connector, request, http -> send(http, request, OutboundHttp::readText),
+                response -> LOG.info("Outbound {} {} status {} body {} chars", connector, request.method(),
+                        response.status(), response.body().length()));
+    }
+
+    /**
+     * Like {@link #execute} for a body that is not text: reads at most {@code maxBytes} and says whether the answer
+     * was longer. The same client, proxy, retry rule and secret-free failures apply.
+     *
+     * @param connector the connector key, used in the log line only
+     * @throws ConnectorException {@code UPSTREAM_UNAVAILABLE}, retryable when nothing was written
+     */
+    public BytesResponse executeBytes(String connector, Request request, int maxBytes) {
+        return retrying(connector, request, http -> send(http, request, (status, contentType, retryAfter, stream) -> {
+            BoundedRead.Result read = BoundedRead.read(stream, maxBytes);
+            return new BytesResponse(status, contentType, read.bytes(), read.overLimit(), retryAfter);
+        }), response -> LOG.info("Outbound {} {} status {} body {} bytes", connector, request.method(),
+                response.status(), response.body().length));
+    }
+
+    private <T> T retrying(String connector, Request request, Function<RestClient, T> exchange,
+            Consumer<T> logged) {
         RestClient http = clients.computeIfAbsent(request.readTimeout(), this::newClient);
         for (int attempt = 1;; attempt++) {
             try {
-                Response response = send(http, request);
-                LOG.info("Outbound {} {} status {} body {} chars", connector, request.method(), response.status(),
-                        response.body().length());
+                T response = exchange.apply(http);
+                logged.accept(response);
                 return response;
             } catch (RuntimeException ex) {
                 OutboundFailurePhase phase = OutboundFailurePhase.classify(ex);
@@ -123,7 +161,14 @@ public class OutboundHttp {
         return RestClient.builder().requestFactory(factory).build();
     }
 
-    private static Response send(RestClient http, Request request) {
+    /** Turns the status line, two headers and the body stream of one answer into the caller's result. */
+    @FunctionalInterface
+    private interface Reader<T> {
+
+        T read(int status, String contentType, Duration retryAfter, InputStream stream) throws IOException;
+    }
+
+    private static <T> T send(RestClient http, Request request, Reader<T> reader) {
         RestClient.RequestBodySpec spec = http.method(request.method())
                 .uri(request.uri())
                 .headers(headers -> request.headers().forEach(headers::set));
@@ -132,11 +177,27 @@ public class OutboundHttp {
         }
         return spec.exchange((clientRequest, clientResponse) -> {
             String contentType = clientResponse.getHeaders().getFirst("Content-Type");
-            return read(clientResponse.getStatusCode().value(), contentType, clientResponse.getBody());
+            Duration retryAfter = retryAfter(clientResponse.getHeaders().getFirst("Retry-After"));
+            return reader.read(clientResponse.getStatusCode().value(), contentType, retryAfter,
+                    clientResponse.getBody());
         });
     }
 
-    private static Response read(int status, String contentType, InputStream stream) throws IOException {
+    /** Whole seconds only: the HTTP-date form is ignored. A day is the most a caller is told to wait. */
+    private static Duration retryAfter(String header) {
+        if (header == null) {
+            return null;
+        }
+        try {
+            long seconds = Long.parseLong(header.trim());
+            return seconds < 0 ? null : Duration.ofSeconds(Math.min(seconds, 86_400));
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private static Response readText(int status, String contentType, Duration retryAfter, InputStream stream)
+            throws IOException {
         byte[] bytes = stream.readNBytes(MAX_BODY_BYTES + 1);
         boolean truncated = bytes.length > MAX_BODY_BYTES;
         String text = new String(bytes, 0, Math.min(bytes.length, MAX_BODY_BYTES), StandardCharsets.UTF_8);
@@ -144,7 +205,7 @@ public class OutboundHttp {
             text = text.substring(0, MAX_BODY_CHARS);
             truncated = true;
         }
-        return new Response(status, contentType, text, truncated);
+        return new Response(status, contentType, text, truncated, retryAfter);
     }
 
     private boolean pause() {

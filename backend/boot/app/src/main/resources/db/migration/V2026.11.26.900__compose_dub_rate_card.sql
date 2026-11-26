@@ -10,7 +10,7 @@
 --   BEGIN;
 --   DELETE FROM capability_pricing WHERE capability = 'compose_dub';
 --   DELETE FROM rate_card WHERE rate_card_ref = 'video.compose';
---   DELETE FROM flyway_schema_history WHERE version = '2026.11.24.300';
+--   DELETE FROM flyway_schema_history WHERE version = '2026.11.26.900';
 --   COMMIT;
 
 INSERT INTO rate_card (id, rate_card_ref, pricing_unit, provider_key, credits_per_unit, markup_pct, effective_from)

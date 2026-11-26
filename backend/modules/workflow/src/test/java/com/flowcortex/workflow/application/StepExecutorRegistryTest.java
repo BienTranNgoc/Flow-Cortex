@@ -282,4 +282,28 @@ class StepExecutorRegistryTest {
         assertThatThrownBy(() -> new StepExecutorRegistry(List.of(new EchoStepExecutor(), new EchoStepExecutor())))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    private static StepExecutor executor(String type, boolean available) {
+        StepExecutor executor = mock(StepExecutor.class);
+        when(executor.type()).thenReturn(type);
+        when(executor.available()).thenReturn(available);
+        return executor;
+    }
+
+    @Test
+    void theFirstUnavailableTypeIsTheFirstOfTheGivenOrderNotOfTheRegistrys() {
+        StepExecutor first = executor("first", false);
+        StepExecutor second = executor("second", false);
+        StepExecutorRegistry unavailable = new StepExecutorRegistry(List.of(first, second, new EchoStepExecutor()));
+
+        assertThat(unavailable.firstUnavailable(List.of("echo", "second", "first"))).containsSame(second);
+    }
+
+    @Test
+    void anUnknownTypeAndAnAvailableTypeAreNeverUnavailable() {
+        StepExecutorRegistry unavailable = new StepExecutorRegistry(List.of(executor("first", true)));
+
+        assertThat(unavailable.firstUnavailable(List.of("nope", "first"))).isEmpty();
+        assertThat(unavailable.firstUnavailable(List.of())).isEmpty();
+    }
 }
