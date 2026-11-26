@@ -8,6 +8,7 @@ import enDashboard from '../locales/en/dashboard.json';
 import enDrive from '../locales/en/drive.json';
 import enDriveItems from '../locales/en/driveItems.json';
 import enDriveMemory from '../locales/en/driveMemory.json';
+import enLegal from '../locales/en/legal.json';
 import enOnboarding from '../locales/en/onboarding.json';
 import enRunHistory from '../locales/en/runHistory.json';
 import enNotifications from '../locales/en/notifications.json';
@@ -22,6 +23,7 @@ import viDashboard from '../locales/vi/dashboard.json';
 import viDrive from '../locales/vi/drive.json';
 import viDriveItems from '../locales/vi/driveItems.json';
 import viDriveMemory from '../locales/vi/driveMemory.json';
+import viLegal from '../locales/vi/legal.json';
 import viOnboarding from '../locales/vi/onboarding.json';
 import viRunHistory from '../locales/vi/runHistory.json';
 import viNotifications from '../locales/vi/notifications.json';
@@ -46,6 +48,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     driveItems: viDriveItems,
     driveMemory: viDriveMemory,
     billing: viBilling,
+    legal: viLegal,
   },
   en: {
     common: enCommon,
@@ -62,6 +65,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     driveItems: enDriveItems,
     driveMemory: enDriveMemory,
     billing: enBilling,
+    legal: enLegal,
   },
 });
 

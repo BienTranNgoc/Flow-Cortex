@@ -10,6 +10,8 @@ import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +47,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @TestPropertySource(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({WorkflowForkService.class, ServedDefinitions.class, WorkflowForkConcurrencyIT.Beans.class})
+@Import({WorkflowForkService.class, ServedDefinitions.class, WorkflowDataStore.class, WorkflowWriteAccess.class,
+        WorkflowForkConcurrencyIT.Beans.class})
 @Testcontainers
 class WorkflowForkConcurrencyIT {
 
@@ -64,6 +67,11 @@ class WorkflowForkConcurrencyIT {
         @Bean
         StepExecutorRegistry stepExecutorRegistry() {
             return new StepExecutorRegistry(mock(MediaJobs.class), Clock.systemUTC());
+        }
+
+        @Bean
+        Validator validator() {
+            return Validation.buildDefaultValidatorFactory().getValidator();
         }
     }
 
