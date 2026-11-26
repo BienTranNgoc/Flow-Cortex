@@ -1,6 +1,7 @@
 import { setToken, type AdminSetting } from '@flow-cortex/api-client';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { stubDialogElement } from '../../test/dialog';
 import { ADMIN_ME, renderRoute, staffMe, stubApi } from '../../test/fakeApi';
 import { SettingsPage } from './SettingsPage';
 
@@ -210,39 +211,7 @@ describe('SettingsPage', () => {
   });
 
   describe('lowering the versions kept per project', () => {
-    const showModalDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLDialogElement.prototype,
-      'showModal',
-    );
-    const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
-
-    beforeEach(() => {
-      Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.setAttribute('open', '');
-        },
-      });
-      Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.removeAttribute('open');
-          this.dispatchEvent(new Event('close'));
-        },
-      });
-    });
-    afterEach(() => {
-      for (const [name, descriptor] of [
-        ['showModal', showModalDescriptor],
-        ['close', closeDescriptor],
-      ] as const) {
-        if (descriptor) {
-          Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
-        } else {
-          Reflect.deleteProperty(HTMLDialogElement.prototype, name);
-        }
-      }
-    });
+    stubDialogElement();
 
     const VERSIONS = 'media.editor.project_max_versions';
     const VERSIONS_LABEL = 'Versions kept per project';

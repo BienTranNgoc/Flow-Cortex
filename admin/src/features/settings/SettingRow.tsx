@@ -1,4 +1,5 @@
 import { ApiError, type AdminSetting } from '@flow-cortex/api-client';
+import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatVietnamTime } from '../support/vietnamTime';
@@ -16,6 +17,13 @@ interface SettingRowProps {
 /** The refused-value text the server wrote in the caller's language, else the generic save failure. */
 function refusal(error: unknown): string | undefined {
   return error instanceof ApiError && error.status === 422 ? error.problem?.errors?.value : undefined;
+}
+
+/** Who last changed the stored value and when, or null when it was never changed. */
+function changeNote(t: TFunction, setting: AdminSetting): string | null {
+  if (!setting.updatedAt) return null;
+  const key = setting.updatedBy ? 'settings.changedBy' : 'settings.changedAt';
+  return t(key, { email: setting.updatedBy, at: formatVietnamTime(setting.updatedAt) });
 }
 
 /** A lowering the admin has not confirmed yet: the change it releases and the button that asked. */
@@ -106,12 +114,56 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
     save(value);
   };
 
-  const change = setting.updatedAt
-    ? t(setting.updatedBy ? 'settings.changedBy' : 'settings.changedAt', {
-        email: setting.updatedBy,
-        at: formatVietnamTime(setting.updatedAt),
-      })
-    : null;
+  const change = changeNote(t, setting);
+  const describedBy = message ? messageId : undefined;
+
+  const renderControl = () => {
+    if (isSwitch) {
+      return (
+        <input
+          id={controlId}
+          className="settings-switch"
+          type="checkbox"
+          role="switch"
+          checked={decided === true}
+          disabled={!canUpdate}
+          aria-disabled={busy}
+          aria-describedby={describedBy}
+          onChange={(event) => toggle(event.target.checked)}
+        />
+      );
+    }
+    if (setting.type === 'ENUM') {
+      return <output id={controlId}>{String(decided)}</output>;
+    }
+    return (
+      <form className="settings-number" onSubmit={submitNumber} noValidate>
+        <input
+          id={controlId}
+          type="text"
+          inputMode="numeric"
+          value={draft}
+          readOnly={!canUpdate}
+          aria-invalid={message !== null}
+          aria-describedby={describedBy}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setBounds(null);
+          }}
+        />
+        {canUpdate && (
+          <button
+            ref={saveButton}
+            type="submit"
+            className="cortex-admin-btn cortex-admin-btn--primary cortex-admin-btn--sm"
+            aria-disabled={busy || draft.trim() === String(decided)}
+          >
+            {t(update.isPending ? 'settings.saving' : 'settings.save')}
+          </button>
+        )}
+      </form>
+    );
+  };
 
   return (
     <li className="cortex-admin-panel settings-item" data-setting={setting.key}>
@@ -122,47 +174,7 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
           </label>
           {help && <p className="settings-muted">{help}</p>}
         </div>
-        {isSwitch ? (
-          <input
-            id={controlId}
-            className="settings-switch"
-            type="checkbox"
-            role="switch"
-            checked={decided === true}
-            disabled={!canUpdate}
-            aria-disabled={busy}
-            aria-describedby={message ? messageId : undefined}
-            onChange={(event) => toggle(event.target.checked)}
-          />
-        ) : setting.type === 'ENUM' ? (
-          <output id={controlId}>{String(decided)}</output>
-        ) : (
-          <form className="settings-number" onSubmit={submitNumber} noValidate>
-            <input
-              id={controlId}
-              type="text"
-              inputMode="numeric"
-              value={draft}
-              readOnly={!canUpdate}
-              aria-invalid={message !== null}
-              aria-describedby={message ? messageId : undefined}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                setBounds(null);
-              }}
-            />
-            {canUpdate && (
-              <button
-                ref={saveButton}
-                type="submit"
-                className="cortex-admin-btn cortex-admin-btn--primary cortex-admin-btn--sm"
-                aria-disabled={busy || draft.trim() === String(decided)}
-              >
-                {t(update.isPending ? 'settings.saving' : 'settings.save')}
-              </button>
-            )}
-          </form>
-        )}
+        {renderControl()}
       </div>
 
       <p className="settings-meta">
