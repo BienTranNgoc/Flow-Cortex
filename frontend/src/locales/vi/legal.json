@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "label": "Tài liệu pháp lý"
+  },
+  "footer": {
+    "menu": "Pháp lý"
+  },
+  "index": {
+    "title": "Tài liệu pháp lý",
+    "intro": "Chọn một tài liệu trong danh sách.",
+    "empty": "Chưa có tài liệu pháp lý nào được công bố",
+    "error": "Không tải được danh sách tài liệu pháp lý."
+  },
+  "document": {
+    "version": "Phiên bản",
+    "effectiveDate": "Ngày hiệu lực",
+    "publishedAt": "Ngày công bố",
+    "textHeading": "Nội dung tài liệu",
+    "earlierVersions": "Các phiên bản trước",
+    "notAvailable": "Tài liệu này hiện không có sẵn",
+    "error": "Không tải được tài liệu này."
+  },
+  "history": {
+    "title": "Các phiên bản trước",
+    "pager": "Phân trang",
+    "empty": "Chưa có phiên bản trước nào được công bố",
+    "previous": "Trước",
+    "next": "Sau",
+    "notAvailable": "Phiên bản này hiện không có sẵn",
+    "olderNotice": "Đây là phiên bản trước, được công bố ngày {{date}}.",
+    "currentNotice": "Đây là phiên bản hiện hành, được công bố ngày {{date}}.",
+    "currentLink": "Xem phiên bản hiện hành",
+    "error": "Không tải được các phiên bản trước."
+  },
+  "common": {
+    "retry": "Thử lại",
+    "loading": "Đang tải…"
+  }
+}

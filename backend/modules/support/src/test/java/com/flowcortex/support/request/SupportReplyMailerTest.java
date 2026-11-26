@@ -134,7 +134,7 @@ class SupportReplyMailerTest {
     }
 
     private static SupportProperties properties(boolean enabled) {
-        return new SupportProperties(enabled, null, new SupportProperties.Assistant(false, "m", 2000, 50, 10, 100),
+        return new SupportProperties(enabled, null, new SupportProperties.Assistant(false, 2000, 50, 10, 100),
                 new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
     }
 }
