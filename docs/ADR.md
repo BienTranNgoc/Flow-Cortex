@@ -1044,3 +1044,139 @@ written, and whichever change merges first takes it.
     child price.
   - A lost signal costs at most the wait up to the sweep or the parent's
     deadline.
+
+---
+
+## ADR-0037 — TOTP second factor at session creation
+
+The number is provisional: it is the next free one when this was written, and
+whichever change merges first takes it.
+
+- **Context:** A password, or a Google account, is the only proof behind every
+  session, including those of the accounts that read personal data and change
+  other accounts (the super admin and the four staff roles that reach the
+  console). The access token is a stateless JWT with no session id, and a
+  session is a refresh-token family, so a per-session "verified" flag in the
+  Xood style has no row to live on at request time. Member sign-in has no route
+  guard to hang such a flag on either.
+- **Decision:**
+  - **The second factor is asked where a first factor becomes a session.**
+    Password login, Google sign-in and the email and password-link sign-ins all
+    go through one gate. An account with TOTP on gets no session: the answer is
+    `202` and an `HttpOnly`, `Secure`, `SameSite=Strict` challenge cookie
+    (`totp_challenge`, or `totp_challenge_admin` for the admin client) scoped to
+    `/api/v1/auth/login/totp`, valid 5 minutes, stored only as a hash. The code
+    goes to that route, which carries no bearer token (`permitAll`). Completion
+    re-runs the checks the first factor ran (account not locked, active, email
+    confirmed for the password and link origins) and refuses with 401 when TOTP
+    is no longer on, so a suspension, disable or reset during the window cannot
+    be outrun. A challenge is spent once by a conditional `UPDATE` and dies at
+    the fifth wrong code. Accounts without TOTP see no change. Google sign-in
+    carries the challenge in the cookie and redirects to `/login/totp`, never in
+    a URL.
+  - **The session carries a mark, not a lookup.** Completion opens a refresh
+    family with `refresh_token.mfa_verified_at` set, and every rotation copies
+    it and mints the access token with an `mfa: true` claim (absent otherwise,
+    so older tokens read as unverified). Enabling TOTP revokes every other
+    family of the account and opens one marked family. Admin requests read the
+    claim from the token they already resolve and add no query.
+  - **The admin decision has one more step, before the super-admin pass.** The
+    order is: no keys, deny; deactivated, `admin-disabled`; a console account
+    (super admin or staff role) whose session has no mark, 403 `mfa-required`
+    with an `enrolled` flag; super admin, allow; then the keys. An end user
+    keeps `forbidden`, so a member is never sent to an enrollment screen for a
+    route it may never use. Every caller of the decision passes the step,
+    including the programmatic check behind `/users/{id}` writes and support
+    ticket closing, which reads the claim from the security context. Creating a
+    personal access token needs a marked session too (`PAT_MFA_REQUIRED`, the
+    proof not spent). An un-enrolled console account still gets a session,
+    because enrollment needs an authenticated caller; every governed route
+    refuses it and the console shows only the setup screen. Chat and member
+    routes are not governed and stay open to it.
+  - **The requirement has a switch, and the switch is configuration.**
+    `flowcortex.auth.totp.admin-required` (default `true`) lifts the console
+    requirement and the refusal to turn TOTP off for a console account. It is
+    not a console toggle, so a stolen super-admin session cannot turn the factor
+    off. It does not remove the factor from an account that has it: an enrolled
+    account is still asked for its code at sign-in.
+  - **A code is accepted once, and wrong ones are bounded.** RFC 6238 HMAC-SHA1,
+    6 digits, 30 seconds, the previous, current and next step accepted. The
+    matched step is claimed by a conditional `UPDATE` that only moves
+    `last_used_step` forward, so a replay or a second request with the same code
+    loses. Ten consecutive wrong codes lock the account for 15 minutes, counted
+    and locked by one `UPDATE`; a right code while locked is refused without
+    claiming its step. Ten recovery codes (50 bits each, shown once) are stored
+    as keyed HMACs and spent by deleting the row; regenerating them needs a TOTP
+    code, never a recovery code. Disabling needs a code, not a password, so a
+    Google-only account can turn it off, and is refused for a console account
+    while the requirement is on.
+  - **The keyring encrypts every secret and the app does not start without it.**
+    Secrets are AES-256-GCM with the account id as associated data, stored as
+    `kid.iv.tag.ct`, so a copied value cannot be opened under another account.
+    The keyring is `flowcortex.auth.totp.keys.<id>` with `current-key-id`; the
+    environment fills `keys.k1` from `FLOWCORTEX_AUTH_TOTP_KEYS_K1` (32 random
+    bytes, base64), the dev profile supplies a fixed non-secret key, and a
+    missing or invalid key stops startup in every other profile. Recovery-code
+    hashes use a key derived from the same ring per key id. A secret the keyring
+    cannot open answers 503 `TOTP_UNAVAILABLE` and is not counted as a wrong
+    code. Operators: generate the key with `openssl rand -base64 32`, set it in
+    the deploy host's `.env` (compose passes it) and back it up with the other
+    deployment secrets before the release. Losing it makes every secret
+    unreadable. Rotating adds a new key id and moves `current-key-id`; an old id
+    stays in the ring while any secret or recovery code still lives under it, and
+    nothing re-encrypts them in bulk.
+  - **Reset is a write on `/api/v1/users/{id}`, under the owner scope of every
+    other write there.** It needs `user.account.update`, plus
+    `system.admin_account.manage` for a console target, and is never allowed on
+    oneself. One transaction deletes the secret, the recovery codes and the live
+    challenges of the target and revokes its refresh tokens and personal access
+    tokens; the next sign-in is password-only. Enable, disable, reset (actor and
+    target), lock, recovery-code use, regeneration and a failed sign-in code
+    each write one auth event, none carrying a code or a secret.
+  - **Break-glass for a super admin no live owner can reach.** A super admin is
+    owned by its creator, and the owner scope lets only the owner reach it. The
+    self-owned root admin, and any super admin whose owner is gone, is therefore
+    reachable by nobody through the API. If its device is lost, in order:
+    1. Its recovery codes: sign in with one, then enroll again.
+    2. Operator SQL against the production database, in one transaction:
+       `DELETE FROM user_totp WHERE user_id = '<id>';`
+       `DELETE FROM user_recovery_code WHERE user_id = '<id>';`
+       `DELETE FROM login_challenge WHERE user_id = '<id>';`
+       `UPDATE refresh_token SET revoked_at = now() WHERE user_id = '<id>' AND revoked_at IS NULL;`
+       `UPDATE personal_access_token SET revoked_at = now() WHERE user_id = '<id>' AND revoked_at IS NULL;`
+       The account then signs in with its password, reaches only the setup
+       screen and enrolls a new device. The SQL writes no auth event, so the
+       operator records it in the incident log.
+
+    The same SQL covers an unreadable secret after a lost keyring. Setting
+    `FLOWCORTEX_AUTH_TOTP_ADMIN_REQUIRED=false` in the host `.env` and
+    recreating the backend container is the other tool, for a blocked rollout
+    (console accounts that cannot enroll); it is not a way past a lost device,
+    because the sign-in challenge is not part of the requirement.
+- **Consequences:**
+  - New tables `user_totp`, `user_recovery_code` and `login_challenge`, and a
+    nullable `refresh_token.mfa_verified_at`; the migration is additive and
+    two-way (rollback in its header). The auth retention job deletes expired and
+    spent challenges.
+  - `POST /api/v1/auth/login`, `/auth/confirm-email` and `/auth/password-link`
+    gain a `202` answer. A client that treats any 2xx as tokens breaks; the
+    member app, the admin SPA and the compose smoke probe are the consumers, and
+    all handle it.
+  - Deploying turns the requirement on for every console account at once; each
+    enrolls from the setup screen on its next admin request. The switch ends a
+    blocked rollout without a code change.
+  - An access token minted before an enable or a reset stays valid for at most
+    its 15-minute lifetime, the window that already exists for a suspension;
+    refresh is refused at once.
+  - The lockout is flat: 10 guesses per 15 minutes is about 960 a day against
+    three accepted codes in a million, and every lock is audited. An escalating
+    lockout is a later change.
+  - An un-enrolled console account can enroll with a password-only session, so
+    whoever holds that password first can bind their own authenticator to it. A
+    notification on enable would detect it and is a later change.
+  - Existing integration tests run with the requirement off and a test keyring;
+    the TOTP tests share one context with it on, a movable clock and a mutable
+    requirement.
+  - The cipher follows ADR-0012's keyring pattern as a second copy, because the
+    connector one is package-private to its module; the two merge when a shared
+    home exists.

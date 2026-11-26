@@ -401,6 +401,59 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
+## Two-factor sign-in (`V2026.11.24.010`)
+
+```mermaid
+erDiagram
+  app_user ||--o| user_totp : "user_id, ON DELETE CASCADE"
+  app_user ||--o{ user_recovery_code : "user_id, ON DELETE CASCADE"
+  app_user ||--o{ login_challenge : "user_id, ON DELETE CASCADE"
+  app_user ||--o{ refresh_token : "user_id, ON DELETE CASCADE"
+
+  user_totp {
+    uuid user_id PK, FK
+    text secret_encrypted "AES-256-GCM, kid.iv.tag.ct, bound to the account id"
+    timestamptz enabled_at "NULL = setup pending, not yet confirmed with a code"
+    bigint last_used_step "highest accepted 30 s step; moved forward by a conditional UPDATE, so a code is accepted once"
+    integer failed_attempts "CHECK >= 0; back to 0 when the account locks or a code is accepted"
+    timestamptz locked_until "NULL = not locked"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  user_recovery_code {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar key_id "keyring id the hash was made under"
+    char code_hash "UNIQUE (user_id, key_id, code_hash); hex HMAC-SHA256 of the normalized code"
+    timestamptz created_at
+  }
+  login_challenge {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE; index idx_login_challenge_user"
+    char token_hash UK "SHA-256 hex of the cookie value; the value itself is never stored"
+    boolean remember_me "carried to the session the completed challenge opens"
+    varchar origin "password | google | link, CHECK"
+    integer failed_codes "CHECK >= 0; the limit is configuration, enforced in the statement"
+    timestamptz expires_at "index idx_login_challenge_expires — retention scan"
+    timestamptz spent_at "set once by a conditional UPDATE; NULL = unspent"
+    timestamptz created_at
+  }
+  refresh_token {
+    uuid id PK
+    uuid user_id FK "ON DELETE CASCADE"
+    uuid family_id "one family = one session"
+    timestamptz mfa_verified_at "NULL = the session never passed the second factor; copied to every rotation"
+  }
+```
+
+`refresh_token` shows only the columns this section touches; the rest are in `V2026.10.14.002`.
+
+A recovery code is spent by deleting its row, so nothing reads a used code and no purge exists. A pending
+setup is the one `user_totp` row of the account with `enabled_at` NULL, replaced in place by a new setup
+without clearing `failed_attempts` and `locked_until`, so starting over does not lift a lock. Live
+challenges of an account are deleted with its disable and reset; the auth retention job deletes the dead
+ones.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
