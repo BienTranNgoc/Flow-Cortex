@@ -4,11 +4,13 @@ import {
   type ModerationPersonResponse,
 } from '@flow-cortex/api-client';
 import { ArrowLeft } from '@phosphor-icons/react';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { Timestamp } from '../../app/AdminList';
+import { detailLoadScreen } from '../../app/detailLoadScreen';
 import { PageHeading } from '../../app/PageHeading';
 import { can } from '../../app/permissions';
 import { StatusPill } from '../../app/StatusPill';
@@ -84,6 +86,13 @@ function HistoryTable({ entries }: Readonly<{ entries: ModerationHistoryEntryRes
   );
 }
 
+/** The server's explanation of a failed action, or a generic one when it gave none. */
+function moderationFailure(t: TFunction, error: unknown): string | undefined {
+  if (!error) return undefined;
+  const detail = error instanceof ApiError ? error.problem?.detail : undefined;
+  return detail ?? t('workflowReports.dialog.failed');
+}
+
 export function WorkflowReportDetailPage() {
   const { t } = useTranslation();
   usePageTitle(t('workflowReports.detail.title'));
@@ -101,59 +110,14 @@ export function WorkflowReportDetailPage() {
     </Link>
   );
 
-  const failure = query.error instanceof ApiError ? query.error.status : undefined;
-  if (!parsedId.success || failure === 404 || failure === 400) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflowReports.detail.notFound')}</h1>
-        <p role="alert">{t('workflowReports.detail.notFoundHint')}</p>
-      </div>
-    );
-  }
-  if (failure === 503) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflowReports.detail.title')}</h1>
-        <output className="cortex-admin-disabled-banner">{t('common.shell.list.disabled')}</output>
-      </div>
-    );
-  }
-  if (query.isPending) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflowReports.detail.title')}</h1>
-        <output className="cortex-admin-loading">{t('workflowReports.detail.loading')}</output>
-      </div>
-    );
-  }
-  if (query.isError || !query.data) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflowReports.detail.title')}</h1>
-        <div className="cortex-admin-error">
-          <p role="alert">
-            {failure === 403 ? t('workflowReports.detail.forbidden') : t('workflowReports.detail.loadError')}
-          </p>
-          <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
-            {t('common.shell.list.retry')}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const screen = detailLoadScreen(t, { back, keyPrefix: 'workflowReports.detail', idValid: parsedId.success, query });
+  if (screen || !query.data) return screen;
 
   const report = query.data;
   const { workflow } = report;
   const actions = allowedActions(workflow.moderationStatus, workflow.deleted, me);
   const canOpenWorkflow = !workflow.deleted && can(me, 'workflow.workflow.view');
-  const actionError = moderate.error
-    ? ((moderate.error instanceof ApiError ? moderate.error.problem?.detail : undefined) ??
-      t('workflowReports.dialog.failed'))
-    : undefined;
+  const actionError = moderationFailure(t, moderate.error);
   const closeDialog = () => {
     setActing(undefined);
     moderate.reset();

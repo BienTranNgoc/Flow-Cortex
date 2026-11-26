@@ -1,10 +1,11 @@
-import { ApiError, ListAdminRunsStatus } from '@flow-cortex/api-client';
+import { ListAdminRunsStatus } from '@flow-cortex/api-client';
 import { ArrowLeft } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import { Timestamp } from '../../app/AdminList';
 import { BarSeries } from '../../app/BarSeries';
+import { detailLoadScreen } from '../../app/detailLoadScreen';
 import { MetricCard } from '../../app/MetricCard';
 import { PageHeading } from '../../app/PageHeading';
 import { can } from '../../app/permissions';
@@ -35,50 +36,8 @@ export function WorkflowReportPage() {
     </Link>
   );
 
-  const failure = query.error instanceof ApiError ? query.error.status : undefined;
-  if (!parsedId.success || failure === 404 || failure === 400) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflows.report.notFound')}</h1>
-        <p role="alert">{t('workflows.report.notFoundHint')}</p>
-      </div>
-    );
-  }
-  if (failure === 503) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflows.report.title')}</h1>
-        <output className="cortex-admin-disabled-banner">{t('common.shell.list.disabled')}</output>
-      </div>
-    );
-  }
-  if (query.isPending) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflows.report.title')}</h1>
-        <output className="cortex-admin-loading">{t('workflows.report.loading')}</output>
-      </div>
-    );
-  }
-  if (query.isError || !query.data) {
-    return (
-      <div>
-        {back}
-        <h1>{t('workflows.report.title')}</h1>
-        <div className="cortex-admin-error">
-          <p role="alert">
-            {failure === 403 ? t('workflows.report.forbidden') : t('workflows.report.loadError')}
-          </p>
-          <button type="button" className="cortex-admin-btn" onClick={() => query.refetch()}>
-            {t('common.shell.list.retry')}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const screen = detailLoadScreen(t, { back, keyPrefix: 'workflows.report', idValid: parsedId.success, query });
+  if (screen || !query.data) return screen;
 
   const { workflow, countsByStatus, lastRunAt, series } = query.data;
   const locale = activeLocale();

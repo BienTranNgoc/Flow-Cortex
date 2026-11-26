@@ -126,6 +126,22 @@ describe('WorkflowReportDetailPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('keeps the dialog and the typed reason when the backdrop is clicked', async () => {
+    stubApi({
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [REPORT_PATH]: { status: 200, body: report() },
+    });
+    render();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Hide' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Reason (required)'), 'Repeated spam');
+    await userEvent.click(dialog);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Reason (required)')).toHaveValue('Repeated spam');
+  });
+
   it('offers only dismiss and resolve to a caller without the hide key', async () => {
     stubApi({
       [ME_PATH]: {

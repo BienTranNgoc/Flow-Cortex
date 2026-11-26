@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, type FormEvent } from 'react';
+import { useId, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalDialog } from '../../app/useModalDialog';
 
 interface StopRunDialogProps {
   readonly pending: boolean;
@@ -13,12 +14,7 @@ interface StopRunDialogProps {
 export function StopRunDialog({ pending, error, onConfirm, onClose }: StopRunDialogProps) {
   const { t } = useTranslation();
   const titleId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
+  const dialogRef = useModalDialog();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

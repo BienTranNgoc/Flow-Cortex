@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalDialog } from '../../app/useModalDialog';
 import { reasonRequired, type ModerationAction } from './moderationActions';
 import './workflowReports.css';
 
@@ -24,18 +25,13 @@ export function ModerationDialog({ action, pending, error, onConfirm, onClose }:
   const reasonId = useId();
   const reasonErrorId = useId();
   const noteId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useModalDialog();
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [missingReason, setMissingReason] = useState(false);
   const needsReason = reasonRequired(action);
   const takesContentDown = action === 'hide' || action === 'remove';
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -55,9 +51,6 @@ export function ModerationDialog({ action, pending, error, onConfirm, onClose }:
       className="cortex-admin-account-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <form className="moderation-dialog__body" onSubmit={submit} noValidate>
         <h2 id={titleId}>{t(`workflowReports.dialog.${action}.title`)}</h2>

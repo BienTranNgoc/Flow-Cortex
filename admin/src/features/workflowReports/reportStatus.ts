@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import type { StatusTone } from '../../app/StatusPill';
 
 const REPORT_STATUSES: readonly string[] = Object.values(ListWorkflowReportsStatus);
-const MODERATION_STATUSES: readonly string[] = ['visible', 'hidden', 'removed'];
+const MODERATION_STATUSES: ReadonlySet<string> = new Set(['visible', 'hidden', 'removed']);
 
 /** The pill colour of a report status; a code this console does not know reads as informational. */
 export function reportStatusTone(status: string): StatusTone {
@@ -29,13 +29,13 @@ export function reportStatusLabel(t: TFunction, status: string): string {
 
 export function moderationStatusTone(status: string): StatusTone {
   if (status === 'visible') return 'success';
-  return MODERATION_STATUSES.includes(status) ? 'error' : 'info';
+  return MODERATION_STATUSES.has(status) ? 'error' : 'info';
 }
 
 /** The workflow's moderation status in the active language; a deleted workflow reads as deleted. */
 export function moderationStatusLabel(t: TFunction, status: string, deleted: boolean): string {
   if (deleted) return t('workflowReports.moderation.deleted');
-  return MODERATION_STATUSES.includes(status) ? t(`workflowReports.moderation.${status}`) : status;
+  return MODERATION_STATUSES.has(status) ? t(`workflowReports.moderation.${status}`) : status;
 }
 
 /** The reason a member gave; a code this console does not know is shown as sent. */

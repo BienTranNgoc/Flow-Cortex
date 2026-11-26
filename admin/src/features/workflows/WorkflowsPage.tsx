@@ -1,9 +1,10 @@
 import { getExportAdminWorkflowsUrl, ListAdminWorkflowsStatus } from '@flow-cortex/api-client';
-import { useId, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { AdminList, Timestamp } from '../../app/AdminList';
 import { ExportCsvButton } from '../../app/ExportCsvButton';
+import { ListSearchToolbar } from '../../app/ListSearchToolbar';
+import { useListFilters } from '../../app/useListFilters';
 import { PageHeading } from '../../app/PageHeading';
 import { can } from '../../app/permissions';
 import { StatusPill } from '../../app/StatusPill';
@@ -15,18 +16,14 @@ import { workflowStatusLabel } from './workflowStatus';
 import { useAdminWorkflows } from './useAdminWorkflows';
 
 const STATUSES = Object.values(ListAdminWorkflowsStatus);
-const NAME_MAX = 255;
 
 export function WorkflowsPage() {
   const { t } = useTranslation();
   usePageTitle(t('workflows.title'));
-  const searchId = useId();
   const locale = activeLocale();
-  const [page, setPage] = useState(0);
-  const [status, setStatus] = useState<ListAdminWorkflowsStatus | ''>('');
-  const [q, setQ] = useState('');
-  const [text, setText] = useState('');
-  const query = useAdminWorkflows(page, status || undefined, q);
+  const filters = useListFilters<ListAdminWorkflowsStatus>();
+  const { status, q } = filters;
+  const query = useAdminWorkflows(filters.page, status || undefined, q);
   const canExport = can(useMeQuery().data, 'workflow.workflow.export');
   const exportUrl = getExportAdminWorkflowsUrl({
     ...(status ? { status } : {}),
@@ -44,18 +41,6 @@ export function WorkflowsPage() {
     updated: t('workflows.columns.updated'),
   };
 
-  const search = (event: FormEvent) => {
-    event.preventDefault();
-    setQ(text.trim());
-    setPage(0);
-  };
-  const clearFilters = () => {
-    setStatus('');
-    setQ('');
-    setText('');
-    setPage(0);
-  };
-
   return (
     <div>
       <PageHeading
@@ -64,28 +49,9 @@ export function WorkflowsPage() {
         description={t('workflows.description')}
       />
       <div className="cortex-admin-panel">
-        <form className="cortex-admin-toolbar" role="search" onSubmit={search}>
-          <div className="cortex-admin-field">
-            <label htmlFor={searchId}>{t('workflows.search.label')}</label>
-            <input
-              id={searchId}
-              type="search"
-              value={text}
-              maxLength={NAME_MAX}
-              placeholder={t('workflows.search.placeholder')}
-              onChange={(event) => setText(event.target.value)}
-            />
-          </div>
-          <button type="submit" className="cortex-admin-btn">
-            {t('workflows.search.submit')}
-          </button>
-          {(q || status) && (
-            <button type="button" className="cortex-admin-btn cortex-admin-btn--ghost" onClick={clearFilters}>
-              {t('workflows.search.clear')}
-            </button>
-          )}
+        <ListSearchToolbar filters={filters} keyPrefix="workflows">
           {canExport && <ExportCsvButton url={exportUrl} nounKey="workflows.noun" />}
-        </form>
+        </ListSearchToolbar>
         <AdminList
           query={query}
           nounKey="workflows.noun"
@@ -94,11 +60,8 @@ export function WorkflowsPage() {
           statusLabel={(code) => workflowStatusLabel(t, code)}
           status={status}
           filtered={q !== ''}
-          onStatusChange={(next) => {
-            setStatus(next as ListAdminWorkflowsStatus | '');
-            setPage(0);
-          }}
-          onPageChange={setPage}
+          onStatusChange={filters.changeStatus}
+          onPageChange={filters.setPage}
         >
           {(workflows) => (
             <table className="cortex-admin-table">
