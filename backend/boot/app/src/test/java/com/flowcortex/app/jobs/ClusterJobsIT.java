@@ -319,6 +319,7 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
             Map<String, Long> expected = Map.ofEntries(
                     Map.entry("jobs.publication-resubmitter", 60_000L),
                     Map.entry("workflow.lease-reaper", 30_000L),
+                    Map.entry("workflow.discovery-stats", 600_000L),
                     Map.entry("user.auth-retention", 3_600_000L),
                     Map.entry("user.unconfirmed-account-purge", 3_600_000L),
                     Map.entry("user.phone-retention", 3_600_000L),

@@ -516,6 +516,9 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    # The pass that refreshes the Explore trending and popular figures runs once per interval.
+    discovery:
+      stats-interval-ms: ${FLOWCORTEX_WORKFLOW_DISCOVERY_STATS_INTERVAL_MS:600000}
     # A review nobody decided within expire-after ends as `expired` and stops its run (REVIEW_EXPIRED);
     # the sweep looks every sweep-interval-ms. Env var + restart.
     review:
