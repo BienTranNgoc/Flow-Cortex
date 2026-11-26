@@ -107,6 +107,12 @@ class RequestRepository {
                 new MapSqlParameterSource("number", number), REQUEST).stream().findFirst();
     }
 
+    boolean existsByNumber(long number) {
+        Boolean exists = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM support_request WHERE number = :number)",
+                new MapSqlParameterSource("number", number), Boolean.class);
+        return Boolean.TRUE.equals(exists);
+    }
+
     Optional<RequestRow> findById(UUID id) {
         return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request WHERE id = :id",
                 new MapSqlParameterSource("id", id), REQUEST).stream().findFirst();
@@ -284,11 +290,16 @@ class RequestRepository {
                 .stream().findFirst();
     }
 
-    /** Clears the unread mark; the first read of a resolution starts its close clock. */
-    void markSeen(UUID id, Instant now) {
-        jdbc.update("UPDATE support_request SET member_unread = false, resolved_seen_at = CASE "
+    /**
+     * Clears the unread mark; the first read of a resolution starts its close clock.
+     *
+     * @return whether anything changed: an open of a request that is already seen writes nothing
+     */
+    boolean markSeen(UUID id, Instant now) {
+        return jdbc.update("UPDATE support_request SET member_unread = false, resolved_seen_at = CASE "
                 + "WHEN status = 'resolved' AND resolved_seen_at IS NULL THEN :now ELSE resolved_seen_at END "
-                + "WHERE id = :id", new MapSqlParameterSource("id", id).addValue("now", Timestamp.from(now)));
+                + "WHERE id = :id AND (member_unread OR (status = 'resolved' AND resolved_seen_at IS NULL))",
+                new MapSqlParameterSource("id", id).addValue("now", Timestamp.from(now))) > 0;
     }
 
     /** Resolutions whose member first saw them at or before {@code cutoff}. */
