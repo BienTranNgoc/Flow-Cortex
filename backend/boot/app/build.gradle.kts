@@ -41,6 +41,7 @@ dependencies {
     implementation(project(":modules:trend"))
     implementation(project(":modules:notification"))
     implementation(project(":modules:mail"))
+    implementation(project(":modules:trash"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))

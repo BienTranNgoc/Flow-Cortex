@@ -329,6 +329,8 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     Map.entry("support.request-retention", 21_600_000L),
                     Map.entry("support.sla-sweep", 300_000L),
                     Map.entry("asset.registration-sweep", 120_000L),
+                    Map.entry("trash.purge-sweep", 3_600_000L),
+                    Map.entry("trash.expiry-reminder", 3_600_000L),
                     Map.entry("user.mcp-oauth-retention", 3_600_000L),
                     Map.entry("trend.template-purge", 900_000L));
 
