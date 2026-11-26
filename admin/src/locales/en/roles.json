@@ -162,7 +162,8 @@
         "help_topic": "Guide topics",
         "help_article": "Guide articles",
         "document": "Documents",
-        "media": "Media library"
+        "media": "Media library",
+        "trend_template": "Trend templates"
       },
       "platform": {
         "setting": "Settings",
@@ -227,6 +228,10 @@
         "media": {
           "view": "View the media library",
           "manage": "Manage the media library"
+        },
+        "trend_template": {
+          "view": "View trend templates",
+          "manage": "Manage trend templates"
         }
       },
       "platform": {

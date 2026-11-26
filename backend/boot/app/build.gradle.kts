@@ -39,6 +39,7 @@ dependencies {
     implementation(project(":modules:connector"))
     implementation(project(":modules:billing"))
     implementation(project(":modules:chat"))
+    implementation(project(":modules:trend"))
     implementation(project(":modules:notification"))
     implementation(project(":modules:mail"))
     implementation(project(":modules:trash"))

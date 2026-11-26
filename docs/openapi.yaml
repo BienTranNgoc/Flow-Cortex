@@ -609,6 +609,70 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/tags/order:
+    put:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: reorderAdminTrendTags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendTagOrderRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminTrendTag"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-order-stale
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/categories/order:
+    put:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: reorderAdminTrendCategories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendCategoryOrderRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminTrendCategory"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-order-stale
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/settings:
     get:
       tags:
@@ -5093,6 +5157,72 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/tags:
+    post:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: createAdminTrendTag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendTagCreateRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendTag"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-full
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/categories:
+    post:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: createAdminTrendCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendCategoryCreateRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendCategory"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-full
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: category-key-exhausted (errors.nameVi)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/support/requests/{number}/messages:
     post:
       tags:
@@ -6636,6 +6766,124 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/trend/taxonomy/tags/{id}:
+    delete:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: deleteAdminTrendTag
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: tag-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: updateAdminTrendTag
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendTagUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendTag"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: tag-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/categories/{key}:
+    delete:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: deleteAdminTrendCategory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: category-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: category-in-use (templateCount)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: updateAdminTrendCategory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendCategoryUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendCategory"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: category-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/roles/{code}:
     get:
       tags:
@@ -9066,6 +9314,18 @@ paths:
             text/csv:
               schema:
                 type: string
+  /api/v1/admin/trend/taxonomy:
+    get:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: listAdminTrendTaxonomy
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendTaxonomy"
   /api/v1/admin/support/requests:
     get:
       tags:
@@ -10355,6 +10615,8 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - content.trend_template.view
+            - content.trend_template.manage
         adminDisabled:
           type: boolean
         phoneVerificationRequired:
@@ -10403,6 +10665,79 @@ components:
           type: string
       required:
       - locale
+    AdminTrendTagOrderRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 1000
+          minItems: 0
+      required:
+      - ids
+    AdminTrendTag:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameVi:
+          type: string
+        nameEn:
+          type: string
+        order:
+          type: integer
+          format: int32
+        visible:
+          type: boolean
+        usageCount:
+          type: integer
+          format: int32
+      required:
+      - id
+      - nameEn
+      - nameVi
+      - order
+      - usageCount
+      - visible
+    AdminTrendCategoryOrderRequest:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          maxItems: 1000
+          minItems: 0
+      required:
+      - keys
+    AdminTrendCategory:
+      type: object
+      properties:
+        key:
+          type: string
+        nameVi:
+          type: string
+        nameEn:
+          type: string
+        order:
+          type: integer
+          format: int32
+        visible:
+          type: boolean
+        usageCount:
+          type: integer
+          format: int32
+      required:
+      - key
+      - nameEn
+      - nameVi
+      - order
+      - usageCount
+      - visible
     AdminSupportSettingsUpdate:
       type: object
       properties:
@@ -10903,6 +11238,8 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - content.trend_template.view
+            - content.trend_template.manage
         permissionsVersion:
           type: integer
           format: int32
@@ -13755,6 +14092,34 @@ components:
       - stepOrder
       - type
       - value
+    AdminTrendTagCreateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 30
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 30
+          minLength: 0
+      required:
+      - nameEn
+      - nameVi
+    AdminTrendCategoryCreateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 60
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 60
+          minLength: 0
+      required:
+      - nameEn
+      - nameVi
     AdminSupportRequestReply:
       type: object
       properties:
@@ -14325,6 +14690,32 @@ components:
           enum:
           - show
           - hide
+    AdminTrendTagUpdateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 30
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 30
+          minLength: 0
+        visible:
+          type: boolean
+    AdminTrendCategoryUpdateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 60
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 60
+          minLength: 0
+        visible:
+          type: boolean
     UpdateRoleRequest:
       type: object
       properties:
@@ -16633,6 +17024,20 @@ components:
       - countsByStatus
       - series
       - workflow
+    AdminTrendTaxonomy:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTrendCategory"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTrendTag"
+      required:
+      - categories
+      - tags
     AdminSupportRequestPage:
       type: object
       properties:
@@ -17050,6 +17455,8 @@ components:
           - payment.setting.view
           - payment.setting.update
           - user.account.export
+          - content.trend_template.view
+          - content.trend_template.manage
         module:
           type: string
         feature:
