@@ -1,7 +1,7 @@
 import i18n from '../../lib/i18n';
 import enWorkflow from '../../locales/en/workflow.json';
 import viWorkflow from '../../locales/vi/workflow.json';
-import { KNOWN_STEP_ERROR_CODES, stepErrorSentence } from './stepErrorMessages';
+import { KNOWN_STEP_ERROR_CODES, recoveryKey, stepErrorSentence } from './stepErrorMessages';
 
 const en = i18n.getFixedT('en');
 const vi = i18n.getFixedT('vi');
@@ -157,17 +157,102 @@ describe('stepErrorSentence', () => {
     );
   });
 
-  it('falls back to noMessage for unknown or missing codes and never leaks server message', () => {
+  it('reads the category sentence for a code without its own sentence and never leaks the server message', () => {
+    const rawError = 'NullPointerException at com.flowcortex.InternalService:42';
+    expect(stepErrorSentence('unknown_future_code', rawError, true, en, 'en', undefined, 'internal')).toBe(
+      enWorkflow.stepError.category.internal,
+    );
+    expect(stepErrorSentence(undefined, rawError, true, vi, 'vi', undefined, 'internal')).toBe(
+      viWorkflow.stepError.category.internal,
+    );
+  });
+
+  it('falls back to noMessage only when there is no category either', () => {
     const rawError = 'NullPointerException at com.flowcortex.InternalService:42';
     expect(stepErrorSentence('unknown_future_code', rawError, true, en, 'en')).toBe(
       enWorkflow.stepError.noMessage,
     );
-    expect(stepErrorSentence('unknown_future_code', rawError, true, vi, 'vi')).toBe(
-      viWorkflow.stepError.noMessage,
-    );
     expect(stepErrorSentence(undefined, rawError, true, vi, 'vi')).toBe(
       viWorkflow.stepError.noMessage,
     );
+  });
+
+  it('uses the category sentence in Vietnamese for connector_upstream_error, not the server message', () => {
+    const fromServer = 'The connected service answered 502 Bad Gateway.';
+    const sentence = stepErrorSentence(
+      'connector_upstream_error',
+      fromServer,
+      false,
+      vi,
+      'vi',
+      'connector.call',
+      'provider_error',
+    );
+
+    expect(sentence).toBe(viWorkflow.stepError.category.provider_error);
+    expect(sentence).not.toContain('502');
+  });
+
+  it('keeps the code sentence for probe_failed', () => {
+    expect(stepErrorSentence('probe_failed', 'raw', true, en, 'en', 'probe', 'validation')).toBe(
+      "We couldn't read that file as audio or video. Upload a video or audio file (for example .mp4).",
+    );
+  });
+
+  it('keeps the neutral sentence for a reaped inline step', () => {
+    expect(stepErrorSentence('lease_expired', 'raw', false, en, 'en', 'echo', 'timeout')).toBe(
+      enWorkflow.stepError.reapedInline,
+    );
+  });
+
+  it('has a sentence for every category and an advice for every recovery in both languages', () => {
+    const categories = [
+      'validation',
+      'handoff',
+      'configuration',
+      'contract',
+      'review_rejected',
+      'insufficient_credits',
+      'timeout',
+      'provider_error',
+      'quota_exceeded',
+      'unavailable',
+      'processing',
+      'internal',
+    ];
+    for (const category of categories) {
+      const enText = stepErrorSentence('no_sentence_code', 'raw', true, en, 'en', undefined, category);
+      const viText = stepErrorSentence('no_sentence_code', 'raw', true, vi, 'vi', undefined, category);
+      for (const text of [enText, viText]) {
+        expect(text).toBeTruthy();
+        expect(text).not.toContain('workflow.stepError.');
+        expect(text).not.toBe(enWorkflow.stepError.noMessage);
+      }
+      expect(viText).not.toBe(enText);
+    }
+    for (const recovery of ['retry', 'change_input', 'edit_workflow', 'top_up']) {
+      const key = recoveryKey(recovery);
+      expect(key).not.toBeNull();
+      expect(en(key as string)).not.toContain('workflow.stepError.');
+      expect(vi(key as string)).not.toContain('workflow.stepError.');
+      expect(vi(key as string)).not.toBe(en(key as string));
+    }
+  });
+});
+
+describe('recoveryKey', () => {
+  it('reads the English advice for each recovery', () => {
+    expect(en(recoveryKey('retry') as string)).toBe('You can run this step again.');
+    expect(en(recoveryKey('change_input') as string)).toBe('Start a new run with a different file or input.');
+    expect(en(recoveryKey('edit_workflow') as string)).toBe(
+      'Fix this step in the workflow, then start a new run.',
+    );
+    expect(en(recoveryKey('top_up') as string)).toBe('Top up your credits, then run this step again.');
+  });
+
+  it('gives no advice for none or a missing recovery', () => {
+    expect(recoveryKey('none')).toBeNull();
+    expect(recoveryKey(undefined)).toBeNull();
   });
 
   describe('load_template_missing_input', () => {

@@ -42,7 +42,27 @@
     "load_template_missing_input": "Some required inputs for the template are missing.",
     "load_template_missing_input_fields": "Missing required template inputs: {{fields}}.",
     "reapedInline": "This step stopped before it finished. Try running again.",
-    "noMessage": "This step stopped with an error."
+    "noMessage": "This step stopped with an error.",
+    "category": {
+      "validation": "The input given to this step can't be used.",
+      "handoff": "This step couldn't read what an earlier step produced.",
+      "configuration": "This step is set up in a way that can't run.",
+      "contract": "This step returned a result we couldn't use.",
+      "review_rejected": "The review ended without approval, so the run stopped.",
+      "insufficient_credits": "You don't have enough credits for this step.",
+      "timeout": "This step took too long and was stopped.",
+      "provider_error": "The service this step relies on returned an error.",
+      "quota_exceeded": "The service this step relies on has reached its usage limit for now.",
+      "unavailable": "This step can't run right now.",
+      "processing": "Something went wrong while this step was processing.",
+      "internal": "Something went wrong on our side."
+    },
+    "recovery": {
+      "retry": "You can run this step again.",
+      "change_input": "Start a new run with a different file or input.",
+      "edit_workflow": "Fix this step in the workflow, then start a new run.",
+      "top_up": "Top up your credits, then run this step again."
+    }
   },
   "step": {
     "state": {

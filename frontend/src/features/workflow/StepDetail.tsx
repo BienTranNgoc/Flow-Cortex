@@ -7,7 +7,7 @@ import { parseStoryboardOutput } from './productVideoSchemas';
 import { StepActivityCard } from './StepActivityCard';
 import { StepDownloads } from './StepDownloads';
 import { formatTime, stepDuration, stepKey, stepNameId } from './stepDisplay';
-import { stepErrorSentence } from './stepErrorMessages';
+import { recoveryKey, stepErrorSentence } from './stepErrorMessages';
 import { StepOutput } from './StepOutput';
 import { StoredOutputDownload } from './StoredOutputDownload';
 import { StoryboardOutputView } from './StoryboardOutputView';
@@ -84,6 +84,7 @@ export function StepDetail({
   const { t } = useTranslation();
   const locale = activeLocale();
   const status = step.status ?? 'pending';
+  const advice = recoveryKey(step.failure?.recovery);
   const outputs = step.outputs ?? [];
   const details = outputs.find((output) => output.mime === 'application/json');
   const artifacts = outputs.filter((output) => output.mime !== 'application/json');
@@ -185,6 +186,13 @@ export function StepDetail({
                 t,
                 locale,
                 step.type,
+                step.failure?.category,
+              )}
+              {advice && (
+                <>
+                  <br />
+                  {t(advice)}
+                </>
               )}
             </p>
           </div>
