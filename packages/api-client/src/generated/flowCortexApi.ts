@@ -2286,6 +2286,10 @@ export interface Saved {
   baseUrl?: string;
 }
 
+export interface GoogleAuthorizeResponse {
+  authorizationUrl?: string;
+}
+
 export interface Attachment {
   uploadId?: string;
   fileName?: string;
@@ -4085,6 +4089,57 @@ export interface Summary {
   extraHeaderNames?: string[];
 }
 
+export interface GoogleConnection {
+  provider?: string;
+  email?: string;
+  scopes?: string[];
+  missingScopes?: string[];
+  expiresAt?: string;
+  usageEnabled?: boolean;
+}
+
+export interface Spreadsheet {
+  id?: string;
+  name?: string;
+  modifiedAt?: string;
+  ownerEmail?: string;
+  webViewUrl?: string;
+}
+
+export interface SpreadsheetPage {
+  items?: Spreadsheet[];
+  nextCursor?: string;
+}
+
+export interface Tab {
+  sheetId?: number;
+  title?: string;
+  rowCount?: number;
+  columnCount?: number;
+}
+
+export interface Tabs {
+  spreadsheetId?: string;
+  title?: string;
+  tabs?: Tab[];
+}
+
+export type PreviewRowsItem = { [key: string]: string };
+
+export interface Preview {
+  spreadsheetId?: string;
+  tab?: string;
+  range?: string;
+  header?: string[];
+  rows?: PreviewRowsItem[];
+}
+
+export interface GoogleHealth {
+  valid?: boolean;
+  email?: string;
+  reason?: string;
+}
+
 export interface ChatFolderList {
   items?: ChatFolder[];
 }
@@ -5521,6 +5576,25 @@ export type ListContentDocumentHistoryParams = {
    * @maximum 100
    */
   size?: number;
+};
+
+export type ListGoogleSpreadsheetsParams = {
+  q?: string;
+  limit?: string;
+  cursor?: string;
+};
+
+export type PreviewGoogleSpreadsheetTabParams = {
+  tab?: string;
+  range?: string;
+  limit?: string;
+  hasHeader?: string;
+};
+
+export type GoogleCallbackParams = {
+  state?: string;
+  code?: string;
+  error?: string;
 };
 
 export type CountChatConversationsParams = {
@@ -13544,6 +13618,45 @@ export const save = async (
   });
 };
 
+export type googleAuthorizeResponse200 = {
+  data: GoogleAuthorizeResponse;
+  status: 200;
+};
+
+export type googleAuthorizeResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleAuthorizeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleAuthorizeResponseSuccess = googleAuthorizeResponse200 & {
+  headers: Headers;
+};
+export type googleAuthorizeResponseError = (
+  googleAuthorizeResponse403 | googleAuthorizeResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleAuthorizeResponse = googleAuthorizeResponseSuccess | googleAuthorizeResponseError;
+
+export const getGoogleAuthorizeUrl = () => {
+  return `/api/v1/connectors/google/authorize`;
+};
+
+export const googleAuthorize = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleAuthorizeResponse> => {
+  return customFetch<googleAuthorizeResponse>(getGoogleAuthorizeUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type reportClientErrorResponse204 = {
   data: void;
   status: 204;
@@ -20262,6 +20375,386 @@ export const getTelegramConnectorHealth = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getTelegramConnectorHealthResponse> => {
   return customFetch<getTelegramConnectorHealthResponse>(getGetTelegramConnectorHealthUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type googleReadResponse200 = {
+  data: GoogleConnection;
+  status: 200;
+};
+
+export type googleReadResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleReadResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type googleReadResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleReadResponseSuccess = googleReadResponse200 & {
+  headers: Headers;
+};
+export type googleReadResponseError = (
+  googleReadResponse403 | googleReadResponse404 | googleReadResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleReadResponse = googleReadResponseSuccess | googleReadResponseError;
+
+export const getGoogleReadUrl = () => {
+  return `/api/v1/connectors/google`;
+};
+
+export const googleRead = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleReadResponse> => {
+  return customFetch<googleReadResponse>(getGoogleReadUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listGoogleSpreadsheetsResponse200 = {
+  data: SpreadsheetPage;
+  status: 200;
+};
+
+export type listGoogleSpreadsheetsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listGoogleSpreadsheetsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listGoogleSpreadsheetsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listGoogleSpreadsheetsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listGoogleSpreadsheetsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listGoogleSpreadsheetsResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type listGoogleSpreadsheetsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listGoogleSpreadsheetsResponseSuccess = listGoogleSpreadsheetsResponse200 & {
+  headers: Headers;
+};
+export type listGoogleSpreadsheetsResponseError = (
+  | listGoogleSpreadsheetsResponse400
+  | listGoogleSpreadsheetsResponse403
+  | listGoogleSpreadsheetsResponse404
+  | listGoogleSpreadsheetsResponse409
+  | listGoogleSpreadsheetsResponse422
+  | listGoogleSpreadsheetsResponse502
+  | listGoogleSpreadsheetsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listGoogleSpreadsheetsResponse =
+  listGoogleSpreadsheetsResponseSuccess | listGoogleSpreadsheetsResponseError;
+
+export const getListGoogleSpreadsheetsUrl = (params?: ListGoogleSpreadsheetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/sheets?${stringifiedParams}`
+    : `/api/v1/connectors/google/sheets`;
+};
+
+export const listGoogleSpreadsheets = async (
+  params?: ListGoogleSpreadsheetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listGoogleSpreadsheetsResponse> => {
+  return customFetch<listGoogleSpreadsheetsResponse>(getListGoogleSpreadsheetsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listGoogleSpreadsheetTabsResponse200 = {
+  data: Tabs;
+  status: 200;
+};
+
+export type listGoogleSpreadsheetTabsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listGoogleSpreadsheetTabsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listGoogleSpreadsheetTabsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listGoogleSpreadsheetTabsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listGoogleSpreadsheetTabsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listGoogleSpreadsheetTabsResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type listGoogleSpreadsheetTabsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listGoogleSpreadsheetTabsResponseSuccess = listGoogleSpreadsheetTabsResponse200 & {
+  headers: Headers;
+};
+export type listGoogleSpreadsheetTabsResponseError = (
+  | listGoogleSpreadsheetTabsResponse400
+  | listGoogleSpreadsheetTabsResponse403
+  | listGoogleSpreadsheetTabsResponse404
+  | listGoogleSpreadsheetTabsResponse409
+  | listGoogleSpreadsheetTabsResponse422
+  | listGoogleSpreadsheetTabsResponse502
+  | listGoogleSpreadsheetTabsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listGoogleSpreadsheetTabsResponse =
+  listGoogleSpreadsheetTabsResponseSuccess | listGoogleSpreadsheetTabsResponseError;
+
+export const getListGoogleSpreadsheetTabsUrl = (id: string) => {
+  return `/api/v1/connectors/google/sheets/${id}/tabs`;
+};
+
+export const listGoogleSpreadsheetTabs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listGoogleSpreadsheetTabsResponse> => {
+  return customFetch<listGoogleSpreadsheetTabsResponse>(getListGoogleSpreadsheetTabsUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type previewGoogleSpreadsheetTabResponse200 = {
+  data: Preview;
+  status: 200;
+};
+
+export type previewGoogleSpreadsheetTabResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type previewGoogleSpreadsheetTabResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type previewGoogleSpreadsheetTabResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type previewGoogleSpreadsheetTabResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type previewGoogleSpreadsheetTabResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type previewGoogleSpreadsheetTabResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type previewGoogleSpreadsheetTabResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type previewGoogleSpreadsheetTabResponseSuccess = previewGoogleSpreadsheetTabResponse200 & {
+  headers: Headers;
+};
+export type previewGoogleSpreadsheetTabResponseError = (
+  | previewGoogleSpreadsheetTabResponse400
+  | previewGoogleSpreadsheetTabResponse403
+  | previewGoogleSpreadsheetTabResponse404
+  | previewGoogleSpreadsheetTabResponse409
+  | previewGoogleSpreadsheetTabResponse422
+  | previewGoogleSpreadsheetTabResponse502
+  | previewGoogleSpreadsheetTabResponse503
+) & {
+  headers: Headers;
+};
+
+export type previewGoogleSpreadsheetTabResponse =
+  previewGoogleSpreadsheetTabResponseSuccess | previewGoogleSpreadsheetTabResponseError;
+
+export const getPreviewGoogleSpreadsheetTabUrl = (
+  id: string,
+  params?: PreviewGoogleSpreadsheetTabParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/sheets/${id}/preview?${stringifiedParams}`
+    : `/api/v1/connectors/google/sheets/${id}/preview`;
+};
+
+export const previewGoogleSpreadsheetTab = async (
+  id: string,
+  params?: PreviewGoogleSpreadsheetTabParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<previewGoogleSpreadsheetTabResponse> => {
+  return customFetch<previewGoogleSpreadsheetTabResponse>(
+    getPreviewGoogleSpreadsheetTabUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type googleHealthResponse200 = {
+  data: GoogleHealth;
+  status: 200;
+};
+
+export type googleHealthResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleHealthResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type googleHealthResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type googleHealthResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleHealthResponseSuccess = googleHealthResponse200 & {
+  headers: Headers;
+};
+export type googleHealthResponseError = (
+  | googleHealthResponse403
+  | googleHealthResponse404
+  | googleHealthResponse502
+  | googleHealthResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleHealthResponse = googleHealthResponseSuccess | googleHealthResponseError;
+
+export const getGoogleHealthUrl = () => {
+  return `/api/v1/connectors/google/health`;
+};
+
+export const googleHealth = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleHealthResponse> => {
+  return customFetch<googleHealthResponse>(getGoogleHealthUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type googleCallbackResponse302 = {
+  data: void;
+  status: 302;
+};
+
+export type googleCallbackResponseError = googleCallbackResponse302 & {
+  headers: Headers;
+};
+
+export type googleCallbackResponse = googleCallbackResponseError;
+
+export const getGoogleCallbackUrl = (params?: GoogleCallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/callback?${stringifiedParams}`
+    : `/api/v1/connectors/google/callback`;
+};
+
+export const googleCallback = async (
+  params?: GoogleCallbackParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleCallbackResponse> => {
+  return customFetch<googleCallbackResponse>(getGoogleCallbackUrl(params), {
     ...options,
     method: 'GET',
   });
