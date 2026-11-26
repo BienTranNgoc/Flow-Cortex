@@ -3,12 +3,46 @@ package com.flowcortex.support.assistant;
 import static io.micrometer.observation.tck.TestObservationRegistryAssert.assertThat;
 
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.support.assistant.TopicGuard.Topic;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.tck.TestObservationRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
+@ExtendWith(OutputCaptureExtension.class)
 class AssistantTelemetryTest {
+
+    @Test
+    void aHandoffTicksItsTopicAndLogsNoText(CapturedOutput output) {
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+        AssistantTelemetry telemetry = new AssistantTelemetry(meters, TestObservationRegistry.create());
+
+        telemetry.handoff(Topic.MONEY);
+        telemetry.handoff(Topic.MONEY);
+        telemetry.handoff(Topic.LEGAL);
+        telemetry.record("handoff", 0, 31, System.nanoTime());
+
+        org.assertj.core.api.Assertions.assertThat(meters.counter(AssistantTelemetry.HANDOFF_COUNTER, "topic", "money")
+                .count()).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(meters.counter(AssistantTelemetry.HANDOFF_COUNTER, "topic", "legal")
+                .count()).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(output.getAll())
+                .contains("support.assistant.handoff topic=money", "topic=legal")
+                .doesNotContain("trừ tiền");
+    }
+
+    @Test
+    void aHandoffWithoutATopicTicksAndLogsNothing(CapturedOutput output) {
+        SimpleMeterRegistry meters = new SimpleMeterRegistry();
+
+        new AssistantTelemetry(meters, TestObservationRegistry.create()).handoff(null);
+
+        org.assertj.core.api.Assertions.assertThat(meters.getMeters()).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(output.getAll()).doesNotContain("support.assistant.handoff");
+    }
 
     @Test
     void theProviderAndItsTokensLandOnTheCurrentObservation() {

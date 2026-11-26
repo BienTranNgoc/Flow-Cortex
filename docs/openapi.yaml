@@ -3553,6 +3553,16 @@ paths:
       tags:
       - notifications-controller
       operationId: markAllNotificationsRead
+      parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       responses:
         "200":
           description: OK
@@ -3560,6 +3570,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReadAllResult"
+        "400":
+          description: audience is not member or admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/step-up:
     post:
       tags:
@@ -7777,6 +7793,15 @@ paths:
       - notifications-controller
       operationId: listNotifications
       parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       - name: filter
         in: query
         required: false
@@ -7800,7 +7825,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationPage"
         "400":
-          description: "filter, page or size out of range"
+          description: "audience, filter, page or size out of range"
           content:
             application/problem+json:
               schema:
@@ -7810,6 +7835,16 @@ paths:
       tags:
       - notifications-controller
       operationId: getUnreadNotificationCount
+      parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       responses:
         "200":
           description: OK
@@ -7817,6 +7852,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnreadCount"
+        "400":
+          description: audience is not member or admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone:
     get:
       tags:
@@ -8562,6 +8603,14 @@ paths:
         schema:
           type: string
           maxLength: 100
+      - name: sla
+        in: query
+        description: Keeps only due-soon and overdue requests
+        required: false
+        schema:
+          type: string
+          enum:
+          - at_risk
       - name: sort
         in: query
         required: false
@@ -8589,7 +8638,7 @@ paths:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
           description: "validation-failed (errors.status, errors.type, errors.assignee,\
-            \ errors.created, errors.q, errors.sort, errors.page)"
+            \ errors.created, errors.q, errors.sla, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -8615,6 +8664,70 @@ paths:
                 $ref: "#/components/schemas/AdminSupportRequestDetail"
         "404":
           description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/sla-summary:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportSlaSummary
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportSlaSummary"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
           content:
             application/problem+json:
               schema:
@@ -9921,6 +10034,8 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         createdAt:
           type: string
           format: date-time
@@ -11351,6 +11466,25 @@ components:
           maxLength: 1000
       required:
       - question
+    SupportAssistantHandoff:
+      type: object
+      properties:
+        topic:
+          type:
+          - string
+          - "null"
+          enum:
+          - money
+          - security
+          - personal_data
+          - legal
+          - violation
+        subject:
+          type: string
+        description:
+          type: string
+      required:
+      - topic
     SupportAssistantQuota:
       type: object
       properties:
@@ -11392,10 +11526,14 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         sources:
           type: array
           items:
             $ref: "#/components/schemas/SupportAssistantSource"
+        handoff:
+          $ref: "#/components/schemas/SupportAssistantHandoff"
       required:
       - outcome
       - role
@@ -14069,10 +14207,14 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         sources:
           type: array
           items:
             $ref: "#/components/schemas/SupportAssistantSource"
+        handoff:
+          $ref: "#/components/schemas/SupportAssistantHandoff"
         createdAt:
           type: string
           format: date-time
@@ -15414,14 +15556,34 @@ components:
         lastActivityAt:
           type: string
           format: date-time
+        slaLevel:
+          type: string
+          enum:
+          - ok
+          - due_soon
+          - overdue
+          - paused
       required:
       - createdAt
       - lastActivityAt
       - number
       - requester
+      - slaLevel
       - status
       - subject
       - type
+    AdminSupportSlaSummary:
+      type: object
+      properties:
+        overdue:
+          type: integer
+          format: int64
+        dueSoon:
+          type: integer
+          format: int64
+      required:
+      - dueSoon
+      - overdue
     AdminSupportAssigneeFacet:
       type: object
       properties:

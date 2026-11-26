@@ -65,6 +65,9 @@ class RequestRepository {
     record AssigneeGroup(UUID id, long count) {
     }
 
+    record SlaCounts(long overdue, long dueSoon) {
+    }
+
     record DueReplyMail(UUID id, Instant dueAt) {
     }
 
@@ -120,18 +123,25 @@ class RequestRepository {
                 REQUEST);
     }
 
-    List<RequestRow> page(InboxFilter filter, int offset, int limit) {
-        Where where = InboxSql.where(filter, null);
+    List<RequestRow> page(InboxFilter filter, SlaThresholds thresholds, int offset, int limit) {
+        Where where = InboxSql.where(filter, null, thresholds);
         return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request" + where.sql()
                 + InboxSql.orderBy(filter.sort()) + " OFFSET :offset LIMIT :limit",
                 where.params().addValue("offset", offset).addValue("limit", limit), REQUEST);
     }
 
-    long count(InboxFilter filter) {
-        Where where = InboxSql.where(filter, null);
+    long count(InboxFilter filter, SlaThresholds thresholds) {
+        Where where = InboxSql.where(filter, null, thresholds);
         Long count = jdbc.queryForObject("SELECT count(*) FROM support_request" + where.sql(), where.params(),
                 Long.class);
         return count;
+    }
+
+    /** How many of the requests under the filter are overdue and how many are due soon. */
+    SlaCounts slaSummary(InboxFilter filter, SlaThresholds thresholds) {
+        Where where = InboxSql.where(filter, null, thresholds);
+        return jdbc.queryForObject(InboxSql.slaSummarySelect() + where.and(InboxSql.AT_RISK), where.params(),
+                (rs, n) -> new SlaCounts(rs.getLong("overdue"), rs.getLong("due_soon")));
     }
 
     /**

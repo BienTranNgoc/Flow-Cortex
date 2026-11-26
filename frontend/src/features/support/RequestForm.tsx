@@ -154,7 +154,7 @@ export function RequestForm({ prefill }: Readonly<{ prefill?: RequestPrefill | n
   const submitKey = useSubmitKey();
   const uploaded = useUploadedIds();
   const [type, setType] = useState('');
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(prefill?.subject ?? '');
   const [description, setDescription] = useState(prefill?.description ?? '');
   const [files, setFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});

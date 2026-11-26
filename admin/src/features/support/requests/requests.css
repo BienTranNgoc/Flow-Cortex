@@ -123,6 +123,38 @@
   background: var(--admin-card-surface-2);
 }
 
+.request-status-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.request-sla-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--admin-warning) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--admin-warning-soft);
+  color: var(--admin-warning);
+}
+
+.request-sla-summary {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.request-sla-toggle {
+  flex: 0 0 auto;
+}
+
 /* Short values break only between words; only the free-text columns break inside one. */
 .request-table td.request-cell-fit {
   overflow-wrap: normal;
@@ -253,6 +285,11 @@
   main:has(> .request-inbox) .cortex-admin-page-description {
     display: none;
   }
+
+  /* On a 650px-tall window the table region sits at its floor; a full-height banner would push the page past one viewport. */
+  .request-sla-banner {
+    padding-block: 0.25rem;
+  }
 }
 
 @media (max-width: 720px) {
@@ -273,6 +310,16 @@
   .request-bulk {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .request-sla-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .request-sla-toggle {
+    width: 100%;
+    min-height: var(--admin-hit-min);
   }
 
   .request-table .request-select-col {
