@@ -1,0 +1,118 @@
+/* The pending screen sits on the fixed light auth card, so it reads the auth palette. */
+
+.pending-deletion .auth-title {
+  margin-bottom: 12px;
+  font-size: 28px;
+}
+
+.pending-deletion .auth-subtitle {
+  margin-bottom: 16px;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.pending-deletion__days {
+  margin: 0 0 16px;
+  color: var(--auth-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+}
+
+.pending-deletion__notice {
+  margin: 0 0 24px;
+  color: var(--auth-ink-3);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.pending-deletion .auth-btn {
+  margin-bottom: 12px;
+}
+
+.pending-deletion .auth-btn:focus-visible {
+  outline: 2px solid var(--auth-accent);
+  outline-offset: 2px;
+}
+
+/* The deletion dialog, on the member app's own scheme. */
+
+.account-deletion-dialog {
+  box-sizing: border-box;
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.account-deletion-dialog[open] {
+  animation: account-deletion-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.account-deletion-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.account-deletion-dialog h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.account-deletion-dialog p {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.account-deletion-dialog__reasons {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.account-deletion-dialog__reasons li + li {
+  margin-top: 0.35rem;
+}
+
+.account-deletion-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.account-deletion-dialog .cortex-btn:focus-visible {
+  outline: 0.125rem solid var(--primary);
+  outline-offset: 0.125rem;
+}
+
+@keyframes account-deletion-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-deletion-dialog[open] {
+    animation: none;
+  }
+}
+
+@media (max-width: 479px) {
+  .account-deletion-dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .account-deletion-dialog__actions .cortex-btn {
+    width: 100%;
+  }
+}
