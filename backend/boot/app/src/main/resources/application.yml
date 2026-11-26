@@ -580,6 +580,17 @@ flowcortex:
     # How often reviews of an uploaded workflow file that were never imported are deleted.
     import-review:
       purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
+    # Batches of runs: rows start a few at a time. Off stops every batch where it stands, nothing is lost.
+    batch:
+      dispatch-enabled: ${FLOWCORTEX_WORKFLOW_BATCH_DISPATCH_ENABLED:true}
+      # Wait between dispatch ticks; a create, resume, cancel or retry dispatches at once.
+      dispatch-interval: ${FLOWCORTEX_WORKFLOW_BATCH_DISPATCH_INTERVAL:PT5S}
+      # How long one instance holds a batch before another may take it over; the order of lease-seconds.
+      lease: ${FLOWCORTEX_WORKFLOW_BATCH_LEASE:PT2M}
+      # Live batch rows (claimed or running) one member may have across all their batches.
+      max-live-rows-per-member: ${FLOWCORTEX_WORKFLOW_BATCH_MAX_LIVE_ROWS_PER_MEMBER:5}
+      # Live batch rows in the whole cluster: the provider step pool's 4 running + 4 queued.
+      max-live-rows: ${FLOWCORTEX_WORKFLOW_BATCH_MAX_LIVE_ROWS:8}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
