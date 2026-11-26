@@ -114,13 +114,17 @@ final class StepFailureTaxonomy {
         add(rows, Category.VALIDATION, Source.SYSTEM, "duration_exceeded", "no_audio_stream", "speech_too_long",
                 "audio_alignment_out_of_range", "load_template_invalid_input", "load_template_missing_input",
                 "no_beats_detected");
-        add(rows, Category.HANDOFF, Source.SYSTEM, "input_unresolved");
+        add(rows, Category.HANDOFF, Source.SYSTEM, "input_unresolved", "iterate_source_not_list",
+                "iterate_item_field_missing");
         add(rows, Category.CONFIGURATION, Source.SYSTEM, "workflow_call_cycle", "workflow_call_too_deep",
                 "workflow_call_not_found", "workflow_call_unsupported", "workflow_call_child_empty",
                 "workflow_call_needs_upload", "workflow_call_has_checkpoint", "workflow_call_invalid_config",
                 "workflow_call_child_incomplete", "workflow_call_child_connector_not_owner", "load_template_not_found",
-                "load_template_invalid_template", "connector_url_outside_base_url", "connector_invalid_request");
+                "load_template_invalid_template", "connector_url_outside_base_url", "connector_invalid_request",
+                "iterate_config_invalid");
         add(rows, Category.REVIEW_REJECTED, Source.USER, "APPROVAL_REJECTED");
+        // Nobody decided: the charge is refunded, so the fault is not the member's.
+        add(rows, Category.REVIEW_REJECTED, Source.SYSTEM, ReviewExpirySweep.CODE);
         add(rows, Category.INSUFFICIENT_CREDITS, Source.USER, "INSUFFICIENT_CREDITS");
         add(rows, Category.CONTRACT, Source.SYSTEM, "contract_violation");
         add(rows, Category.TIMEOUT, Source.SYSTEM, "queue_timeout", "lease_expired", "run_timeout", "provider_timeout");
@@ -133,7 +137,7 @@ final class StepFailureTaxonomy {
                 "connector_not_connected", "connector_usage_disabled", "connector_reconnect_needed");
         add(rows, Category.PROCESSING, Source.SYSTEM, "audio_extraction_failed", "audio_alignment_failed",
                 "workflow_call_child_failed", "workflow_call_child_cancelled", "separation_failed",
-                "diarization_failed", "beat_detection_failed");
+                "diarization_failed", "beat_detection_failed", "iterate_item_failed", "sibling_failed");
         add(rows, Category.INTERNAL, Source.SYSTEM, "store_unavailable", "unsupported_step_type");
         return Collections.unmodifiableMap(rows);
     }

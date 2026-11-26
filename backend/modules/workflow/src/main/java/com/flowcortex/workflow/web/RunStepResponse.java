@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.web;
 
+import com.flowcortex.workflow.api.RunStepChildView;
 import com.flowcortex.workflow.api.RunStepFailure;
 import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
@@ -21,6 +22,7 @@ record RunStepResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) int deliveryCount, Instant pickedUpAt,
         @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepOutputResponse> outputs,
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode,
+        @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepChildResponse> children,
         RunStepFailureResponse failure) {
 
     static RunStepResponse from(RunStepView view) {
@@ -28,6 +30,7 @@ record RunStepResponse(
                 view.output(), view.errorMessage(), view.startedAt(), view.finishedAt(), view.progressPercent(),
                 view.attempt(), view.errorCode(), view.deliveryCount(), view.pickedUpAt(),
                 view.outputs().stream().map(RunStepOutputResponse::from).toList(), view.mode(),
+                view.children().stream().map(RunStepChildResponse::from).toList(),
                 view.failure() == null ? null : RunStepFailureResponse.from(view.failure()));
     }
 
@@ -45,6 +48,21 @@ record RunStepResponse(
         static RunStepFailureResponse from(RunStepFailure failure) {
             return new RunStepFailureResponse(failure.category(), failure.source(), failure.retryable(),
                     failure.recovery());
+        }
+    }
+
+    /** One item of an iterate step in the attempt the step is in now; {@code attempt} is the item's own. */
+    record RunStepChildResponse(
+            @Schema(requiredMode = RequiredMode.REQUIRED) UUID id,
+            @Schema(requiredMode = RequiredMode.REQUIRED) int itemIndex,
+            @Schema(requiredMode = RequiredMode.REQUIRED) String status, String output, String errorCode,
+            String errorMessage, @Schema(requiredMode = RequiredMode.REQUIRED) int attempt, Instant startedAt,
+            Instant finishedAt, @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepOutputResponse> outputs) {
+
+        static RunStepChildResponse from(RunStepChildView view) {
+            return new RunStepChildResponse(view.id(), view.itemIndex(), view.status(), view.output(),
+                    view.errorCode(), view.errorMessage(), view.attempt(), view.startedAt(), view.finishedAt(),
+                    view.outputs().stream().map(RunStepOutputResponse::from).toList());
         }
     }
 

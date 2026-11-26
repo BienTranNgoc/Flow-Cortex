@@ -52,7 +52,7 @@ final class RunResumeRules {
         if (step.status() != RunStepStatus.ERROR) {
             return refused(Kind.STEP_NOT_FAILED);
         }
-        if (KnownStepTypes.APPROVAL_CHECKPOINT.equals(step.type())
+        if (HumanSteps.TYPES.contains(step.type())
                 || !StepFailureTaxonomy.recordFor(step.errorCode()).retryable()) {
             return refused(Kind.STEP_NOT_RETRYABLE);
         }

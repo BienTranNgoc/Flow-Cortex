@@ -140,13 +140,15 @@ class ChatToolsTest {
     }
 
     @Test
-    void proposeRunRefusesAProductVideoWorkflowWithoutExactlyOneImage() {
+    void proposeRunRefusesAProductVideoWorkflowWithoutOneToThreeImages() {
         catalog(videoFlow);
+        cardWillBeStored();
         String args = "{\"workflowId\":\"" + videoFlow.id() + "\",\"productVideo\":{\"productName\":\"Lamp\","
                 + "\"description\":\"A lamp\"}}";
 
         assertRefused(propose(context(0), args), "attachments");
-        assertRefused(propose(context(2), args), "attachments");
+        assertRefused(propose(context(4), args), "attachments");
+        assertThat(propose(context(3), args).path("proposed").asBoolean()).isTrue();
     }
 
     @Test
@@ -246,7 +248,7 @@ class ChatToolsTest {
         UUID runId = UUID.randomUUID();
         UUID foreign = UUID.randomUUID();
         RunStepView step = new RunStepView(UUID.randomUUID(), 1, "echo", "running", null, null, null, null, null, 40,
-                1, null, 1, null, List.of(), "inline", null);
+                1, null, 1, null, List.of(), "inline");
         when(runs.getRun(owner, runId)).thenReturn(new RunView(runId, textFlow.id(), owner, "running", "hi", null,
                 Instant.now(), null, List.of(step)));
         when(runs.getRun(owner, foreign)).thenThrow(new NotFoundException(new LocalizedMessage("run.notFound",

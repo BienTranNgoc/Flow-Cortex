@@ -205,6 +205,31 @@ class StepFailureTaxonomyTest {
     }
 
     @Test
+    void everyIterateCodeHasItsCategory() {
+        assertCategory("configuration", "iterate_config_invalid");
+        assertCategory("handoff", "iterate_source_not_list", "iterate_item_field_missing");
+        assertCategory("processing", "iterate_item_failed");
+    }
+
+    @Test
+    void aClipCancelledBecauseItsSiblingFailedStaysRetryable() {
+        RunStepFailure record = StepFailureTaxonomy.recordFor("sibling_failed");
+
+        assertThat(record.category()).isEqualTo("processing");
+        assertThat(record.retryable()).isTrue();
+    }
+
+    @Test
+    void anExpiredReviewEndsTheRunWithoutARetryAndKeepsNoCharge() {
+        RunStepFailure record = StepFailureTaxonomy.recordFor(ReviewExpirySweep.CODE);
+
+        assertThat(record.category()).isEqualTo("review_rejected");
+        assertThat(record.source()).isEqualTo("system");
+        assertThat(record.retryable()).isFalse();
+        assertThat(record.recovery()).isEqualTo("none");
+    }
+
+    @Test
     void workflowCallCycleIsConfigurationEditWorkflow() {
         RunStepFailure record = StepFailureTaxonomy.recordFor("workflow_call_cycle");
 

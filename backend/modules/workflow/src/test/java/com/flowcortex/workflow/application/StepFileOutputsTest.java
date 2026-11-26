@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +50,18 @@ class StepFileOutputsTest {
     @Test
     void translateDeclaresNoFiles() {
         assertThat(StepFileOutputs.declared("translate")).contains(Set.of());
+    }
+
+    @Test
+    void bothHumanStepsDeclareNoFiles() {
+        for (String type : HumanSteps.TYPES) {
+            assertThat(StepFileOutputs.declared(type)).as(type).contains(Set.of());
+        }
+    }
+
+    @Test
+    void anIterateStepIsUndeclaredBecauseItsFilesAreNamedByItsChildType() {
+        assertThat(StepFileOutputs.declared(IterateStepConfig.TYPE)).isEqualTo(Optional.empty());
     }
 
     @Test

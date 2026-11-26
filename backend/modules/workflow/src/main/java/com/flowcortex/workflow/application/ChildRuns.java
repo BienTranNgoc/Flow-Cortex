@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -28,14 +29,18 @@ class ChildRuns {
     private final ApplicationEventPublisher events;
     private final RunUpdates runUpdates;
     private final Clock clock;
+    private final ObjectProvider<RunStepTransactions> transactions;
 
+    /** {@code transactions} is looked up on use: that bean itself depends on this one. */
     ChildRuns(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            ApplicationEventPublisher events, RunUpdates runUpdates, Clock clock) {
+            ApplicationEventPublisher events, RunUpdates runUpdates, Clock clock,
+            ObjectProvider<RunStepTransactions> transactions) {
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.events = events;
         this.runUpdates = runUpdates;
         this.clock = clock;
+        this.transactions = transactions;
     }
 
     /** Call wherever a run's status becomes final; a no-op for a run no step started. */
@@ -66,9 +71,10 @@ class ChildRuns {
     private void stop(ChildRef child, Instant now) {
         if (workflowRunRepository.requestCancel(child.id(), child.ownerId()) == 1) {
             int skipped = runStepRepository.skipPending(child.id());
-            boolean settled = workflowRunRepository.settleCancelled(child.id(), now) == 1;
+            boolean settledByIterate = transactions.getObject().failIdleIterateParents(child.id(), now);
+            boolean settled = settledByIterate || workflowRunRepository.settleCancelled(child.id(), now) == 1;
             runUpdates.touched(child.id());
-            if (settled) {
+            if (settled && !settledByIterate) {
                 finished(child.id());
             }
             LOG.info("Child run stop: runId={} skippedSteps={} status={}", child.id(), skipped,

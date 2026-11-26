@@ -13,6 +13,7 @@
     "generate_storyboard": [],
     "generate_video": ["clip.mp4", "manifest.json"],
     "probe": ["video-details.json"],
+    "qa.review": [],
     "render_video": ["manifest.json", "video.mp4"],
     "translate": [],
     "tts": ["voice-manifest.json", "voice.wav"]

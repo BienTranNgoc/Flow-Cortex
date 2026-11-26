@@ -76,7 +76,8 @@ final class StepFileOutputs {
 
     private static Map<String, Set<String>> declarations() {
         Map<String, Set<String>> types = new TreeMap<>();
-        types.put(KnownStepTypes.APPROVAL_CHECKPOINT, Set.of());
+        types.put(HumanSteps.APPROVAL_CHECKPOINT, Set.of());
+        types.put(HumanSteps.QA_REVIEW, Set.of());
         types.put("align_audio", Set.of("aligned-speech.wav", "alignment-manifest.json"));
         types.put("caption_burn", Set.of("preview.png", "video.mp4"));
         types.put("echo", Set.of());
