@@ -325,5 +325,26 @@ describe('ResetPasswordPage', () => {
         email: 'an@example.com',
       });
     });
+
+    it('toggles visibility on both password fields and renders placeholders', async () => {
+      const { user } = renderPage({});
+
+      const password = await screen.findByLabelText(viAuth.reset.password.passwordLabel);
+      const confirm = screen.getByLabelText(viAuth.reset.password.confirmPasswordLabel);
+      expect(password).toHaveAttribute('placeholder', viAuth.reset.password.passwordPlaceholder);
+      expect(confirm).toHaveAttribute(
+        'placeholder',
+        viAuth.reset.password.confirmPasswordPlaceholder,
+      );
+      const toggles = screen.getAllByRole('button', { name: viAuth.login.showPassword });
+      expect(toggles).toHaveLength(2);
+
+      await user.click(toggles[0]!);
+      expect(password).toHaveAttribute('type', 'text');
+      expect(confirm).toHaveAttribute('type', 'password');
+
+      await user.click(toggles[1]!);
+      expect(confirm).toHaveAttribute('type', 'text');
+    });
   });
 });

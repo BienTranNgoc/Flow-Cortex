@@ -2,6 +2,8 @@ import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useFeaturesQuery } from '../../app/useFeatures';
+import { useAuthPose } from './authPose';
+import { nodiPeekState } from './nodiPeekState';
 import { resendEmailSchema } from './registerSchema';
 import {
   failureMessage,
@@ -28,7 +30,19 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
   const forgot = useForgotPasswordMutation();
   const [typedEmail, setTypedEmail] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [focused, setFocused] = useState<'email' | null>(null);
+  const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
+  const editVersion = useRef(0);
   const emailInput = useRef<HTMLInputElement>(null);
+
+  useAuthPose(
+    nodiPeekState({
+      focused,
+      pending: forgot.isPending,
+      failed: Boolean(emailError) || (forgot.isError && !editedSinceSubmit),
+      succeeded: forgot.isSuccess,
+    }),
+  );
 
   const refuseEmail = (message: string) => {
     setEmailError(message);
@@ -37,6 +51,7 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
+    setEditedSinceSubmit(false);
     const parsed = resendEmailSchema.safeParse(typedEmail);
     if (!parsed.success) {
       forgot.reset();
@@ -44,8 +59,10 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
       return;
     }
     setEmailError(null);
+    const submittedVersion = editVersion.current;
     forgot.mutate(parsed.data, {
       onError: (error) => {
+        if (editVersion.current !== submittedVersion) return;
         const message = fieldErrorsFrom(error).email;
         if (message) refuseEmail(message);
       },
@@ -73,8 +90,16 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
             type="email"
             className="auth-input"
             autoComplete="email"
+            placeholder={t('auth.reset.request.emailPlaceholder')}
             value={typedEmail}
-            onChange={(event) => setTypedEmail(event.target.value)}
+            onChange={(event) => {
+              editVersion.current += 1;
+              setTypedEmail(event.target.value);
+              setEditedSinceSubmit(true);
+              if (emailError) setEmailError(null);
+            }}
+            onFocus={() => setFocused('email')}
+            onBlur={() => setFocused(null)}
             aria-invalid={emailError ? 'true' : 'false'}
             aria-describedby={emailError ? 'reset-request-email-error' : undefined}
           />

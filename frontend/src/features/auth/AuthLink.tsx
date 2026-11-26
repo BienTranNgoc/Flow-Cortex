@@ -4,11 +4,12 @@ import { useAuthNavigate } from './useAuthNavigate';
 
 interface AuthLinkProps {
   to: string;
+  className?: string;
   children: ReactNode;
 }
 
 /** A real link to another auth screen; a plain left click swaps screens through `useAuthNavigate`. */
-export function AuthLink({ to, children }: AuthLinkProps) {
+export function AuthLink({ to, className, children }: AuthLinkProps) {
   const { go } = useAuthNavigate();
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (
@@ -25,7 +26,7 @@ export function AuthLink({ to, children }: AuthLinkProps) {
     go(to);
   };
   return (
-    <Link to={to} className="auth-link" onClick={onClick}>
+    <Link to={to} className={className ? `auth-link ${className}` : 'auth-link'} onClick={onClick}>
       {children}
     </Link>
   );

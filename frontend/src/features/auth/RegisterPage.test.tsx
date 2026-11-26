@@ -580,5 +580,34 @@ describe('RegisterPage', () => {
         return_to: '/',
       });
     });
+
+    it('omits the OAuth divider when Google sign-up is disabled and shows it when enabled', () => {
+      const { container, unmount } = renderRegister();
+      expect(container.querySelector('.auth-divider')).toBeNull();
+      unmount();
+
+      vi.stubEnv('VITE_OAUTH_ENABLED', 'true');
+      const enabled = renderRegister();
+      expect(enabled.container.querySelector('.auth-divider')).not.toBeNull();
+    });
+
+    it('toggles password visibility independently for password and confirm password fields', async () => {
+      const user = userEvent.setup();
+      renderRegister();
+
+      const password = screen.getByLabelText('Mật khẩu');
+      const confirm = screen.getByLabelText('Nhập lại mật khẩu');
+      const toggles = screen.getAllByRole('button', { name: viAuth.login.showPassword });
+      expect(toggles).toHaveLength(2);
+      expect(password).toHaveAttribute('type', 'password');
+      expect(confirm).toHaveAttribute('type', 'password');
+
+      await user.click(toggles[0]!);
+      expect(password).toHaveAttribute('type', 'text');
+      expect(confirm).toHaveAttribute('type', 'password');
+
+      await user.click(toggles[1]!);
+      expect(confirm).toHaveAttribute('type', 'text');
+    });
   });
 });

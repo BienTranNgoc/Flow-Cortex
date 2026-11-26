@@ -14,6 +14,7 @@ import { ResendConfirmation } from './ConfirmEmailPage';
 import { loginSchema, type LoginFormValues } from './loginSchema';
 import { nodiPeekState } from './nodiPeekState';
 import { googleAuthorizeUrl, oauthErrorKey } from './oauth';
+import { PasswordRevealButton } from './PasswordRevealButton';
 import {
   accountLockedMessage,
   clearRememberedEmail,
@@ -27,40 +28,6 @@ import {
   useAuthToken,
   useLoginMutation,
 } from './useAuth';
-
-const eyeIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    width="20"
-    height="20"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-const eyeOffIcon = (
-  <svg
-    viewBox="0 0 24 24"
-    width="20"
-    height="20"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10.4 10.4 0 0 0 5.4-1.6" />
-    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18" />
-  </svg>
-);
 
 /** Router state other pages hand to sign-in: where to return, or a notice and the email to fill in. */
 interface LoginState {
@@ -162,7 +129,7 @@ export function LoginPage() {
   const lockedText = otherFailure
     ? accountLockedMessage(loginMutation.error, t, activeLocale())
     : undefined;
-  const resetLink = <Link to="/forgot-password" />;
+  const resetLink = <AuthLink to="/forgot-password">{null}</AuthLink>;
   // A link to a panel that never opens would be a dead end, so the sentence stays plain text.
   const helpLink = supportWidget ? <Link to={{ search: HELP_FROM_INACTIVE_ACCOUNT }} /> : <></>;
   const alertBody = (() => {
@@ -311,16 +278,11 @@ export function LoginPage() {
                 return passwordField.onBlur(event);
               }}
             />
-            <button
-              type="button"
-              className="auth-reveal"
-              aria-label={t('auth.login.showPassword')}
-              aria-pressed={passwordShown}
-              aria-controls="login-password"
-              onClick={() => setPasswordShown((shown) => !shown)}
-            >
-              {passwordShown ? eyeOffIcon : eyeIcon}
-            </button>
+            <PasswordRevealButton
+              shown={passwordShown}
+              controlsId="login-password"
+              onToggle={() => setPasswordShown((shown) => !shown)}
+            />
           </div>
           {errors.password?.message && (
             <p id="login-password-error" role="alert" className="auth-error">
@@ -334,9 +296,9 @@ export function LoginPage() {
             <span>{t('auth.login.rememberMe')}</span>
           </label>
           {passwordReset ? (
-            <Link to="/forgot-password" className="auth-link forgot-password-link">
+            <AuthLink to="/forgot-password" className="forgot-password-link">
               {t('auth.login.forgotPassword')}
-            </Link>
+            </AuthLink>
           ) : (
             <span
               className="auth-link forgot-password-link forgot-password-link--disabled"
@@ -358,14 +320,18 @@ export function LoginPage() {
         </button>
       </form>
 
-      <hr className="auth-divider" />
-      {oauthEnabled() && <p className="auth-hint">{t('auth.login.googleHint')}</p>}
-      <OAuthButton
-        provider="google"
-        label={t('auth.login.google')}
-        href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
-        className="auth-btn auth-btn--google"
-      />
+      {oauthEnabled() && (
+        <>
+          <hr className="auth-divider" />
+          <p className="auth-hint">{t('auth.login.googleHint')}</p>
+          <OAuthButton
+            provider="google"
+            label={t('auth.login.google')}
+            href={googleAuthorizeUrl(watch('rememberMe'), returnTo)}
+            className="auth-btn auth-btn--google"
+          />
+        </>
+      )}
 
       <p className="auth-footnote">
         {t('auth.login.newHere')}{' '}
