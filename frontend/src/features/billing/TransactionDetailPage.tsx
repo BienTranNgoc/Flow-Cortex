@@ -7,6 +7,7 @@ import { Skeleton } from '../../app/Skeleton';
 import { StatusBlock } from '../../app/StatusBlock';
 import { formatDateTime, formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
+import { RefundBlock } from './RefundBlock';
 import { StatusChip } from './StatusChip';
 import { useTransaction } from './useTransactions';
 import './billing.css';
@@ -92,6 +93,8 @@ function TransactionFacts({ transaction }: Readonly<{ transaction: TransactionDe
           </div>
         ))}
       </dl>
+
+      <RefundBlock transactionId={transaction.id} />
 
       <section className="billing-timeline" aria-labelledby="billing-timeline-title">
         <h2 id="billing-timeline-title" className="billing-timeline__title">

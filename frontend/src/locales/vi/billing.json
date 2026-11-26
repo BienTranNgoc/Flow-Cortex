@@ -67,5 +67,46 @@
       "payment_expired": "Thanh toán đã hết hạn",
       "code": "Mã nhà cung cấp {{code}}"
     }
+  },
+  "refund": {
+    "title": "Hoàn tiền",
+    "invite": {
+      "days": "Bạn còn {{days}} ngày để yêu cầu hoàn tiền.",
+      "today": "Hôm nay là ngày cuối cùng bạn có thể yêu cầu hoàn tiền."
+    },
+    "request": "Yêu cầu hoàn tiền",
+    "processing": {
+      "line": "Yêu cầu hoàn tiền {{code}} của bạn đang được xử lý.",
+      "sent": "Đã gửi",
+      "cancel": "Huỷ yêu cầu",
+      "cancelling": "Đang huỷ…",
+      "cancelRefused": "Yêu cầu này đã được tiếp nhận xử lý nên không thể huỷ nữa.",
+      "cancelFailed": "Không thể huỷ yêu cầu. Vui lòng thử lại."
+    },
+    "rejected": {
+      "line": "Yêu cầu hoàn tiền {{code}} của bạn đã bị từ chối.",
+      "reason": "Lý do: {{reason}}"
+    },
+    "refused": {
+      "window_elapsed": "Thời hạn {{days}} ngày để yêu cầu hoàn tiền cho khoản thanh toán này đã kết thúc.",
+      "turn_limit_reached": "Bạn đã đạt giới hạn số yêu cầu hoàn tiền ({{limit}} yêu cầu trong mỗi kỳ {{months}} tháng). Bạn có thể gửi yêu cầu tiếp theo từ {{date}}.",
+      "turn_limit_reached_no_date": "Bạn đã đạt giới hạn số yêu cầu hoàn tiền ({{limit}} yêu cầu trong mỗi kỳ {{months}} tháng).",
+      "not_settled": "Khoản thanh toán này chưa hoàn tất nên chưa có gì để hoàn lại.",
+      "already_refunded": "Khoản thanh toán này đã được hoàn tiền hoặc đang trong quá trình hoàn tiền.",
+      "previously_rejected": "Yêu cầu hoàn tiền cho khoản thanh toán này đã bị từ chối nên không thể yêu cầu lại.",
+      "generic": "Không thể yêu cầu hoàn tiền cho khoản thanh toán này."
+    },
+    "policy": "Chính sách hoàn tiền",
+    "policyNewTab": "(mở trong tab mới)",
+    "dialog": {
+      "title": "Yêu cầu hoàn tiền",
+      "description": "Hãy cho chúng tôi biết vì sao bạn muốn hoàn lại khoản thanh toán này. Chúng tôi đọc mọi yêu cầu.",
+      "reasonLabel": "Lý do",
+      "reasonHint": "Nhập ít nhất {{min}} ký tự.",
+      "failure": "Không thể gửi yêu cầu của bạn. Nội dung vẫn được giữ lại; vui lòng thử lại.",
+      "cancel": "Đóng",
+      "send": "Gửi yêu cầu",
+      "sending": "Đang gửi…"
+    }
   }
 }
