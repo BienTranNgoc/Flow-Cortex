@@ -30,10 +30,16 @@ class RunStartGuards {
     }
 
     void check(UUID ownerId, UUID workflowId, List<WorkflowStep> steps, StartContext context) {
-        checkDefs(ownerId, workflowId, steps.stream()
-                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
-                        step.getInputRef()))
-                .toList(), context);
+        checkDefs(ownerId, workflowId, defsOf(steps), context);
+    }
+
+    /** Runs only the readiness guard: whether the steps can start at all, with no cost or ownership check. */
+    void checkReadiness(UUID ownerId, UUID workflowId, List<WorkflowStep> steps) {
+        List<StepDef> defs = defsOf(steps);
+        StartContext context = new StartContext(false);
+        guards.stream()
+                .filter(WorkflowReadinessGuard.class::isInstance)
+                .forEach(guard -> guard.check(ownerId, workflowId, defs, context));
     }
 
     /** Runs every guard over {@code defs}, which may be only the steps a run retry re-executes. */
@@ -58,16 +64,17 @@ class RunStartGuards {
      */
     void checkSubset(UUID ownerId, UUID workflowId, List<WorkflowStep> allSteps, List<WorkflowStep> targetSteps,
             StartContext context) {
-        List<StepDef> allDefs = allSteps.stream()
-                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
-                        step.getInputRef()))
-                .toList();
-        List<StepDef> subsetDefs = targetSteps.stream()
-                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
-                        step.getInputRef()))
-                .toList();
+        List<StepDef> allDefs = defsOf(allSteps);
+        List<StepDef> subsetDefs = defsOf(targetSteps);
         for (RunStartGuard guard : guards) {
             guard.check(ownerId, workflowId, guard instanceof WorkflowReadinessGuard ? allDefs : subsetDefs, context);
         }
+    }
+
+    private static List<StepDef> defsOf(List<WorkflowStep> steps) {
+        return steps.stream()
+                .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),
+                        step.getInputRef()))
+                .toList();
     }
 }

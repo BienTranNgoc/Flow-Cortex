@@ -38,6 +38,7 @@ import type {
   UploadRequest,
 } from '@flow-cortex/api-client';
 import { activeLocale } from '../../lib/i18n';
+import { untilLinkRenewal } from '../../lib/signedLinks';
 import { newUuidV4 } from '../support/uuid';
 import { useRunEvents } from './useRunEvents';
 
@@ -151,24 +152,8 @@ export function useRunQuery(runId: string | undefined) {
   return query;
 }
 
-const INPUT_URL_REFRESH_LEAD_MS = 60_000;
-// A stale timer longer than ~24.8 days overflows setTimeout and fires at once.
-const MAX_INPUT_STALE_MS = 24 * 60 * 60 * 1000;
-
-/** Whether a signed link is expired or about to be, so a failed load means "renew", not "gone". */
-export function inputUrlNeedsRenewal(expiresAt: string, now = Date.now()): boolean {
-  const expiry = Date.parse(expiresAt);
-  return Number.isNaN(expiry) || now >= expiry - INPUT_URL_REFRESH_LEAD_MS;
-}
-
-/** Milliseconds until the earliest link needs renewing; 0 when none is known or one already does. */
 function untilInputRefresh(inputs: RunInputResponse[] | undefined): number {
-  const expiries = (inputs ?? []).map((input) => Date.parse(input.expiresAt));
-  if (expiries.length === 0 || expiries.some(Number.isNaN)) {
-    return 0;
-  }
-  const untilRefresh = Math.min(...expiries) - INPUT_URL_REFRESH_LEAD_MS - Date.now();
-  return Math.min(Math.max(0, untilRefresh), MAX_INPUT_STALE_MS);
+  return untilLinkRenewal((inputs ?? []).map((input) => input.expiresAt));
 }
 
 /**

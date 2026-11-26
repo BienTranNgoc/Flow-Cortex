@@ -65,7 +65,7 @@ async function fetchPage(filter: NotificationFilter, page: number, size: number)
 export function useUnreadCount(): number {
   const query = useQuery({
     queryKey: [...NOTIFICATIONS_KEY, 'unread-count'],
-    queryFn: () => unwrap(getUnreadNotificationCount(authHeaders())),
+    queryFn: () => unwrap(getUnreadNotificationCount({}, authHeaders())),
   });
   return query.data?.unreadCount ?? 0;
 }
@@ -113,7 +113,7 @@ export function useMarkRead() {
 export function useMarkAllRead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => unwrap(markAllNotificationsRead(authHeaders())),
+    mutationFn: () => unwrap(markAllNotificationsRead({}, authHeaders())),
     onSettled: () => queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
   });
 }

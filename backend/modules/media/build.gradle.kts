@@ -5,6 +5,8 @@ plugins {
 dependencies {
     // UploadRejectedException, part of the api package, carries a LocalizedMessage.
     api(project(":shared:web"))
+    // SettingKey, the type of every editor limit handle, is part of media :: api.
+    api(project(":modules:settings"))
     implementation(project(":modules:space"))
     implementation(project(":modules:jobs"))
     implementation("org.springframework.boot:spring-boot-starter-amqp")

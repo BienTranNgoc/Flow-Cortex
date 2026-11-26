@@ -8,6 +8,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import i18n from '../lib/i18n';
 import viCommon from '../locales/vi/common.json';
+import { stubDialogElement } from '../test/dialog';
 import { ADMIN_ME, MEMBER_ME, stubApi, testQueryClient } from '../test/fakeApi';
 import { stubMatchMedia } from '../test/matchMedia';
 import type { NavGroup } from './nav';
@@ -76,10 +77,25 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Workflows & Templates')).not.toBeInTheDocument();
   });
 
+  it('links Feature Switches to /features with no coming-soon tag for a holder of platform.setting.view, and hides it otherwise', () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { unmount } = renderSidebar(ADMIN_ME);
+
+    const link = screen.getByRole('link', { name: /Feature Switches/ });
+    expect(link).toHaveAttribute('href', '/features');
+    expect(link).not.toHaveTextContent('Coming soon');
+    unmount();
+
+    renderSidebar({
+      permissions: ADMIN_ME.permissions.filter((key) => key !== 'platform.setting.view'),
+      adminDisabled: false,
+    });
+    expect(screen.queryByText('Feature Switches')).not.toBeInTheDocument();
+  });
+
   it.each([
     'Approval Queue',
     'Credits & Wallets',
-    'Feature Switches',
     'Audit Log',
     'Voice Quota',
     'Health',
@@ -378,39 +394,7 @@ describe('Sidebar', () => {
   });
 
   describe('as a drawer below 1024px', () => {
-    const showModalDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLDialogElement.prototype,
-      'showModal',
-    );
-    const closeDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, 'close');
-
-    beforeEach(() => {
-      Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.setAttribute('open', '');
-        },
-      });
-      Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-        configurable: true,
-        value(this: HTMLDialogElement) {
-          this.removeAttribute('open');
-          this.dispatchEvent(new Event('close'));
-        },
-      });
-    });
-    afterEach(() => {
-      for (const [name, descriptor] of [
-        ['showModal', showModalDescriptor],
-        ['close', closeDescriptor],
-      ] as const) {
-        if (descriptor) {
-          Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
-        } else {
-          Reflect.deleteProperty(HTMLDialogElement.prototype, name);
-        }
-      }
-    });
+    stubDialogElement();
 
     it('opens as a modal dialog holding the full navigation, with no collapse control', () => {
       stubMatchMedia(false);

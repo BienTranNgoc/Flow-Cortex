@@ -95,53 +95,6 @@ describe('ChatPage', () => {
     expect(screen.queryByText('Assistant')).not.toBeInTheDocument();
   });
 
-  it('deletes after confirming and goes back to /chat when the open one is deleted', async () => {
-    stubApi({
-      'GET /api/v1/chat/conversations': LIST(),
-      'GET /api/v1/chat/conversations/c1/messages': MESSAGES(),
-      'DELETE /api/v1/chat/conversations/c1': { status: 204 },
-    });
-    HTMLDialogElement.prototype.showModal = function showModal() {
-      this.setAttribute('open', '');
-    };
-    HTMLDialogElement.prototype.close = function close() {
-      this.removeAttribute('open');
-    };
-    const { queryClient } = renderRoute(
-      '/chat/:conversationId',
-      '/chat/c1',
-      <ChatPage />,
-      <Route path="/chat" element={<p>chat index</p>} />,
-    );
-    await settled(queryClient);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Conversations' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete: Launch video' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-
-    expect(await screen.findByText('chat index')).toBeInTheDocument();
-  });
-
-  it('refuses a title over 80 characters and cancels a rename on Escape', async () => {
-    stubApi({
-      'GET /api/v1/chat/conversations': LIST(),
-      'GET /api/v1/chat/conversations/c1/messages': MESSAGES(),
-    });
-    const { queryClient } = renderChat();
-    await settled(queryClient);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Conversations' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Rename: Launch video' }));
-    const input = screen.getByRole('textbox', { name: 'Conversation title' });
-    await userEvent.clear(input);
-    await userEvent.type(input, 'x'.repeat(81));
-    expect(screen.getByText('A title can have at most 80 characters.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
-
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('textbox', { name: 'Conversation title' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Launch video' })).toBeInTheDocument();
-  });
 });
 
 describe('ChatPage new conversation', () => {

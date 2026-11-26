@@ -34,8 +34,9 @@ final class ForkEligibility {
     }
 
     /**
-     * A connector call step runs with the credential of whoever owns the workflow, and a copy is owned by the
-     * caller: it would send a request someone else chose, so a workflow that holds one is not copied.
+     * A step that reads a member connector (a connector call or a drive read) runs with the credential of whoever
+     * owns the workflow, and a copy is owned by the caller: it would act on a request or folder someone else chose,
+     * so a workflow that holds one is not copied. {@code holdsConnectorCall} is true for any such step.
      */
     static Optional<Refusal> refusal(UUID sourceId, UUID sourceOwnerId, boolean allowFork,
             boolean holdsConnectorCall, UUID callerId) {

@@ -3,6 +3,7 @@ package com.flowcortex.workflow.application;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,8 +17,10 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -74,8 +77,23 @@ public final class WorkflowArtifacts {
         }
     }
 
+    /**
+     * Deepest nesting the reader accepts: the root, the steps (or data store) array and one entry take three levels,
+     * which leaves a step config or a data-store value 61 levels of its own.
+     */
+    static final int MAX_NESTING_DEPTH = 64;
+    /** Longest object key the reader accepts; a step config or a data-store value is far below it in practice. */
+    static final int MAX_KEY_LENGTH = 1_000;
+    /** Faults kept per read: each holds its path, so an unbounded count would let a crafted file grow the map. */
+    static final int MAX_RECORDED_FAULTS = 1_000;
+
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
-    private static final JsonFactory FACTORY = new JsonFactory();
+    private static final JsonFactory FACTORY = JsonFactory.builder()
+            .streamReadConstraints(StreamReadConstraints.builder()
+                    .maxNestingDepth(MAX_NESTING_DEPTH)
+                    .maxNameLength(MAX_KEY_LENGTH)
+                    .build())
+            .build();
     /** Exact decimals, so {@code 2.50} and {@code 100.0} travel as written instead of being normalised. */
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
@@ -85,12 +103,20 @@ public final class WorkflowArtifacts {
     private static final Instant LATEST_EXPORTED_AT = Instant.parse("9999-12-31T23:59:59.999999999Z");
 
     private static final Set<String> ROOT_KEYS = Set.of("formatVersion", "exportedAt", "workflow", "steps");
+    private static final Set<String> OPTIONAL_ROOT_KEYS = Set.of("dataStore");
     private static final Set<String> WORKFLOW_KEYS = Set.of("name");
+    private static final Set<String> DATA_ENTRY_KEYS = WorkflowCarry.CARRIED_ENTRY_FIELDS;
 
     private WorkflowArtifacts() {
     }
 
     public static ObjectNode write(String name, List<StepDefinition> steps, Instant exportedAt) {
+        return write(name, steps, List.of(), exportedAt);
+    }
+
+    /** The {@code dataStore} section is written only when there are entries, sorted by key. */
+    public static ObjectNode write(String name, List<StepDefinition> steps, List<WorkflowDataStore.Seed> dataStore,
+            Instant exportedAt) {
         ObjectNode artifact = NODES.objectNode();
         artifact.put("formatVersion", FORMAT_VERSION);
         artifact.put("exportedAt", exportedAt.toString());
@@ -104,6 +130,15 @@ public final class WorkflowArtifacts {
             node.put("inputRef", step.inputRef());
             node.set("config", configNode(step.config()));
         });
+        if (!dataStore.isEmpty()) {
+            ArrayNode entries = artifact.putArray("dataStore");
+            dataStore.stream().sorted(Comparator.comparing(WorkflowDataStore.Seed::key)).forEach(seed -> {
+                ObjectNode node = entries.addObject();
+                node.put("key", seed.key());
+                node.put("dataType", seed.dataType());
+                node.set("value", seed.value());
+            });
+        }
         return artifact;
     }
 
@@ -114,7 +149,7 @@ public final class WorkflowArtifacts {
             if (parser.nextToken() == null) {
                 return notJson();
             }
-            root = build(parser, "", faults);
+            root = build(parser, null, faults);
             if (parser.nextToken() != null) {
                 return notJson();
             }
@@ -126,7 +161,7 @@ public final class WorkflowArtifacts {
             return new Invalid(faults);
         }
         ObjectNode document = (ObjectNode) root;
-        checkKeys(document, ROOT_KEYS, "", faults);
+        checkKeys(document, ROOT_KEYS, OPTIONAL_ROOT_KEYS, "", faults);
 
         if (document.has("formatVersion") && !isInt(document.get("formatVersion"), FORMAT_VERSION)) {
             fault(faults, "formatVersion", Reason.UNSUPPORTED_FORMAT_VERSION);
@@ -134,11 +169,25 @@ public final class WorkflowArtifacts {
         Instant exportedAt = document.has("exportedAt") ? exportedAt(document.get("exportedAt"), faults) : null;
         String name = document.has("workflow") ? workflowName(document.get("workflow"), faults) : null;
         List<StepDefinition> steps = document.has("steps") ? steps(document.get("steps"), faults) : null;
+        List<WorkflowDataStore.Seed> dataStore =
+                document.has("dataStore") ? dataStore(document.get("dataStore"), faults) : List.of();
 
         if (!faults.isEmpty()) {
             return new Invalid(faults);
         }
-        return new Parsed(new WorkflowArtifact(FORMAT_VERSION, exportedAt, name, steps));
+        return new Parsed(new WorkflowArtifact(FORMAT_VERSION, exportedAt, name, steps, dataStore));
+    }
+
+    /** Whether a file stays inside the nesting and key-length limits {@link #read} enforces, so it can be read back. */
+    static boolean withinReadLimits(byte[] body) {
+        try (JsonParser parser = FACTORY.createParser(body)) {
+            while (parser.nextToken() != null) {
+                // only the stream constraints are being exercised
+            }
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** An ASCII slug for a download name: diacritics removed, {@code workflow} when nothing is left. */
@@ -172,8 +221,39 @@ public final class WorkflowArtifacts {
         }
     }
 
+    /**
+     * One step of the way from the document root to a value. Each level only links to its parent, so descending costs
+     * a constant per level and the dotted text is built only for the rare value that a fault names.
+     */
+    private record Position(Position parent, String key, int index) {
+
+        static Position key(Position parent, String key) {
+            return new Position(parent, key, -1);
+        }
+
+        static Position index(Position parent, int index) {
+            return new Position(parent, null, index);
+        }
+
+        String path() {
+            Deque<Position> chain = new ArrayDeque<>();
+            for (Position at = this; at != null; at = at.parent) {
+                chain.push(at);
+            }
+            StringBuilder path = new StringBuilder();
+            for (Position at : chain) {
+                if (at.key != null) {
+                    path.append(path.isEmpty() ? "" : ".").append(at.key);
+                } else {
+                    path.append('[').append(at.index).append(']');
+                }
+            }
+            return path.toString();
+        }
+    }
+
     /** Builds the tree itself so a duplicate key is reported at its path and parsing goes on to find the rest. */
-    private static JsonNode build(JsonParser parser, String path, Map<String, String> faults) throws IOException {
+    private static JsonNode build(JsonParser parser, Position at, Map<String, String> faults) throws IOException {
         JsonToken token = parser.currentToken();
         switch (token) {
             case START_OBJECT -> {
@@ -181,10 +261,12 @@ public final class WorkflowArtifacts {
                 while (parser.nextToken() == JsonToken.FIELD_NAME) {
                     String key = parser.currentName();
                     parser.nextToken();
-                    String childPath = path.isEmpty() ? key : path + "." + key;
-                    JsonNode value = build(parser, childPath, faults);
+                    Position child = Position.key(at, key);
+                    JsonNode value = build(parser, child, faults);
                     if (object.has(key)) {
-                        fault(faults, childPath, Reason.DUPLICATE_KEY);
+                        if (faults.size() < MAX_RECORDED_FAULTS) {
+                            fault(faults, child.path(), Reason.DUPLICATE_KEY);
+                        }
                     } else {
                         object.set(key, value);
                     }
@@ -194,7 +276,7 @@ public final class WorkflowArtifacts {
             case START_ARRAY -> {
                 ArrayNode array = NODES.arrayNode();
                 while (parser.nextToken() != JsonToken.END_ARRAY) {
-                    array.add(build(parser, path + "[" + array.size() + "]", faults));
+                    array.add(build(parser, Position.index(at, array.size()), faults));
                 }
                 return array;
             }
@@ -294,6 +376,43 @@ public final class WorkflowArtifacts {
         return steps;
     }
 
+    /**
+     * The entries of the optional {@code dataStore} section. Only the shape and storable text are checked here; the
+     * store's own rules (key pattern, size, quota) grade at review and import.
+     */
+    private static List<WorkflowDataStore.Seed> dataStore(JsonNode node, Map<String, String> faults) {
+        if (!node.isArray()) {
+            fault(faults, "dataStore", Reason.WRONG_TYPE);
+            return null;
+        }
+        List<WorkflowDataStore.Seed> seeds = new ArrayList<>();
+        for (int i = 0; i < node.size(); i++) {
+            WorkflowDataStore.Seed seed = dataEntry(node.get(i), i, faults);
+            if (seed != null) {
+                seeds.add(seed);
+            }
+        }
+        return seeds;
+    }
+
+    private static WorkflowDataStore.Seed dataEntry(JsonNode node, int index, Map<String, String> faults) {
+        String prefix = "dataStore[" + index + "]";
+        if (!node.isObject()) {
+            fault(faults, prefix, Reason.WRONG_TYPE);
+            return null;
+        }
+        int before = faults.size();
+        checkKeys((ObjectNode) node, DATA_ENTRY_KEYS, prefix + ".", faults);
+        String key = node.has("key") ? text(node.get("key"), prefix + ".key", Integer.MAX_VALUE, faults) : null;
+        String dataType =
+                node.has("dataType") ? text(node.get("dataType"), prefix + ".dataType", Integer.MAX_VALUE, faults) : null;
+        JsonNode value = node.get("value");
+        if (value != null && containsUnstorableText(value)) {
+            fault(faults, prefix + ".value", Reason.INVALID_TEXT);
+        }
+        return faults.size() == before ? new WorkflowDataStore.Seed(key, dataType, value) : null;
+    }
+
     private static StepDefinition step(JsonNode node, int index, Map<String, String> faults) {
         String prefix = "steps[" + index + "]";
         if (!node.isObject()) {
@@ -390,8 +509,14 @@ public final class WorkflowArtifacts {
 
     /** Reports each unknown key and each missing key of an object whose key set is exactly {@code keys}. */
     private static void checkKeys(ObjectNode object, Set<String> keys, String prefix, Map<String, String> faults) {
+        checkKeys(object, keys, Set.of(), prefix, faults);
+    }
+
+    /** As above, but a key of {@code optional} may be present or absent. */
+    private static void checkKeys(ObjectNode object, Set<String> keys, Set<String> optional, String prefix,
+            Map<String, String> faults) {
         object.fieldNames().forEachRemaining(key -> {
-            if (!keys.contains(key)) {
+            if (!keys.contains(key) && !optional.contains(key)) {
                 fault(faults, prefix + key, Reason.UNKNOWN_KEY);
             }
         });
@@ -430,6 +555,8 @@ public final class WorkflowArtifacts {
     }
 
     private static void fault(Map<String, String> faults, String path, String reason) {
-        faults.putIfAbsent(path, reason);
+        if (faults.size() < MAX_RECORDED_FAULTS) {
+            faults.putIfAbsent(path, reason);
+        }
     }
 }

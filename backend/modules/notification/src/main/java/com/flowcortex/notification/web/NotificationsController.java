@@ -1,5 +1,6 @@
 package com.flowcortex.notification.web;
 
+import com.flowcortex.notification.application.Audience;
 import com.flowcortex.notification.application.NotificationService;
 import com.flowcortex.notification.application.NotificationService.Item;
 import com.flowcortex.notification.application.NotificationService.Listing;
@@ -7,6 +8,7 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.UserDirectory;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -44,23 +46,33 @@ class NotificationsController {
 
     @Operation(operationId = "listNotifications")
     @ApiResponse(responseCode = "200")
-    @ApiResponse(responseCode = "400", description = "filter, page or size out of range",
+    @ApiResponse(responseCode = "400", description = "audience, filter, page or size out of range",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     NotificationPage list(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(schema = @Schema(allowableValues = {"member", "admin"}, defaultValue = "member"))
+            @RequestParam(name = "audience", required = false) String audience,
             @RequestParam(name = "filter", required = false) String filter,
             @RequestParam(name = "page", required = false) String page,
             @RequestParam(name = "size", required = false) String size, Locale locale) {
-        Listing listing = service.list(currentUserId(jwt), filter, page, size, locale);
+        Audience asked = Audience.parse(audience);
+        Listing listing = service.list(currentUserId(jwt), asked, filter, page, size, locale);
         return new NotificationPage(listing.items().stream().map(NotificationsController::item).toList(),
                 listing.page(), listing.size(), listing.hasMore(), listing.unreadCount());
     }
 
     @Operation(operationId = "getUnreadNotificationCount")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "audience is not member or admin",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @GetMapping(path = "/unread-count", produces = MediaType.APPLICATION_JSON_VALUE)
-    UnreadCount unreadCount(@AuthenticationPrincipal Jwt jwt) {
-        return new UnreadCount(service.unreadCount(currentUserId(jwt)));
+    UnreadCount unreadCount(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(schema = @Schema(allowableValues = {"member", "admin"}, defaultValue = "member"))
+            @RequestParam(name = "audience", required = false) String audience) {
+        Audience asked = Audience.parse(audience);
+        return new UnreadCount(service.unreadCount(currentUserId(jwt), asked));
     }
 
     @Operation(operationId = "markNotificationRead")
@@ -78,9 +90,16 @@ class NotificationsController {
     }
 
     @Operation(operationId = "markAllNotificationsRead")
+    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "400", description = "audience is not member or admin",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping(path = "/read-all", produces = MediaType.APPLICATION_JSON_VALUE)
-    ReadAllResult markAllRead(@AuthenticationPrincipal Jwt jwt) {
-        return new ReadAllResult(service.markAllRead(currentUserId(jwt)));
+    ReadAllResult markAllRead(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(schema = @Schema(allowableValues = {"member", "admin"}, defaultValue = "member"))
+            @RequestParam(name = "audience", required = false) String audience) {
+        Audience asked = Audience.parse(audience);
+        return new ReadAllResult(service.markAllRead(currentUserId(jwt), asked));
     }
 
     private UUID currentUserId(Jwt jwt) {

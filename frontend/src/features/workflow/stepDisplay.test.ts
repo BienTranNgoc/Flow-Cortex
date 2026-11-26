@@ -6,6 +6,7 @@ import {
   defaultStep,
   edgeState,
   formatElapsedClock,
+  formatSeconds,
   selectedStep,
   stateWord,
   stepDuration,
@@ -324,6 +325,19 @@ describe('stepDuration', () => {
     expect(outputFields({ sourceBytes: 1500 * 1024 * 1024 }, vi, 'vi')).toEqual([
       { label: 'Source', value: '1.500,0 MB' },
     ]);
+  });
+});
+
+describe('formatSeconds', () => {
+  const en = i18n.getFixedT('en');
+
+  it('writes whole seconds below a minute', () => {
+    expect(formatSeconds(42, en, 'en')).toBe('42s');
+  });
+
+  it('writes minutes and seconds from a minute on', () => {
+    expect(formatSeconds(80, en, 'en')).toBe('1m 20s');
+    expect(formatSeconds(120, en, 'en')).toBe('2m');
   });
 });
 

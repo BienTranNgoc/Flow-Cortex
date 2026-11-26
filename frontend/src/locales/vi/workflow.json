@@ -128,6 +128,22 @@
     "notConfigured": "Chưa cấu hình",
     "headingCount": "{{done}}/{{total}}"
   },
+  "canvas": {
+    "region": "Sơ đồ lượt chạy",
+    "input": "Đầu vào",
+    "runInput": "Đầu vào của lượt chạy",
+    "live": "Trực tiếp",
+    "progress": "Bước {{current}} trên {{total}}",
+    "elapsed": "Đã chạy {{time}}",
+    "zoomIn": "Phóng to",
+    "zoomOut": "Thu nhỏ",
+    "zoomLevel": "{{percent}}%",
+    "fit": "Vừa khung sơ đồ",
+    "expand": "Mở rộng sơ đồ",
+    "close": "Đóng",
+    "minimap": "Tổng quan sơ đồ",
+    "splitHandle": "Đổi kích thước sơ đồ và phần chi tiết"
+  },
   "run": {
     "heading": {
       "pending": "Lượt chạy đang chờ",

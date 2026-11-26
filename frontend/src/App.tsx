@@ -21,17 +21,28 @@ import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
+import { HistoryPage } from './features/chat/history/HistoryPage';
+import { DriveFeatureGate } from './features/drive/DriveFeatureGate';
+import { DrivePage } from './features/drive/DrivePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { OAuthConsentRoute } from './features/auth/OAuthConsentPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
+import { PendingDeletionGate } from './features/auth/PendingDeletionGate';
+import { PendingDeletionPage } from './features/auth/PendingDeletionPage';
 import { PhoneGate } from './features/auth/PhoneGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { useMeQuery } from './features/auth/useAuth';
 import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
+import { LegalDocumentPage } from './features/legal/LegalDocumentPage';
+import { LegalHistoryPage } from './features/legal/LegalHistoryPage';
+import { LegalIndexPage } from './features/legal/LegalIndexPage';
+import { LegalLayout } from './features/legal/LegalLayout';
+import { LegalVersionPage } from './features/legal/LegalVersionPage';
 import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
 import { NotificationsPage } from './features/notifications/NotificationsPage';
@@ -62,9 +73,13 @@ const SupportWidget = lazy(() =>
   import('./features/support/SupportWidget').then((module) => ({ default: module.SupportWidget })),
 );
 
+// The widget is global and its unread poll is refused by the deletion gate, so a signed-in member
+// gets it only once `/me` says the account is free.
 function SupportWidgetWhenOn() {
   const { supportWidget } = useFeatures();
-  return supportWidget ? (
+  const me = useMeQuery();
+  const held = me.isLoading || Boolean(me.data?.accountDeletion);
+  return supportWidget && !held ? (
     <ErrorBoundary fallback={null}>
       <Suspense fallback={null}>
         <SupportWidget />
@@ -95,6 +110,12 @@ const chatPage = (
   </ChatFeatureGate>
 );
 
+const historyPage = (
+  <ChatFeatureGate>
+    <HistoryPage />
+  </ChatFeatureGate>
+);
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -121,17 +142,34 @@ export function App() {
                 </RequireAuth>
               }
             >
-              <Route path="/verify-phone" element={<VerifyPhonePage />} />
+              <Route
+                path="/verify-phone"
+                element={
+                  <PendingDeletionGate>
+                    <VerifyPhonePage />
+                  </PendingDeletionGate>
+                }
+              />
+              <Route path="/account-deletion" element={<PendingDeletionPage />} />
             </Route>
+          </Route>
+          {/* Public: a signed-out visitor reads the legal documents too. */}
+          <Route path="legal" element={<LegalLayout />}>
+            <Route index element={<LegalIndexPage />} />
+            <Route path=":doc" element={<LegalDocumentPage />} />
+            <Route path=":doc/history" element={<LegalHistoryPage />} />
+            <Route path=":doc/history/:id" element={<LegalVersionPage />} />
           </Route>
           <Route
             element={
               <RequireAuth>
                 <PasswordSetupGate>
-                  <PhoneGate>
-                    <Layout />
-                    <OnboardingFlowWhenOn />
-                  </PhoneGate>
+                  <PendingDeletionGate>
+                    <PhoneGate>
+                      <Layout />
+                      <OnboardingFlowWhenOn />
+                    </PhoneGate>
+                  </PendingDeletionGate>
                 </PasswordSetupGate>
               </RequireAuth>
             }
@@ -154,7 +192,16 @@ export function App() {
               <Route path="runs/:runId" element={<RunProgressPage />} />
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
               <Route path="chat" element={chatPage} />
+              <Route path="chat/history" element={historyPage} />
               <Route path="chat/:conversationId" element={chatPage} />
+              <Route
+                path="drive"
+                element={
+                  <DriveFeatureGate>
+                    <DrivePage />
+                  </DriveFeatureGate>
+                }
+              />
               <Route path="docs" element={<DocsPage />} />
               <Route path="docs/api" element={<DocsPage initialTab="api" />} />
               <Route path="docs/guides" element={<DocsPage initialTab="guides" />} />

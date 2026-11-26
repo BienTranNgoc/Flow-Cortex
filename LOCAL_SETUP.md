@@ -263,6 +263,13 @@ What to know about the media path:
     `EGRESS_ACL_FILE` is set; keep the host's copy outside the checkout and add the SMTP relay
     host to it, plus the five registry hosts the payments region gate downloads from:
     `ftp.apnic.net`, `ftp.arin.net`, `ftp.ripe.net`, `ftp.lacnic.net`, `ftp.afrinic.net`.
+  - The VietGuys SMS sender (`FLOWCORTEX_SMS_SENDER=vietguys`) reaches `api-v2.vietguys.biz` and
+    `cloudsms4.vietguys.biz` (port 4438) through this proxy. Both hosts are in the committed file
+    (a host-side `EGRESS_ACL_FILE` copy must list them too); another account's hosts are added by
+    the same file edit. To rotate the key that seals the carrier tokens, add
+    `FLOWCORTEX_SMS_CREDENTIAL_KEYS_K2` (`openssl rand -base64 32`), set
+    `FLOWCORTEX_SMS_CREDENTIAL_CURRENT_KEY_ID=k2`, and keep `..._KEYS_K1` until the next token
+    renewal has re-sealed both tokens under `k2`; only then drop `k1`.
   - A call that bypasses the proxy, or runs while the proxy is down, fails instead of
     connecting directly. Why and what else was weighed: `docs/ADR.md`, ADR-0010.
 - **Every published port is loopback-only** (`127.0.0.1`). The backend's
@@ -291,6 +298,10 @@ apply a change with `docker compose up -d backend`.
 - `FLOWCORTEX_SPACES_ENABLED=false` (the default outside compose): the session space
   answers 503 "This feature is turned off"; personal spaces are still provisioned when
   an account is activated, so nothing is lost when it is turned on.
+- `FLOWCORTEX_TRASH_ENABLED=false` (the default, in compose too): every `/api/v1/trash`
+  route answers 503 "This feature is turned off" and the expiry sweep and reminder jobs
+  do nothing; deletes are still recorded, so nothing is lost when it is turned on.
+  Turning it on also needs `FLOWCORTEX_APP_PUBLIC_URL`, or the backend refuses to start.
 
 **Demo switches.** Compose turns all five on; `application.yml` keeps the first four
 off for a bare `bootRun` and any environment that does not set them. Same mechanism
@@ -304,6 +315,7 @@ the member app reads it once per session.
 | `FLOWCORTEX_PHONE_VERIFICATION_ENABLED` | the profile offers phone verification by SMS code | the phone endpoints answer 503 and the profile hides the section |
 | `FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED` | an upload whose first bytes do not match its type is refused | the bytes are not checked (the size caps still apply) |
 | `FLOWCORTEX_WORKFLOW_CANCEL_ENABLED` | a member can stop a running run | stopping answers 503 and the button is hidden |
+| `FLOWCORTEX_WORKFLOW_SCHEDULES_ENABLED` | a member can set, pause and run workflow schedules (no timer fires them yet) | every schedule route answers 503 |
 | `FLOWCORTEX_CREDITS_ENABLED` | runs are charged per step from a 1000-credit signup grant, and refunded on system failures | no balance check, charge or refund, and no balance in the header |
 
 - **Payments region gate.** `FLOWCORTEX_BILLING_REGION_GATE_MODE` takes `off` (nobody is

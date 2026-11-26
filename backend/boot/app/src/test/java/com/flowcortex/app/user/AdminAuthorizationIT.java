@@ -87,7 +87,8 @@ class AdminAuthorizationIT extends AbstractUserModuleIT {
                 "content.document.manage", "content.document.view",
                 "content.help_article.manage", "content.help_article.view",
                 "content.help_topic.manage", "content.help_topic.view",
-                "content.media.manage", "content.media.view");
+                "content.media.manage", "content.media.view",
+                "content.trend_template.manage", "content.trend_template.view");
     }
 
     @Test

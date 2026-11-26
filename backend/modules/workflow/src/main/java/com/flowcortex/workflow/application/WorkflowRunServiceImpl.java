@@ -12,7 +12,6 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.media.api.UploadPurpose;
 import com.flowcortex.media.api.UploadRejectedException;
 import com.flowcortex.shared.web.LocalizedMessage;
-import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
 import com.flowcortex.user.api.UserDirectory;
@@ -21,11 +20,9 @@ import com.flowcortex.workflow.api.AdminRunFilter;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.MediaJobView;
-import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunOptions;
 import com.flowcortex.workflow.api.RunInputView;
 import com.flowcortex.workflow.api.RunOutputUrlView;
-import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.domain.RunStatus;
@@ -49,10 +46,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,34 +80,41 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final WorkflowRepository workflowRepository;
-    private final ServedDefinitions servedDefinitions;
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
     private final StepExecutorRegistry registry;
     private final MediaJobs mediaJobs;
     private final UserDirectory userDirectory;
-    private final RunStartGuards runStartGuards;
+    private final RunStartPreflight preflight;
     private final RunCreation runCreation;
     private final CreditAccounts creditAccounts;
-    private final boolean workflowEnabled;
 
     @Autowired
-    WorkflowRunServiceImpl(WorkflowRepository workflowRepository, ServedDefinitions servedDefinitions,
-            WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
-            StepExecutorRegistry registry, MediaJobs mediaJobs, UserDirectory userDirectory,
-            RunStartGuards runStartGuards, RunCreation runCreation, CreditAccounts creditAccounts,
-            @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+    WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowRunRepository workflowRunRepository,
+            RunStepRepository runStepRepository, StepExecutorRegistry registry, MediaJobs mediaJobs,
+            UserDirectory userDirectory, RunStartPreflight preflight, RunCreation runCreation,
+            CreditAccounts creditAccounts) {
         this.creditAccounts = creditAccounts;
         this.workflowRepository = workflowRepository;
-        this.servedDefinitions = servedDefinitions;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.registry = registry;
         this.mediaJobs = mediaJobs;
         this.userDirectory = userDirectory;
-        this.runStartGuards = runStartGuards;
+        this.preflight = preflight;
         this.runCreation = runCreation;
-        this.workflowEnabled = workflowEnabled;
+    }
+
+    /** Builds its own preflight from the pieces it is made of, so a test wires the service without the bean. */
+    WorkflowRunServiceImpl(WorkflowRepository workflowRepository, ServedDefinitions servedDefinitions,
+            WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
+            StepExecutorRegistry registry, MediaJobs mediaJobs, UserDirectory userDirectory,
+            RunStartGuards runStartGuards, RunCreation runCreation, CreditAccounts creditAccounts,
+            boolean workflowEnabled) {
+        this(workflowRepository, workflowRunRepository, runStepRepository, registry, mediaJobs, userDirectory,
+                new RunStartPreflight(workflowRepository, servedDefinitions, registry, mediaJobs, runStartGuards,
+                        workflowEnabled),
+                runCreation, creditAccounts);
     }
 
     @Override
@@ -149,19 +151,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
 
     private RunView start(UUID currentUserId, UUID workflowId, String input, UUID uploadId, List<UUID> uploadIds,
             String originalName, RunOptions options, boolean acknowledgeCost, String requestKey) {
-        // Kill switch — checked BEFORE anything is persisted: off means no
-        // run is created at all, not a run that is immediately refused.
-        if (!workflowEnabled) {
-            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    new LocalizedMessage("workflow.disabled"));
-        }
-        if (ProductVideoWorkflow.isProductVideo(workflowId)) {
-            throw new LocalizedStatusException(HttpStatus.BAD_REQUEST,
-                    new LocalizedMessage("workflow.productVideo.startElsewhere"));
-        }
-
-        Workflow workflow = workflowRepository.findVisibleTo(workflowId, currentUserId)
-                .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
+        Workflow workflow = preflight.resolve(currentUserId, workflowId);
         // A retried start answers with its run before any cost guard or object copy runs again.
         Optional<RunView> started = RunRequestKeys.existing(workflowRunRepository, runStepRepository, registry,
                 mediaJobs::isDownloadable, currentUserId, requestKey);
@@ -178,19 +168,11 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private RunView startNew(UUID currentUserId, Workflow workflow, String input, UUID uploadId,
             List<UUID> uploadIds, String originalName, RunOptions options, boolean acknowledgeCost,
             String requestKey) {
-        List<WorkflowStep> stepDefs = servedDefinitions.stepsFor(workflow, currentUserId);
-        // Refused up front: a run whose remote step would only fail media_disabled later.
-        if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
-            throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
-        }
-        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
-            throw new DubDisabledException();
-        }
+        List<WorkflowStep> stepDefs = preflight.checkSteps(currentUserId, workflow, acknowledgeCost);
         if (!stepDefs.isEmpty() && WorkflowMapper.takesLink(stepDefs.getFirst())
                 && FetchVideoConfig.linkFault(input) != null) {
             throw new UploadRejectedException("input", new LocalizedMessage("workflow.start.linkRequired"));
         }
-        runStartGuards.check(currentUserId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));
 
         boolean mediaWorkflow = !stepDefs.isEmpty() && registry.snapshotsRunInputs(stepDefs.getFirst().getType());
         String runInput = input;

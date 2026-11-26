@@ -12,6 +12,7 @@ import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.FacetRows;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
 import com.flowcortex.support.request.RequestRepository.RequestRow;
+import com.flowcortex.support.request.RequestRepository.SlaCounts;
 import com.flowcortex.support.request.RequestStateMachine.Move;
 import com.flowcortex.support.request.RequestStateMachine.Refusal;
 import com.flowcortex.support.request.RequestStateMachine.Transition;
@@ -29,6 +30,7 @@ import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.request.RequestViews.FacetCount;
 import com.flowcortex.support.request.RequestViews.Message;
 import com.flowcortex.support.request.RequestViews.Requester;
+import com.flowcortex.support.request.RequestViews.SlaSummary;
 import com.flowcortex.support.request.RequestViews.Summary;
 import com.flowcortex.support.request.RequestViews.SupportAssignee;
 import com.flowcortex.support.web.SupportProblemException;
@@ -96,12 +98,13 @@ class RequestService {
     private final UserDirectory users;
     private final AdminPermissions adminPermissions;
     private final Settings settings;
+    private final SupportSignals signals;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     RequestService(RequestRepository requests, IdempotencyGuard idempotency, ApplicationEventPublisher events,
             AttachmentService attachments, UserDirectory users, AdminPermissions adminPermissions, Settings settings,
-            PlatformTransactionManager transactionManager, Clock clock) {
+            SupportSignals signals, PlatformTransactionManager transactionManager, Clock clock) {
         this.requests = requests;
         this.idempotency = idempotency;
         this.events = events;
@@ -109,6 +112,7 @@ class RequestService {
         this.users = users;
         this.adminPermissions = adminPermissions;
         this.settings = settings;
+        this.signals = signals;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -154,6 +158,7 @@ class RequestService {
                     locale.getLanguage(), at);
             requests.insertMessage(messageId, requestId, "member", memberId, description, at);
             requests.insertAttachments(messageId, kept, at);
+            signals.changed(memberId, number);
             LOG.info("support.request outcome=created request={} type={} attachments={}", number, type, kept.size());
             return Optional.<UUID>empty();
         });
@@ -170,7 +175,9 @@ class RequestService {
     /** Opening a request clears its unread mark, and the first opening of a resolution starts its close clock. */
     Detail open(UUID memberId, long number) {
         RequestRow row = owned(memberId, number);
-        requests.markSeen(row.id(), Instant.now(clock));
+        if (requests.markSeen(row.id(), Instant.now(clock))) {
+            signals.changed(row.requesterId(), row.number());
+        }
         return memberDetail(requireById(row.id()));
     }
 
@@ -195,6 +202,7 @@ class RequestService {
             requireMoved(row, move, null, at);
             requests.insertMessage(messageId, row.id(), "member", memberId, text, at);
             requests.insertAttachments(messageId, kept, at);
+            signals.changed(row.requesterId(), row.number());
             LOG.info("support.request outcome=replied request={} actor=member attachments={}", row.number(),
                     kept.size());
             return Optional.<UUID>empty();
@@ -215,10 +223,11 @@ class RequestService {
     }
 
     /** @param callerId what {@code assignee=me} stands for */
-    AdminPage page(String status, String type, String assignee, String created, String q, String sort, int page,
-            UUID callerId) {
-        InboxFilter filter = inboxFilter(status, type, assignee, created, q, sort, page, callerId);
-        List<RequestRow> rows = requests.page(filter, page * PAGE_SIZE, PAGE_SIZE);
+    AdminPage page(String status, String type, String assignee, String created, String q, String sla, String sort,
+            int page, UUID callerId) {
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, sla, sort, page, callerId);
+        SlaThresholds thresholds = SlaThresholds.read(settings);
+        List<RequestRow> rows = requests.page(filter, thresholds, page * PAGE_SIZE, PAGE_SIZE);
         Set<UUID> ids = new LinkedHashSet<>();
         rows.forEach(row -> ids.add(row.requesterId()));
         rows.stream().map(RequestRow::assigneeId).filter(Objects::nonNull).forEach(ids::add);
@@ -226,14 +235,22 @@ class RequestService {
         List<AdminSummary> items = rows.stream()
                 .map(row -> new AdminSummary(row.number(), row.type(), row.subject(), row.status().value(),
                         requester(row.requesterId(), emails), assignee(row.assigneeId(), emails), row.createdAt(),
-                        row.lastActivityAt()))
+                        row.lastActivityAt(),
+                        SlaLevel.of(row.status(), row.lastActivityAt(), filter.now(), thresholds).value()))
                 .toList();
-        return new AdminPage(items, page, PAGE_SIZE, requests.count(filter));
+        return new AdminPage(items, page, PAGE_SIZE, requests.count(filter, thresholds));
+    }
+
+    /** How many requests the list would show under these filters are overdue and how many are due soon. */
+    SlaSummary slaSummary(String status, String type, String assignee, String created, String q, UUID callerId) {
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, null, 0, callerId);
+        SlaCounts counts = requests.slaSummary(filter, SlaThresholds.read(settings));
+        return new SlaSummary(counts.overdue(), counts.dueSoon());
     }
 
     /** The inbox's counts under the same filters as {@link #page}, each ignoring its own selection. */
     AdminFacets facets(String status, String type, String assignee, String created, String q, UUID callerId) {
-        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, 0, callerId);
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, null, 0, callerId);
         FacetRows rows = requests.facets(filter, callerId);
         Map<UUID, String> emails = users.findEmailsByIds(
                 rows.people().stream().map(AssigneeGroup::id).toList());
@@ -268,6 +285,7 @@ class RequestService {
                         new LocalizedMessage("support.request.changedMeanwhile", row.number()));
             }
             notifyMember(row, RequestEvent.ADMIN_ASSIGN, target, null, at);
+            signals.changed(row.requesterId(), row.number());
         });
         LOG.info("support.request outcome=assigned request={} actor={} cleared={} picked_up={}", row.number(),
                 adminId, assigneeId == null, target != row.status());
@@ -311,6 +329,7 @@ class RequestService {
         boolean won = requests.assign(row.id(), row.status(), move.target(), assigneeId, at);
         if (won) {
             notifyMember(row, RequestEvent.ADMIN_ASSIGN, move.target(), null, at);
+            signals.changed(row.requesterId(), row.number());
         }
         return BulkAssignOutcome.written(won);
     }
@@ -331,8 +350,8 @@ class RequestService {
     }
 
     private InboxFilter inboxFilter(String status, String type, String assignee, String created, String q,
-            String sort, int page, UUID callerId) {
-        InboxQuery.Parsed parsed = InboxQuery.parse(status, type, assignee, created, q, sort, page, callerId,
+            String sla, String sort, int page, UUID callerId) {
+        InboxQuery.Parsed parsed = InboxQuery.parse(status, type, assignee, created, q, sla, sort, page, callerId,
                 Instant.now(clock));
         requireValid(parsed.errors());
         return parsed.filter();
@@ -380,6 +399,7 @@ class RequestService {
             requests.insertAttachments(messageId, kept, at);
             requests.markReplyMailDue(row.id(), messageId, at.plus(mailWindow));
             notifyMember(row, event, move.target(), messageId, at);
+            signals.changed(row.requesterId(), row.number());
             LOG.info("support.request outcome=replied request={} actor=admin status={} attachments={}", row.number(),
                     move.target().value(), kept.size());
             return Optional.<UUID>empty();
@@ -414,6 +434,7 @@ class RequestService {
             boolean closed = requests.closeSeenResolution(row.id(), move.closedReason(), cutoff, at);
             if (closed) {
                 notifyMember(row, RequestEvent.AUTO_CLOSE, move.target(), null, at);
+                signals.changed(row.requesterId(), row.number());
             }
             return closed;
         }));
@@ -448,6 +469,7 @@ class RequestService {
             Instant at = Instant.now(clock);
             requireMoved(row, move, null, at);
             notifyMember(row, event, move.target(), null, at);
+            signals.changed(row.requesterId(), row.number());
         });
         LOG.info("support.request outcome={} request={} from={} to={}", outcome, row.number(), row.status().value(),
                 move.target().value());
