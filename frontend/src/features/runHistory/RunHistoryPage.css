@@ -168,6 +168,47 @@
   overflow-wrap: anywhere;
 }
 
+.run-row__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* What the run produced: under the name on a narrow row, beside it from 768px. */
+.run-result {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 0.5rem;
+  margin-block-start: 0.35rem;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-result__saving {
+  font-style: italic;
+}
+
+.run-result__thumbs {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.run-result__thumb {
+  display: block;
+  width: var(--run-thumb-size);
+  height: var(--run-thumb-size);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-sm);
+  background: var(--paper-3);
+  object-fit: cover;
+}
+
+.run-result__count {
+  white-space: nowrap;
+}
+
 .run-row__meta {
   grid-area: meta;
   display: flex;
@@ -545,7 +586,7 @@
   }
 }
 
-/* ===== Wider screens: one-line rows ===================================== */
+/* ===== Wider screens: name, summary, status and actions on the first line, details beneath ======= */
 
 @media (min-width: 768px) {
   .run-row {
@@ -554,14 +595,23 @@
       'main pill actions'
       'meta meta actions';
   }
+
+  .run-row__main {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .run-row__titles {
+    flex: 1 1 auto;
+  }
+
+  .run-result {
+    margin-block-start: 0;
+  }
 }
 
 @media (min-width: 1024px) {
-  .run-row {
-    grid-template-columns: minmax(0, 2fr) 9rem minmax(0, 3fr) auto;
-    grid-template-areas: 'main pill meta actions';
-  }
-
   /* 56px top bar, the canvas padding above and below and the footer (control height, 1rem padding, 1px border); the filters and list sit in the left column, the usage card in a right column, and each scrolls inside its own box. */
   .run-history {
     height: calc(100svh - 56px - 4rem - var(--control-h) - 1rem - 1px);

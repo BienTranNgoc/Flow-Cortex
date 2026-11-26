@@ -183,8 +183,11 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
-            throw new DubDisabledException();
+        Optional<StepExecutor> unavailable = registry.firstUnavailable(stepDefs.stream()
+                .flatMap(step -> IterateStepConfig.effectiveTypes(step.getType(), step.getConfig()).stream())
+                .toList());
+        if (unavailable.isPresent()) {
+            throw unavailable.get().unavailableRefusal();
         }
         if (!stepDefs.isEmpty() && WorkflowMapper.takesLink(stepDefs.getFirst())
                 && FetchVideoConfig.linkFault(input) != null) {

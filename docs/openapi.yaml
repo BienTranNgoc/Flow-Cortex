@@ -4913,6 +4913,30 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/Saved"
+  /api/v1/connectors/google/authorize:
+    post:
+      tags:
+      - google-connector-controller
+      operationId: googleAuthorize
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleAuthorizeResponse"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/client-errors:
     post:
       tags:
@@ -9634,6 +9658,318 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/TelegramHealth"
+  /api/v1/connectors/google:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleRead
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleConnection"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/sheets:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: listGoogleSpreadsheets
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SpreadsheetPage"
+  /api/v1/connectors/google/sheets/{id}/tabs:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: listGoogleSpreadsheetTabs
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Tabs"
+  /api/v1/connectors/google/sheets/{id}/preview:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: previewGoogleSpreadsheetTab
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: tab
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: range
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: hasHeader
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Preview"
+  /api/v1/connectors/google/health:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleHealth"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/callback:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleCallback
+      parameters:
+      - name: connector_google_flow
+        in: cookie
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to the return path with connector=google and result
+          headers:
+            Location:
+              description: The return path with the result
+              style: simple
+              schema:
+                type: string
+      security: []
   /api/v1/chat/conversations/{id}/messages:
     get:
       tags:
@@ -9929,6 +10265,307 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/assets:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssets
+      parameters:
+      - name: kind
+        in: query
+        description: "Comma-separated kinds: video, image, audio"
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Comma-separated sources: run, upload"
+        schema:
+          type: string
+      - name: group
+        in: query
+        description: "A group key: workflow:<id>, upload or day:<YYYY-MM-DD>"
+        schema:
+          type: string
+      - name: runId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        description: "Search in titles and tags, at most 200 characters"
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: time
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - 7d
+          - 30d
+          - custom
+      - name: from
+        in: query
+        description: "First day, Asia/Ho_Chi_Minh; with time=custom"
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        description: "Last day, inclusive; with time=custom"
+        schema:
+          type: string
+          format: date
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - size_desc
+          - size_asc
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 48
+          maximum: 100
+          minimum: 1
+      - name: cursor
+        in: query
+        description: meta.nextCursor of the previous page
+        schema:
+          type: string
+      - name: mark
+        in: query
+        description: Snapshot instant of a walk
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetPageResponse"
+  /api/v1/assets/{id}:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAsset
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetItemResponse"
+  /api/v1/assets/{id}/view-url:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetViewUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLinkResponse"
+  /api/v1/assets/{id}/download-url:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetDownloadUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLinkResponse"
+  /api/v1/assets/usage:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetUsage
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetUsageResponse"
+  /api/v1/assets/tags:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssetTags
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetTagListResponse"
+  /api/v1/assets/run-results:
+    get:
+      tags:
+      - assets-controller
+      operationId: listRunResults
+      parameters:
+      - name: runId
+        in: query
+        description: 1-100 distinct run ids; a repeated id answers once
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResultListResponse"
+  /api/v1/assets/groups:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssetGroups
+      parameters:
+      - name: groupBy
+        in: query
+        schema:
+          type: string
+          enum:
+          - workflow
+          - day
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 10
+          maximum: 30
+          minimum: 1
+      - name: itemsPerGroup
+        in: query
+        schema:
+          type: integer
+          default: 4
+          maximum: 12
+          minimum: 1
+      - name: kind
+        in: query
+        description: "Comma-separated kinds: video, image, audio"
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Comma-separated sources: run, upload"
+        schema:
+          type: string
+      - name: runId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: time
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - 7d
+          - 30d
+          - custom
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: sort
+        in: query
+        description: Order of the items inside each group
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - size_desc
+          - size_asc
+      - name: mark
+        in: query
+        description: "meta.mark of page 1, sent with every later page"
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetGroupPageResponse"
   /api/v1/admin/workflows/{id}/report:
     get:
       tags:
@@ -14674,6 +15311,11 @@ components:
           type: string
         baseUrl:
           type: string
+    GoogleAuthorizeResponse:
+      type: object
+      properties:
+        authorizationUrl:
+          type: string
     Attachment:
       type: object
       properties:
@@ -17811,6 +18453,102 @@ components:
           type: array
           items:
             type: string
+    GoogleConnection:
+      type: object
+      properties:
+        provider:
+          type: string
+        email:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        missingScopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        usageEnabled:
+          type: boolean
+    Spreadsheet:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+        ownerEmail:
+          type: string
+        webViewUrl:
+          type: string
+    SpreadsheetPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Spreadsheet"
+        nextCursor:
+          type: string
+    Tab:
+      type: object
+      properties:
+        sheetId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        rowCount:
+          type: integer
+          format: int32
+        columnCount:
+          type: integer
+          format: int32
+    Tabs:
+      type: object
+      properties:
+        spreadsheetId:
+          type: string
+        title:
+          type: string
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tab"
+    Preview:
+      type: object
+      properties:
+        spreadsheetId:
+          type: string
+        tab:
+          type: string
+        range:
+          type: string
+        header:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+    GoogleHealth:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        email:
+          type: string
+        reason:
+          type: string
     ChatFolderList:
       type: object
       properties:
@@ -18121,6 +18859,277 @@ components:
       required:
       - privacy
       - ui
+    AssetCountsResponse:
+      type: object
+      properties:
+        all:
+          type: integer
+          format: int64
+        video:
+          type: integer
+          format: int64
+        image:
+          type: integer
+          format: int64
+        audio:
+          type: integer
+          format: int64
+        favorite:
+          type: integer
+          format: int64
+      required:
+      - all
+      - audio
+      - favorite
+      - image
+      - video
+    AssetItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - video
+          - image
+          - audio
+        title:
+          type: string
+        source:
+          type: string
+          enum:
+          - run
+          - upload
+        mimeType:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        favorite:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        missing:
+          type: boolean
+        thumbnailUrl:
+          type: string
+      required:
+      - bytes
+      - createdAt
+      - favorite
+      - id
+      - kind
+      - mimeType
+      - missing
+      - runId
+      - source
+      - tags
+      - title
+    AssetPageMetaResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        counts:
+          $ref: "#/components/schemas/AssetCountsResponse"
+        nextCursor:
+          type: string
+        mark:
+          type: string
+          format: date-time
+      required:
+      - counts
+      - mark
+      - total
+    AssetPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetItemResponse"
+        meta:
+          $ref: "#/components/schemas/AssetPageMetaResponse"
+      required:
+      - items
+      - meta
+    AssetLinkResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - url
+    AssetUsageByKindResponse:
+      type: object
+      properties:
+        video:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        image:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        audio:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+      required:
+      - audio
+      - image
+      - video
+    AssetUsageEntryResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+        bytes:
+          type: integer
+          format: int64
+      required:
+      - bytes
+      - count
+    AssetUsageResponse:
+      type: object
+      properties:
+        total:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        byKind:
+          $ref: "#/components/schemas/AssetUsageByKindResponse"
+      required:
+      - byKind
+      - total
+    AssetTagListResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetTagResponse"
+      required:
+      - tags
+    AssetTagResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - label
+    RunResultListResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunResultResponse"
+      required:
+      - results
+    RunResultResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        count:
+          type: integer
+          format: int64
+        kinds:
+          type: array
+          items:
+            type: string
+        thumbnails:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunResultThumbnailResponse"
+        registration:
+          type: string
+          enum:
+          - pending
+          - done
+          - none
+      required:
+      - count
+      - kinds
+      - registration
+      - runId
+      - thumbnails
+    RunResultThumbnailResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+      - url
+    AssetGroupPageMetaResponse:
+      type: object
+      properties:
+        totalGroups:
+          type: integer
+          format: int64
+        mark:
+          type: string
+          format: date-time
+      required:
+      - mark
+      - totalGroups
+    AssetGroupPageResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetGroupResponse"
+        meta:
+          $ref: "#/components/schemas/AssetGroupPageMetaResponse"
+      required:
+      - groups
+      - meta
+    AssetGroupResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        count:
+          type: integer
+          format: int64
+        runCount:
+          type: integer
+          format: int64
+        latestAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetItemResponse"
+      required:
+      - count
+      - items
+      - key
+      - latestAt
+      - runCount
     AdminWorkflowResponse:
       type: object
       properties:
