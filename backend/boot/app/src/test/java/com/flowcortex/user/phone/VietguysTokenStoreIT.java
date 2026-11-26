@@ -63,6 +63,7 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
     private final AtomicInteger smsRequests = new AtomicInteger();
     private final AtomicReference<String> tokenAnswer = new AtomicReference<>();
     private final AtomicReference<Long> tokenDelayMillis = new AtomicReference<>(0L);
+    private final AtomicReference<CountDownLatch> tokenHold = new AtomicReference<>(new CountDownLatch(0));
     private final ConcurrentLinkedQueue<String> smsAnswers = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<String> smsRequestBodies = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<String> smsAccessTokens = new ConcurrentLinkedQueue<>();
@@ -79,6 +80,7 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
             tokenRequests.incrementAndGet();
             refreshHeaders.add(String.valueOf(exchange.getRequestHeaders().getFirst("Refresh-Token")));
             exchange.getRequestBody().readAllBytes();
+            await(tokenHold.get());
             sleep(tokenDelayMillis.get());
             reply(exchange, 200, tokenAnswer.get());
         });
@@ -149,14 +151,19 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
         VietguysTokenStore store = store(ring("k1", KEY_1), "k1", SEED, Duration.ofSeconds(1));
         store.seed();
         String sealedBefore = jdbc.queryForObject("SELECT refresh_token_enc FROM sms_provider_credential", String.class);
-        tokenDelayMillis.set(2500L);
-
-        assertThatThrownBy(store::accessToken).isInstanceOf(TokenUnavailableException.class);
+        // A fixed stub delay races the read timeout: a client stall longer than the gap lets the answer in.
+        CountDownLatch held = new CountDownLatch(1);
+        tokenHold.set(held);
+        try {
+            assertThatThrownBy(store::accessToken).isInstanceOf(TokenUnavailableException.class);
+        } finally {
+            tokenHold.set(new CountDownLatch(0));
+            held.countDown();
+        }
 
         assertThat(jdbc.queryForObject("SELECT refresh_token_enc FROM sms_provider_credential", String.class))
                 .isEqualTo(sealedBefore);
         assertThat(state()).isEqualTo("active");
-        tokenDelayMillis.set(0L);
         assertThat(store.accessToken()).isEqualTo("access-2");
         assertThat(tokenRequests.get()).isEqualTo(2);
     }
@@ -324,6 +331,14 @@ class VietguysTokenStoreIT extends AbstractPostgresBootTest {
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await(30, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static void sleep(long millis) {
