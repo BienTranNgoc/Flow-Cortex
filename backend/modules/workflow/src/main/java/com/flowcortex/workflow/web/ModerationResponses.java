@@ -76,7 +76,10 @@ final class ModerationResponses {
         }
     }
 
-    /** {@code moderationStatus} is the workflow's status after the action; a null {@code reason} is a dismiss or resolve sent without one. */
+    /**
+     * {@code moderationStatus} is the workflow's status after the action; a null {@code reason} is a dismiss or
+     * resolve sent without one.
+     */
     record ModerationHistoryEntryResponse(
             @Schema(requiredMode = RequiredMode.REQUIRED) UUID id,
             @Schema(requiredMode = RequiredMode.REQUIRED,
