@@ -1,6 +1,7 @@
 package com.flowcortex.app.devdata;
 
 import com.flowcortex.shared.web.ConflictException;
+import com.flowcortex.user.api.TotpDevSeed;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.workflow.api.NewWorkflowStep;
@@ -18,7 +19,8 @@ import org.springframework.core.annotation.Order;
 
 /**
  * Dev-profile-only demo data: two ADMINs in distinct owner scopes (so a cross-scope 404 has a
- * real scope B to probe) plus one MEMBER under the first ADMIN's scope — runnable end to end via
+ * real scope B to probe) plus one MEMBER under the first ADMIN's scope, with the first ADMIN's
+ * two-factor sign-in on under a fixed secret — runnable end to end via
  * {@code SPRING_PROFILES_ACTIVE=dev docker compose up}.
  *
  * <p>Gated by {@code @Profile("dev")}; never active in prod.
@@ -45,6 +47,9 @@ class DevDataSeeder {
     private static final String MEMBER_PASSWORD = "MemberPass123!";
     private static final String TEST_PASSWORD = "TestPass123!";
 
+    /** Dev fixture, documented in LOCAL_SETUP.md; same tier as the seeded password, never a real secret. */
+    static final String ADMIN_1_TOTP_SECRET = "JBSWY3DPEHPK3PXP";
+
     // Synthetic, fixed "seed" identity for the two shared demo workflows' owner_id — not tied to
     // a real app_user row (workflow.owner_id has no FK constraint, and shared-workflow
     // visibility doesn't depend on the owner). Simpler than re-resolving admin1's id on restart.
@@ -52,11 +57,16 @@ class DevDataSeeder {
 
     @Bean
     @Order(1)
-    ApplicationRunner seedDemoUsers(UserService userService) {
+    ApplicationRunner seedDemoUsers(UserService userService, TotpDevSeed totpDevSeed) {
         return args -> {
             UserView admin1 = seedAdmin(userService, ADMIN_1_EMAIL, "Demo Admin One");
             seedAdmin(userService, ADMIN_2_EMAIL, "Demo Admin Two");
             seedAdmin(userService, TEST_EMAIL, TEST_PASSWORD, "FlowCortex Test User");
+
+            // Not tied to admin1's creation: on a restart seedAdmin returns null, and admin1 must still be enrolled.
+            if (totpDevSeed.enrollWithSecret(ADMIN_1_EMAIL, ADMIN_1_TOTP_SECRET)) {
+                LOG.info("[dev-seed] enrolled {} in two-factor sign-in", ADMIN_1_EMAIL);
+            }
 
             if (admin1 != null) {
                 seedMember(userService, admin1.id());

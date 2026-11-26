@@ -5,6 +5,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
@@ -20,6 +21,8 @@ import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
 import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import com.flowcortex.user.totp.TotpProblems;
+import com.flowcortex.user.totp.TotpService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -30,6 +33,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Implementation of {@link UserService}.
@@ -51,15 +56,20 @@ class UserServiceImpl implements UserService {
     private final RegistrationOwnerGuard registrationOwnerGuard;
     private final RoleCatalog roleCatalog;
     private final UserDirectoryRepository directory;
+    private final TotpService totp;
+    private final AuditEventWriter audit;
     private final Clock clock;
 
     UserServiceImpl(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             AccountCredentials accountCredentials, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
             SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard,
-            RoleCatalog roleCatalog, UserDirectoryRepository directory, Clock clock) {
+            RoleCatalog roleCatalog, UserDirectoryRepository directory, TotpService totp, AuditEventWriter audit,
+            Clock clock) {
         this.roleCatalog = roleCatalog;
         this.directory = directory;
+        this.totp = totp;
+        this.audit = audit;
         this.clock = clock;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -198,6 +208,40 @@ class UserServiceImpl implements UserService {
         userRepository.delete(user);
     }
 
+    @Override
+    @Transactional
+    public void resetTotp(UUID callerId, UUID id) {
+        AppUser caller = requireActiveCaller(callerId);
+        // Checked before the scope: a staff caller's own row is outside its scope and would answer 404.
+        if (id.equals(callerId)) {
+            throw new UnprocessableEntityException(new LocalizedMessage("auth.totp.resetSelf"), "TOTP_RESET_SELF");
+        }
+        AppUser target = requireOwned(scopeOf(caller), id);
+        requireKeys(caller, UserMutationPolicy.requiredKeys(
+                UserMutation.totpReset(roleCatalog.require(target.getRole().code()))));
+        // A pending, unconfirmed setup is TOTP off: deleteFor would remove it and report a secret.
+        if (!totp.isEnabled(id) || !totp.deleteFor(id)) {
+            throw new TotpProblems.NotEnabled();
+        }
+        accountCredentials.revokeAllFor(id);
+        // The audit row commits on its own, so it is written only once the reset is certain to stay.
+        afterCommit(() -> audit.write(AuthEventType.TOTP_RESET, id, null, null,
+                AuthEventType.metadata("userId", id.toString(), "actorId", callerId.toString())));
+    }
+
+    private static void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
+    }
+
     /**
      * The routes authorize by key, but a suspended caller with a still-valid token must not keep
      * working for the token's remaining TTL, so the caller's row is loaded and gated here too.
@@ -256,7 +300,7 @@ class UserServiceImpl implements UserService {
 
     private UserView toView(AppUser user) {
         return AppUserMapper.toUserView(user, roleCatalog.names(), clock.instant(),
-                directory.staffTarget(user.getRole().code()));
+                directory.staffTarget(user.getRole().code()), totp.isEnabled(user.getId()));
     }
 
     private AppUser requireOwned(UUID ownerId, UUID id) {

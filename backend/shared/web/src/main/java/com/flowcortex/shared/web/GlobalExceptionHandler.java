@@ -129,6 +129,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "admin-disabled", message("problem.adminDisabled", locale(request)));
     }
 
+    @ExceptionHandler(MfaRequiredException.class)
+    public ProblemDetail handleMfaRequired(MfaRequiredException ex, HttpServletRequest request) {
+        ProblemDetail detail = problem(HttpStatus.FORBIDDEN, "mfa-required",
+                message("auth.mfaRequired", locale(request)));
+        detail.setProperty("enrolled", ex.isEnrolled());
+        return detail;
+    }
+
     @ExceptionHandler(AccountLockedException.class)
     public ProblemDetail handleAccountLocked(AccountLockedException ex, HttpServletRequest request) {
         ProblemDetail detail = problem(HttpStatus.LOCKED, "account-locked",

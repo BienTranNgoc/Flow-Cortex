@@ -40,6 +40,9 @@ public class RefreshToken {
     @Column(name = "remember_me", nullable = false, updatable = false)
     private boolean rememberMe;
 
+    @Column(name = "mfa_verified_at", updatable = false)
+    private Instant mfaVerifiedAt;
+
     @Column(name = "used_at")
     private Instant usedAt;
 
@@ -58,8 +61,10 @@ public class RefreshToken {
     protected RefreshToken() {
     }
 
+    /** {@code mfaVerifiedAt} is when the family's sign-in passed a second factor; null when it did not. */
     public RefreshToken(UUID id, UUID userId, String tokenHash, UUID familyId, Instant issuedAt,
-            Instant expiresAt, boolean rememberMe, String createdIp, String userAgent) {
+            Instant expiresAt, boolean rememberMe, String createdIp, String userAgent, Instant mfaVerifiedAt) {
+        this.mfaVerifiedAt = mfaVerifiedAt;
         this.id = id;
         this.userId = userId;
         this.tokenHash = tokenHash;
@@ -97,6 +102,10 @@ public class RefreshToken {
 
     public boolean isRememberMe() {
         return rememberMe;
+    }
+
+    public Instant getMfaVerifiedAt() {
+        return mfaVerifiedAt;
     }
 
     public Instant getUsedAt() {

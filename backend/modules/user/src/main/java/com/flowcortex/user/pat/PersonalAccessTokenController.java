@@ -2,6 +2,7 @@ package com.flowcortex.user.pat;
 
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.flowcortex.user.application.JwtClaims;
 import com.flowcortex.user.pat.PersonalAccessTokenService.CreatedToken;
 import com.flowcortex.user.pat.PersonalAccessTokenService.TokenSummary;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,7 +75,7 @@ class PersonalAccessTokenController {
             @Valid @RequestBody CreateApiTokenRequest request, HttpServletRequest servletRequest) {
         CreatedToken created = service.create(UUID.fromString(jwt.getSubject()), request.getName(),
                 request.getExpiresInDays(), request.getStepUpProof(), servletRequest.getRemoteAddr(),
-                userAgent(servletRequest));
+                userAgent(servletRequest), JwtClaims.mfaOf(jwt));
         PersonalAccessToken token = created.token();
         return ResponseEntity.status(HttpStatus.CREATED).body(new CreatedApiToken(token.getId(), token.getName(),
                 created.rawToken(), token.getCreatedAt(), token.getExpiresAt()));

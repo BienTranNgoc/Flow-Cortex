@@ -9,18 +9,28 @@ import org.junit.jupiter.api.Test;
 
 class AdminAuthorizationDecisionTest {
 
-    private static final CallerFacts SUPER_ADMIN = new CallerFacts(true, false, Set.of());
-    private static final CallerFacts DEACTIVATED_SUPER_ADMIN = new CallerFacts(true, true, Set.of());
-    private static final CallerFacts END_USER = new CallerFacts(false, false, Set.of());
-    private static final CallerFacts DEACTIVATED_STAFF = new CallerFacts(false, true,
+    private static final CallerFacts SUPER_ADMIN = new CallerFacts(true, false, true, false, Set.of());
+    private static final CallerFacts DEACTIVATED_SUPER_ADMIN = new CallerFacts(true, true, true, false, Set.of());
+    private static final CallerFacts END_USER = new CallerFacts(false, false, false, false, Set.of());
+    private static final CallerFacts DEACTIVATED_STAFF = new CallerFacts(false, true, true, false,
             Set.of(Permission.SUPPORT_TICKET_VIEW));
 
     private static CallerFacts staff(Permission... keys) {
-        return new CallerFacts(false, false, Set.copyOf(EnumSet.of(keys[0], keys)));
+        return new CallerFacts(false, false, true, false, Set.copyOf(EnumSet.of(keys[0], keys)));
     }
 
+    private static CallerFacts withMfa(CallerFacts caller) {
+        return new CallerFacts(caller.superAdmin(), caller.adminDisabled(), caller.consoleAccount(), true,
+                caller.keys());
+    }
+
+    /** The second-factor step is off here, so these cases read as they did before it existed. */
     private static Verdict decide(Posture posture, CallerFacts caller) {
-        return AdminAuthorizationDecision.decide(posture, caller);
+        return AdminAuthorizationDecision.decide(posture, caller, false);
+    }
+
+    private static Verdict decideRequiringMfa(Posture posture, CallerFacts caller) {
+        return AdminAuthorizationDecision.decide(posture, caller, true);
     }
 
     @Test
@@ -97,6 +107,62 @@ class AdminAuthorizationDecisionTest {
     void aKeyPostureWithNoKeysIsDeniedForEveryone() {
         assertThat(decide(new Posture.AllOf(Set.of()), staff(Permission.WORKFLOW_RUN_VIEW))).isEqualTo(Verdict.DENY);
         assertThat(decide(new Posture.AnyOf(Set.of()), SUPER_ADMIN)).isEqualTo(Verdict.DENY);
+    }
+
+    @Test
+    void consoleAccountWithoutMfaIsMfaRequired() {
+        Posture runs = new Posture.AllOf(Set.of(Permission.WORKFLOW_RUN_VIEW));
+
+        assertThat(decideRequiringMfa(runs, SUPER_ADMIN)).isEqualTo(Verdict.MFA_REQUIRED);
+        assertThat(decideRequiringMfa(runs, staff(Permission.WORKFLOW_RUN_VIEW))).isEqualTo(Verdict.MFA_REQUIRED);
+        assertThat(decideRequiringMfa(new Posture.AnyOf(Set.of(Permission.WORKFLOW_RUN_VIEW)), SUPER_ADMIN))
+                .isEqualTo(Verdict.MFA_REQUIRED);
+        assertThat(decideRequiringMfa(runs, staff(Permission.SUPPORT_TICKET_VIEW))).isEqualTo(Verdict.MFA_REQUIRED);
+    }
+
+    @Test
+    void consoleAccountWithMfaPassesToKeys() {
+        Posture runs = new Posture.AllOf(Set.of(Permission.WORKFLOW_RUN_VIEW));
+
+        assertThat(decideRequiringMfa(runs, withMfa(SUPER_ADMIN))).isEqualTo(Verdict.ALLOW);
+        assertThat(decideRequiringMfa(runs, withMfa(staff(Permission.WORKFLOW_RUN_VIEW)))).isEqualTo(Verdict.ALLOW);
+        assertThat(decideRequiringMfa(runs, withMfa(staff(Permission.SUPPORT_TICKET_VIEW)))).isEqualTo(Verdict.DENY);
+    }
+
+    @Test
+    void endUserWithoutMfaStaysDenied() {
+        assertThat(decideRequiringMfa(new Posture.AllOf(Set.of(Permission.WORKFLOW_RUN_VIEW)), END_USER))
+                .isEqualTo(Verdict.DENY);
+        assertThat(decideRequiringMfa(new Posture.AnyOf(Set.of(Permission.WORKFLOW_RUN_VIEW)), END_USER))
+                .isEqualTo(Verdict.DENY);
+    }
+
+    @Test
+    void deactivatedComesBeforeMfa() {
+        Posture tickets = new Posture.AllOf(Set.of(Permission.SUPPORT_TICKET_VIEW));
+
+        assertThat(decideRequiringMfa(tickets, DEACTIVATED_SUPER_ADMIN)).isEqualTo(Verdict.ADMIN_DISABLED);
+        assertThat(decideRequiringMfa(tickets, DEACTIVATED_STAFF)).isEqualTo(Verdict.ADMIN_DISABLED);
+    }
+
+    @Test
+    void aKeyPostureWithNoKeysIsDeniedBeforeMfa() {
+        assertThat(decideRequiringMfa(new Posture.AllOf(Set.of()), SUPER_ADMIN)).isEqualTo(Verdict.DENY);
+    }
+
+    @Test
+    void aPostureThatNeedsNoKeyNeverAsksForMfa() {
+        assertThat(decideRequiringMfa(new Posture.AuthenticatedOnly(), SUPER_ADMIN)).isEqualTo(Verdict.ALLOW);
+        assertThat(decideRequiringMfa(new Posture.Public(), staff(Permission.SUPPORT_TICKET_VIEW)))
+                .isEqualTo(Verdict.ALLOW);
+    }
+
+    @Test
+    void requirementOffSkipsTheStep() {
+        Posture runs = new Posture.AllOf(Set.of(Permission.WORKFLOW_RUN_VIEW));
+
+        assertThat(decide(runs, SUPER_ADMIN)).isEqualTo(Verdict.ALLOW);
+        assertThat(decide(runs, staff(Permission.WORKFLOW_RUN_VIEW))).isEqualTo(Verdict.ALLOW);
     }
 
     @Test

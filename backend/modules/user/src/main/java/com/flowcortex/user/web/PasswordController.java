@@ -4,6 +4,7 @@ import com.flowcortex.user.api.AccessTokenResponse;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.PasswordSetup;
+import com.flowcortex.user.application.JwtClaims;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,7 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code /api/v1/me/password}: the signed-in member's first password, for an account that has none,
  * with the names and username chosen alongside it. A bearer token alone is not enough: the request
  * carries the one-time setup token an emailed link handed to this browser. Every other session ends;
- * the response replaces the caller's session with a new one. 409 once the account has a password.
+ * the response replaces the caller's session with a new one that has the caller's second-factor level.
+ * 409 once the account has a password.
  */
 @RestController
 @RequestMapping("/api/v1/me/password")
@@ -55,7 +57,8 @@ class PasswordController {
         AuthSession session = authService.setPassword(UUID.fromString(jwt.getSubject()),
                 new PasswordSetup(request.passwordSetupToken(), request.password(), request.firstName(),
                         request.lastName(), request.username()),
-                servletRequest.getRemoteAddr(), servletRequest.getHeader(HttpHeaders.USER_AGENT));
+                JwtClaims.mfaOf(jwt), servletRequest.getRemoteAddr(),
+                servletRequest.getHeader(HttpHeaders.USER_AGENT));
         cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session);
         return ResponseEntity.ok(session.toResponse());
     }

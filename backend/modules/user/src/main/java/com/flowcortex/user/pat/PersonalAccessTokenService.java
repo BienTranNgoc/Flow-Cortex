@@ -10,6 +10,7 @@ import com.flowcortex.user.application.AuthEventType;
 import com.flowcortex.user.application.OpaqueTokens;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.totp.TotpRequirement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,15 +38,18 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
     private final StepUpProofs stepUpProofs;
     private final AuditEventWriter audit;
     private final PersonalAccessTokenProperties properties;
+    private final TotpRequirement totpRequirement;
     private final Clock clock;
 
     PersonalAccessTokenService(PersonalAccessTokenRepository tokens, AppUserRepository users,
-            StepUpProofs stepUpProofs, AuditEventWriter audit, PersonalAccessTokenProperties properties, Clock clock) {
+            StepUpProofs stepUpProofs, AuditEventWriter audit, PersonalAccessTokenProperties properties,
+            TotpRequirement totpRequirement, Clock clock) {
         this.tokens = tokens;
         this.users = users;
         this.stepUpProofs = stepUpProofs;
         this.audit = audit;
         this.properties = properties;
+        this.totpRequirement = totpRequirement;
         this.clock = clock;
     }
 
@@ -58,18 +62,24 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator {
 
     /**
      * One transaction: the owner's row is locked first so two creates cannot both pass the cap, the
-     * cap is checked before the proof is spent so a refusal for any other reason leaves it usable.
+     * cap and the second factor are checked before the proof is spent so a refusal for any other reason leaves
+     * it usable.
      *
+     * @param sessionMfa whether the caller's access token carries the second-factor claim
      * @throws PatNotEligibleException when the owner is not an active, unlocked admin
+     * @throws PatMfaRequiredException when the second factor is required and the session did not pass it
      * @throws PatLimitReachedException at the live-token cap
      * @throws com.flowcortex.user.api.StepUpRequiredException when the proof is missing, spent, expired or not theirs
      */
     @Transactional
     CreatedToken create(UUID userId, String name, Integer expiresInDays, String stepUpProof, String ip,
-            String userAgent) {
+            String userAgent, boolean sessionMfa) {
         Instant now = clock.instant();
         AppUser owner = users.findByIdForUpdate(userId).orElseThrow(PatNotEligibleException::new);
         requireEligible(owner, now);
+        if (totpRequirement.adminRequired() && !sessionMfa) {
+            throw new PatMfaRequiredException();
+        }
         if (tokens.countLive(userId, now) >= properties.maxLivePerUser()) {
             throw new PatLimitReachedException();
         }

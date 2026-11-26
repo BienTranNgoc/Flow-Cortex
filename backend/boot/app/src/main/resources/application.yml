@@ -271,11 +271,26 @@ flowcortex:
         period: ${FLOWCORTEX_AUTH_PERSONAL_ACCESS_TOKENS_PER_DAY_PERIOD:1d}
     # A scheduled job deletes auth_event rows (they hold IPs and user agents) older than
     # `audit-events`, refresh-token rows that expired or were revoked, reset-link rows that were
-    # used or expired, spent step-up proofs, and revoked access tokens or ones expired longer ago
-    # than `audit-events`, every `interval`.
+    # used or expired, spent step-up proofs, sign-in challenges that were spent or expired, and revoked
+    # access tokens or ones expired longer ago than `audit-events`, every `interval`.
     retention:
       interval: ${FLOWCORTEX_AUTH_RETENTION_INTERVAL:1h}
       audit-events: ${FLOWCORTEX_AUTH_AUDIT_RETENTION:90d}
+    # Two-factor sign-in (TOTP). The keyring seals the secrets: no `keys` entry here on purpose, the
+    # environment fills keys.k1 from FLOWCORTEX_AUTH_TOTP_KEYS_K1 (32 random bytes in base64, e.g.
+    # `openssl rand -base64 32`) and the dev profile supplies a fixed one; startup fails without a key.
+    # Console accounts (super admin and staff roles) must keep TOTP on while `admin-required` is true;
+    # false lifts that requirement for an incident and changes nothing else. `max-failed-attempts`
+    # (3-100) wrong codes lock the second factor for `lockout` (1-1440 minutes); a sign-in challenge
+    # lives `challenge-ttl` and dies after `challenge-max-wrong-codes` wrong codes.
+    totp:
+      current-key-id: ${FLOWCORTEX_AUTH_TOTP_CURRENT_KEY_ID:k1}
+      admin-required: ${FLOWCORTEX_AUTH_TOTP_ADMIN_REQUIRED:true}
+      max-failed-attempts: 10
+      lockout: 15m
+      challenge-ttl: 5m
+      challenge-max-wrong-codes: 5
+      issuer: Nodi
   # Admin audit rows are kept; only their client address and user agent are cleared after
   # `origin-retention`, checked every `retention-interval`.
   admin-audit:

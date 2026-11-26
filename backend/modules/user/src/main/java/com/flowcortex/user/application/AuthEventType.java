@@ -38,6 +38,16 @@ public enum AuthEventType {
     PHONE_CHANGED,
     PHONE_CHANGE_REVERTED,
 
+    TOTP_ENABLED,
+    TOTP_DISABLED,
+    /** An administrator reset the account's second factor; the actor id is in the metadata. */
+    TOTP_RESET,
+    TOTP_LOCKED,
+    TOTP_RECOVERY_CODE_USED,
+    TOTP_RECOVERY_CODES_REGENERATED,
+    /** A wrong code (or a replayed one) at sign-in; never carries the code. */
+    LOGIN_FAILED_TOTP,
+
     LOGOUT;
 
     public static Map<String, Object> metadata(Object... keyValuePairs) {

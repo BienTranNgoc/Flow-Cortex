@@ -111,4 +111,20 @@ class UserMutationPolicyTest {
         assertThat(UserMutationPolicy.requiredKeys(UserMutation.delete(PLATFORM_OPERATOR)))
                 .containsExactlyInAnyOrder(USER_ACCOUNT_DELETE, SYSTEM_ADMIN_ACCOUNT_MANAGE);
     }
+
+    @Test
+    void totpResetOfAMemberNeedsUpdate() {
+        assertThat(UserMutationPolicy.requiredKeys(UserMutation.totpReset(MEMBER)))
+                .containsExactlyInAnyOrder(USER_ACCOUNT_UPDATE);
+    }
+
+    @Test
+    void totpResetOfStaffOrAdminAddsTheAdminKey() {
+        assertThat(UserMutationPolicy.requiredKeys(UserMutation.totpReset(CUSTOMER_SUPPORT)))
+                .containsExactlyInAnyOrder(USER_ACCOUNT_UPDATE, SYSTEM_ADMIN_ACCOUNT_MANAGE);
+        assertThat(UserMutationPolicy.requiredKeys(UserMutation.totpReset(ADMIN)))
+                .containsExactlyInAnyOrder(USER_ACCOUNT_UPDATE, SYSTEM_ADMIN_ACCOUNT_MANAGE);
+        assertThat(UserMutationPolicy.requiredKeys(UserMutation.totpReset(CUSTOM_STAFF)))
+                .containsExactlyInAnyOrder(USER_ACCOUNT_UPDATE, SYSTEM_ADMIN_ACCOUNT_MANAGE);
+    }
 }

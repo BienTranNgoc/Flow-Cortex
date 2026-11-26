@@ -131,6 +131,16 @@ class UsersController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(operationId = "resetUserTotp")
+    @RequirePermission(Permission.USER_ACCOUNT_UPDATE)
+    @AdminAudit("user.totp_reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PostMapping("/{id}/totp/reset")
+    ResponseEntity<Void> resetTotp(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        userService.resetTotp(callerId(jwt), id);
+        return ResponseEntity.noContent().build();
+    }
+
     private static UUID callerId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }
@@ -158,12 +168,12 @@ class UsersController {
     record UserResponse(UUID id, String email, String name, String role,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String roleName, String status, Instant createdAt,
             Instant updatedAt, String username, String state, Instant emailConfirmedAt, Instant lockedUntil,
-            List<String> signInMethods, boolean adminDisabled, boolean staffTarget) {
+            List<String> signInMethods, boolean adminDisabled, boolean staffTarget, boolean totpEnabled) {
         static UserResponse from(UserView view) {
             return new UserResponse(view.id(), view.email(), view.name(), view.role(), view.roleName(),
                     view.status(), view.createdAt(), view.updatedAt(), view.username(), view.state(),
                     view.emailConfirmedAt(), view.lockedUntil(), view.signInMethods(), view.adminDisabled(),
-                    view.staffTarget());
+                    view.staffTarget(), view.totpEnabled());
         }
     }
 }

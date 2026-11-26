@@ -46,6 +46,9 @@ public abstract class AbstractPostgresBootTest {
     protected static final String UPLOAD_BUCKET = "flowcortex-uploads";
     protected static final String MEDIA_BUCKET = "flowcortex-media";
 
+    /** 32 bytes in base64: the keyring entry every booted context seals TOTP secrets under. */
+    protected static final String TOTP_TEST_KEY = "dGVzdC10b3RwLWtleS1rMS0zMi1ieXRlcy1sb25nISE=";
+
     @ServiceConnection
     protected static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
 
@@ -86,6 +89,9 @@ public abstract class AbstractPostgresBootTest {
         registry.add("flowcortex.media.s3.public-endpoint", AbstractPostgresBootTest::publicEndpoint);
         registry.add("flowcortex.media.s3.access-key", SILO::getUserName);
         registry.add("flowcortex.media.s3.secret-key", SILO::getPassword);
+        registry.add("flowcortex.auth.totp.keys.k1", () -> TOTP_TEST_KEY);
+        // Sign-in helpers log admins in with a password alone; the TOTP ITs switch the requirement back on.
+        registry.add("flowcortex.auth.totp.admin-required", () -> "false");
     }
 
     protected static String internalEndpoint() {

@@ -30,7 +30,8 @@ final class AppUserMapper {
     }
 
     /** {@code roleNames} is the role catalog's code-to-name map; a code missing from it shows as itself. */
-    static UserView toUserView(AppUser user, Map<String, String> roleNames, Instant now, boolean staffTarget) {
+    static UserView toUserView(AppUser user, Map<String, String> roleNames, Instant now, boolean staffTarget,
+            boolean totpEnabled) {
         String code = user.getRole().code();
         Instant lockedUntil = user.getLockedUntil();
         return new UserView(
@@ -49,6 +50,7 @@ final class AppUserMapper {
                 lockedUntil != null && lockedUntil.isAfter(now) ? lockedUntil : null,
                 UserView.signInMethodsOf(user.hasPassword(), user.getGoogleSubject() != null),
                 user.isAdminDisabled(),
-                staffTarget);
+                staffTarget,
+                totpEnabled);
     }
 }

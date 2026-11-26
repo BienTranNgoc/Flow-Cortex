@@ -2,6 +2,7 @@ package com.flowcortex.user.application;
 
 import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.domain.AppUser;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -11,8 +12,18 @@ import java.util.UUID;
  */
 public interface RefreshTokenService {
 
-    /** Starts a new session (family) for the user and enforces the per-user cap on live sessions. */
-    AuthSession issueFor(AppUser user, String ip, String userAgent, boolean rememberMe);
+    /**
+     * Starts a new session (family) for the user and enforces the per-user cap on live sessions.
+     * {@code mfaVerifiedAt} is when the sign-in passed a second factor, or {@code null}: it marks the
+     * family and every access token it mints.
+     */
+    AuthSession issueFor(AppUser user, String ip, String userAgent, boolean rememberMe, Instant mfaVerifiedAt);
+
+    /**
+     * Whether the token is a live token of this user's remembered session; false for an unknown,
+     * used, revoked or expired token and for another account's.
+     */
+    boolean rememberMeOf(UUID userId, String rawToken);
 
     /**
      * Exchanges a refresh token for the next one in its family. Every refusal is a returned

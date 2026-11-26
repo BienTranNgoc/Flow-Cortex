@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -26,6 +27,7 @@ import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.OAuthFailure;
 import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.api.PasswordSetup;
+import com.flowcortex.user.api.SessionOutcome;
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
@@ -34,9 +36,16 @@ import com.flowcortex.user.infrastructure.AppUserRepository;
 import java.time.Clock;
 import com.flowcortex.user.emailconfirm.EmailConfirmationProperties;
 import com.flowcortex.user.emailconfirm.EmailConfirmationService;
+import com.flowcortex.user.emailconfirm.EmailNotConfirmedException;
 import com.flowcortex.user.emailconfirm.RegistrationConflictException;
 import com.flowcortex.user.passwordreset.PasswordResetService;
 import com.flowcortex.user.profile.UsernameRules;
+import com.flowcortex.user.totp.ChallengeOrigin;
+import com.flowcortex.user.totp.LoginChallenge;
+import com.flowcortex.user.totp.LoginChallengeRepository;
+import com.flowcortex.user.totp.TotpProblems;
+import com.flowcortex.user.totp.TotpProperties;
+import com.flowcortex.user.totp.TotpService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -69,6 +78,7 @@ class AuthServiceImplTest {
 
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-10-29T00:00:00Z"), ZoneOffset.UTC);
     private static final Instant NOW = Instant.now(FIXED_CLOCK);
+    private static final UUID CHALLENGE_ID = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
     private static final AuthSession SESSION = new AuthSession("signed-access", 900L, "signed-refresh",
             Instant.parse("2026-11-05T00:00:00Z"), false);
 
@@ -83,6 +93,11 @@ class AuthServiceImplTest {
 
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final EmailConfirmationService emailConfirmation = mock(EmailConfirmationService.class);
+    private final TotpService totpService = mock(TotpService.class);
+    private final LoginChallengeRepository challenges = mock(LoginChallengeRepository.class);
+    private final SessionGate sessionGate = new SessionGate(refreshTokenService, totpService, challenges,
+            new TotpProperties(Map.of("k1", "unused"), "k1", true, 10, Duration.ofMinutes(15), Duration.ofMinutes(5),
+                    5, "Nodi", ""), audit, repository, FIXED_CLOCK);
 
     private final AuthServiceImpl service = serviceWithOwner(OWNER_EMAIL);
 
@@ -92,7 +107,7 @@ class AuthServiceImplTest {
 
     private AuthServiceImpl service(String ownerEmail, boolean confirmationEnabled) {
         return new AuthServiceImpl(repository, ENCODER, refreshTokenService, accountCredentials, loginAttempts, loginRateLimiter,
-                registrationRateLimiter, googleOAuthClient, audit,
+                registrationRateLimiter, googleOAuthClient, audit, sessionGate,
                 new RegistrationProperties(ownerEmail, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
                 new EmailConfirmationProperties(confirmationEnabled, Duration.ofHours(24),
@@ -142,7 +157,7 @@ class AuthServiceImplTest {
                     }
                 });
         verify(repository, never()).saveAndFlush(any());
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -156,7 +171,7 @@ class AuthServiceImplTest {
         verify(audit).write(eq(AuthEventType.LOGIN_FAILED_BAD_CREDENTIALS), isNull(), eq("127.0.0.1"), eq("ua"),
                 eq(Map.of("email", "nobody@example.com")));
         verifyNoInteractions(loginAttempts);
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -170,7 +185,7 @@ class AuthServiceImplTest {
         verify(loginRateLimiter).recordFailure("127.0.0.1");
         verify(audit).write(eq(AuthEventType.LOGIN_FAILED_BAD_CREDENTIALS), eq(user.getId()), eq("127.0.0.1"),
                 eq("ua"), any());
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -193,7 +208,7 @@ class AuthServiceImplTest {
                 .isInstanceOf(AccountLockedException.class);
 
         verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_LOCKED), eq(user.getId()), any(), any(), any());
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -235,9 +250,10 @@ class AuthServiceImplTest {
         UUID id = UUID.randomUUID();
         AppUser user = activeUser(id, Role.MEMBER);
         when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
-        assertThat(service.login("  Person@Example.COM ", RAW_PASSWORD, false, "127.0.0.1", "ua")).isEqualTo(SESSION);
+        assertThat(service.login("  Person@Example.COM ", RAW_PASSWORD, false, "127.0.0.1", "ua"))
+                .isEqualTo(new SessionOutcome.Opened(SESSION));
     }
 
     @Test
@@ -248,7 +264,7 @@ class AuthServiceImplTest {
                 .isInstanceOf(AccessDeniedException.class);
 
         verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_SUSPENDED), eq(user.getId()), any(), any(), any());
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -264,13 +280,200 @@ class AuthServiceImplTest {
         UUID id = UUID.randomUUID();
         AppUser user = activeUser(id, Role.ADMIN);
         when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
-        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true, null)).thenReturn(SESSION);
 
-        AuthSession session = service.login("person@example.com", RAW_PASSWORD, true, "127.0.0.1", "ua");
+        SessionOutcome outcome = service.login("person@example.com", RAW_PASSWORD, true, "127.0.0.1", "ua");
 
-        assertThat(session).isEqualTo(SESSION);
+        assertThat(outcome).isEqualTo(new SessionOutcome.Opened(SESSION));
         verify(audit).write(eq(AuthEventType.LOGIN_SUCCESS), eq(id), eq("127.0.0.1"), eq("ua"), any());
         verify(loginAttempts, never()).recordSuccess(any());
+    }
+
+    @Test
+    void loginWithoutTotpIssuesTheSessionAsBefore() {
+        AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
+        when(totpService.isEnabled(user.getId())).thenReturn(false);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
+
+        assertThat(service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua"))
+                .isEqualTo(new SessionOutcome.Opened(SESSION));
+
+        verifyNoInteractions(challenges);
+    }
+
+    @Test
+    void loginOfATotpAccountReturnsAChallengeAndNoSession() {
+        AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
+        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
+        when(totpService.isEnabled(user.getId())).thenReturn(true);
+
+        SessionOutcome outcome = service.login("person@example.com", RAW_PASSWORD, true, "127.0.0.1", "ua");
+
+        SessionOutcome.Challenged challenged = (SessionOutcome.Challenged) outcome;
+        assertThat(challenged.ttl()).isEqualTo(Duration.ofMinutes(5));
+        ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
+        verify(challenges).insert(eq(user.getId()), hash.capture(), eq(true), eq(ChallengeOrigin.PASSWORD),
+                eq(NOW.plus(Duration.ofMinutes(5))));
+        assertThat(hash.getValue()).isEqualTo(OpaqueTokens.hash(challenged.rawChallenge()))
+                .isNotEqualTo(challenged.rawChallenge());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
+        verify(audit, never()).write(eq(AuthEventType.LOGIN_SUCCESS), any(), any(), any(), any());
+    }
+
+    @Test
+    void googleLoginOfATotpAccountReturnsAChallenge() {
+        AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
+        givenGoogleIdentity("sub-1", "person@example.com");
+        when(repository.findByGoogleSubject("sub-1")).thenReturn(Optional.of(user));
+        when(totpService.isEnabled(user.getId())).thenReturn(true);
+
+        SessionOutcome outcome = service.loginWithGoogle("code", "verifier", "nonce", true, "127.0.0.1", "ua");
+
+        assertThat(outcome).isInstanceOf(SessionOutcome.Challenged.class);
+        verify(challenges).insert(eq(user.getId()), any(), eq(true), eq(ChallengeOrigin.GOOGLE), any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
+        verify(audit, never()).write(eq(AuthEventType.OAUTH_LOGIN_SUCCESS), any(), any(), any(), any());
+    }
+
+    @Test
+    void linkSignInOfATotpAccountCarriesTheSetupToken() {
+        AppUser user = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "person@example.com", "", "P", Role.MEMBER,
+                UserStatus.ACTIVE, false);
+        when(emailConfirmation.openPasswordLink("raw-link")).thenReturn(Optional.of(user));
+        when(emailConfirmation.issuePasswordSetupToken(user.getId())).thenReturn("setup-token");
+        when(totpService.isEnabled(user.getId())).thenReturn(true);
+
+        ConfirmedEmailSession opened = service.openPasswordLink("raw-link", "127.0.0.1", "ua");
+
+        assertThat(opened.outcome()).isInstanceOf(SessionOutcome.Challenged.class);
+        assertThat(opened.passwordSetupRequired()).isTrue();
+        assertThat(opened.passwordSetupToken()).isEqualTo("setup-token");
+        verify(challenges).insert(eq(user.getId()), any(), eq(false), eq(ChallengeOrigin.LINK), any());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
+    }
+
+    private AppUser withLiveChallenge(ChallengeOrigin origin, boolean rememberMe) {
+        AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
+        when(repository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(challenges.findLive(OpaqueTokens.hash("raw-challenge"), NOW, 5)).thenReturn(Optional.of(
+                new LoginChallenge(CHALLENGE_ID, user.getId(), rememberMe, origin, NOW.plusSeconds(200), 0)));
+        return user;
+    }
+
+    @Test
+    void completingAChallengeOpensAVerifiedSessionWithItsRememberMe() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.PASSWORD, true);
+        AuthSession remembered = new AuthSession("marked-access", 900L, "refresh", NOW.plusSeconds(60), true);
+        when(totpService.verifyForSignIn(user.getId(), "123456", "127.0.0.1", "ua")).thenReturn(TotpService.Method.TOTP);
+        when(challenges.spend(CHALLENGE_ID, NOW, 5)).thenReturn(true);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true, NOW)).thenReturn(remembered);
+
+        AuthSession session = service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua");
+
+        assertThat(session).isSameAs(remembered);
+        assertThat(session.persistent()).isTrue();
+        verify(audit).write(eq(AuthEventType.LOGIN_SUCCESS), eq(user.getId()), eq("127.0.0.1"), eq("ua"), any());
+    }
+
+    @Test
+    void completingAGoogleChallengeAuditsAnOauthLogin() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.GOOGLE, false);
+        when(totpService.verifyForSignIn(user.getId(), "123456", "127.0.0.1", "ua")).thenReturn(TotpService.Method.TOTP);
+        when(challenges.spend(CHALLENGE_ID, NOW, 5)).thenReturn(true);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, NOW)).thenReturn(SESSION);
+
+        service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua");
+
+        verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_SUCCESS), eq(user.getId()), eq("127.0.0.1"), eq("ua"), any());
+    }
+
+    @Test
+    void aWrongCodeCountsAgainstTheChallengeAndOpensNothing() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.PASSWORD, false);
+        when(totpService.verifyForSignIn(user.getId(), "000000", "127.0.0.1", "ua")).thenThrow(new TotpProblems.InvalidCode());
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "000000", "127.0.0.1", "ua"))
+                .isInstanceOf(TotpProblems.InvalidCode.class);
+
+        verify(challenges).recordWrongCode(CHALLENGE_ID, NOW, 5);
+        verify(challenges, never()).spend(any(), any(), anyInt());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
+    }
+
+    @Test
+    void aChallengeDiesAtFiveWrongCodes() {
+        when(challenges.findLive(OpaqueTokens.hash("raw-challenge"), NOW, 5)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua"))
+                .isInstanceOf(TotpProblems.ChallengeInvalid.class);
+
+        verifyNoInteractions(totpService, refreshTokenService);
+    }
+
+    @Test
+    void aCodeThatLosesTheSpendRaceOpensNothing() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.PASSWORD, false);
+        when(totpService.verifyForSignIn(user.getId(), "123456", "127.0.0.1", "ua")).thenReturn(TotpService.Method.TOTP);
+        when(challenges.spend(CHALLENGE_ID, NOW, 5)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua"))
+                .isInstanceOf(TotpProblems.ChallengeInvalid.class);
+
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
+    }
+
+    @Test
+    void suspendedDuringChallenge() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.PASSWORD, false);
+        user.changeStatus(UserStatus.SUSPENDED);
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua"))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_SUSPENDED), eq(user.getId()), any(), any(), any());
+        verifyNoInteractions(totpService);
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
+    }
+
+    @Test
+    void lockedDuringChallenge() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.PASSWORD, false);
+        user.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua"))
+                .isInstanceOf(AccountLockedException.class);
+
+        verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_LOCKED), eq(user.getId()), any(), any(), any());
+        verifyNoInteractions(totpService);
+    }
+
+    @Test
+    void anUnconfirmedAccountCannotCompleteAPasswordChallenge() {
+        UUID id = UUID.randomUUID();
+        AppUser unconfirmed = AppUser.selfRegistered(id, UUID.randomUUID(), "person@example.com", "hash", "A", "B",
+                null, null);
+        when(repository.findById(id)).thenReturn(Optional.of(unconfirmed));
+        when(challenges.findLive(OpaqueTokens.hash("raw-challenge"), NOW, 5)).thenReturn(Optional.of(
+                new LoginChallenge(CHALLENGE_ID, id, false, ChallengeOrigin.PASSWORD, NOW.plusSeconds(200), 0)));
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua"))
+                .isInstanceOf(EmailNotConfirmedException.class);
+
+        verifyNoInteractions(totpService);
+    }
+
+    @Test
+    void totpTurnedOffDuringChallenge() {
+        AppUser user = withLiveChallenge(ChallengeOrigin.PASSWORD, false);
+        when(totpService.verifyForSignIn(user.getId(), "123456", "127.0.0.1", "ua"))
+                .thenThrow(new TotpProblems.ChallengeInvalid());
+
+        assertThatThrownBy(() -> service.completeTotpSignIn("raw-challenge", "123456", "127.0.0.1", "ua"))
+                .isInstanceOf(TotpProblems.ChallengeInvalid.class);
+
+        verify(challenges, never()).recordWrongCode(any(), any(), anyInt());
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -279,7 +482,7 @@ class AuthServiceImplTest {
         AppUser user = activeUser(id, Role.MEMBER);
         user.recordFailedLogin(5, Duration.ofMinutes(15), NOW);
         when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(user));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
         service.login("person@example.com", RAW_PASSWORD, false, "127.0.0.1", "ua");
 
@@ -290,7 +493,7 @@ class AuthServiceImplTest {
     void registerCreatesAMemberOwnedByTheConfiguredOwnerAndReturnsTheSession() {
         AppUser owner = givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
         AuthSession session = service.register("new@example.com", RAW_PASSWORD, "New", "Person", null, false,
                 "127.0.0.1", "ua").orElseThrow();
@@ -315,7 +518,7 @@ class AuthServiceImplTest {
     void registerTrimsAndLowerCasesTheStoredEmail() {
         givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
         service.register(" New@Example.COM ", RAW_PASSWORD, "New", "Person", null, false, "127.0.0.1", "ua");
 
@@ -373,14 +576,14 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> service.register("taken@example.com", RAW_PASSWORD, "Taken", "Member", null, false,
                 "127.0.0.1", "ua"))
                 .isInstanceOf(ConflictException.class);
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
     void registerWithConfirmationOffPublishesTheActivationAndMailsNoLink() {
         givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
         service.register("new@example.com", RAW_PASSWORD, "New", "Person", null, false, "127.0.0.1", "ua");
 
@@ -452,16 +655,16 @@ class AuthServiceImplTest {
         when(emailConfirmation.confirm("raw-token"))
                 .thenReturn(Optional.of(new EmailConfirmationService.Confirmed(user, true)));
         when(emailConfirmation.issuePasswordSetupToken(user.getId())).thenReturn("setup-token");
-        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
 
         ConfirmedEmailSession confirmed = service.confirmEmail("raw-token", "127.0.0.1", "ua");
 
-        assertThat(confirmed.session()).isEqualTo(SESSION);
+        assertThat(confirmed.outcome()).isEqualTo(new SessionOutcome.Opened(SESSION));
         assertThat(confirmed.passwordSetupRequired()).isTrue();
         assertThat(confirmed.passwordSetupToken()).isEqualTo("setup-token");
         InOrder order = inOrder(accountCredentials, refreshTokenService);
         order.verify(accountCredentials).revokeAllFor(user.getId());
-        order.verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false);
+        order.verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false, null);
         verify(events).publishEvent(new UserActivatedEvent(user.getId()));
     }
 
@@ -481,7 +684,7 @@ class AuthServiceImplTest {
         AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
         when(emailConfirmation.confirm("raw-token"))
                 .thenReturn(Optional.of(new EmailConfirmationService.Confirmed(user, false)));
-        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
 
         ConfirmedEmailSession confirmed = service.confirmEmail("raw-token", "127.0.0.1", "ua");
 
@@ -496,11 +699,11 @@ class AuthServiceImplTest {
                 UserStatus.ACTIVE, false);
         when(emailConfirmation.openPasswordLink("raw-link")).thenReturn(Optional.of(user));
         when(emailConfirmation.issuePasswordSetupToken(user.getId())).thenReturn("setup-token");
-        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
 
         ConfirmedEmailSession opened = service.openPasswordLink("raw-link", "127.0.0.1", "ua");
 
-        assertThat(opened.session()).isEqualTo(SESSION);
+        assertThat(opened.outcome()).isEqualTo(new SessionOutcome.Opened(SESSION));
         assertThat(opened.passwordSetupRequired()).isTrue();
         assertThat(opened.passwordSetupToken()).isEqualTo("setup-token");
     }
@@ -522,9 +725,9 @@ class AuthServiceImplTest {
                 UserStatus.ACTIVE, false);
         when(repository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
         when(emailConfirmation.spendPasswordSetupToken(user.getId(), "setup-token")).thenReturn(true);
-        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
 
-        AuthSession session = service.setPassword(user.getId(), setup("setup-token"), "127.0.0.1", "ua");
+        AuthSession session = service.setPassword(user.getId(), setup("setup-token"), false, "127.0.0.1", "ua");
 
         assertThat(session).isEqualTo(SESSION);
         assertThat(user.hasPassword()).isTrue();
@@ -533,10 +736,23 @@ class AuthServiceImplTest {
         assertThat(user.getUsername()).isEqualTo("binh_le");
         InOrder order = inOrder(accountCredentials, refreshTokenService);
         order.verify(accountCredentials).revokeAllFor(user.getId());
-        order.verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false);
+        order.verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false, null);
         verify(emailConfirmation).retireOpenLinks(user.getId());
         verify(emailConfirmation).mailPasswordSetNotice(user.getId(), "person@example.com");
         verify(audit).write(eq(AuthEventType.PASSWORD_SET), eq(user.getId()), eq("127.0.0.1"), eq("ua"), any());
+    }
+
+    @Test
+    void theSessionSetPasswordOpensCarriesTheLevelOfTheCaller() {
+        AppUser user = new AppUser(UUID.randomUUID(), UUID.randomUUID(), "person@example.com", "", "P", Role.MEMBER,
+                UserStatus.ACTIVE, false);
+        when(repository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+        when(emailConfirmation.spendPasswordSetupToken(user.getId(), "setup-token")).thenReturn(true);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", false, NOW)).thenReturn(SESSION);
+
+        service.setPassword(user.getId(), setup("setup-token"), true, "127.0.0.1", "ua");
+
+        verify(refreshTokenService).issueFor(user, "127.0.0.1", "ua", false, NOW);
     }
 
     @Test
@@ -546,7 +762,7 @@ class AuthServiceImplTest {
         when(repository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
         when(emailConfirmation.spendPasswordSetupToken(user.getId(), "stolen-or-stale")).thenReturn(false);
 
-        assertThatThrownBy(() -> service.setPassword(user.getId(), setup("stolen-or-stale"), "127.0.0.1", "ua"))
+        assertThatThrownBy(() -> service.setPassword(user.getId(), setup("stolen-or-stale"), false, "127.0.0.1", "ua"))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> assertThat(english(e.getDetail()))
                         .isEqualTo("This password setup has expired; ask for a new set-password link"));
 
@@ -566,10 +782,10 @@ class AuthServiceImplTest {
                 "duplicate key value violates unique constraint \"uq_app_user_username\""));
 
         RegistrationConflictException conflict = catchThrowableOfType(RegistrationConflictException.class,
-                () -> service.setPassword(user.getId(), setup("setup-token"), "127.0.0.1", "ua"));
+                () -> service.setPassword(user.getId(), setup("setup-token"), false, "127.0.0.1", "ua"));
 
         assertThat(conflict.getField()).isEqualTo("username");
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -578,7 +794,7 @@ class AuthServiceImplTest {
         String hash = user.getPasswordHash();
         when(repository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> service.setPassword(user.getId(), setup("setup-token"), "127.0.0.1", "ua"))
+        assertThatThrownBy(() -> service.setPassword(user.getId(), setup("setup-token"), false, "127.0.0.1", "ua"))
                 .isInstanceOfSatisfying(ConflictException.class,
                         e -> assertThat(english(e.getDetail())).isEqualTo("This account already has a password"));
 
@@ -592,7 +808,7 @@ class AuthServiceImplTest {
                 UserStatus.SUSPENDED, false);
         when(repository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> service.setPassword(user.getId(), setup("setup-token"), "127.0.0.1", "ua"))
+        assertThatThrownBy(() -> service.setPassword(user.getId(), setup("setup-token"), false, "127.0.0.1", "ua"))
                 .isInstanceOf(AccessDeniedException.class);
 
         assertThat(user.hasPassword()).isFalse();
@@ -611,7 +827,7 @@ class AuthServiceImplTest {
                 .isInstanceOf(AccessDeniedException.class);
 
         verify(accountCredentials).revokeAllFor(user.getId());
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
         verifyNoInteractions(events);
     }
 
@@ -620,13 +836,13 @@ class AuthServiceImplTest {
         givenOwner(Role.ADMIN, UserStatus.ACTIVE);
         AppUser unconfirmed = unconfirmedMember("person@example.com");
         unconfirmed.changeStatus(UserStatus.SUSPENDED);
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
         assertThatThrownBy(() -> service.register("person@example.com", RAW_PASSWORD, "Binh", "Le", null, false,
                 "127.0.0.1", "ua")).isInstanceOf(AccessDeniedException.class);
 
         verify(emailConfirmation).retireOpenLinks(unconfirmed.getId());
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
         verify(audit).write(eq(AuthEventType.LOGIN_FAILED_ACCOUNT_SUSPENDED), eq(unconfirmed.getId()),
                 eq("127.0.0.1"), eq("ua"), any());
         verifyNoInteractions(events);
@@ -649,7 +865,7 @@ class AuthServiceImplTest {
     private void verifyOAuthFailureAudited(OAuthFailure failure) {
         verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_FAILED), any(), eq("127.0.0.1"), eq("ua"),
                 argThat(metadata -> failure.code().equals(metadata.get("reason"))));
-        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class));
+        verify(refreshTokenService, never()).issueFor(any(), any(), any(), any(Boolean.class), any());
     }
 
     @Test
@@ -657,11 +873,11 @@ class AuthServiceImplTest {
         AppUser user = activeUser(UUID.randomUUID(), Role.MEMBER);
         givenGoogleIdentity("sub-1", "person@example.com");
         when(repository.findByGoogleSubject("sub-1")).thenReturn(Optional.of(user));
-        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(user, "127.0.0.1", "ua", true, null)).thenReturn(SESSION);
 
-        AuthSession session = service.loginWithGoogle("code", "verifier", "nonce", true, "127.0.0.1", "ua");
+        SessionOutcome outcome = service.loginWithGoogle("code", "verifier", "nonce", true, "127.0.0.1", "ua");
 
-        assertThat(session).isEqualTo(SESSION);
+        assertThat(outcome).isEqualTo(new SessionOutcome.Opened(SESSION));
         verify(audit).write(eq(AuthEventType.OAUTH_LOGIN_SUCCESS), eq(user.getId()), eq("127.0.0.1"), eq("ua"), any());
         verify(repository, never()).saveAndFlush(any());
     }
@@ -714,11 +930,11 @@ class AuthServiceImplTest {
         UUID id = unconfirmed.getId();
         givenGoogleIdentity("sub-new", "person@example.com");
         when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
-        when(refreshTokenService.issueFor(unconfirmed, "127.0.0.1", "ua", false)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(unconfirmed, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
 
-        AuthSession session = service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
+        SessionOutcome outcome = service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
 
-        assertThat(session).isEqualTo(SESSION);
+        assertThat(outcome).isEqualTo(new SessionOutcome.Opened(SESSION));
         assertThat(unconfirmed.getGoogleSubject()).isEqualTo("sub-new");
         assertThat(unconfirmed.isEmailConfirmed()).isTrue();
         assertThat(unconfirmed.hasPassword()).isFalse();
@@ -737,7 +953,7 @@ class AuthServiceImplTest {
         when(googleOAuthClient.exchangeAndVerify("code", "verifier", "nonce"))
                 .thenReturn(new GoogleIdTokenClaims("sub-new", "person@example.com", true, "Nguyen Van A"));
         when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
-        when(refreshTokenService.issueFor(unconfirmed, "127.0.0.1", "ua", false)).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(unconfirmed, "127.0.0.1", "ua", false, null)).thenReturn(SESSION);
 
         service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
 
@@ -768,11 +984,11 @@ class AuthServiceImplTest {
         givenGoogleIdentity("sub-new", " New@Example.com ");
         when(repository.findByGoogleSubject("sub-new")).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
-        AuthSession session = service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
+        SessionOutcome outcome = service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
 
-        assertThat(session).isEqualTo(SESSION);
+        assertThat(outcome).isEqualTo(new SessionOutcome.Opened(SESSION));
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(repository).saveAndFlush(captor.capture());
         AppUser saved = captor.getValue();
@@ -794,7 +1010,7 @@ class AuthServiceImplTest {
                 .thenReturn(new GoogleIdTokenClaims("sub-anon", "anon.person@example.com", true, null));
         when(repository.findByGoogleSubject(any())).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class))).thenReturn(SESSION);
+        when(refreshTokenService.issueFor(any(), any(), any(), any(Boolean.class), any())).thenReturn(SESSION);
 
         service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
         service.loginWithGoogle("code", "verifier", "nonce", false, "127.0.0.1", "ua");
@@ -935,7 +1151,7 @@ class AuthServiceImplTest {
 
     private AuthServiceImpl resetService(PasswordEncoder encoder, PasswordResetService resets) {
         return new AuthServiceImpl(repository, encoder, refreshTokenService, accountCredentials, loginAttempts, loginRateLimiter,
-                registrationRateLimiter, googleOAuthClient, audit,
+                registrationRateLimiter, googleOAuthClient, audit, sessionGate,
                 new RegistrationProperties(OWNER_EMAIL, HOURLY, HOURLY), FIXED_CLOCK,
                 events, mock(PlatformTransactionManager.class), emailConfirmation,
                 new EmailConfirmationProperties(false, Duration.ofHours(24),

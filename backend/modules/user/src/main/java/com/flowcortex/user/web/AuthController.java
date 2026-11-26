@@ -9,11 +9,14 @@ import com.flowcortex.user.api.AuthSession;
 import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.CurrentUser;
 import com.flowcortex.user.api.OwnProfiles;
+import com.flowcortex.user.api.SessionOutcome;
 import com.flowcortex.user.api.UserDirectory;
+import com.flowcortex.user.application.JwtClaims;
 import com.flowcortex.user.application.RoleCatalog;
 import com.flowcortex.user.authz.CallerFacts;
 import com.flowcortex.user.authz.CallerFactsLoader;
 import com.flowcortex.user.phone.PhoneGate;
+import com.flowcortex.user.totp.TotpService;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -65,11 +68,13 @@ class AuthController {
     private final CallerFactsLoader callerFacts;
     private final PhoneGate phoneGate;
     private final RoleCatalog roleCatalog;
+    private final TotpService totp;
 
     AuthController(AuthService authService, UserDirectory userDirectory, OwnProfiles ownProfiles,
             RefreshCookieSupport cookieSupport, CallerFactsLoader callerFacts, PhoneGate phoneGate,
-            RoleCatalog roleCatalog) {
+            RoleCatalog roleCatalog, TotpService totp) {
         this.roleCatalog = roleCatalog;
+        this.totp = totp;
         this.authService = authService;
         this.userDirectory = userDirectory;
         this.ownProfiles = ownProfiles;
@@ -78,14 +83,26 @@ class AuthController {
         this.phoneGate = phoneGate;
     }
 
+    /**
+     * 200 with the session, or 202 {@code totp_required} with a challenge cookie and no token when the
+     * account has TOTP on; {@code POST /login/totp} then completes the sign-in.
+     */
     @SecurityRequirements
-    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "200", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = AccessTokenResponse.class)))
+    @ApiResponse(responseCode = "202", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = TotpChallengeResponse.class)))
     @PostMapping(value = "/login", produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<AccessTokenResponse> login(@Valid @RequestBody LoginRequest request,
+    ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        AuthSession session = authService.login(request.email(), request.password(),
+        SessionOutcome outcome = authService.login(request.email(), request.password(),
                 Boolean.TRUE.equals(request.rememberMe()),
                 servletRequest.getRemoteAddr(), servletRequest.getHeader(HttpHeaders.USER_AGENT));
+        if (outcome instanceof SessionOutcome.Challenged challenged) {
+            cookieSupport.attachChallengeCookie(servletRequest, servletResponse, challenged);
+            return ResponseEntity.accepted().body(TotpChallengeResponse.of(challenged));
+        }
+        AuthSession session = ((SessionOutcome.Opened) outcome).session();
         cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session);
         return ResponseEntity.ok(session.toResponse());
     }
@@ -111,35 +128,49 @@ class AuthController {
     }
 
     @SecurityRequirements
-    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "200", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = ConfirmEmailResponse.class)))
+    @ApiResponse(responseCode = "202", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = TotpLinkChallengeResponse.class)))
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping(value = "/confirm-email", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<ConfirmEmailResponse> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request,
+    ResponseEntity<?> confirmEmail(@Valid @RequestBody ConfirmEmailRequest request,
             HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         ConfirmedEmailSession confirmed = authService.confirmEmail(request.token(), servletRequest.getRemoteAddr(),
                 servletRequest.getHeader(HttpHeaders.USER_AGENT));
         return signedInFromLink(confirmed, servletRequest, servletResponse);
     }
 
-    /** Opens an emailed set-password link: signs its account in and hands out the password-setup token. */
+    /**
+     * Opens an emailed set-password link: signs its account in and hands out the password-setup token; 202 with
+     * a challenge cookie instead of a session when the account has TOTP on.
+     */
     @SecurityRequirements
-    @ApiResponse(responseCode = "200")
+    @ApiResponse(responseCode = "200", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = ConfirmEmailResponse.class)))
+    @ApiResponse(responseCode = "202", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+            schema = @Schema(implementation = TotpLinkChallengeResponse.class)))
     @ApiResponse(responseCode = "422", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping(value = "/password-link", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<ConfirmEmailResponse> openPasswordLink(@Valid @RequestBody ConfirmEmailRequest request,
+    ResponseEntity<?> openPasswordLink(@Valid @RequestBody ConfirmEmailRequest request,
             HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
         ConfirmedEmailSession opened = authService.openPasswordLink(request.token(), servletRequest.getRemoteAddr(),
                 servletRequest.getHeader(HttpHeaders.USER_AGENT));
         return signedInFromLink(opened, servletRequest, servletResponse);
     }
 
-    private ResponseEntity<ConfirmEmailResponse> signedInFromLink(ConfirmedEmailSession opened,
-            HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        AuthSession session = opened.session();
+    private ResponseEntity<?> signedInFromLink(ConfirmedEmailSession opened, HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        if (opened.outcome() instanceof SessionOutcome.Challenged challenged) {
+            cookieSupport.attachChallengeCookie(servletRequest, servletResponse, challenged);
+            return ResponseEntity.accepted().body(new TotpLinkChallengeResponse(TotpChallengeResponse.REQUIRED,
+                    challenged.ttl().toSeconds(), opened.passwordSetupRequired(), opened.passwordSetupToken()));
+        }
+        AuthSession session = ((SessionOutcome.Opened) opened.outcome()).session();
         cookieSupport.attachRefreshCookie(servletRequest, servletResponse, session);
         return ResponseEntity.ok(new ConfirmEmailResponse(session.accessToken(), session.expiresIn(),
                 opened.passwordSetupRequired(), opened.passwordSetupToken()));
@@ -220,7 +251,7 @@ class AuthController {
 
     @GetMapping(value = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<MeResponse> me(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(meOf(subjectId(jwt)));
+        return ResponseEntity.ok(meOf(subjectId(jwt), JwtClaims.mfaOf(jwt)));
     }
 
     @PutMapping(value = "/profile", consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -229,15 +260,19 @@ class AuthController {
             @Valid @RequestBody ProfileUpdateRequest request) {
         UUID id = subjectId(jwt);
         ownProfiles.updateNames(id, request.name(), request.firstName(), request.lastName());
-        return ResponseEntity.ok(meOf(id));
+        return ResponseEntity.ok(meOf(id, JwtClaims.mfaOf(jwt)));
     }
 
-    /** One by-code role lookup per call: the role name is not part of the per-request {@link CurrentUser}. */
-    private MeResponse meOf(UUID id) {
+    /**
+     * One by-code role lookup per call: the role name is not part of the per-request {@link CurrentUser}.
+     * {@code sessionMfa}: the caller's access token carries the second-factor claim.
+     */
+    private MeResponse meOf(UUID id, boolean sessionMfa) {
         CurrentUser user = userDirectory.findById(id)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
         String roleName = roleCatalog.names().getOrDefault(user.role(), user.role());
-        return MeResponse.from(user, roleName, callerFacts.load(id), phoneGate.holds(id));
+        TotpState totpState = new TotpState(totp.isEnabled(id), totp.isRequired(user.role()), sessionMfa);
+        return MeResponse.from(user, roleName, callerFacts.load(id, sessionMfa), phoneGate.holds(id), totpState);
     }
 
     private static UUID subjectId(Jwt jwt) {
@@ -313,20 +348,51 @@ class AuthController {
      * once deactivated); {@code adminDisabled}: the admin console access is deactivated;
      * {@code phoneVerificationRequired}: the phone gate holds this caller until a number is verified.
      * {@code role} is the role code; {@code roleName} its current display name (the code when no role row is found).
+     * {@code totp}: the second-factor state of the account and of this session.
      */
     record MeResponse(UUID id, String email, String name, String role,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String roleName, String status,
             boolean hasPassword, boolean passwordSetupRequired,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Permission> permissions,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean adminDisabled,
-            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean phoneVerificationRequired) {
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean phoneVerificationRequired,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) TotpState totp) {
         static MeResponse from(CurrentUser user, String roleName, CallerFacts facts,
-                boolean phoneVerificationRequired) {
+                boolean phoneVerificationRequired, TotpState totp) {
             List<Permission> keys = facts.effectiveKeys().stream()
                     .sorted(Comparator.comparing(Permission::key)).toList();
             return new MeResponse(user.id(), user.email(), user.name(), user.role(), roleName, user.status(),
                     user.hasPassword(), user.passwordSetupRequired(), keys, facts.adminDisabled(),
-                    phoneVerificationRequired);
+                    phoneVerificationRequired, totp);
         }
+    }
+
+    /**
+     * {@code enabled}: the account has TOTP on; {@code required}: it is a console account and the requirement
+     * is on; {@code verified}: this session passed a TOTP or recovery code.
+     */
+    record TotpState(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean enabled,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean required,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean verified) {
+    }
+
+    /** The 202 of a sign-in that owes a code; the challenge itself travels in an HttpOnly cookie. */
+    record TotpChallengeResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long expiresIn) {
+        static final String REQUIRED = "totp_required";
+
+        static TotpChallengeResponse of(SessionOutcome.Challenged challenged) {
+            return new TotpChallengeResponse(REQUIRED, challenged.ttl().toSeconds());
+        }
+    }
+
+    /** The 202 of an emailed link whose account owes a code: the challenge plus what the link carried. */
+    record TotpLinkChallengeResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String status,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long expiresIn,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean passwordSetupRequired,
+            String passwordSetupToken) {
     }
 }

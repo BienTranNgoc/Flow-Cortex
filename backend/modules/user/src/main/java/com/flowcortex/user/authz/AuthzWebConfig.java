@@ -1,5 +1,8 @@
 package com.flowcortex.user.authz;
 
+import com.flowcortex.user.totp.TotpRequirement;
+import com.flowcortex.user.totp.TotpService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -8,7 +11,8 @@ import org.springframework.context.annotation.Configuration;
 class AuthzWebConfig {
 
     @Bean
-    AdminAuthorizationInterceptor adminAuthorizationInterceptor(CallerFactsLoader factsLoader) {
-        return new AdminAuthorizationInterceptor(factsLoader);
+    AdminAuthorizationInterceptor adminAuthorizationInterceptor(CallerFactsLoader factsLoader,
+            ObjectProvider<TotpRequirement> requirement, ObjectProvider<TotpService> totp) {
+        return new AdminAuthorizationInterceptor(factsLoader, requirement, totp);
     }
 }
