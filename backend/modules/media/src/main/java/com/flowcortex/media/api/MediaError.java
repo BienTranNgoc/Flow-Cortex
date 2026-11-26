@@ -25,7 +25,11 @@ public record MediaError(@NotNull Code code, @NotNull String message, @NotNull B
         SEPARATION_FAILED("separation_failed"),
         DIARIZATION_FAILED("diarization_failed"),
         BEAT_DETECTION_FAILED("beat_detection_failed"),
-        NO_BEATS_DETECTED("no_beats_detected");
+        NO_BEATS_DETECTED("no_beats_detected"),
+        COMPOSE_FAILED("compose_failed"),
+        AUDIO_MIX_FAILED("audio_mix_failed"),
+        VIDEO_CONCAT_FAILED("video_concat_failed"),
+        TOO_MANY_SEGMENTS_DROPPED("too_many_segments_dropped");
 
         private final String value;
 

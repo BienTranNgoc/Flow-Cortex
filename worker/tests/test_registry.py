@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 from conftest import FakeConnection, assert_valid, job_body, published, run_consumer, settled
+from pydantic import ValidationError
 
+from flowcortex_worker import roles
+from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError
-from flowcortex_worker.handlers import registry, render_video, role_suggest
+from flowcortex_worker.handlers import compose_dub, registry, render_video, role_suggest
 from flowcortex_worker.roles import RoleError
 
 BROKEN = "flowcortex_worker.handlers.not_installed"
@@ -147,6 +151,69 @@ def test_an_audio_only_worker_loads_just_its_handler() -> None:
     handlers = registry.load_handlers(frozenset({"separate_audio"}))
 
     assert set(handlers) == {"separate_audio"}
+
+
+ASSEMBLY = ("concat_audio", "timeline_audio", "segment_dub", "compose_dub", "concat_video")
+
+
+def test_the_assembly_handlers_sit_beside_the_existing_rows() -> None:
+    for capability in ASSEMBLY:
+        assert registry.HANDLER_MODULES[capability] == f"flowcortex_worker.handlers.{capability}"
+    assert {"render_video", "separate_audio", "probe"} <= set(registry.HANDLER_MODULES)
+
+
+def test_the_assembly_handlers_are_not_opt_in() -> None:
+    assert not set(ASSEMBLY) & registry.OPT_IN_CAPABILITIES
+    assert set(ASSEMBLY) <= set(registry.load_handlers(None))
+
+
+def test_the_render_worker_loads_exactly_its_two_capabilities() -> None:
+    accepted = roles.accepted_capabilities("render_video,compose_dub", registry.HANDLER_MODULES)
+
+    handlers = registry.load_handlers(accepted)
+
+    assert set(handlers) == {"render_video", "compose_dub"}
+    assert handlers["compose_dub"] is compose_dub.handle
+
+
+def test_every_capability_a_compose_service_names_has_a_handler_row() -> None:
+    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text()
+    named = {
+        entry.strip()
+        for line in compose.splitlines()
+        if line.strip().startswith("WORKER_CAPABILITIES:")
+        for entry in line.split(":", 1)[1].split("#")[0].split(",")
+        if entry.strip()
+    }
+
+    assert "compose_dub" in named
+    assert not named - set(registry.HANDLER_MODULES)
+
+
+@pytest.mark.parametrize("capability", [c for c in ASSEMBLY if c != "compose_dub"])
+def test_a_job_naming_a_handler_whose_enum_value_is_missing_is_rejected_by_the_job_model(
+    capability: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        MediaJob.model_validate(job_body(capability=capability))
+
+
+def test_importing_the_assembly_modules_pulls_in_only_the_standard_library_and_the_worker() -> None:
+    script = (
+        "import sys\n"
+        "import flowcortex_worker.handlers.registry\n"
+        "before = set(sys.modules)\n"
+        + "".join(f"import flowcortex_worker.handlers.{name}\n" for name in ASSEMBLY)
+        + "import flowcortex_worker.assembly.compose, flowcortex_worker.assembly.timeline\n"
+        "print(','.join(sorted({m.split('.')[0] for m in set(sys.modules) - before})))\n"
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script], check=True, capture_output=True, text=True
+    )
+
+    added = {name for name in completed.stdout.strip().split(",") if name}
+    assert not added - sys.stdlib_module_names - {"flowcortex_worker"}
 
 
 def test_role_suggest_loads_alone() -> None:

@@ -499,7 +499,8 @@ class MediaContractSchemaTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"duration_exceeded", "no_audio_stream", "separation_failed", "no_beats_detected"})
+    @ValueSource(strings = {"duration_exceeded", "no_audio_stream", "separation_failed", "no_beats_detected",
+            "compose_failed", "too_many_segments_dropped"})
     void dubErrorCodesConformToTheResultSchema(String code) {
         MediaError.Code parsed = Arrays.stream(MediaError.Code.values())
                 .filter(c -> c.value().equals(code)).findFirst().orElseThrow();

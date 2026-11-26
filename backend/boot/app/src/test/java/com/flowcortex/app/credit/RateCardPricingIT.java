@@ -96,6 +96,12 @@ class RateCardPricingIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void composeDubIsPricedPerRequest() {
+        assertThat(creditAccounts.estimate(List.of("separate_audio", "compose_dub"))).isEqualTo(100);
+        assertThatCode(() -> creditAccounts.requirePriced(List.of("compose_dub"))).doesNotThrowAnyException();
+    }
+
+    @Test
     void twoCapabilitiesSharingARefAreEachPricedByIt() {
         insertCard("test.shared", 3);
         mapCapability("test.a", "test.shared");

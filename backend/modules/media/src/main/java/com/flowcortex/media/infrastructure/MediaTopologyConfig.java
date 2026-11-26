@@ -75,7 +75,8 @@ class MediaTopologyConfig {
     static final String VIDEO_JOB_KEY = "video.job";
     private static final String VIDEO_CAPABILITY = "generate_video";
     /** Capabilities that run for minutes and so travel on the render lane, not the default queue. */
-    private static final Set<MediaCapability> RENDER_LANE = EnumSet.of(MediaCapability.RENDER_VIDEO);
+    private static final Set<MediaCapability> RENDER_LANE =
+            EnumSet.of(MediaCapability.RENDER_VIDEO, MediaCapability.COMPOSE_DUB);
     /** CPU-bound audio analysis runs on its own worker pool, apart from the default and render lanes. */
     private static final Set<MediaCapability> AUDIO_LANE = EnumSet.of(MediaCapability.SEPARATE_AUDIO);
     /** The one lane whose worker may reach the internet, so no other capability shares it. */

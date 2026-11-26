@@ -808,11 +808,11 @@ class WorkflowServiceImplTest {
                         .extracting(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                         .containsExactlyInAnyOrder(
                                 "steps[1].type unknown capability 'transcode'; allowed: APPROVAL_CHECKPOINT, align_audio, "
-                                        + "echo, extract_audio, fail, fetch_video, generate_script, "
+                                        + "compose_dub, echo, extract_audio, fail, fetch_video, generate_script, "
                                         + "generate_speech, generate_storyboard, generate_video, ingest_image, "
                                         + "ingest_video, probe, qa.review, render_video, separate_audio",
                                 "steps[3].type unknown capability 'demucs-typo'; allowed: APPROVAL_CHECKPOINT, "
-                                        + "align_audio, echo, extract_audio, fail, fetch_video, "
+                                        + "align_audio, compose_dub, echo, extract_audio, fail, fetch_video, "
                                         + "generate_script, generate_speech, generate_storyboard, generate_video, "
                                         + "ingest_image, ingest_video, probe, qa.review, render_video, "
                                         + "separate_audio"));

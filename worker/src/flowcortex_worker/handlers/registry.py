@@ -41,6 +41,11 @@ HANDLER_MODULES: dict[str, str] = {
     "derive": "flowcortex_worker.handlers.derive",
     "grade_match": "flowcortex_worker.handlers.grade_match",
     "role_suggest": "flowcortex_worker.handlers.role_suggest",
+    "concat_audio": "flowcortex_worker.handlers.concat_audio",
+    "timeline_audio": "flowcortex_worker.handlers.timeline_audio",
+    "segment_dub": "flowcortex_worker.handlers.segment_dub",
+    "compose_dub": "flowcortex_worker.handlers.compose_dub",
+    "concat_video": "flowcortex_worker.handlers.concat_video",
 }
 
 

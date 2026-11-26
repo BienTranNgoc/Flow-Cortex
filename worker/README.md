@@ -3,7 +3,7 @@
 One Python codebase serves two isolated runtimes:
 
 - the media worker consumes the queue `MEDIA_QUEUE` names — `media.jobs` (the default) or
-  `media.render.jobs` (`render_video`, compose service `render-worker`) or `media.audio.jobs`
+  `media.render.jobs` (`render_video`, `compose_dub`, compose service `render-worker`) or `media.audio.jobs`
   (`separate_audio`, compose service `audio-worker`) — reads assets, runs FFmpeg/FFprobe
   capabilities and publishes through exchange `media`. It runs the capabilities
   `WORKER_CAPABILITIES` lists, comma-separated (empty = every capability except the opt-in
