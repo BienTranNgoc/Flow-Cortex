@@ -879,6 +879,144 @@ export interface AiModel {
   updatedAt: string;
 }
 
+export interface CatalogCapabilityRequest {
+  /**
+   * @minLength 1
+   * @pattern ^(ingest|analyze|generate|transform|present|review|deliver|control)$
+   */
+  category: string;
+  /**
+   * @minLength 1
+   * @pattern ^(input|generate|edit|replace|analyze|deliver|control)$
+   */
+  uiGroup: string;
+  /** @pattern ^[a-z0-9-]{1,64}$ */
+  uiIcon?: string;
+}
+
+export interface CatalogCapability {
+  capability: string;
+  category: string;
+  uiGroup: string;
+  /** @nullable */
+  uiIcon?: string | null;
+  registered: boolean;
+  modelCount: number;
+  enabledModelCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CatalogModelReplaceRequest {
+  /**
+   * @minLength 1
+   * @pattern ^[a-z0-9._-]{1,64}$
+   */
+  providerKey: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  vendorLabel?: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  makerLabel?: string;
+  /**
+   * @minLength 1
+   * @pattern ^(text|image|video|audio|transform|deliver|ingest|control)$
+   */
+  mode: string;
+  enabled?: boolean;
+  notImplemented?: boolean;
+}
+
+export type ModelDescriptorInputModalitiesItem =
+  (typeof ModelDescriptorInputModalitiesItem)[keyof typeof ModelDescriptorInputModalitiesItem];
+
+export const ModelDescriptorInputModalitiesItem = {
+  text: 'text',
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+  pdf: 'pdf',
+} as const;
+
+export interface ModelDescriptorLimits {
+  context: number;
+  output: number;
+}
+
+export type ModelDescriptorStructuredOutput =
+  (typeof ModelDescriptorStructuredOutput)[keyof typeof ModelDescriptorStructuredOutput];
+
+export const ModelDescriptorStructuredOutput = {
+  response_schema: 'response_schema',
+  none: 'none',
+} as const;
+
+export type ModelDescriptorThinkingKnob =
+  (typeof ModelDescriptorThinkingKnob)[keyof typeof ModelDescriptorThinkingKnob];
+
+export const ModelDescriptorThinkingKnob = {
+  budget: 'budget',
+  level: 'level',
+  none: 'none',
+} as const;
+
+export interface ModelDescriptorThinking {
+  knob: ModelDescriptorThinkingKnob;
+  values: string[];
+  /** @nullable */
+  defaultValue?: string | null;
+}
+
+export type ModelDescriptorStatus =
+  (typeof ModelDescriptorStatus)[keyof typeof ModelDescriptorStatus];
+
+export const ModelDescriptorStatus = {
+  stable: 'stable',
+  preview: 'preview',
+  deprecated: 'deprecated',
+} as const;
+
+export interface ModelDescriptor {
+  id: string;
+  providerKey: string;
+  family: string;
+  inputModalities: ModelDescriptorInputModalitiesItem[];
+  limits: ModelDescriptorLimits;
+  functionCalling: boolean;
+  structuredOutput: ModelDescriptorStructuredOutput;
+  thinking: ModelDescriptorThinking;
+  temperatureSupported: boolean;
+  status: ModelDescriptorStatus;
+  /** @nullable */
+  shutdownDate?: string | null;
+  /** @nullable */
+  successorId?: string | null;
+  /** @nullable */
+  rateCardRef?: string | null;
+}
+
+export interface CatalogModel {
+  capability: string;
+  modelKey: string;
+  providerKey: string;
+  /** @nullable */
+  vendorLabel?: string | null;
+  /** @nullable */
+  makerLabel?: string | null;
+  mode: string;
+  enabled: boolean;
+  notImplemented: boolean;
+  /** @nullable */
+  descriptor?: ModelDescriptor;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateWorkflowRequest {
   /**
    * @minLength 0
@@ -2556,6 +2694,37 @@ export interface ProbeResult {
   latencyMs?: number;
   outputTokens?: number;
   missingSettings?: string[];
+}
+
+export interface CatalogModelCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$
+   */
+  modelKey: string;
+  /**
+   * @minLength 1
+   * @pattern ^[a-z0-9._-]{1,64}$
+   */
+  providerKey: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  vendorLabel?: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  makerLabel?: string;
+  /**
+   * @minLength 1
+   * @pattern ^(text|image|video|audio|transform|deliver|ingest|control)$
+   */
+  mode: string;
+  enabled?: boolean;
+  notImplemented?: boolean;
 }
 
 export interface AdminAccountResponse {
@@ -4362,6 +4531,18 @@ export interface PageViewAiModel {
   total: number;
 }
 
+export interface CatalogCapabilityList {
+  capabilities: CatalogCapability[];
+  uncatalogued: string[];
+}
+
+export interface PageViewCatalogModel {
+  items: CatalogModel[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface PageViewAdminAccountResponse {
   items: AdminAccountResponse[];
   page: number;
@@ -4411,6 +4592,33 @@ export type ApiTokenDailyLimitResponse = ProblemDetail;
  * Optional on POST and PATCH made with a personal access token. A repeat of the same request within 24 hours returns the stored answer with Idempotent-Replayed: true.
  */
 export type IdempotencyKeyParameter = string;
+
+export type GetAdminAiCatalogModelParams = {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$
+   */
+  key: string;
+};
+
+export type ReplaceAdminAiCatalogModelParams = {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$
+   */
+  key: string;
+};
+
+export type DeleteAdminAiCatalogModelParams = {
+  /**
+   * @minLength 0
+   * @maxLength 128
+   * @pattern ^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$
+   */
+  key: string;
+};
 
 export type ListWorkflowVersionsParams = {
   /**
@@ -4563,6 +4771,19 @@ export type ListContentMediaParams = {
 };
 
 export type ListAdminAiModelsParams = {
+  /**
+   * @minimum 0
+   * @maximum 100000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListAdminAiCatalogModelsParams = {
   /**
    * @minimum 0
    * @maximum 100000
@@ -7651,6 +7872,291 @@ export const deleteAdminAiModel = async (
     ...options,
     method: 'DELETE',
   });
+};
+
+export type getAdminAiCapabilityResponse200 = {
+  data: CatalogCapability;
+  status: 200;
+};
+
+export type getAdminAiCapabilityResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getAdminAiCapabilityResponseSuccess = getAdminAiCapabilityResponse200 & {
+  headers: Headers;
+};
+export type getAdminAiCapabilityResponseError = getAdminAiCapabilityResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminAiCapabilityResponse =
+  getAdminAiCapabilityResponseSuccess | getAdminAiCapabilityResponseError;
+
+export const getGetAdminAiCapabilityUrl = (capability: string) => {
+  return `/api/v1/admin/ai/capabilities/${capability}`;
+};
+
+export const getAdminAiCapability = async (
+  capability: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminAiCapabilityResponse> => {
+  return customFetch<getAdminAiCapabilityResponse>(getGetAdminAiCapabilityUrl(capability), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type replaceAdminAiCapabilityResponse200 = {
+  data: CatalogCapability;
+  status: 200;
+};
+
+export type replaceAdminAiCapabilityResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type replaceAdminAiCapabilityResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replaceAdminAiCapabilityResponseSuccess = replaceAdminAiCapabilityResponse200 & {
+  headers: Headers;
+};
+export type replaceAdminAiCapabilityResponseError = (
+  replaceAdminAiCapabilityResponse400 | replaceAdminAiCapabilityResponse404
+) & {
+  headers: Headers;
+};
+
+export type replaceAdminAiCapabilityResponse =
+  replaceAdminAiCapabilityResponseSuccess | replaceAdminAiCapabilityResponseError;
+
+export const getReplaceAdminAiCapabilityUrl = (capability: string) => {
+  return `/api/v1/admin/ai/capabilities/${capability}`;
+};
+
+export const replaceAdminAiCapability = async (
+  capability: string,
+  catalogCapabilityRequest: CatalogCapabilityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replaceAdminAiCapabilityResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replaceAdminAiCapabilityResponse>(getReplaceAdminAiCapabilityUrl(capability), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(catalogCapabilityRequest),
+  });
+};
+
+export type getAdminAiCatalogModelResponse200 = {
+  data: CatalogModel;
+  status: 200;
+};
+
+export type getAdminAiCatalogModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getAdminAiCatalogModelResponseSuccess = getAdminAiCatalogModelResponse200 & {
+  headers: Headers;
+};
+export type getAdminAiCatalogModelResponseError = getAdminAiCatalogModelResponse404 & {
+  headers: Headers;
+};
+
+export type getAdminAiCatalogModelResponse =
+  getAdminAiCatalogModelResponseSuccess | getAdminAiCatalogModelResponseError;
+
+export const getGetAdminAiCatalogModelUrl = (
+  capability: string,
+  params: GetAdminAiCatalogModelParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/ai/capabilities/${capability}/model?${stringifiedParams}`
+    : `/api/v1/admin/ai/capabilities/${capability}/model`;
+};
+
+export const getAdminAiCatalogModel = async (
+  capability: string,
+  params: GetAdminAiCatalogModelParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminAiCatalogModelResponse> => {
+  return customFetch<getAdminAiCatalogModelResponse>(
+    getGetAdminAiCatalogModelUrl(capability, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type replaceAdminAiCatalogModelResponse200 = {
+  data: CatalogModel;
+  status: 200;
+};
+
+export type replaceAdminAiCatalogModelResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type replaceAdminAiCatalogModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type replaceAdminAiCatalogModelResponseSuccess = replaceAdminAiCatalogModelResponse200 & {
+  headers: Headers;
+};
+export type replaceAdminAiCatalogModelResponseError = (
+  replaceAdminAiCatalogModelResponse400 | replaceAdminAiCatalogModelResponse404
+) & {
+  headers: Headers;
+};
+
+export type replaceAdminAiCatalogModelResponse =
+  replaceAdminAiCatalogModelResponseSuccess | replaceAdminAiCatalogModelResponseError;
+
+export const getReplaceAdminAiCatalogModelUrl = (
+  capability: string,
+  params: ReplaceAdminAiCatalogModelParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/ai/capabilities/${capability}/model?${stringifiedParams}`
+    : `/api/v1/admin/ai/capabilities/${capability}/model`;
+};
+
+export const replaceAdminAiCatalogModel = async (
+  capability: string,
+  catalogModelReplaceRequest: CatalogModelReplaceRequest,
+  params: ReplaceAdminAiCatalogModelParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<replaceAdminAiCatalogModelResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<replaceAdminAiCatalogModelResponse>(
+    getReplaceAdminAiCatalogModelUrl(capability, params),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(catalogModelReplaceRequest),
+    },
+  );
+};
+
+export type deleteAdminAiCatalogModelResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminAiCatalogModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminAiCatalogModelResponseSuccess = deleteAdminAiCatalogModelResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminAiCatalogModelResponseError = deleteAdminAiCatalogModelResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminAiCatalogModelResponse =
+  deleteAdminAiCatalogModelResponseSuccess | deleteAdminAiCatalogModelResponseError;
+
+export const getDeleteAdminAiCatalogModelUrl = (
+  capability: string,
+  params: DeleteAdminAiCatalogModelParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/ai/capabilities/${capability}/model?${stringifiedParams}`
+    : `/api/v1/admin/ai/capabilities/${capability}/model`;
+};
+
+export const deleteAdminAiCatalogModel = async (
+  capability: string,
+  params: DeleteAdminAiCatalogModelParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminAiCatalogModelResponse> => {
+  return customFetch<deleteAdminAiCatalogModelResponse>(
+    getDeleteAdminAiCatalogModelUrl(capability, params),
+    {
+      ...options,
+      method: 'DELETE',
+    },
+  );
 };
 
 export type listWorkflowsResponse200 = {
@@ -14470,6 +14976,132 @@ export const testAdminAiModel = async (
   });
 };
 
+export type listAdminAiCatalogModelsResponse200 = {
+  data: PageViewCatalogModel;
+  status: 200;
+};
+
+export type listAdminAiCatalogModelsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listAdminAiCatalogModelsResponseSuccess = listAdminAiCatalogModelsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiCatalogModelsResponseError = listAdminAiCatalogModelsResponse404 & {
+  headers: Headers;
+};
+
+export type listAdminAiCatalogModelsResponse =
+  listAdminAiCatalogModelsResponseSuccess | listAdminAiCatalogModelsResponseError;
+
+export const getListAdminAiCatalogModelsUrl = (
+  capability: string,
+  params?: ListAdminAiCatalogModelsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/ai/capabilities/${capability}/models?${stringifiedParams}`
+    : `/api/v1/admin/ai/capabilities/${capability}/models`;
+};
+
+export const listAdminAiCatalogModels = async (
+  capability: string,
+  params?: ListAdminAiCatalogModelsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiCatalogModelsResponse> => {
+  return customFetch<listAdminAiCatalogModelsResponse>(
+    getListAdminAiCatalogModelsUrl(capability, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type createAdminAiCatalogModelResponse201 = {
+  data: CatalogModel;
+  status: 201;
+};
+
+export type createAdminAiCatalogModelResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminAiCatalogModelResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createAdminAiCatalogModelResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminAiCatalogModelResponseSuccess = createAdminAiCatalogModelResponse201 & {
+  headers: Headers;
+};
+export type createAdminAiCatalogModelResponseError = (
+  | createAdminAiCatalogModelResponse400
+  | createAdminAiCatalogModelResponse404
+  | createAdminAiCatalogModelResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminAiCatalogModelResponse =
+  createAdminAiCatalogModelResponseSuccess | createAdminAiCatalogModelResponseError;
+
+export const getCreateAdminAiCatalogModelUrl = (capability: string) => {
+  return `/api/v1/admin/ai/capabilities/${capability}/models`;
+};
+
+export const createAdminAiCatalogModel = async (
+  capability: string,
+  catalogModelCreateRequest: CatalogModelCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminAiCatalogModelResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminAiCatalogModelResponse>(
+    getCreateAdminAiCatalogModelUrl(capability),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(catalogModelCreateRequest),
+    },
+  );
+};
+
 export type deactivateAdminAccountResponse200 = {
   data: AdminAccountResponse;
   status: 200;
@@ -19601,6 +20233,52 @@ export const listAdminAiProviderModels = async (
       method: 'GET',
     },
   );
+};
+
+export type listAdminAiModelDescriptorsResponse200 = {
+  data: ModelDescriptor[];
+  status: 200;
+};
+
+export type listAdminAiModelDescriptorsResponseSuccess = listAdminAiModelDescriptorsResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiModelDescriptorsResponse = listAdminAiModelDescriptorsResponseSuccess;
+
+export const getListAdminAiModelDescriptorsUrl = () => {
+  return `/api/v1/admin/ai/model-descriptors`;
+};
+
+export const listAdminAiModelDescriptors = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiModelDescriptorsResponse> => {
+  return customFetch<listAdminAiModelDescriptorsResponse>(getListAdminAiModelDescriptorsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminAiCapabilitiesResponse200 = {
+  data: CatalogCapabilityList;
+  status: 200;
+};
+
+export type listAdminAiCapabilitiesResponseSuccess = listAdminAiCapabilitiesResponse200 & {
+  headers: Headers;
+};
+export type listAdminAiCapabilitiesResponse = listAdminAiCapabilitiesResponseSuccess;
+
+export const getListAdminAiCapabilitiesUrl = () => {
+  return `/api/v1/admin/ai/capabilities`;
+};
+
+export const listAdminAiCapabilities = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminAiCapabilitiesResponse> => {
+  return customFetch<listAdminAiCapabilitiesResponse>(getListAdminAiCapabilitiesUrl(), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type listAdminAccountsResponse200 = {

@@ -1380,6 +1380,167 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/capabilities/{capability}:
+    get:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: getAdminAiCapability
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogCapability"
+        "404":
+          description: capability-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: replaceAdminAiCapability
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogCapabilityRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogCapability"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: capability-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/capabilities/{capability}/model:
+    get:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: getAdminAiCatalogModel
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+          minLength: 0
+          pattern: "^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogModel"
+        "404":
+          description: "capability-not-found, catalog-model-not-found"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    put:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: replaceAdminAiCatalogModel
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+          minLength: 0
+          pattern: "^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogModelReplaceRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogModel"
+        "400":
+          description: "validation-failed (errors), catalog-model-invalid (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: "capability-not-found, catalog-model-not-found"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: deleteAdminAiCatalogModel
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+          minLength: 0
+          pattern: "^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$"
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: "capability-not-found, catalog-model-not-found"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -5535,6 +5696,89 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/capabilities/{capability}/models:
+    get:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: listAdminAiCatalogModels
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 100000
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewCatalogModel"
+        "404":
+          description: capability-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: createAdminAiCatalogModel
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogModelCreateRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogModel"
+        "400":
+          description: "validation-failed (errors), catalog-model-invalid (errors)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: capability-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: catalog-model-exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/accounts/{id}/deactivate:
     post:
       tags:
@@ -9489,6 +9733,32 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/ai/model-descriptors:
+    get:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: listAdminAiModelDescriptors
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModelDescriptor"
+  /api/v1/admin/ai/capabilities:
+    get:
+      tags:
+      - admin-ai-catalog-controller
+      operationId: listAdminAiCapabilities
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogCapabilityList"
   /api/v1/admin/accounts:
     get:
       tags:
@@ -10998,6 +11268,220 @@ components:
       - supportsAudio
       - supportsVision
       - updatedAt
+    CatalogCapabilityRequest:
+      type: object
+      properties:
+        category:
+          type: string
+          minLength: 1
+          pattern: ^(ingest|analyze|generate|transform|present|review|deliver|control)$
+        uiGroup:
+          type: string
+          minLength: 1
+          pattern: ^(input|generate|edit|replace|analyze|deliver|control)$
+        uiIcon:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+      required:
+      - category
+      - uiGroup
+    CatalogCapability:
+      type: object
+      properties:
+        capability:
+          type: string
+        category:
+          type: string
+        uiGroup:
+          type: string
+        uiIcon:
+          type:
+          - string
+          - "null"
+        registered:
+          type: boolean
+        modelCount:
+          type: integer
+          format: int64
+        enabledModelCount:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - capability
+      - category
+      - createdAt
+      - enabledModelCount
+      - modelCount
+      - registered
+      - uiGroup
+      - updatedAt
+    CatalogModelReplaceRequest:
+      type: object
+      properties:
+        providerKey:
+          type: string
+          minLength: 1
+          pattern: "^[a-z0-9._-]{1,64}$"
+        vendorLabel:
+          type: string
+          maxLength: 128
+          minLength: 0
+        makerLabel:
+          type: string
+          maxLength: 128
+          minLength: 0
+        mode:
+          type: string
+          minLength: 1
+          pattern: ^(text|image|video|audio|transform|deliver|ingest|control)$
+        enabled:
+          type: boolean
+        notImplemented:
+          type: boolean
+      required:
+      - mode
+      - providerKey
+    CatalogModel:
+      type: object
+      properties:
+        capability:
+          type: string
+        modelKey:
+          type: string
+        providerKey:
+          type: string
+        vendorLabel:
+          type:
+          - string
+          - "null"
+        makerLabel:
+          type:
+          - string
+          - "null"
+        mode:
+          type: string
+        enabled:
+          type: boolean
+        notImplemented:
+          type: boolean
+        descriptor:
+          type: "null"
+          $ref: "#/components/schemas/ModelDescriptor"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - capability
+      - createdAt
+      - enabled
+      - mode
+      - modelKey
+      - notImplemented
+      - providerKey
+      - updatedAt
+    ModelDescriptor:
+      type: object
+      properties:
+        id:
+          type: string
+        providerKey:
+          type: string
+        family:
+          type: string
+        inputModalities:
+          type: array
+          items:
+            type: string
+            enum:
+            - text
+            - image
+            - video
+            - audio
+            - pdf
+        limits:
+          $ref: "#/components/schemas/ModelDescriptorLimits"
+        functionCalling:
+          type: boolean
+        structuredOutput:
+          type: string
+          enum:
+          - response_schema
+          - none
+        thinking:
+          $ref: "#/components/schemas/ModelDescriptorThinking"
+        temperatureSupported:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - stable
+          - preview
+          - deprecated
+        shutdownDate:
+          type:
+          - string
+          - "null"
+          format: date
+        successorId:
+          type:
+          - string
+          - "null"
+        rateCardRef:
+          type:
+          - string
+          - "null"
+      required:
+      - family
+      - functionCalling
+      - id
+      - inputModalities
+      - limits
+      - providerKey
+      - status
+      - structuredOutput
+      - temperatureSupported
+      - thinking
+    ModelDescriptorLimits:
+      type: object
+      properties:
+        context:
+          type: integer
+          format: int32
+        output:
+          type: integer
+          format: int32
+      required:
+      - context
+      - output
+    ModelDescriptorThinking:
+      type: object
+      properties:
+        knob:
+          type: string
+          enum:
+          - budget
+          - level
+          - none
+        values:
+          type: array
+          items:
+            type: string
+        defaultValue:
+          type:
+          - string
+          - "null"
+      required:
+      - knob
+      - values
     CreateWorkflowRequest:
       type: object
       properties:
@@ -13523,6 +14007,38 @@ components:
           type: array
           items:
             type: string
+    CatalogModelCreateRequest:
+      type: object
+      properties:
+        modelKey:
+          type: string
+          maxLength: 128
+          minLength: 0
+          pattern: "^[A-Za-z0-9._:-]+(/[A-Za-z0-9._:-]+)*$"
+        providerKey:
+          type: string
+          minLength: 1
+          pattern: "^[a-z0-9._-]{1,64}$"
+        vendorLabel:
+          type: string
+          maxLength: 128
+          minLength: 0
+        makerLabel:
+          type: string
+          maxLength: 128
+          minLength: 0
+        mode:
+          type: string
+          minLength: 1
+          pattern: ^(text|image|video|audio|transform|deliver|ingest|control)$
+        enabled:
+          type: boolean
+        notImplemented:
+          type: boolean
+      required:
+      - mode
+      - modelKey
+      - providerKey
     AdminAccountResponse:
       type: object
       properties:
@@ -16665,6 +17181,41 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AiModel"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    CatalogCapabilityList:
+      type: object
+      properties:
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogCapability"
+        uncatalogued:
+          type: array
+          items:
+            type: string
+      required:
+      - capabilities
+      - uncatalogued
+    PageViewCatalogModel:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogModel"
         page:
           type: integer
           format: int32
