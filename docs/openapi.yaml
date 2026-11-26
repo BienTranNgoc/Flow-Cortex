@@ -9086,6 +9086,8 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - ai.model.view
+            - ai.model.update
         adminDisabled:
           type: boolean
         phoneVerificationRequired:
@@ -9632,6 +9634,8 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - ai.model.view
+            - ai.model.update
         permissionsVersion:
           type: integer
           format: int32
@@ -14826,6 +14830,8 @@ components:
           - payment.setting.view
           - payment.setting.update
           - user.account.export
+          - ai.model.view
+          - ai.model.update
         module:
           type: string
         feature:

@@ -86,7 +86,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,
                 Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
                 Permission.AI_PROVIDER_VIEW, Permission.AI_PROVIDER_UPDATE, Permission.WORKFLOW_RUN_EXPORT,
-                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT));
+                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT,
+                Permission.AI_MODEL_VIEW, Permission.AI_MODEL_UPDATE));
 
         Integer workflowManageHolders = jdbc.queryForObject(
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,

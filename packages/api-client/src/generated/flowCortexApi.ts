@@ -232,6 +232,8 @@ export const MeResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  aimodelview: 'ai.model.view',
+  aimodelupdate: 'ai.model.update',
 } as const;
 
 export interface MeResponse {
@@ -584,6 +586,8 @@ export const RoleResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  aimodelview: 'ai.model.view',
+  aimodelupdate: 'ai.model.update',
 } as const;
 
 export interface RoleResponse {
@@ -3841,6 +3845,8 @@ export const PermissionCatalogEntryKey = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  aimodelview: 'ai.model.view',
+  aimodelupdate: 'ai.model.update',
 } as const;
 
 export interface PermissionCatalogEntry {

@@ -137,7 +137,8 @@
         "admin_account": "Admin accounts"
       },
       "ai": {
-        "provider": "AI providers"
+        "provider": "AI providers",
+        "model": "AI models"
       },
       "payment": {
         "setting": "Payment settings"
@@ -216,6 +217,10 @@
         "provider": {
           "view": "View AI providers",
           "update": "Change AI providers"
+        },
+        "model": {
+          "view": "View AI models",
+          "update": "Change AI models"
         }
       },
       "payment": {
