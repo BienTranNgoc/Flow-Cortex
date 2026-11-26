@@ -2070,6 +2070,121 @@ export interface AccountDeletionCancelled {
   cancelledAt: string;
 }
 
+export type CreateEntityRequestKind =
+  (typeof CreateEntityRequestKind)[keyof typeof CreateEntityRequestKind];
+
+export const CreateEntityRequestKind = {
+  brand: 'brand',
+  product: 'product',
+  character: 'character',
+  voice: 'voice',
+} as const;
+
+export type CreateEntityRequestFields = { [key: string]: unknown };
+
+export interface EntityPartRequest {
+  assetId: string;
+  role: string;
+  label?: string;
+}
+
+export interface CreateEntityRequest {
+  kind: CreateEntityRequestKind;
+  name: string;
+  handle?: string;
+  fields?: CreateEntityRequestFields;
+  parts?: EntityPartRequest[];
+  tags?: string[];
+  categoryLabel?: string;
+}
+
+export type EntityPartAssetKind = (typeof EntityPartAssetKind)[keyof typeof EntityPartAssetKind];
+
+export const EntityPartAssetKind = {
+  video: 'video',
+  image: 'image',
+  audio: 'audio',
+} as const;
+
+export interface EntityPartAsset {
+  id: string;
+  kind: EntityPartAssetKind;
+  title: string;
+  mimeType: string;
+}
+
+export interface EntityPartResponse {
+  id: string;
+  role: string;
+  label?: string;
+  sort: number;
+  asset: EntityPartAsset;
+}
+
+export type EntityResponseKind = (typeof EntityResponseKind)[keyof typeof EntityResponseKind];
+
+export const EntityResponseKind = {
+  brand: 'brand',
+  product: 'product',
+  character: 'character',
+  voice: 'voice',
+} as const;
+
+export type EntityResponseFields = { [key: string]: unknown };
+
+export interface EntityResponse {
+  id: string;
+  kind: EntityResponseKind;
+  handle: string;
+  name: string;
+  fields: EntityResponseFields;
+  /** @nullable */
+  categoryLabel?: string | null;
+  tags: string[];
+  parts: EntityPartResponse[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RestoreEntityRequest {
+  baseVersion: number;
+}
+
+export interface EntityDroppedPart {
+  assetId: string;
+  role: string;
+  label?: string;
+}
+
+export type EntityRestoreResponseKind =
+  (typeof EntityRestoreResponseKind)[keyof typeof EntityRestoreResponseKind];
+
+export const EntityRestoreResponseKind = {
+  brand: 'brand',
+  product: 'product',
+  character: 'character',
+  voice: 'voice',
+} as const;
+
+export type EntityRestoreResponseFields = { [key: string]: unknown };
+
+export interface EntityRestoreResponse {
+  id: string;
+  kind: EntityRestoreResponseKind;
+  handle: string;
+  name: string;
+  fields: EntityRestoreResponseFields;
+  /** @nullable */
+  categoryLabel?: string | null;
+  tags: string[];
+  parts: EntityPartResponse[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  droppedParts: EntityDroppedPart[];
+}
+
 export type EmailLinkUnsubscribedList =
   (typeof EmailLinkUnsubscribedList)[keyof typeof EmailLinkUnsubscribedList];
 
@@ -2859,6 +2974,20 @@ export interface NotificationPreferencesView {
   inApp?: boolean;
   careEmail?: boolean;
   marketingEmail?: boolean;
+}
+
+export type UpdateEntityRequestFields = { [key: string]: unknown };
+
+export interface UpdateEntityRequest {
+  baseVersion: number;
+  kind?: string;
+  name?: string;
+  handle?: string;
+  fields?: UpdateEntityRequestFields;
+  parts?: EntityPartRequest[];
+  tags?: string[];
+  /** @nullable */
+  categoryLabel?: string | null;
 }
 
 export interface UpdateDriveItemRequest {
@@ -3830,6 +3959,97 @@ export interface FeaturesResponse {
   drive: boolean;
 }
 
+export interface EntityKindCounts {
+  brand: number;
+  product: number;
+  character: number;
+  voice: number;
+}
+
+export interface EntityListResponse {
+  items: EntityResponse[];
+  page: number;
+  size: number;
+  total: number;
+  counts: EntityKindCounts;
+}
+
+export type EntityChangeResponseCode =
+  (typeof EntityChangeResponseCode)[keyof typeof EntityChangeResponseCode];
+
+export const EntityChangeResponseCode = {
+  created: 'created',
+  renamed: 'renamed',
+  handleChanged: 'handleChanged',
+  fieldsChanged: 'fieldsChanged',
+  partsChanged: 'partsChanged',
+  tagsChanged: 'tagsChanged',
+  categoryChanged: 'categoryChanged',
+  restored: 'restored',
+} as const;
+
+export interface EntityChangeResponse {
+  code: EntityChangeResponseCode;
+  added?: string[];
+  removed?: string[];
+  from?: number;
+}
+
+export interface EntityVersionResponse {
+  version: number;
+  createdAt: string;
+  current: boolean;
+  changes: EntityChangeResponse[];
+  usedInRuns: number;
+}
+
+export interface PageViewEntityVersionResponse {
+  items: EntityVersionResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface EntityVersionDetailResponse {
+  version: number;
+  createdAt: string;
+  current: boolean;
+  entity: EntityResponse;
+}
+
+export interface EntityRunResponse {
+  runId: string;
+  workflowId?: string;
+  workflowName?: string;
+  version: number;
+  completedAt: string;
+}
+
+export interface PageViewEntityRunResponse {
+  items: EntityRunResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface EntityTagSuggestionItem {
+  tag: string;
+  count: number;
+}
+
+export interface EntityTagSuggestionResponse {
+  items: EntityTagSuggestionItem[];
+}
+
+export interface EntitySuggestionItem {
+  label: string;
+  count: number;
+}
+
+export interface EntitySuggestionResponse {
+  items: EntitySuggestionItem[];
+}
+
 export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];
 
 export const EmailLinkViewList = {
@@ -4768,6 +4988,23 @@ export const MarkAllNotificationsReadAudience = {
   admin: 'admin',
 } as const;
 
+export type ListEntitiesParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  kind?: string;
+  q?: string;
+  tag?: string;
+  category?: string;
+};
+
 export type UnsubscribeEmailLinkParams = {
   src?: string;
 };
@@ -5183,6 +5420,60 @@ export const GetUnreadNotificationCountAudience = {
   member: 'member',
   admin: 'admin',
 } as const;
+
+export type ListEntityVersionsParams = {
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListEntityRunsParams = {
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListEntityTagsParams = {
+  q?: string;
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  limit?: number;
+};
+
+export type ListEntityLabelsParams = {
+  role?: string;
+  q?: string;
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  limit?: number;
+};
+
+export type ListEntityCategoriesParams = {
+  q?: string;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
+};
 
 export type ListDriveSuggestionsParams = {
   /**
@@ -12709,6 +13000,134 @@ export const cancelAccountDeletion = async (
   });
 };
 
+export type listEntitiesResponse200 = {
+  data: EntityListResponse;
+  status: 200;
+};
+
+export type listEntitiesResponseSuccess = listEntitiesResponse200 & {
+  headers: Headers;
+};
+export type listEntitiesResponse = listEntitiesResponseSuccess;
+
+export const getListEntitiesUrl = (params?: ListEntitiesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities?${stringifiedParams}`
+    : `/api/v1/entities`;
+};
+
+export const listEntities = async (
+  params?: ListEntitiesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntitiesResponse> => {
+  return customFetch<listEntitiesResponse>(getListEntitiesUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createEntityResponse201 = {
+  data: EntityResponse;
+  status: 201;
+};
+
+export type createEntityResponseSuccess = createEntityResponse201 & {
+  headers: Headers;
+};
+export type createEntityResponse = createEntityResponseSuccess;
+
+export const getCreateEntityUrl = () => {
+  return `/api/v1/entities`;
+};
+
+export const createEntity = async (
+  createEntityRequest: CreateEntityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createEntityResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createEntityResponse>(getCreateEntityUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createEntityRequest),
+  });
+};
+
+export type restoreEntityVersionResponse200 = {
+  data: EntityRestoreResponse;
+  status: 200;
+};
+
+export type restoreEntityVersionResponseSuccess = restoreEntityVersionResponse200 & {
+  headers: Headers;
+};
+export type restoreEntityVersionResponse = restoreEntityVersionResponseSuccess;
+
+export const getRestoreEntityVersionUrl = (id: string, n: number) => {
+  return `/api/v1/entities/${id}/versions/${n}/restore`;
+};
+
+export const restoreEntityVersion = async (
+  id: string,
+  n: number,
+  restoreEntityRequest: RestoreEntityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreEntityVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreEntityVersionResponse>(getRestoreEntityVersionUrl(id, n), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(restoreEntityRequest),
+  });
+};
+
 export type unsubscribeEmailLinkResponse200 = {
   data: EmailLinkUnsubscribed;
   status: 200;
@@ -16489,6 +16908,100 @@ export const updateNotificationPreferences = async (
   });
 };
 
+export type getEntityResponse200 = {
+  data: EntityResponse;
+  status: 200;
+};
+
+export type getEntityResponseSuccess = getEntityResponse200 & {
+  headers: Headers;
+};
+export type getEntityResponse = getEntityResponseSuccess;
+
+export const getGetEntityUrl = (id: string) => {
+  return `/api/v1/entities/${id}`;
+};
+
+export const getEntity = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getEntityResponse> => {
+  return customFetch<getEntityResponse>(getGetEntityUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteEntityResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteEntityResponseSuccess = deleteEntityResponse204 & {
+  headers: Headers;
+};
+export type deleteEntityResponse = deleteEntityResponseSuccess;
+
+export const getDeleteEntityUrl = (id: string) => {
+  return `/api/v1/entities/${id}`;
+};
+
+export const deleteEntity = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteEntityResponse> => {
+  return customFetch<deleteEntityResponse>(getDeleteEntityUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateEntityResponse200 = {
+  data: EntityResponse;
+  status: 200;
+};
+
+export type updateEntityResponseSuccess = updateEntityResponse200 & {
+  headers: Headers;
+};
+export type updateEntityResponse = updateEntityResponseSuccess;
+
+export const getUpdateEntityUrl = (id: string) => {
+  return `/api/v1/entities/${id}`;
+};
+
+export const updateEntity = async (
+  id: string,
+  updateEntityRequest: UpdateEntityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateEntityResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateEntityResponse>(getUpdateEntityUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateEntityRequest),
+  });
+};
+
 export type getDriveItemResponse200 = {
   data: DriveItemResponse;
   status: 200;
@@ -19250,6 +19763,213 @@ export const features = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<featuresResponse> => {
   return customFetch<featuresResponse>(getFeaturesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityVersionsResponse200 = {
+  data: PageViewEntityVersionResponse;
+  status: 200;
+};
+
+export type listEntityVersionsResponseSuccess = listEntityVersionsResponse200 & {
+  headers: Headers;
+};
+export type listEntityVersionsResponse = listEntityVersionsResponseSuccess;
+
+export const getListEntityVersionsUrl = (id: string, params?: ListEntityVersionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/${id}/versions?${stringifiedParams}`
+    : `/api/v1/entities/${id}/versions`;
+};
+
+export const listEntityVersions = async (
+  id: string,
+  params?: ListEntityVersionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityVersionsResponse> => {
+  return customFetch<listEntityVersionsResponse>(getListEntityVersionsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getEntityVersionResponse200 = {
+  data: EntityVersionDetailResponse;
+  status: 200;
+};
+
+export type getEntityVersionResponseSuccess = getEntityVersionResponse200 & {
+  headers: Headers;
+};
+export type getEntityVersionResponse = getEntityVersionResponseSuccess;
+
+export const getGetEntityVersionUrl = (id: string, n: number) => {
+  return `/api/v1/entities/${id}/versions/${n}`;
+};
+
+export const getEntityVersion = async (
+  id: string,
+  n: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getEntityVersionResponse> => {
+  return customFetch<getEntityVersionResponse>(getGetEntityVersionUrl(id, n), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityRunsResponse200 = {
+  data: PageViewEntityRunResponse;
+  status: 200;
+};
+
+export type listEntityRunsResponseSuccess = listEntityRunsResponse200 & {
+  headers: Headers;
+};
+export type listEntityRunsResponse = listEntityRunsResponseSuccess;
+
+export const getListEntityRunsUrl = (id: string, params?: ListEntityRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/${id}/runs?${stringifiedParams}`
+    : `/api/v1/entities/${id}/runs`;
+};
+
+export const listEntityRuns = async (
+  id: string,
+  params?: ListEntityRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityRunsResponse> => {
+  return customFetch<listEntityRunsResponse>(getListEntityRunsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityTagsResponse200 = {
+  data: EntityTagSuggestionResponse;
+  status: 200;
+};
+
+export type listEntityTagsResponseSuccess = listEntityTagsResponse200 & {
+  headers: Headers;
+};
+export type listEntityTagsResponse = listEntityTagsResponseSuccess;
+
+export const getListEntityTagsUrl = (params?: ListEntityTagsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/tags?${stringifiedParams}`
+    : `/api/v1/entities/tags`;
+};
+
+export const listEntityTags = async (
+  params?: ListEntityTagsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityTagsResponse> => {
+  return customFetch<listEntityTagsResponse>(getListEntityTagsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityLabelsResponse200 = {
+  data: EntitySuggestionResponse;
+  status: 200;
+};
+
+export type listEntityLabelsResponseSuccess = listEntityLabelsResponse200 & {
+  headers: Headers;
+};
+export type listEntityLabelsResponse = listEntityLabelsResponseSuccess;
+
+export const getListEntityLabelsUrl = (params?: ListEntityLabelsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/labels?${stringifiedParams}`
+    : `/api/v1/entities/labels`;
+};
+
+export const listEntityLabels = async (
+  params?: ListEntityLabelsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityLabelsResponse> => {
+  return customFetch<listEntityLabelsResponse>(getListEntityLabelsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityCategoriesResponse200 = {
+  data: EntitySuggestionResponse;
+  status: 200;
+};
+
+export type listEntityCategoriesResponseSuccess = listEntityCategoriesResponse200 & {
+  headers: Headers;
+};
+export type listEntityCategoriesResponse = listEntityCategoriesResponseSuccess;
+
+export const getListEntityCategoriesUrl = (params?: ListEntityCategoriesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/categories?${stringifiedParams}`
+    : `/api/v1/entities/categories`;
+};
+
+export const listEntityCategories = async (
+  params?: ListEntityCategoriesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityCategoriesResponse> => {
+  return customFetch<listEntityCategoriesResponse>(getListEntityCategoriesUrl(params), {
     ...options,
     method: 'GET',
   });
