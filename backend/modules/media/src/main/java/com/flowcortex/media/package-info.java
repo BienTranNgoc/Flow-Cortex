@@ -10,6 +10,7 @@
         displayName = "Media",
         allowedDependencies = {
                 "jobs :: api",
+                "settings :: api",
                 "shared :: web",
                 "space :: api"
         }
