@@ -22,6 +22,7 @@ import type {
   RegisterRequest,
   ResetPasswordRequest,
   SetPasswordRequest,
+  TotpLinkChallengeResponse,
 } from '@flow-cortex/api-client';
 import type { TFunction } from 'i18next';
 
@@ -46,13 +47,23 @@ export function useMeQuery() {
   });
 }
 
+/**
+ * `session`: signed in. `totp`: the password was right but the account owes a code; no token exists yet
+ * and the challenge cookie the server set lets `/login/totp` finish the sign-in.
+ */
+export type LoginOutcome = { kind: 'session' } | { kind: 'totp' };
+
 export function useLoginMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (credentials: LoginVariables) => unwrap(loginRequest(credentials)),
-    onSuccess: (data, vars) => {
-      setToken(data.accessToken ?? null, vars.rememberMe);
+    mutationFn: async (credentials: LoginVariables): Promise<LoginOutcome> => {
+      const data = await unwrap(loginRequest(credentials));
+      if (!('accessToken' in data)) {
+        return { kind: 'totp' };
+      }
+      setToken(data.accessToken ?? null, credentials.rememberMe);
       queryClient.invalidateQueries({ queryKey: ['me'] });
+      return { kind: 'session' };
     },
   });
 }
@@ -83,6 +94,9 @@ export interface OpenedLink {
   passwordSetupToken: string | null;
 }
 
+/** An opened link either signed the member in (`session`) or left a code to enter first (`totp`). */
+export type LinkOutcome = OpenedLink & { kind: 'session' | 'totp' };
+
 /**
  * Spends an emailed confirmation link; the server signs the member in for this browser session only.
  * Confirming drops the password chosen at sign-up, so the result usually asks for a new one.
@@ -99,13 +113,16 @@ export function useOpenPasswordLinkMutation() {
 function useLinkMutation(spend: (token: string) => Promise<object>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (token: string): Promise<OpenedLink> => {
+    mutationFn: async (token: string): Promise<LinkOutcome> => {
       const data = await spend(token);
       const opened = 'accessToken' in data ? (data as ConfirmEmailResponse) : null;
+      // A link that owes a code signs nobody in yet, so a token this browser holds is not the link's account.
       setToken(opened?.accessToken ?? null, false);
+      const pending = (opened ?? data) as Partial<TotpLinkChallengeResponse>;
       return {
-        passwordSetupRequired: opened?.passwordSetupRequired ?? false,
-        passwordSetupToken: opened?.passwordSetupToken ?? null,
+        kind: opened ? 'session' : 'totp',
+        passwordSetupRequired: pending.passwordSetupRequired ?? false,
+        passwordSetupToken: pending.passwordSetupToken ?? null,
       };
     },
     onSuccess: () => {

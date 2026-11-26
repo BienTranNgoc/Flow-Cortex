@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { getToken, setToken } from '@flow-cortex/api-client';
 import i18n from '../../lib/i18n';
 import { renderRoute, stubApi } from '../../test/fakeApi';
@@ -26,8 +26,14 @@ function renderSetPassword(url: Parameters<typeof renderRoute>[1]) {
     <>
       <Route path="/" element={<p>Home</p>} />
       <Route path="/login" element={<p>Login page</p>} />
+      <Route path="/login/totp" element={<CodeStep />} />
     </>,
   );
+}
+
+function CodeStep() {
+  const state = useLocation().state as { passwordSetup?: { token: string | null } } | null;
+  return <p>Code step with {state?.passwordSetup?.token ?? 'no token'}</p>;
 }
 
 const withSetupToken = { pathname: '/set-password', state: { passwordSetupToken: 'setup-1' } };
@@ -247,6 +253,24 @@ describe('SetPasswordPage', () => {
         },
       ],
     ]);
+  });
+
+  it('hands an emailed link that owes a code to the code step, signed out and with the setup token', async () => {
+    stubApi({
+      'POST /api/v1/auth/password-link': {
+        status: 202,
+        body: {
+          status: 'totp_required',
+          expiresIn: 300,
+          passwordSetupRequired: true,
+          passwordSetupToken: 'setup-3',
+        },
+      },
+    });
+    renderSetPassword('/set-password?token=link-2');
+
+    expect(await screen.findByText('Code step with setup-3')).toBeInTheDocument();
+    expect(getToken()).toBeNull();
   });
 
   it('says a spent link is no longer valid and lets the visitor ask for another', async () => {

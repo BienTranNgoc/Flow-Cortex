@@ -30,6 +30,7 @@ import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { TotpSignInPage } from './features/auth/TotpSignInPage';
 import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
 import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
@@ -102,6 +103,8 @@ export function App() {
         <Routes>
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
+            {/* Not behind RequireAuth: the sign-in it completes has no token until the code is right. */}
+            <Route path="/login/totp" element={<TotpSignInPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/confirm-email" element={<ConfirmEmailPage />} />
             {/* Not behind RequireAuth: the emailed link opens it signed out. */}

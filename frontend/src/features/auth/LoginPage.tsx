@@ -146,7 +146,11 @@ export function LoginPage() {
     }
     setEditedSinceSubmit(false);
     loginMutation.mutate(values, {
-      onSuccess: () => {
+      onSuccess: (outcome) => {
+        if (outcome.kind === 'totp') {
+          navigate('/login/totp', { state: { from: returnTo, focusHeading: true } });
+          return;
+        }
         setSubmitSucceeded(true);
       },
       onError: (error) => {

@@ -5,6 +5,7 @@ import { AuthLink } from './AuthLink';
 import { useAuthPose } from './authPose';
 import { nodiPeekState } from './nodiPeekState';
 import { resendEmailSchema } from './registerSchema';
+import type { TotpSignInState } from './TotpSignInPage';
 import {
   CONFIRMATION_LINK_INVALID,
   failureMessage,
@@ -123,10 +124,18 @@ export function ConfirmEmailPage() {
   const spend = useCallback(
     () =>
       mutate(token, {
-        onSuccess: ({ passwordSetupRequired, passwordSetupToken }) =>
-          passwordSetupRequired
-            ? navigate('/set-password', { replace: true, state: { passwordSetupToken } })
-            : navigate('/', { replace: true }),
+        onSuccess: ({ kind, passwordSetupRequired, passwordSetupToken }) => {
+          if (kind === 'totp') {
+            const state: TotpSignInState = passwordSetupRequired
+              ? { passwordSetup: { token: passwordSetupToken } }
+              : {};
+            navigate('/login/totp', { replace: true, state: { ...state, focusHeading: true } });
+          } else if (passwordSetupRequired) {
+            navigate('/set-password', { replace: true, state: { passwordSetupToken } });
+          } else {
+            navigate('/', { replace: true });
+          }
+        },
       }),
     [token, mutate, navigate],
   );
