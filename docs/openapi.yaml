@@ -2554,6 +2554,79 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyInvalid"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/batches:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: createBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBatchRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflow-examples/{exampleId}/workflows:
     post:
       tags:
@@ -5359,6 +5432,154 @@ paths:
           description: Not application/json
         "429":
           description: More than 30 requests in a minute; Retry-After gives the wait
+  /api/v1/batches/{id}/retry:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: retryBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/resume:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: resumeBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/pause:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: pauseBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/cancel:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: cancelBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -10192,6 +10413,122 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/batches:
+    get:
+      tags:
+      - batch-runs-controller
+      operationId: listBatches
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewBatchResponse"
+  /api/v1/batches/{id}:
+    get:
+      tags:
+      - batch-runs-controller
+      operationId: getBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/rows:
+    get:
+      tags:
+      - batch-runs-controller
+      operationId: listBatchRows
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - failed
+          - cancelled
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 10737418
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewBatchRowResponse"
   /api/v1/auth/profile/preferences:
     get:
       tags:
@@ -13745,6 +14082,114 @@ components:
           type: string
           maxLength: 200
           minLength: 0
+    CreateBatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 0
+        content:
+          type: string
+          maxLength: 2000000
+          minLength: 0
+        rows:
+          type: array
+          items:
+            type: string
+            maxLength: 10000
+            minLength: 0
+          maxItems: 500
+          minItems: 0
+        format:
+          type: string
+          enum:
+          - csv
+          - json
+          - jsonl
+        skipFirstLine:
+          type: boolean
+        concurrency:
+          type: integer
+          format: int32
+        acknowledgeCost:
+          type: boolean
+    BatchResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - running
+          - paused
+          - completed
+          - completed_with_errors
+          - cancelled
+        concurrency:
+          type: integer
+          format: int32
+        totalRows:
+          type: integer
+          format: int32
+        pendingRows:
+          type: integer
+          format: int64
+        runningRows:
+          type: integer
+          format: int64
+        completedRows:
+          type: integer
+          format: int64
+        failedRows:
+          type: integer
+          format: int64
+        cancelledRows:
+          type: integer
+          format: int64
+        pauseReason:
+          type: string
+          enum:
+          - member
+          - insufficientCredits
+          - unavailable
+        cancelReason:
+          type: string
+          enum:
+          - member
+          - workflowUnavailable
+          - ownerInactive
+        parentBatchId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - cancelledRows
+      - completedRows
+      - concurrency
+      - createdAt
+      - failedRows
+      - id
+      - pendingRows
+      - runningRows
+      - status
+      - totalRows
+      - workflowId
+      - workflowName
     CreateUserRequest:
       type: object
       properties:
@@ -18842,6 +19287,84 @@ components:
       - at
       - code
       - kind
+    PageViewBatchResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    BatchRowResponse:
+      type: object
+      properties:
+        rowIndex:
+          type: integer
+          format: int32
+        sourceRowIndex:
+          type: integer
+          format: int32
+        input:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - failed
+          - cancelled
+        runId:
+          type: string
+          format: uuid
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - input
+      - rowIndex
+      - status
+    PageViewBatchRowResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchRowResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
     PreferencesView:
       type: object
       properties:
