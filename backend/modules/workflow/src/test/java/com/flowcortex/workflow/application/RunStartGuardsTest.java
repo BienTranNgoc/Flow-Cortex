@@ -61,6 +61,26 @@ class RunStartGuardsTest {
         }
     }
 
+    @Order(0)
+    private final class Readiness extends WorkflowReadinessGuard {
+        @Override
+        public void check(UUID ownerId, UUID workflowId, List<StepDef> steps, StartContext context) {
+            calls.add("readiness " + ownerId.equals(OWNER) + " " + workflowId.equals(WORKFLOW) + " " + steps + " "
+                    + context.acknowledgeCost());
+        }
+    }
+
+    @Test
+    void checkReadinessRunsOnlyTheReadinessGuard() {
+        RunStartGuards guards = new RunStartGuards(List.of(new Second(), new First(true), new Readiness()));
+
+        guards.checkReadiness(OWNER, WORKFLOW, STEPS);
+
+        assertThat(calls).containsExactly(
+                "readiness true true [StepDef[order=1, name=Say hello, type=echo, config=null, inputRef=null], "
+                        + "StepDef[order=2, name=Shout, type=echo, config=null, inputRef={step:1.value}]] false");
+    }
+
     @Test
     void guardsRunInOrderAndTheFirstRefusalStopsTheRest() {
         RunStartGuards passing = new RunStartGuards(List.of(new Second(), new First(false)));

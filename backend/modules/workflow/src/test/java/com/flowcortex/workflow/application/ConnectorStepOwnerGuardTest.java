@@ -42,6 +42,10 @@ class ConnectorStepOwnerGuardTest {
         return new StepDef(order, "Call", "connector.call", CONNECTOR_CONFIG, null);
     }
 
+    private static StepDef driveRead(int order) {
+        return new StepDef(order, "Read", "drive.read", "{\"folderFromInput\":true}", null);
+    }
+
     private void workflowOwnedBy(UUID owner) {
         when(workflows.findById(WORKFLOW)).thenReturn(Optional.of(new Workflow(WORKFLOW, owner, "probe", true)));
     }
@@ -62,9 +66,40 @@ class ConnectorStepOwnerGuardTest {
     void onlyTheOwnerMayAuthorAConnectorStepAndTheStartRuleFollowsIt() {
         assertThat(ConnectorStepOwnerGuard.mayAuthor(AUTHOR, AUTHOR)).isTrue();
         assertThat(ConnectorStepOwnerGuard.mayAuthor(OTHER, AUTHOR)).isFalse();
-        assertThat(ConnectorStepOwnerGuard.isConnectorCall("connector.call")).isTrue();
-        assertThat(ConnectorStepOwnerGuard.isConnectorCall("echo")).isFalse();
-        assertThat(ConnectorStepOwnerGuard.isConnectorCall(null)).isFalse();
+    }
+
+    @Test
+    void aStepReadsAMemberConnectorWhenItIsAConnectorCallOrADriveRead() {
+        assertThat(ConnectorStepOwnerGuard.readsMemberConnector("connector.call")).isTrue();
+        assertThat(ConnectorStepOwnerGuard.readsMemberConnector("drive.read")).isTrue();
+        assertThat(ConnectorStepOwnerGuard.readsMemberConnector("echo")).isFalse();
+        assertThat(ConnectorStepOwnerGuard.readsMemberConnector("translate")).isFalse();
+        assertThat(ConnectorStepOwnerGuard.readsMemberConnector(null)).isFalse();
+    }
+
+    @Test
+    void aDriveReadStepIsRefusedWhenTheStarterIsNotTheOwner() {
+        assertThat(ConnectorStepOwnerGuard.firstRefusedStep(OTHER, AUTHOR, List.of(echo(1), driveRead(2)))).contains(2);
+        assertThat(ConnectorStepOwnerGuard.firstRefusedStep(OTHER, AUTHOR, List.of(driveRead(1), connector(2))))
+                .contains(1);
+    }
+
+    @Test
+    void theOwnerIsNeverRefusedForADriveReadStep() {
+        assertThat(ConnectorStepOwnerGuard.firstRefusedStep(AUTHOR, AUTHOR, List.of(echo(1), driveRead(2)))).isEmpty();
+    }
+
+    @Test
+    void anotherMemberStartingADriveReadWorkflowIsRefusedNamingTheStep() {
+        workflowOwnedBy(AUTHOR);
+
+        assertThatThrownBy(() -> guard.check(OTHER, WORKFLOW, List.of(driveRead(1)), CONTEXT))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("CONNECTOR_STEP_NOT_OWNER");
+                    assertThat(englishErrors(e)).containsOnlyKeys("step1");
+                });
+        assertThatCode(() -> guard.check(AUTHOR, WORKFLOW, List.of(driveRead(1)), CONTEXT))
+                .doesNotThrowAnyException();
     }
 
     @Test
