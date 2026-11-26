@@ -407,6 +407,27 @@ flowcortex:
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:
     sender: ${FLOWCORTEX_SMS_SENDER:}
+    # "vietguys" selects the VietGuys SMS Brandname sender below and refuses startup unless the
+    # username, brandname, refresh-token seed, keyring and all three templates are set. The templates
+    # must match the texts registered for the brandname; the carrier refuses any other text. Both
+    # URLs leave through the egress proxy, which must allow their hosts.
+    vietguys:
+      sms-url: ${FLOWCORTEX_VIETGUYS_SMS_URL:https://cloudsms4.vietguys.biz:4438/api/index.php}
+      token-url: ${FLOWCORTEX_VIETGUYS_TOKEN_URL:https://api-v2.vietguys.biz:4438/token/v1/refresh}
+      username: ${FLOWCORTEX_VIETGUYS_SMS_USERNAME:}
+      brandname: ${FLOWCORTEX_VIETGUYS_SMS_BRANDNAME:}
+      refresh-token: ${FLOWCORTEX_VIETGUYS_SMS_REFRESH_TOKEN:}
+      # Keyring for the stored tokens: base64 of 32 random bytes per key id. k2 is the rotation slot.
+      keys:
+        k1: ${FLOWCORTEX_SMS_CREDENTIAL_KEYS_K1:}
+        k2: ${FLOWCORTEX_SMS_CREDENTIAL_KEYS_K2:}
+      current-key-id: ${FLOWCORTEX_SMS_CREDENTIAL_CURRENT_KEY_ID:k1}
+      templates:
+        otp: ${FLOWCORTEX_VIETGUYS_TEMPLATE_OTP:}
+        phone-changed: ${FLOWCORTEX_VIETGUYS_TEMPLATE_PHONE_CHANGED:}
+        phone-change-reverted: ${FLOWCORTEX_VIETGUYS_TEMPLATE_PHONE_CHANGE_REVERTED:}
+      connect-timeout: 5s
+      read-timeout: 10s
   # Personal spaces: off means the session space answers 503; spaces are still provisioned at activation.
   spaces:
     enabled: ${FLOWCORTEX_SPACES_ENABLED:false}

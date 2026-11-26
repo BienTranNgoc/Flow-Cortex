@@ -3644,6 +3644,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/change/verify:
     post:
       tags:
@@ -3724,6 +3730,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
           content:
             application/problem+json:
               schema:
@@ -15684,7 +15696,18 @@ components:
           type: integer
           format: int64
           description: Codes sent in the last 24 hours
+        carrierCredential:
+          type: string
+          description: none when the wired sender holds no carrier credential; reseed_required
+            when its token chain was revoked and needs a new token; unseeded when
+            no token was loaded yet. The token is never returned
+          enum:
+          - none
+          - active
+          - reseed_required
+          - unseeded
       required:
+      - carrierCredential
       - gateEnabled
       - globalSendsPerDay
       - hashSecretConfigured
