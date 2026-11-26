@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useModalDialog } from './useModalDialog';
+import { useModalDialog } from '../../lib/useModalDialog';
 
 export const RUN_TITLE_MAX = 120;
 

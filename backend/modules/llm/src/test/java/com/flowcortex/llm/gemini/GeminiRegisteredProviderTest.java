@@ -97,11 +97,11 @@ class GeminiRegisteredProviderTest {
                 .version(HttpClient.Version.HTTP_1_1).build();
         var rest = GeminiAttempts.restClient(http, readTimeout);
         LlmClient client = new GeminiLlmClient(properties, rest, new SimpleMeterRegistry());
-        Slot slot = new Slot(List.of("gemini-3.5-flash-lite", "gemini-3.8-flash"), 1, List.of(),
+        Slot slot = Slot.of(List.of("gemini-3.5-flash-lite", "gemini-3.8-flash"), 1, List.of(),
                 Duration.ofSeconds(5));
-        Slot speech = new Slot(List.of("gemini-3.8-flash-tts"), 1, List.of(), Duration.ofSeconds(5));
+        Slot speech = Slot.of(List.of("gemini-3.8-flash-tts"), 1, List.of(), Duration.ofSeconds(5));
         return new GeminiRegisteredProvider(properties,
-                new GeminiSlotProperties(Map.of("dub-translate", slot, "dub-speech", speech)), rest, client);
+                GeminiSlotProperties.of(Map.of("dub-translate", slot, "dub-speech", speech)), rest, client);
     }
 
     @Test

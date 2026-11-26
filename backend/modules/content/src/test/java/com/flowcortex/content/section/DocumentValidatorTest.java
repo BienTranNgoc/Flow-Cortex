@@ -97,6 +97,21 @@ class DocumentValidatorTest {
         assertThat(validate(RICH_ONLY, items, okSeo())).isEmpty();
     }
 
+    private static final ContentDocumentDefinition SINGLE = new ContentDocumentDefinition(
+            "single", new LocalizedText("Một mục", "Single"), List.of("richText"), false, 1, 1);
+
+    @Test
+    void refusesMoreSectionsThanTheDefinitionAllowsNamingSections() {
+        List<FieldError> errors = validate(SINGLE, sections(richText("a", "b"), richText("c", "d")), okSeo());
+
+        assertThat(errors).containsExactly(new FieldError("sections", FieldError.TOO_MANY));
+    }
+
+    @Test
+    void acceptsExactlyTheDefinitionMaximum() {
+        assertThat(validate(SINGLE, sections(richText("a", "b")), okSeo())).isEmpty();
+    }
+
     @Test
     void refuses101Sections() {
         ArrayNode items = JSON.createArrayNode();

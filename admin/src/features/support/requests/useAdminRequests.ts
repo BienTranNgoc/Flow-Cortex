@@ -4,6 +4,7 @@ import {
   bulkAssignAdminSupportRequests,
   getAdminSupportRequest,
   getAdminSupportRequestFacets,
+  getAdminSupportSlaSummary,
   listAdminSupportRequests,
   replyToAdminSupportRequest,
   setAdminSupportRequestStatus,
@@ -12,6 +13,7 @@ import {
   type AdminSupportRequestStatusChangeStatus,
   type ListAdminSupportRequestsCreated,
   type ListAdminSupportRequestsParams,
+  type ListAdminSupportRequestsSla,
   type ListAdminSupportRequestsSort,
   type ListAdminSupportRequestsStatus,
   type ListAdminSupportRequestsType,
@@ -41,6 +43,8 @@ export interface RequestFilter {
   assignee?: string | undefined;
   created?: ListAdminSupportRequestsCreated | undefined;
   q?: string | undefined;
+  /** `at_risk` keeps only overdue and due-soon rows. */
+  sla?: ListAdminSupportRequestsSla | undefined;
   sort?: ListAdminSupportRequestsSort | undefined;
   page: number;
 }
@@ -64,12 +68,25 @@ export function useRequestsQuery(filter: RequestFilter) {
 
 /** Counts per status, type, created bucket and assignee, each ignoring its own selection. */
 export function useRequestFacets(filter: RequestFilter) {
-  const { page: _page, sort: _sort, ...rest } = filter;
+  const { page: _page, sort: _sort, sla: _sla, ...rest } = filter;
   const params = definedOnly(rest);
   return useQuery({
     queryKey: [...REQUESTS_KEY, 'facets', params],
     queryFn: () => unwrapSupport(getAdminSupportRequestFacets(params, authHeaders())),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Overdue and due-soon counts under the inbox filters. The `sla` choice, sort and page are left
+ * out, so the counts stay put while the admin narrows the list to at-risk rows.
+ */
+export function useSlaSummary(filter: RequestFilter) {
+  const { page: _page, sort: _sort, sla: _sla, ...rest } = filter;
+  const params = definedOnly(rest);
+  return useQuery({
+    queryKey: [...REQUESTS_KEY, 'sla-summary', params],
+    queryFn: () => unwrapSupport(getAdminSupportSlaSummary(params, authHeaders())),
   });
 }
 

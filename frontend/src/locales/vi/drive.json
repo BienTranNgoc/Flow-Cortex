@@ -1,0 +1,63 @@
+{
+  "page": {
+    "title": "Drive"
+  },
+  "tabs": {
+    "label": "Các mục của Drive",
+    "items": "Mục đã lưu",
+    "memory": "Bộ nhớ"
+  },
+  "gate": {
+    "loading": "Đang tải Drive…"
+  },
+  "roles": {
+    "brand_voice_text": "Giọng thương hiệu",
+    "company_bio": "Giới thiệu công ty",
+    "audience_note": "Ghi chú về khán giả",
+    "logo": "Logo",
+    "product_photo": "Ảnh sản phẩm",
+    "reference_face": "Khuôn mặt tham chiếu",
+    "persona_image": "Ảnh nhân vật",
+    "image_asset": "Ảnh",
+    "driver_video": "Video dẫn động",
+    "video_asset": "Video",
+    "audio_asset": "Âm thanh"
+  },
+  "sources": {
+    "text": "Viết tại đây",
+    "upload": "Tải lên",
+    "run_output": "Từ lần chạy"
+  },
+  "notice": {
+    "title": "Kết quả trước đây của bạn đã nằm trong Drive",
+    "body": "Chúng tôi đã chuyển {{runs}} và {{results}} từ các lần làm việc trước vào Drive của bạn.",
+    "bodyNoCounts": "Các kết quả trước đây của bạn đã được chuyển vào Drive.",
+    "runs_one": "{{n}} lần chạy",
+    "runs_other": "{{n}} lần chạy",
+    "results_one": "{{n}} kết quả",
+    "results_other": "{{n}} kết quả",
+    "dismiss": "Đã hiểu"
+  },
+  "confirm": {
+    "cancel": "Hủy"
+  },
+  "preview": {
+    "close": "Đóng bản xem trước",
+    "empty": "Mục này không có nội dung để hiển thị."
+  },
+  "media": {
+    "unavailable": "Tệp này hiện không khả dụng."
+  },
+  "pagination": {
+    "label": "Phân trang",
+    "previous": "Trang trước",
+    "next": "Trang sau",
+    "page": "Trang {{page}}",
+    "sizeLabel": "Số mục mỗi trang"
+  },
+  "status": {
+    "loading": "Đang tải…",
+    "failed": "Đã xảy ra lỗi. Hãy thử lại.",
+    "retry": "Thử lại"
+  }
+}

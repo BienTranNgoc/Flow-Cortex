@@ -1,18 +1,19 @@
 package com.flowcortex.support.assistant;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.flowcortex.llm.api.AnswerText;
 import com.flowcortex.llm.api.LlmJsonResult;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.assistant.ConversationStore.StoredConversation;
 import com.flowcortex.support.assistant.ConversationStore.StoredMessage;
 import com.flowcortex.support.config.AssistantSwitch;
-import com.flowcortex.support.config.SupportProperties;
 import com.flowcortex.support.kb.KnowledgeBaseService.ScoredArticle;
 import com.flowcortex.support.web.SupportProblemException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,15 +41,16 @@ import tools.jackson.databind.json.JsonMapper;
 class AssistantService {
 
     static final int MAX_QUESTION_CHARS = 1000;
-    /** Stored as the reply text; the member app shows these two outcomes from its own copy instead. */
+    /** Stored as the reply text; the member app shows these outcomes from its own copy instead. */
     static final String NO_ANSWER = "Mình chưa có câu trả lời cho câu hỏi này";
     static final String REFUSAL = "Mình không thể trả lời câu hỏi này";
+    static final String HANDOFF_TEXT = "Câu hỏi này cần đội ngũ hỗ trợ xử lý";
+    static final String SIGN_IN_TEXT = "Bạn cần đăng nhập để tạo nội dung";
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Logger LOG = LoggerFactory.getLogger(AssistantService.class);
 
     private final AssistantSwitch assistantSwitch;
-    private final String model;
     private final ConversationStore conversations;
     private final QuotaService quotas;
     private final MinuteLimiter minuteLimiter;
@@ -57,11 +59,10 @@ class AssistantService {
     private final AssistantTelemetry telemetry;
     private final Clock clock;
 
-    AssistantService(AssistantSwitch assistantSwitch, SupportProperties properties, ConversationStore conversations,
-            QuotaService quotas, MinuteLimiter minuteLimiter, Retriever retriever, LlmDeadline llm,
-            AssistantTelemetry telemetry, Clock clock) {
+    AssistantService(AssistantSwitch assistantSwitch, ConversationStore conversations, QuotaService quotas,
+            MinuteLimiter minuteLimiter, Retriever retriever, LlmDeadline llm, AssistantTelemetry telemetry,
+            Clock clock) {
         this.assistantSwitch = assistantSwitch;
-        this.model = properties.assistant().model();
         this.conversations = conversations;
         this.quotas = quotas;
         this.minuteLimiter = minuteLimiter;
@@ -77,13 +78,26 @@ class AssistantService {
             @Schema(requiredMode = RequiredMode.REQUIRED) String title) {
     }
 
+    /**
+     * A sensitive question sent to the support team. A member's carries the drafted request; a guest's the
+     * topic only. The topic is null when a stored handoff no longer matches any phrase set.
+     */
+    @Schema(name = "SupportAssistantHandoff")
+    record Handoff(
+            @Schema(nullable = true, requiredMode = RequiredMode.REQUIRED,
+                    allowableValues = {"money", "security", "personal_data", "legal", "violation"}) String topic,
+            @JsonInclude(JsonInclude.Include.NON_NULL) String subject,
+            @JsonInclude(JsonInclude.Include.NON_NULL) String description) {
+    }
+
     @Schema(name = "SupportAssistantReplyMessage")
     record ReplyMessage(
             @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = "assistant") String role,
             @Schema(requiredMode = RequiredMode.REQUIRED) String text,
-            @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"answered", "no_answer", "blocked"})
-            String outcome,
-            @Schema(requiredMode = RequiredMode.REQUIRED) List<Source> sources) {
+            @Schema(requiredMode = RequiredMode.REQUIRED,
+                    allowableValues = {"answered", "no_answer", "blocked", "handoff", "sign_in"}) String outcome,
+            @Schema(requiredMode = RequiredMode.REQUIRED) List<Source> sources,
+            @JsonInclude(JsonInclude.Include.NON_NULL) Handoff handoff) {
     }
 
     @Schema(name = "SupportAssistantQuota")
@@ -103,8 +117,9 @@ class AssistantService {
     record HistoryMessage(
             @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"user", "assistant"}) String role,
             @Schema(requiredMode = RequiredMode.REQUIRED) String text,
-            @Schema(allowableValues = {"answered", "no_answer", "blocked"}) String outcome,
+            @Schema(allowableValues = {"answered", "no_answer", "blocked", "handoff", "sign_in"}) String outcome,
             @Schema(requiredMode = RequiredMode.REQUIRED) List<Source> sources,
+            @JsonInclude(JsonInclude.Include.NON_NULL) Handoff handoff,
             @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt) {
     }
 
@@ -114,7 +129,11 @@ class AssistantService {
             @Schema(requiredMode = RequiredMode.REQUIRED) List<HistoryMessage> messages) {
     }
 
-    record Answer(String outcome, String text, List<ScoredArticle> sources) {
+    record Answer(String outcome, String text, List<ScoredArticle> sources, Handoff handoff) {
+
+        Answer(String outcome, String text, List<ScoredArticle> sources) {
+            this(outcome, text, sources, null);
+        }
     }
 
     AssistantReply ask(Asker asker, UUID conversationId, String rawQuestion, Locale locale) {
@@ -140,9 +159,22 @@ class AssistantService {
         }
         limitPerMinute(() -> minuteLimiter.acquire(asker.subjectKey()), question, started);
         Instant askedAt = clock.instant();
+        Optional<TopicGuard.Topic> topic = TopicGuard.topic(question);
+        if (topic.isPresent()) {
+            Handoff handoff = handoff(asker, conversationId, question, topic.get(), locale);
+            AssistantReply reply = unchargedForMemberReply(asker, conversationId, question, askedAt,
+                    new Answer("handoff", HANDOFF_TEXT, List.of(), handoff), started);
+            telemetry.handoff(topic.get());
+            return reply;
+        }
+        if (asker instanceof Asker.Guest && SpendIntent.isSpendRequest(question)) {
+            return unchargedForMemberReply(asker, conversationId, question, askedAt,
+                    new Answer("sign_in", SIGN_IN_TEXT, List.of()), started);
+        }
         List<ScoredArticle> articles = retriever.retrieve(question);
         if (articles.isEmpty()) {
-            return noArticleReply(asker, conversationId, question, askedAt, started);
+            return unchargedForMemberReply(asker, conversationId, question, askedAt,
+                    new Answer("no_answer", NO_ANSWER, List.of()), started);
         }
         QuotaService.Charge charge;
         try {
@@ -169,15 +201,15 @@ class AssistantService {
     }
 
     /**
-     * No article matched, so no provider call. A guest still spends from the guest quotas (the write and
-     * the retrieval are what an abuser would repeat for free); a member is not charged.
+     * A reply that needs no provider call: no article matched, a sensitive topic or a guest's spend request. A
+     * guest still spends from the guest quotas (the write and the retrieval are what an abuser would repeat for
+     * free); a member is not charged.
      */
-    private AssistantReply noArticleReply(Asker asker, UUID conversationId, String question, Instant askedAt,
-            long started) {
-        Answer none = new Answer("no_answer", NO_ANSWER, List.of());
+    private AssistantReply unchargedForMemberReply(Asker asker, UUID conversationId, String question,
+            Instant askedAt, Answer answer, long started) {
         if (!(asker instanceof Asker.Guest)) {
             QuotaService.Remaining left = quotas.peek(asker);
-            return reply(asker, conversationId, question, askedAt, none,
+            return reply(asker, conversationId, question, askedAt, answer,
                     new QuotaView(left.remaining(), left.resetsAt()), started);
         }
         QuotaService.Charge charge;
@@ -188,7 +220,7 @@ class AssistantService {
             throw e;
         }
         try {
-            return reply(asker, conversationId, question, askedAt, none,
+            return reply(asker, conversationId, question, askedAt, answer,
                     new QuotaView(charge.remaining(), QuotaService.resetsAt(charge.day())), started);
         } catch (RuntimeException e) {
             refund(charge, e);
@@ -196,11 +228,27 @@ class AssistantService {
         }
     }
 
+    /** A member's handoff carries the draft of their own words; a guest cannot file a request, so only the topic. */
+    private Handoff handoff(Asker asker, UUID conversationId, String question, TopicGuard.Topic topic,
+            Locale locale) {
+        if (asker instanceof Asker.Guest) {
+            return new Handoff(topic.value(), null, null);
+        }
+        List<String> messages = new ArrayList<>(conversations.userMessages(conversationId, HandoffDraft.WINDOW));
+        messages.add(question);
+        return memberHandoff(topic.value(), messages, locale);
+    }
+
+    private static Handoff memberHandoff(String topic, List<String> userMessages, Locale locale) {
+        HandoffDraft.Draft draft = HandoffDraft.build(userMessages, locale);
+        return new Handoff(topic, draft.subject().orElse(null), draft.description());
+    }
+
     private AssistantReply answerCharged(Asker asker, UUID conversationId, String question, Instant askedAt,
             List<ScoredArticle> articles, Locale locale, QuotaService.Charge charge, long started) {
-        LlmJsonResult result = llm.call(PromptBuilder.request(model, question, articles, locale));
+        LlmJsonResult result = llm.call(PromptBuilder.request(question, articles, locale));
         Optional<Answer> answer = answer(result, articles);
-        telemetry.provider(model, result, answer.map(a -> a.sources().size()).orElse(0));
+        telemetry.provider(AssistantSlot.NAME, result, answer.map(a -> a.sources().size()).orElse(0));
         if (answer.isEmpty()) {
             telemetry.record("unavailable", 0, length(question), started);
             throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-unavailable",
@@ -219,8 +267,8 @@ class AssistantService {
         }
     }
 
-    Optional<ConversationView> latest(Asker asker) {
-        return conversations.latest(asker).map(this::view);
+    Optional<ConversationView> latest(Asker asker, Locale locale) {
+        return conversations.latest(asker).map(conversation -> view(conversation, asker, locale));
     }
 
     static SupportProblemException conversationNotFound() {
@@ -286,19 +334,38 @@ class AssistantService {
                 new StoredMessage("assistant", answer.text(), answer.outcome(), slugs, clock.instant()));
         telemetry.record(answer.outcome(), slugs.size(), length(question), started);
         List<Source> sources = answer.sources().stream().map(a -> new Source(a.slug(), a.title())).toList();
-        return new AssistantReply(id, new ReplyMessage("assistant", answer.text(), answer.outcome(), sources), quota);
+        return new AssistantReply(id,
+                new ReplyMessage("assistant", answer.text(), answer.outcome(), sources, answer.handoff()), quota);
     }
 
-    private ConversationView view(StoredConversation conversation) {
+    /**
+     * The topic is not stored: each handoff is rebuilt from its stored question with the same rules the live
+     * reply used, and a member's draft from the user messages up to it. A topic no phrase set matches any more
+     * stays a handoff with a null topic.
+     */
+    private ConversationView view(StoredConversation conversation, Asker asker, Locale locale) {
         Set<String> slugs = new HashSet<>();
         conversation.messages().forEach(message -> slugs.addAll(message.citedSlugs()));
         Map<String, String> titles = conversations.publishedTitles(slugs);
-        List<HistoryMessage> messages = conversation.messages().stream()
-                .map(message -> new HistoryMessage(message.role(), message.text(), message.outcome(),
-                        message.citedSlugs().stream().filter(titles::containsKey)
-                                .map(slug -> new Source(slug, titles.get(slug))).toList(),
-                        message.createdAt()))
-                .toList();
+        List<String> userMessages = new ArrayList<>();
+        List<HistoryMessage> messages = new ArrayList<>();
+        for (StoredMessage message : conversation.messages()) {
+            if ("user".equals(message.role())) {
+                userMessages.add(message.text());
+            }
+            Handoff handoff = "handoff".equals(message.outcome()) ? storedHandoff(asker, userMessages, locale) : null;
+            messages.add(new HistoryMessage(message.role(), message.text(), message.outcome(),
+                    message.citedSlugs().stream().filter(titles::containsKey)
+                            .map(slug -> new Source(slug, titles.get(slug))).toList(),
+                    handoff, message.createdAt()));
+        }
         return new ConversationView(conversation.id(), messages);
+    }
+
+    private static Handoff storedHandoff(Asker asker, List<String> userMessages, Locale locale) {
+        String question = userMessages.isEmpty() ? "" : userMessages.getLast();
+        String topic = TopicGuard.topic(question).map(TopicGuard.Topic::value).orElse(null);
+        return asker instanceof Asker.Guest ? new Handoff(topic, null, null)
+                : memberHandoff(topic, userMessages, locale);
     }
 }

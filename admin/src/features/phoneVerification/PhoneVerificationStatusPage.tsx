@@ -17,6 +17,13 @@ interface StatusRow {
   readonly tone?: StatusTone;
 }
 
+const CREDENTIAL_TONES: Record<AdminPhoneVerificationStatus['carrierCredential'], StatusTone> = {
+  none: 'muted',
+  active: 'success',
+  reseed_required: 'warning',
+  unseeded: 'warning',
+};
+
 function switchRow(id: string, label: string, on: boolean, t: TFunction): StatusRow {
   return {
     id,
@@ -28,7 +35,7 @@ function switchRow(id: string, label: string, on: boolean, t: TFunction): Status
 
 function rowsOf(status: AdminPhoneVerificationStatus, locale: Locale, t: TFunction) {
   const noSender = status.smsSender === 'none';
-  const known = ['none', 'outbox', 'custom'].includes(status.smsSender);
+  const known = ['none', 'outbox', 'vietguys', 'custom'].includes(status.smsSender);
   const sender = known ? t(`phoneVerification.sender.${status.smsSender}`) : status.smsSender;
   return [
     switchRow('verification', t('phoneVerification.fields.verification'), status.verificationEnabled, t),
@@ -58,6 +65,12 @@ function rowsOf(status: AdminPhoneVerificationStatus, locale: Locale, t: TFuncti
       id: 'sentLast24h',
       label: t('phoneVerification.fields.sentLast24h'),
       value: formatNumber(status.sentLast24h, locale),
+    },
+    {
+      id: 'carrierCredential',
+      label: t('phoneVerification.fields.carrierCredential'),
+      value: t(`phoneVerification.carrierCredential.${status.carrierCredential}`),
+      tone: CREDENTIAL_TONES[status.carrierCredential],
     },
   ] satisfies StatusRow[];
 }
