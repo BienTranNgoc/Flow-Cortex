@@ -27,9 +27,6 @@ export function StopRunDialog({ pending, error, onConfirm, onClose }: StopRunDia
       className="cortex-admin-account-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <form className="cortex-admin-stop-dialog__body" onSubmit={submit} noValidate>
         <h2 id={titleId}>{t('runs.stop.title')}</h2>

@@ -106,6 +106,20 @@ describe('RunDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Stop run' })).toBeInTheDocument();
   });
 
+  it('keeps the confirmation open when the backdrop is clicked', async () => {
+    const calls = stubApi({
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [RUN_PATH]: { status: 200, body: run() },
+    });
+    render();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Stop run' }));
+    await userEvent.click(await screen.findByRole('dialog'));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
   it('keeps the dialog open with the server message when the run finished meanwhile', async () => {
     let current = run();
     stubApi({
