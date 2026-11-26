@@ -1,0 +1,113 @@
+/* History page. Colours come from styles/tokens.css only; rows, buttons and dialogs reuse chat.css. */
+
+.chat-history {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 56rem;
+  margin: 0 auto;
+  color: var(--ink);
+}
+
+.chat-history__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.chat-history h1,
+.chat-history__folder h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.chat-history__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.chat-history__search {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.chat-history__input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.chat-history__sort {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-history__count {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  color: var(--ink-4);
+}
+
+.chat-history__folder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.chat-history__folder h2 {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-history__folder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chat-foldercards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-foldercard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line-3);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.chat-foldercard__open {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.chat-foldercard__count {
+  font-size: 0.85rem;
+  color: var(--ink-4);
+}
+
+.chat-foldercard__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
