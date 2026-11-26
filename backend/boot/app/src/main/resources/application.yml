@@ -396,6 +396,11 @@ flowcortex:
   # (staff and super admins excepted). Needs phone verification on, or startup fails; env + restart.
   phone-gate:
     enabled: ${FLOWCORTEX_PHONE_GATE_ENABLED:false}
+  # Member account deletion: both values are runtime settings changed in the console Settings page;
+  # `enabled: false` here vetoes the switch whatever is stored, empty leaves it to the console.
+  account-deletion:
+    enabled: ${FLOWCORTEX_ACCOUNT_DELETION_ENABLED:}
+    grace-period-days: ${FLOWCORTEX_ACCOUNT_DELETION_GRACE_PERIOD_DAYS:30}
   # HMAC key for phone_send_attempt.phone_hash; at least 32 bytes when phone verification is on.
   phone:
     hash-secret: ${FLOWCORTEX_PHONE_HASH_SECRET:}

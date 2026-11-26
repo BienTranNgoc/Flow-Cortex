@@ -967,6 +967,77 @@ Number provisional until merge; see `openspec/changes/identity-step-up-pat`.
 
 ---
 
+## ADR-0029 — A member's account deletion is a request with a grace deadline
+
+- **Context:** A member can ask to leave, but erasing an account is
+  irreversible and must wait for a recovery window. Access tokens are
+  stateless and live 15 minutes, so ending sessions does not end a token
+  already issued. Other modules own the data that decides whether an account
+  may leave (running workflows, open Help Center requests), and Spring
+  Modulith forbids reading their tables from the user module. Nothing erases
+  data at the deadline yet, so the feature has to ship switched off.
+- **Decision:**
+  - **One request row plus a projection.** `account_deletion_request` records
+    each request (`pending` or `cancelled`); a partial unique index allows one
+    pending row per user, and the row carries no foreign key to the user so an
+    administrator's hard delete keeps the record. `app_user` gains
+    `deletion_requested_at` and `deletion_scheduled_at`, both set or both null
+    by a database check, and the request, the projection and the revocation of
+    every refresh session commit in one transaction.
+  - **State is derived, never stored.** `NONE` when nothing is requested,
+    `PENDING` while now is strictly before the deadline, `EXPIRED` at the
+    deadline or later, or when the deadline is missing. Every reader
+    (the gate, the status route, the session endpoint, cancel) calls the same
+    comparison with the injected clock, so the deadline never depends on a job
+    having run.
+  - **A gate beside the phone gate.** One interceptor on `/api/v1/**` reads
+    the projection from `app_user` by primary key on every request, never from
+    the access token, and refuses everything except an explicit list: the
+    session endpoint, sign-out, the public credential routes (listed one by
+    one, not by prefix), the deletion routes themselves, the features list and
+    client-error reports. It runs after the admin and token-route checks and
+    before the phone gate, so a pending account is told about its deletion
+    first. Sign-in is unchanged: a pending account signs in with its normal
+    credentials, lands on its wall and may cancel; suspension still wins.
+  - **Cancel up to the deadline only.** Cancel is a conditional update on a
+    pending row whose deadline is still ahead; the same comparison decides
+    whether a refusal is "expired" or "nothing pending".
+  - **Blockers are contributed through an SPI.** The user module owns
+    `AccountDeletionBlocker`; each module implements it for the data it owns
+    and the user module never reads their tables. Keys are unique and shaped
+    `module.condition`, validated at startup. Operators edit each condition's
+    switch, order and text in `deletion_block_condition`; a disabled condition
+    is not evaluated, which is the escape hatch for an account stuck behind
+    activity it cannot end. A blocker that fails to read answers "unavailable"
+    (503), never a partial list or "eligible".
+  - **Guards at request time.** The feature switch and the grace period
+    (1 to 365 days, default 30) are runtime settings; the switch is off by
+    default. Only roles positively known to be end-user roles may request;
+    staff and administrator accounts are removed by an administrator. A
+    request spends a step-up proof for a dedicated purpose, checked after the
+    cheap refusals and after the answer for an account that already has a
+    request.
+  - **Erasure is not here.** Deleting the account's data at the deadline
+    belongs to the finalizer change; this change stops at a request that can
+    be made, shown, blocked and cancelled.
+- **Consequences:**
+  - The finalizer and recovery changes extend the same rows: the `state` check
+    widens in their own migration, and nothing is migrated.
+  - **A later feature that starts background work for a member** (batches,
+    schedules) contributes a blocker instead of checking for a pending
+    deletion at each starter.
+  - **A run started in the same instant as the request** can commit after
+    eligibility passed; the finalizer re-checks before erasing.
+  - An access token issued before the request keeps working on the
+    cancel route (and nothing else) for at most its remaining 15 minutes.
+  - Rolling the release back makes a pending account fully usable again until
+    the release returns; requests and deadlines survive. Turn the switch off
+    first to stop new requests.
+  - The gate adds one primary-key read per signed-in request, the same budget
+    as the phone gate.
+
+---
+
 ## ADR-0043 — MCP authorization server: personal access tokens for consenting admins
 
 Number provisional until merge; see `openspec/changes/mcp-oauth-runtime/`.

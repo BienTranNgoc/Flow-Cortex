@@ -222,6 +222,22 @@ export interface ProfileUpdateRequest {
   lastName?: string;
 }
 
+export type AccountDeletionViewState =
+  (typeof AccountDeletionViewState)[keyof typeof AccountDeletionViewState];
+
+export const AccountDeletionViewState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionView {
+  state: AccountDeletionViewState;
+  requestedAt: string;
+  /** When the grace period ends; the deletion can be cancelled until then */
+  scheduledAt: string;
+}
+
 export type MeResponsePermissionsItem =
   (typeof MeResponsePermissionsItem)[keyof typeof MeResponsePermissionsItem];
 
@@ -278,6 +294,7 @@ export interface MeResponse {
   permissions: MeResponsePermissionsItem[];
   adminDisabled: boolean;
   phoneVerificationRequired: boolean;
+  accountDeletion?: AccountDeletionView;
 }
 
 export interface UsernameRequest {
@@ -941,6 +958,39 @@ export interface AiModel {
   active: boolean;
   displayOrder: number;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeletionBlockConditionUpdate {
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 999
+   */
+  sortOrder: number;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  messageVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  messageEn: string;
+}
+
+export interface DeletionBlockConditionView {
+  key: string;
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 999
+   */
+  sortOrder: number;
+  messageVi: string;
+  messageEn: string;
+  updatedBy?: string;
   updatedAt: string;
 }
 
@@ -1899,6 +1949,7 @@ export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof St
 export const StepUpRequestPurpose = {
   PAT_CREATE: 'PAT_CREATE',
   PHONE_CHANGE: 'PHONE_CHANGE',
+  ACCOUNT_DELETION: 'ACCOUNT_DELETION',
 } as const;
 
 export interface StepUpRequest {
@@ -1981,6 +2032,42 @@ export interface CreatedApiToken {
   token: string;
   createdAt: string;
   expiresAt: string;
+}
+
+export interface AccountDeletionRequestBody {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  stepUpProof: string;
+}
+
+export type AccountDeletionAcceptedState =
+  (typeof AccountDeletionAcceptedState)[keyof typeof AccountDeletionAcceptedState];
+
+export const AccountDeletionAcceptedState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionAccepted {
+  requestId: string;
+  state: AccountDeletionAcceptedState;
+  requestedAt: string;
+  scheduledAt: string;
+}
+
+export type AccountDeletionCancelledState =
+  (typeof AccountDeletionCancelledState)[keyof typeof AccountDeletionCancelledState];
+
+export const AccountDeletionCancelledState = {
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export interface AccountDeletionCancelled {
+  state: AccountDeletionCancelledState;
+  cancelledAt: string;
 }
 
 export type CreateEntityRequestKind =
@@ -3822,6 +3909,36 @@ export interface ApiTokenView {
   /** Null until the token is first used */
   lastUsedAt?: string;
   expired: boolean;
+}
+
+export type AccountDeletionStatusState =
+  (typeof AccountDeletionStatusState)[keyof typeof AccountDeletionStatusState];
+
+export const AccountDeletionStatusState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionStatus {
+  enabled: boolean;
+  gracePeriodDays: number;
+  state: AccountDeletionStatusState;
+  /** Null while the state is NONE */
+  requestedAt?: string;
+  /** When the grace period ends; null while the state is NONE */
+  scheduledAt?: string;
+}
+
+export interface DeletionReasonView {
+  key: string;
+  /** Already in the caller's language */
+  message: string;
+}
+
+export interface DeletionEligibilityView {
+  eligible: boolean;
+  reasons: DeletionReasonView[];
 }
 
 export interface HealthResponse {
@@ -8834,6 +8951,73 @@ export const deleteAdminAiModel = async (
   });
 };
 
+export type updateAdminDeletionBlockConditionResponse200 = {
+  data: DeletionBlockConditionView;
+  status: 200;
+};
+
+export type updateAdminDeletionBlockConditionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminDeletionBlockConditionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminDeletionBlockConditionResponseSuccess =
+  updateAdminDeletionBlockConditionResponse200 & {
+    headers: Headers;
+  };
+export type updateAdminDeletionBlockConditionResponseError = (
+  updateAdminDeletionBlockConditionResponse400 | updateAdminDeletionBlockConditionResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminDeletionBlockConditionResponse =
+  updateAdminDeletionBlockConditionResponseSuccess | updateAdminDeletionBlockConditionResponseError;
+
+export const getUpdateAdminDeletionBlockConditionUrl = (key: string) => {
+  return `/api/v1/admin/account-deletion/block-conditions/${key}`;
+};
+
+export const updateAdminDeletionBlockCondition = async (
+  key: string,
+  deletionBlockConditionUpdate: DeletionBlockConditionUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminDeletionBlockConditionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminDeletionBlockConditionResponse>(
+    getUpdateAdminDeletionBlockConditionUrl(key),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(deletionBlockConditionUpdate),
+    },
+  );
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -13016,6 +13200,144 @@ export const createApiToken = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createApiTokenRequest),
+  });
+};
+
+export type getAccountDeletionStatusResponse200 = {
+  data: AccountDeletionStatus;
+  status: 200;
+};
+
+export type getAccountDeletionStatusResponseSuccess = getAccountDeletionStatusResponse200 & {
+  headers: Headers;
+};
+export type getAccountDeletionStatusResponse = getAccountDeletionStatusResponseSuccess;
+
+export const getGetAccountDeletionStatusUrl = () => {
+  return `/api/v1/me/account-deletion`;
+};
+
+export const getAccountDeletionStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountDeletionStatusResponse> => {
+  return customFetch<getAccountDeletionStatusResponse>(getGetAccountDeletionStatusUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type requestAccountDeletionResponse202 = {
+  data: AccountDeletionAccepted;
+  status: 202;
+};
+
+export type requestAccountDeletionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type requestAccountDeletionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type requestAccountDeletionResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type requestAccountDeletionResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type requestAccountDeletionResponseSuccess = requestAccountDeletionResponse202 & {
+  headers: Headers;
+};
+export type requestAccountDeletionResponseError = (
+  | requestAccountDeletionResponse400
+  | requestAccountDeletionResponse403
+  | requestAccountDeletionResponse409
+  | requestAccountDeletionResponse503
+) & {
+  headers: Headers;
+};
+
+export type requestAccountDeletionResponse =
+  requestAccountDeletionResponseSuccess | requestAccountDeletionResponseError;
+
+export const getRequestAccountDeletionUrl = () => {
+  return `/api/v1/me/account-deletion`;
+};
+
+export const requestAccountDeletion = async (
+  accountDeletionRequestBody: AccountDeletionRequestBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestAccountDeletionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestAccountDeletionResponse>(getRequestAccountDeletionUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountDeletionRequestBody),
+  });
+};
+
+export type cancelAccountDeletionResponse200 = {
+  data: AccountDeletionCancelled;
+  status: 200;
+};
+
+export type cancelAccountDeletionResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelAccountDeletionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type cancelAccountDeletionResponseSuccess = cancelAccountDeletionResponse200 & {
+  headers: Headers;
+};
+export type cancelAccountDeletionResponseError = (
+  cancelAccountDeletionResponse409 | cancelAccountDeletionResponse422
+) & {
+  headers: Headers;
+};
+
+export type cancelAccountDeletionResponse =
+  cancelAccountDeletionResponseSuccess | cancelAccountDeletionResponseError;
+
+export const getCancelAccountDeletionUrl = () => {
+  return `/api/v1/me/account-deletion/cancel`;
+};
+
+export const cancelAccountDeletion = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelAccountDeletionResponse> => {
+  return customFetch<cancelAccountDeletionResponse>(getCancelAccountDeletionUrl(), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -19745,6 +20067,41 @@ export const getDriveMigration = async (
   });
 };
 
+export type getAccountDeletionEligibilityResponse200 = {
+  data: DeletionEligibilityView;
+  status: 200;
+};
+
+export type getAccountDeletionEligibilityResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getAccountDeletionEligibilityResponseSuccess =
+  getAccountDeletionEligibilityResponse200 & {
+    headers: Headers;
+  };
+export type getAccountDeletionEligibilityResponseError =
+  getAccountDeletionEligibilityResponse503 & {
+    headers: Headers;
+  };
+
+export type getAccountDeletionEligibilityResponse =
+  getAccountDeletionEligibilityResponseSuccess | getAccountDeletionEligibilityResponseError;
+
+export const getGetAccountDeletionEligibilityUrl = () => {
+  return `/api/v1/me/account-deletion/eligibility`;
+};
+
+export const getAccountDeletionEligibility = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountDeletionEligibilityResponse> => {
+  return customFetch<getAccountDeletionEligibilityResponse>(getGetAccountDeletionEligibilityUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;
@@ -22404,6 +22761,34 @@ export const listAdminAccounts = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listAdminDeletionBlockConditionsResponse200 = {
+  data: DeletionBlockConditionView[];
+  status: 200;
+};
+
+export type listAdminDeletionBlockConditionsResponseSuccess =
+  listAdminDeletionBlockConditionsResponse200 & {
+    headers: Headers;
+  };
+export type listAdminDeletionBlockConditionsResponse =
+  listAdminDeletionBlockConditionsResponseSuccess;
+
+export const getListAdminDeletionBlockConditionsUrl = () => {
+  return `/api/v1/admin/account-deletion/block-conditions`;
+};
+
+export const listAdminDeletionBlockConditions = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminDeletionBlockConditionsResponse> => {
+  return customFetch<listAdminDeletionBlockConditionsResponse>(
+    getListAdminDeletionBlockConditionsUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type oauthMetadataResponse200 = {

@@ -1572,6 +1572,42 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/account-deletion/block-conditions/{key}:
+    put:
+      tags:
+      - admin-deletion-block-conditions-controller
+      operationId: updateAdminDeletionBlockCondition
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeletionBlockConditionUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionBlockConditionView"
+        "400":
+          description: validation-failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: The key is not a registered condition
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -4181,6 +4217,83 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "503":
           description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/account-deletion:
+    get:
+      tags:
+      - account-deletion-controller
+      operationId: getAccountDeletionStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionStatus"
+    post:
+      tags:
+      - account-deletion-controller
+      operationId: requestAccountDeletion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDeletionRequestBody"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionAccepted"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/account-deletion/cancel:
+    post:
+      tags:
+      - account-deletion-controller
+      operationId: cancelAccountDeletion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionCancelled"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
           content:
             application/problem+json:
               schema:
@@ -8705,6 +8818,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DriveMigrationResponse"
+  /api/v1/me/account-deletion/eligibility:
+    get:
+      tags:
+      - account-deletion-controller
+      operationId: getAccountDeletionEligibility
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionEligibilityView"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/health:
     get:
       tags:
@@ -11023,6 +11154,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewAdminAccountResponse"
+  /api/v1/admin/account-deletion/block-conditions:
+    get:
+      tags:
+      - admin-deletion-block-conditions-controller
+      operationId: listAdminDeletionBlockConditions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeletionBlockConditionView"
   /.well-known/oauth-authorization-server:
     get:
       tags:
@@ -11495,6 +11640,27 @@ components:
           minLength: 0
       required:
       - name
+    AccountDeletionView:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - NONE
+          - PENDING
+          - EXPIRED
+        requestedAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When the grace period ends; the deletion can be cancelled until
+            then
+      required:
+      - requestedAt
+      - scheduledAt
+      - state
     MeResponse:
       type: object
       properties:
@@ -11562,6 +11728,8 @@ components:
           type: boolean
         phoneVerificationRequired:
           type: boolean
+        accountDeletion:
+          $ref: "#/components/schemas/AccountDeletionView"
       required:
       - adminDisabled
       - permissions
@@ -12605,6 +12773,57 @@ components:
       - providerKey
       - supportsAudio
       - supportsVision
+      - updatedAt
+    DeletionBlockConditionUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        sortOrder:
+          type: integer
+          format: int32
+          maximum: 999
+          minimum: 0
+        messageVi:
+          type: string
+          maxLength: 500
+          minLength: 0
+        messageEn:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - enabled
+      - messageEn
+      - messageVi
+      - sortOrder
+    DeletionBlockConditionView:
+      type: object
+      properties:
+        key:
+          type: string
+        enabled:
+          type: boolean
+        sortOrder:
+          type: integer
+          format: int32
+          maximum: 999
+          minimum: 0
+        messageVi:
+          type: string
+        messageEn:
+          type: string
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - enabled
+      - key
+      - messageEn
+      - messageVi
+      - sortOrder
       - updatedAt
     CreateWorkflowRequest:
       type: object
@@ -13993,6 +14212,7 @@ components:
           enum:
           - PAT_CREATE
           - PHONE_CHANGE
+          - ACCOUNT_DELETION
       required:
       - password
       - purpose
@@ -14126,6 +14346,51 @@ components:
       - id
       - name
       - token
+    AccountDeletionRequestBody:
+      type: object
+      properties:
+        stepUpProof:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - stepUpProof
+    AccountDeletionAccepted:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - NONE
+          - PENDING
+          - EXPIRED
+        requestedAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+      required:
+      - requestId
+      - requestedAt
+      - scheduledAt
+      - state
+    AccountDeletionCancelled:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - CANCELLED
+        cancelledAt:
+          type: string
+          format: date-time
+      required:
+      - cancelledAt
+      - state
     CreateEntityRequest:
       type: object
       properties:
@@ -17048,6 +17313,55 @@ components:
       - expiresAt
       - id
       - name
+    AccountDeletionStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        gracePeriodDays:
+          type: integer
+          format: int32
+        state:
+          type: string
+          enum:
+          - NONE
+          - PENDING
+          - EXPIRED
+        requestedAt:
+          type: string
+          format: date-time
+          description: Null while the state is NONE
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When the grace period ends; null while the state is NONE
+      required:
+      - enabled
+      - gracePeriodDays
+      - state
+    DeletionEligibilityView:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeletionReasonView"
+      required:
+      - eligible
+      - reasons
+    DeletionReasonView:
+      type: object
+      properties:
+        key:
+          type: string
+        message:
+          type: string
+          description: Already in the caller's language
+      required:
+      - key
+      - message
     HealthResponse:
       type: object
       properties:
