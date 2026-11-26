@@ -12546,17 +12546,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowArtifactStep"
+        dataStore:
+          type: array
+          description: The workflow's data-store entries; absent when it has none
+          items:
+            $ref: "#/components/schemas/WorkflowArtifactDataEntry"
       required:
       - exportedAt
       - formatVersion
       - steps
       - workflow
+    WorkflowArtifactDataEntry:
+      type: object
+      properties:
+        key:
+          type: string
+        dataType:
+          type: string
+        value:
+          description: Any JSON value
+      required:
+      - dataType
+      - key
+      - value
     WorkflowArtifactStep:
       type: object
       properties:
         stepOrder:
           type: integer
           format: int32
+          maximum: 32767
           minimum: 1
         name:
           type:
@@ -12574,8 +12593,9 @@ components:
           maxLength: 255
         config:
           type:
-          - string
+          - object
           - "null"
+          additionalProperties: {}
       required:
       - config
       - inputRef

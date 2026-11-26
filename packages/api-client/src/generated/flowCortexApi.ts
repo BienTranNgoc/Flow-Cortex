@@ -2182,8 +2182,16 @@ export interface WorkflowArtifactWorkflow {
   name: string;
 }
 
+/**
+ * @nullable
+ */
+export type WorkflowArtifactStepConfig = { [key: string]: unknown } | null;
+
 export interface WorkflowArtifactStep {
-  /** @minimum 1 */
+  /**
+   * @minimum 1
+   * @maximum 32767
+   */
   stepOrder: number;
   /**
    * @maxLength 255
@@ -2201,7 +2209,14 @@ export interface WorkflowArtifactStep {
    */
   inputRef: string | null;
   /** @nullable */
-  config: string | null;
+  config: WorkflowArtifactStepConfig;
+}
+
+export interface WorkflowArtifactDataEntry {
+  key: string;
+  dataType: string;
+  /** Any JSON value */
+  value: unknown;
 }
 
 export interface WorkflowArtifact {
@@ -2213,6 +2228,8 @@ export interface WorkflowArtifact {
   exportedAt: string;
   workflow: WorkflowArtifactWorkflow;
   steps: WorkflowArtifactStep[];
+  /** The workflow's data-store entries; absent when it has none */
+  dataStore?: WorkflowArtifactDataEntry[];
 }
 
 export type ImportIssueResponseSeverity =
