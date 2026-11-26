@@ -81,7 +81,10 @@ public class MarketplaceService {
         return items(queries.recommended(callerId, limit, clock.instant(), excludedWorkflowIds()), callerId);
     }
 
-    /** Resolved through the visibility rule first, so a workflow the caller cannot read is a 404. */
+    /**
+     * Resolved through the visibility rule first, so a workflow the caller cannot read is a 404. A visible workflow
+     * outside the catalogue (the caller's own private, draft or unlisted one) has no similar list.
+     */
     @Transactional(readOnly = true)
     public List<MarketplaceItemView> similar(UUID callerId, UUID workflowId, int limit) {
         workflows.findVisibleTo(workflowId, callerId)
@@ -90,7 +93,7 @@ public class MarketplaceService {
         if (excluded.contains(workflowId)) {
             return List.of();
         }
-        return items(queries.similar(workflowId, limit, clock.instant(), excluded), callerId);
+        return items(queries.similar(callerId, workflowId, limit, clock.instant(), excluded), callerId);
     }
 
     @Transactional(readOnly = true)

@@ -17,6 +17,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,8 @@ class MarketplaceQueriesIT {
     private static final String UNLISTED = "unlisted";
     private static final String PUBLISHED = "published";
     private static final String DRAFT = "draft";
+
+    private static final UUID CALLER = UUID.randomUUID();
 
     private final Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
 
@@ -162,6 +165,16 @@ class MarketplaceQueriesIT {
         return id;
     }
 
+    private void runAll(UUID workflow, List<UUID> owners, int daysAgo) {
+        for (UUID owner : owners) {
+            run(workflow, owner, "completed", daysAgo(daysAgo));
+        }
+    }
+
+    private static List<UUID> crowd(int size) {
+        return Stream.generate(UUID::randomUUID).limit(size).toList();
+    }
+
     private void childRun(UUID parentRun, UUID workflow, UUID owner, Instant startedAt) {
         UUID step = UUID.randomUUID();
         jdbc.update("INSERT INTO run_step (id, run_id, step_order, type, status) VALUES (?, ?, 1, 'echo', 'running')",
@@ -228,8 +241,8 @@ class MarketplaceQueriesIT {
                 + " is_shared = true WHERE id = ?", ProductVideoWorkflow.ID);
         UUID other = catalogue("other", "tts");
 
-        MarketplaceQueries off = new MarketplaceQueries(namedJdbc, false);
-        MarketplaceQueries on = new MarketplaceQueries(namedJdbc, true);
+        MarketplaceQueries off = new MarketplaceQueries(namedJdbc, false, 3);
+        MarketplaceQueries on = new MarketplaceQueries(namedJdbc, true, 3);
         Browse all = MarketplaceQuery.browse(null, List.of(), Sort.NAME, 0, 50);
 
         assertThat(browse(off, all)).containsExactly(other);
@@ -453,73 +466,129 @@ class MarketplaceQueriesIT {
     @Test
     void similarRanksByCoRunnersAndSkipsPrivate() {
         UUID ana = UUID.randomUUID();
-        UUID chi = UUID.randomUUID();
-        UUID dan = UUID.randomUUID();
+        List<UUID> crowd = crowd(4);
         UUID w = catalogue("w", "tts");
         UUID x = catalogue("x", "tts");
         UUID y = catalogue("y", "tts");
+        UUID thin = catalogue("thin", "tts");
         UUID z = insertWorkflow(ana, "z", PUBLISHED, PRIVATE, false, daysAgo(5));
         UUID old = catalogue("old co-run", "tts");
-        run(w, chi, "completed", daysAgo(3));
-        run(w, dan, "running", daysAgo(4));
-        run(x, chi, "completed", daysAgo(2));
-        run(x, dan, "completed", daysAgo(2));
-        run(y, dan, "completed", daysAgo(1));
-        run(z, chi, "completed", daysAgo(1));
-        run(old, chi, "completed", daysAgo(120));
+        run(w, crowd.get(0), "completed", daysAgo(3));
+        run(w, crowd.get(1), "running", daysAgo(4));
+        runAll(w, crowd.subList(2, 4), 3);
+        runAll(x, crowd, 2);
+        runAll(y, crowd.subList(0, 3), 1);
+        runAll(thin, crowd.subList(0, 2), 1);
+        runAll(z, crowd, 1);
+        runAll(old, crowd, 120);
 
-        assertThat(ids(queries.similar(w, 8, now, Set.of()))).containsExactly(x, y);
-        assertThat(ids(queries.similar(w, 1, now, Set.of()))).containsExactly(x);
-        assertThat(queries.similar(UUID.randomUUID(), 8, now, Set.of())).isEmpty();
+        assertThat(ids(queries.similar(CALLER, w, 8, now, Set.of()))).containsExactly(x, y);
+        assertThat(ids(queries.similar(CALLER, w, 1, now, Set.of()))).containsExactly(x);
+        assertThat(queries.similar(CALLER, UUID.randomUUID(), 8, now, Set.of())).isEmpty();
     }
 
     @Test
     void similarBreaksTiesByTrendingScore() {
-        UUID chi = UUID.randomUUID();
+        List<UUID> crowd = crowd(3);
         UUID w = catalogue("w", "tts");
         UUID cold = catalogue("cold", "tts");
         UUID warm = catalogue("warm", "tts");
         stats(warm, 1, 0, 1, 9);
         for (UUID workflow : List.of(w, cold, warm)) {
-            run(workflow, chi, "completed", daysAgo(2));
+            runAll(workflow, crowd, 2);
         }
 
-        assertThat(ids(queries.similar(w, 8, now, Set.of()))).containsExactly(warm, cold);
+        assertThat(ids(queries.similar(CALLER, w, 8, now, Set.of()))).containsExactly(warm, cold);
     }
 
     @Test
     void similarLeavesOutExcludedWorkflows() {
-        UUID chi = UUID.randomUUID();
-        UUID dan = UUID.randomUUID();
+        List<UUID> crowd = crowd(3);
         UUID w = catalogue("w", "tts");
         UUID sample = catalogue("onboarding sample", "tts");
         UUID other = catalogue("other", "tts");
-        for (UUID member : List.of(chi, dan)) {
-            run(w, member, "completed", daysAgo(2));
-            run(sample, member, "completed", daysAgo(2));
-        }
-        run(other, chi, "completed", daysAgo(1));
+        runAll(w, crowd, 2);
+        runAll(sample, crowd, 2);
+        runAll(other, crowd, 1);
 
-        assertThat(ids(queries.similar(w, 8, now, Set.of()))).containsExactly(sample, other);
-        assertThat(ids(queries.similar(w, 8, now, Set.of(sample)))).containsExactly(other);
+        assertThat(ids(queries.similar(CALLER, w, 8, now, Set.of()))).containsExactlyInAnyOrder(sample, other);
+        assertThat(ids(queries.similar(CALLER, w, 8, now, Set.of(sample)))).containsExactly(other);
     }
 
     @Test
     void childRunsAreNotCoRuns() {
-        UUID chi = UUID.randomUUID();
         UUID dan = UUID.randomUUID();
+        List<UUID> crowd = crowd(3);
         UUID w = catalogue("w", "tts");
         UUID parent = catalogue("parent", "tts");
         UUID child = catalogue("child", "tts");
         UUID danOnly = catalogue("dan only", "tts");
-        run(w, chi, "completed", daysAgo(3));
-        UUID chiParentRun = run(parent, chi, "completed", daysAgo(2));
-        childRun(chiParentRun, child, chi, daysAgo(2));
-        UUID danParentRun = run(parent, dan, "completed", daysAgo(2));
-        childRun(danParentRun, w, dan, daysAgo(2));
-        run(danOnly, dan, "completed", daysAgo(2));
+        runAll(w, crowd, 3);
+        for (UUID member : crowd) {
+            childRun(run(parent, member, "completed", daysAgo(2)), child, member, daysAgo(2));
+        }
+        childRun(run(parent, dan, "completed", daysAgo(2)), w, dan, daysAgo(2));
+        runAll(danOnly, List.of(dan, crowd.get(0), crowd.get(1)), 2);
 
-        assertThat(ids(queries.similar(w, 8, now, Set.of()))).containsExactly(parent);
+        assertThat(ids(queries.similar(CALLER, w, 8, now, Set.of()))).containsExactly(parent);
+    }
+
+    @Test
+    void similarIsEmptyUnlessTheWorkflowIsInTheCatalogue() {
+        UUID ana = UUID.randomUUID();
+        List<UUID> crowd = crowd(4);
+        UUID popular = catalogue("popular", "tts");
+        UUID live = catalogue(ana, "live", "tts");
+        runAll(live, crowd, 3);
+        runAll(popular, crowd, 2);
+        assertThat(ids(queries.similar(ana, live, 8, now, Set.of()))).containsExactly(popular);
+
+        for (UUID hidden : List.of(
+                insertWorkflow(ana, "private", PUBLISHED, PRIVATE, false, daysAgo(5)),
+                insertWorkflow(ana, "draft", DRAFT, PUBLIC, false, daysAgo(5)),
+                insertWorkflow(ana, "unlisted", PUBLISHED, UNLISTED, false, daysAgo(5)),
+                insertWorkflow(ana, "deleted", PUBLISHED, PUBLIC, true, daysAgo(5)))) {
+            runAll(hidden, crowd, 3);
+            run(hidden, ana, "completed", daysAgo(3));
+
+            assertThat(queries.similar(ana, hidden, 8, now, Set.of())).as("similar of %s", hidden).isEmpty();
+        }
+    }
+
+    @Test
+    void similarNeedsTheMinimumOfOtherMembersAndNeverCountsTheCaller() {
+        UUID caller = UUID.randomUUID();
+        List<UUID> crowd = crowd(3);
+        UUID w = catalogue("w", "tts");
+        UUID x = catalogue("x", "tts");
+        runAll(w, crowd.subList(0, 2), 3);
+        runAll(x, crowd.subList(0, 2), 2);
+        runAll(w, List.of(caller), 3);
+        runAll(x, List.of(caller), 2);
+
+        assertThat(queries.similar(caller, w, 8, now, Set.of())).isEmpty();
+
+        runAll(w, crowd.subList(2, 3), 3);
+        assertThat(queries.similar(caller, w, 8, now, Set.of())).isEmpty();
+
+        runAll(x, crowd.subList(2, 3), 2);
+        assertThat(ids(queries.similar(caller, w, 8, now, Set.of()))).containsExactly(x);
+        assertThat(ids(queries.similar(CALLER, w, 8, now, Set.of()))).containsExactly(x);
+    }
+
+    @Test
+    void similarMinimumIsConfigurableAndNeverBelowOne() {
+        List<UUID> pair = crowd(2);
+        UUID w = catalogue("w", "tts");
+        UUID x = catalogue("x", "tts");
+        runAll(w, pair, 3);
+        runAll(x, pair, 2);
+
+        assertThat(ids(new MarketplaceQueries(namedJdbc, false, 2).similar(CALLER, w, 8, now, Set.of())))
+                .containsExactly(x);
+        assertThat(new MarketplaceQueries(namedJdbc, false, 3).similar(CALLER, w, 8, now, Set.of())).isEmpty();
+        assertThat(ids(new MarketplaceQueries(namedJdbc, false, 0).similar(CALLER, w, 8, now, Set.of())))
+                .containsExactly(x);
     }
 
     @Test

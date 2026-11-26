@@ -79,11 +79,14 @@ public class MarketplaceQueries {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean productVideoOn;
+    private final int similarMinSupport;
 
     public MarketplaceQueries(NamedParameterJdbcTemplate jdbc,
-            @Value("${flowcortex.product-video.enabled:false}") boolean productVideoOn) {
+            @Value("${flowcortex.product-video.enabled:false}") boolean productVideoOn,
+            @Value("${flowcortex.workflow.discovery.similar-min-support:3}") int similarMinSupport) {
         this.jdbc = jdbc;
         this.productVideoOn = productVideoOn;
+        this.similarMinSupport = Math.max(1, similarMinSupport);
     }
 
     /** One page of the catalogue matching the parsed read, in the order of its sort. */
@@ -167,21 +170,27 @@ public class MarketplaceQueries {
     }
 
     /**
-     * Catalogue workflows other than {@code id} run, in the last 90 days, by the members who ran {@code id} (its
-     * 500 latest runners), most shared runners first.
+     * Catalogue workflows other than {@code id} run, in the last 90 days, by the members other than {@code caller}
+     * who ran {@code id} (its 500 latest runners), most shared runners first. Empty unless {@code id} is itself in
+     * the catalogue, and a workflow is listed only when at least the configured minimum of those members ran it, so
+     * no listed workflow reveals what fewer members did.
      */
-    public List<CatalogueRow> similar(UUID id, int limit, Instant now, Set<UUID> excluded) {
-        MapSqlParameterSource params = base().addValue("id", id).addValue("since", since(now))
-                .addValue("limit", limit).addValue("runnerCap", MAX_SIMILAR_RUNNERS);
+    public List<CatalogueRow> similar(UUID caller, UUID id, int limit, Instant now, Set<UUID> excluded) {
+        MapSqlParameterSource params = base().addValue("caller", caller).addValue("id", id)
+                .addValue("since", since(now)).addValue("limit", limit).addValue("runnerCap", MAX_SIMILAR_RUNNERS)
+                .addValue("minSupport", similarMinSupport);
         String excludedClause = "";
         if (!excluded.isEmpty()) {
             excludedClause = " AND r.workflow_id NOT IN (:excluded)";
             params.addValue("excluded", excluded);
         }
         return jdbc.query("""
-                WITH runners AS (
-                    SELECT r.owner_id FROM workflow_run r
-                     WHERE r.workflow_id = :id AND r.started_at > :since""" + RUN_SCOPE + """
+                WITH source AS (
+                    SELECT w.id FROM workflow w WHERE w.id = :id AND\s""" + CATALOGUE + """
+                ),
+                runners AS (
+                    SELECT r.owner_id FROM workflow_run r JOIN source ON source.id = r.workflow_id
+                     WHERE r.owner_id <> :caller AND r.started_at > :since""" + RUN_SCOPE + """
 
                      GROUP BY r.owner_id ORDER BY max(r.started_at) DESC LIMIT :runnerCap),
                 co AS (
@@ -189,7 +198,7 @@ public class MarketplaceQueries {
                       FROM workflow_run r JOIN runners u ON u.owner_id = r.owner_id
                      WHERE r.started_at > :since AND r.workflow_id <> :id""" + RUN_SCOPE + excludedClause + """
 
-                     GROUP BY r.workflow_id)
+                     GROUP BY r.workflow_id HAVING count(DISTINCT r.owner_id) >= :minSupport)
                 SELECT\s""" + ROW_COLUMNS + """
                   FROM co JOIN workflow w ON w.id = co.workflow_id\s""" + FIGURES + """
                  WHERE\s""" + CATALOGUE + """
