@@ -41,6 +41,9 @@ public enum AuthEventType {
     PHONE_CHANGED,
     PHONE_CHANGE_REVERTED,
 
+    ACCOUNT_DELETION_REQUESTED,
+    ACCOUNT_DELETION_CANCELLED,
+
     LOGOUT;
 
     public static Map<String, Object> metadata(Object... keyValuePairs) {

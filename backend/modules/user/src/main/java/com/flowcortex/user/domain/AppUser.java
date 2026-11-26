@@ -89,6 +89,13 @@ public class AppUser {
     @Column(name = "admin_disabled_by")
     private UUID adminDisabledBy;
 
+    /** Projection of a pending deletion request; written only by the account-deletion JDBC statements. */
+    @Column(name = "deletion_requested_at", insertable = false, updatable = false)
+    private Instant deletionRequestedAt;
+
+    @Column(name = "deletion_scheduled_at", insertable = false, updatable = false)
+    private Instant deletionScheduledAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -243,6 +250,14 @@ public class AppUser {
 
     public boolean isAdminDisabled() {
         return adminDisabledAt != null;
+    }
+
+    public Instant getDeletionRequestedAt() {
+        return deletionRequestedAt;
+    }
+
+    public Instant getDeletionScheduledAt() {
+        return deletionScheduledAt;
     }
 
     public Instant getCreatedAt() {

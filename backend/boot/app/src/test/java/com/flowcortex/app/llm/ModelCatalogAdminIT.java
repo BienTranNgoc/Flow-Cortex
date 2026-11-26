@@ -84,6 +84,7 @@ class ModelCatalogAdminIT extends AbstractPostgresBootTest {
             Map.entry("ingest_video", "ingest/input"),
             Map.entry("ingest_image", "ingest/input"),
             Map.entry("connector.call", "ingest/input"),
+            Map.entry("drive.read", "ingest/input"),
             Map.entry("load_template", "ingest/input"));
 
     /** A descriptor the vendor has retired, so a text row naming it is refused unless it is being switched off. */
@@ -184,14 +185,14 @@ class ModelCatalogAdminIT extends AbstractPostgresBootTest {
     }
 
     @Test
-    void theSeededRowsAreTheTwentyTwoStepTypesWithTheirCategoryAndGroup() {
+    void theSeededRowsAreTheTwentyThreeStepTypesWithTheirCategoryAndGroup() {
         Map<String, String> stored = new LinkedHashMap<>();
         jdbc.queryForList("SELECT capability, category, ui_group, ui_icon FROM capability_catalog").forEach(row -> {
             stored.put((String) row.get("capability"), row.get("category") + "/" + row.get("ui_group"));
             assertThat(row.get("ui_icon")).isNull();
         });
 
-        assertThat(stored).hasSize(22).containsExactlyInAnyOrderEntriesOf(SEEDED);
+        assertThat(stored).hasSize(23).containsExactlyInAnyOrderEntriesOf(SEEDED);
     }
 
     @Test

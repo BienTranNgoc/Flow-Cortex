@@ -8,7 +8,7 @@
 --   DROP TABLE capability_catalog;
 --   DELETE FROM role_permission WHERE permission_key IN ('ai.model.view', 'ai.model.update');
 --   DELETE FROM permission WHERE key IN ('ai.model.view', 'ai.model.update');
---   DELETE FROM flyway_schema_history WHERE version = '2026.11.24.300';
+--   DELETE FROM flyway_schema_history WHERE version = '2026.11.26.530';
 
 CREATE TABLE capability_catalog (
     capability  text        PRIMARY KEY CHECK (capability ~ '^[A-Za-z0-9._-]{1,64}$'),
@@ -59,6 +59,7 @@ INSERT INTO capability_catalog (capability, category, ui_group) VALUES
     ('ingest_video', 'ingest', 'input'),
     ('ingest_image', 'ingest', 'input'),
     ('connector.call', 'ingest', 'input'),
+    ('drive.read', 'ingest', 'input'),
     ('load_template', 'ingest', 'input');
 
 INSERT INTO permission (key, module, feature, action, super_admin_only, sort_order)
