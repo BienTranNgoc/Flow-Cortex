@@ -47,6 +47,12 @@ public class DocumentRegistry {
                             + "' allows section type '" + type + "' that no SectionType bean registers");
                 }
             }
+            if (definition.minSections() < 0 || definition.maxSections() > DocumentValidator.MAX_SECTIONS
+                    || definition.minSections() > definition.maxSections()) {
+                throw new IllegalStateException("Content document '" + slug + "' declares sections "
+                        + definition.minSections() + ".." + definition.maxSections()
+                        + ", which must satisfy 0 <= min <= max <= " + DocumentValidator.MAX_SECTIONS);
+            }
             bySlug.put(slug, definition);
         }
     }

@@ -8,6 +8,7 @@ import com.flowcortex.user.api.StepUpProofs;
 import com.flowcortex.user.api.StepUpPurpose;
 import com.flowcortex.user.api.StepUpRequiredException;
 import com.flowcortex.user.api.UserView;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -85,6 +86,9 @@ class PhoneChangeIT extends AbstractUserModuleIT {
 
     @Autowired
     private StepUpProofs stepUpProofs;
+
+    @Autowired
+    private MeterRegistry meters;
 
     private String clientIp;
 
@@ -279,6 +283,7 @@ class PhoneChangeIT extends AbstractUserModuleIT {
         assertThat(phone(member)).isEqualTo(verified.getBody());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM user_phone WHERE phone_e164 = ?", Integer.class, old))
                 .isZero();
+        mail.awaitQueuedSends();
         assertThat(bodiesTo(old)).contains(CHANGED_NOTICE);
         List<CapturedMail> mails = mail.sentTo(member.email());
         assertThat(mails).hasSize(1);
@@ -303,6 +308,7 @@ class PhoneChangeIT extends AbstractUserModuleIT {
         ResponseEntity<PhoneView> verified;
         try {
             verified = changeVerify(member, code, PhoneView.class);
+            mail.awaitQueuedSends();
         } finally {
             jdbc.execute("DROP TRIGGER reject_phone_notice ON sms_outbox");
             jdbc.execute("DROP FUNCTION reject_phone_notice()");
@@ -313,6 +319,36 @@ class PhoneChangeIT extends AbstractUserModuleIT {
         assertThat(bodiesTo(old)).doesNotContain(CHANGED_NOTICE);
         assertThat(output.getAll()).contains("channel=sms").doesNotContain(old).doesNotContain(next);
         assertThat(mail.sentTo(member.email())).hasSize(1);
+    }
+
+    @Test
+    void aCarrierOutageAtChangeStartIs503SpendsTheProofAndKeepsTheOldNumber() {
+        String old = randomNumber();
+        String next = randomNumber();
+        Member member = verifiedMember("start-down", old);
+        String proof = proofFor(member);
+        double before = meters.counter("phone_change", "step", "start", "outcome", "sms_unavailable").count();
+        jdbc.execute("CREATE OR REPLACE FUNCTION reject_phone_code() RETURNS trigger AS $$ BEGIN "
+                + "RAISE EXCEPTION 'code sender down'; END; $$ LANGUAGE plpgsql");
+        jdbc.execute("CREATE TRIGGER reject_phone_code BEFORE INSERT ON sms_outbox FOR EACH ROW WHEN "
+                + "(NEW.phone_e164 = '" + next + "') EXECUTE FUNCTION reject_phone_code()");
+        ResponseEntity<ProblemView> down;
+        try {
+            down = changeStart(member, next, proof, ProblemView.class);
+        } finally {
+            jdbc.execute("DROP TRIGGER reject_phone_code ON sms_outbox");
+            jdbc.execute("DROP FUNCTION reject_phone_code()");
+        }
+
+        assertThat(down.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(down.getBody().code()).isEqualTo("SMS_UNAVAILABLE");
+        assertThat(down.getBody().retryAfterSeconds()).isEqualTo(60L);
+        assertThat(down.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
+        assertThat(phone(member).phone()).isEqualTo(old);
+        assertThat(changeStart(member, randomNumber(), proof, ProblemView.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(meters.counter("phone_change", "step", "start", "outcome", "sms_unavailable").count())
+                .isEqualTo(before + 1);
     }
 
     @Test
@@ -411,6 +447,7 @@ class PhoneChangeIT extends AbstractUserModuleIT {
         assertThat(cancelled.getBody().verified()).isTrue();
         assertThat(cancelled.getBody().cancelAvailableUntil()).isNull();
         assertThat(phone(member)).isEqualTo(cancelled.getBody());
+        mail.awaitQueuedSends();
         assertThat(bodiesTo(old)).containsOnlyOnce(REVERTED_NOTICE);
         assertThat(bodiesTo(next)).containsOnlyOnce(REVERTED_NOTICE);
         assertThat(auditMetadata(member.id(), "PHONE_CHANGE_REVERTED")).contains(masked(old), masked(next));

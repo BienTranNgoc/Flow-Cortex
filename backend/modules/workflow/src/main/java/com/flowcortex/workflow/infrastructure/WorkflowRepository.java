@@ -2,6 +2,7 @@ package com.flowcortex.workflow.infrastructure;
 
 import com.flowcortex.workflow.domain.Workflow;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,14 +28,21 @@ public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
             + "com.flowcortex.workflow.api.WorkflowVisibility.PUBLIC)) ORDER BY w.name ASC")
     List<Workflow> findAllVisibleTo(@Param("ownerId") UUID ownerId);
 
-    @Query("SELECT w FROM Workflow w WHERE w.id = :id AND w.deletedAt IS NULL "
+    /** The readable-by-{@code :ownerId} condition on {@code w}, shared by every single-workflow visibility query. */
+    String VISIBLE_TO_OWNER = "w.deletedAt IS NULL "
             + "AND (w.ownerId = :ownerId OR (w.status = "
             + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND "
             + "(w.visibility = com.flowcortex.workflow.api.WorkflowVisibility.PUBLIC "
             + "OR (w.visibility = com.flowcortex.workflow.api.WorkflowVisibility.UNLISTED "
             + "AND EXISTS (SELECT 1 FROM WorkflowLinkGrant g "
-            + "WHERE g.workflowId = w.id AND g.userId = :ownerId)))))")
+            + "WHERE g.workflowId = w.id AND g.userId = :ownerId)))))";
+
+    @Query("SELECT w FROM Workflow w WHERE w.id = :id AND " + VISIBLE_TO_OWNER)
     Optional<Workflow> findVisibleTo(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
+
+    /** Which of {@code ids} are readable by {@code ownerId}, by the same rule as {@link #findVisibleTo}. */
+    @Query("SELECT w.id FROM Workflow w WHERE w.id IN :ids AND " + VISIBLE_TO_OWNER)
+    List<UUID> findVisibleIds(@Param("ids") Collection<UUID> ids, @Param("ownerId") UUID ownerId);
 
     Optional<Workflow> findByUnlistedKey(String unlistedKey);
 
