@@ -37,6 +37,11 @@ import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
 import { useMeQuery } from './features/auth/useAuth';
 import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
+import { LegalDocumentPage } from './features/legal/LegalDocumentPage';
+import { LegalHistoryPage } from './features/legal/LegalHistoryPage';
+import { LegalIndexPage } from './features/legal/LegalIndexPage';
+import { LegalLayout } from './features/legal/LegalLayout';
+import { LegalVersionPage } from './features/legal/LegalVersionPage';
 import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
 import { NotificationsPage } from './features/notifications/NotificationsPage';
@@ -140,6 +145,13 @@ export function App() {
               />
               <Route path="/account-deletion" element={<PendingDeletionPage />} />
             </Route>
+          </Route>
+          {/* Public: a signed-out visitor reads the legal documents too. */}
+          <Route path="legal" element={<LegalLayout />}>
+            <Route index element={<LegalIndexPage />} />
+            <Route path=":doc" element={<LegalDocumentPage />} />
+            <Route path=":doc/history" element={<LegalHistoryPage />} />
+            <Route path=":doc/history/:id" element={<LegalVersionPage />} />
           </Route>
           <Route
             element={

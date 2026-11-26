@@ -1,17 +1,25 @@
 import { getGetContentMediaUrl, type ContentMediaItem } from '@flow-cortex/api-client';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { errorAt, mediaPath, textPath } from './fieldPaths';
+import { errorAt, mediaPath, plainPath, textPath, type PlainPathField } from './fieldPaths';
 import {
+  DOC_VERSION,
+  EFFECTIVE_DATE,
+  LEGAL_DOC,
+  LEGAL_INDEX,
+  MAX_DOC_VERSION_CHARS,
   MAX_TEXT_CHARS,
+  MAX_TITLE_CHARS,
   MEDIA,
   RICH_TEXT,
   mediaIdOf,
   readText,
+  withField,
   withText,
   type ContentLocale,
   type Section,
 } from './documentModel';
+import { LegalIndexEditor } from './LegalIndexEditor';
 import { MediaThumb } from './MediaThumb';
 import { TextField } from './TextField';
 
@@ -26,7 +34,8 @@ interface SectionEditorProps {
   readonly canBrowseMedia: boolean;
   /** The library item the section names, when the picker handed it over in this session. */
   readonly mediaItem: ContentMediaItem | undefined;
-  readonly onEdit: (section: Section, path: string) => void;
+  /** `path` is the field the edit touched; absent for an edit that shifts rows. */
+  readonly onEdit: (section: Section, path?: string) => void;
   readonly onPickMedia: () => void;
 }
 
@@ -46,7 +55,7 @@ export function SectionEditor({
   const language = t(`content.languages.${locale}`);
   const hintId = useId();
 
-  const text = (field: 'body' | 'alt' | 'caption') => {
+  const text = (field: 'body' | 'alt' | 'caption' | 'title') => {
     const path = textPath(index, field, locale);
     return {
       value: readText(section.data[field])[locale],
@@ -57,7 +66,65 @@ export function SectionEditor({
     };
   };
 
-  const fields = { body: text('body'), alt: text('alt'), caption: text('caption') };
+  const fields = {
+    body: text('body'),
+    alt: text('alt'),
+    caption: text('caption'),
+    title: text('title'),
+  };
+
+  const plain = (field: PlainPathField) => {
+    const path = plainPath(index, field);
+    const value = section.data[field];
+    return {
+      value: typeof value === 'string' ? value : '',
+      readOnly,
+      hint: t('content.editor.sharedField'),
+      error: errors[path],
+      onChange: (next: string) => onEdit(withField(section, field, next), path),
+    };
+  };
+
+  if (section.type === LEGAL_DOC) {
+    return (
+      <>
+        <TextField
+          label={t('content.editor.fieldIn', { field: t('content.fields.title'), language })}
+          max={MAX_TITLE_CHARS}
+          {...fields.title}
+        />
+        <TextField
+          label={t('content.editor.fieldIn', { field: t('content.fields.body'), language })}
+          max={MAX_TEXT_CHARS}
+          rows={20}
+          {...fields.body}
+        />
+        <TextField
+          label={t('content.fields.docVersion')}
+          max={MAX_DOC_VERSION_CHARS}
+          {...plain(DOC_VERSION)}
+        />
+        <TextField
+          label={t('content.fields.effectiveDate')}
+          type="date"
+          {...plain(EFFECTIVE_DATE)}
+        />
+      </>
+    );
+  }
+
+  if (section.type === LEGAL_INDEX) {
+    return (
+      <LegalIndexEditor
+        section={section}
+        index={index}
+        locale={locale}
+        readOnly={readOnly}
+        errors={errors}
+        onEdit={onEdit}
+      />
+    );
+  }
 
   if (section.type === RICH_TEXT) {
     return (

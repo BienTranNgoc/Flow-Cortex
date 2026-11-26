@@ -62,6 +62,13 @@
   color: var(--ink);
 }
 
+.assistant-message__fixed--handoff {
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+}
+
 .assistant-sources {
   display: flex;
   flex-wrap: wrap;

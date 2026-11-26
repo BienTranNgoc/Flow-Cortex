@@ -12,6 +12,7 @@ import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.FacetRows;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
 import com.flowcortex.support.request.RequestRepository.RequestRow;
+import com.flowcortex.support.request.RequestRepository.SlaCounts;
 import com.flowcortex.support.request.RequestStateMachine.Move;
 import com.flowcortex.support.request.RequestStateMachine.Refusal;
 import com.flowcortex.support.request.RequestStateMachine.Transition;
@@ -29,6 +30,7 @@ import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.request.RequestViews.FacetCount;
 import com.flowcortex.support.request.RequestViews.Message;
 import com.flowcortex.support.request.RequestViews.Requester;
+import com.flowcortex.support.request.RequestViews.SlaSummary;
 import com.flowcortex.support.request.RequestViews.Summary;
 import com.flowcortex.support.request.RequestViews.SupportAssignee;
 import com.flowcortex.support.web.SupportProblemException;
@@ -215,10 +217,11 @@ class RequestService {
     }
 
     /** @param callerId what {@code assignee=me} stands for */
-    AdminPage page(String status, String type, String assignee, String created, String q, String sort, int page,
-            UUID callerId) {
-        InboxFilter filter = inboxFilter(status, type, assignee, created, q, sort, page, callerId);
-        List<RequestRow> rows = requests.page(filter, page * PAGE_SIZE, PAGE_SIZE);
+    AdminPage page(String status, String type, String assignee, String created, String q, String sla, String sort,
+            int page, UUID callerId) {
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, sla, sort, page, callerId);
+        SlaThresholds thresholds = SlaThresholds.read(settings);
+        List<RequestRow> rows = requests.page(filter, thresholds, page * PAGE_SIZE, PAGE_SIZE);
         Set<UUID> ids = new LinkedHashSet<>();
         rows.forEach(row -> ids.add(row.requesterId()));
         rows.stream().map(RequestRow::assigneeId).filter(Objects::nonNull).forEach(ids::add);
@@ -226,14 +229,22 @@ class RequestService {
         List<AdminSummary> items = rows.stream()
                 .map(row -> new AdminSummary(row.number(), row.type(), row.subject(), row.status().value(),
                         requester(row.requesterId(), emails), assignee(row.assigneeId(), emails), row.createdAt(),
-                        row.lastActivityAt()))
+                        row.lastActivityAt(),
+                        SlaLevel.of(row.status(), row.lastActivityAt(), filter.now(), thresholds).value()))
                 .toList();
-        return new AdminPage(items, page, PAGE_SIZE, requests.count(filter));
+        return new AdminPage(items, page, PAGE_SIZE, requests.count(filter, thresholds));
+    }
+
+    /** How many requests the list would show under these filters are overdue and how many are due soon. */
+    SlaSummary slaSummary(String status, String type, String assignee, String created, String q, UUID callerId) {
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, null, 0, callerId);
+        SlaCounts counts = requests.slaSummary(filter, SlaThresholds.read(settings));
+        return new SlaSummary(counts.overdue(), counts.dueSoon());
     }
 
     /** The inbox's counts under the same filters as {@link #page}, each ignoring its own selection. */
     AdminFacets facets(String status, String type, String assignee, String created, String q, UUID callerId) {
-        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, 0, callerId);
+        InboxFilter filter = inboxFilter(status, type, assignee, created, q, null, null, 0, callerId);
         FacetRows rows = requests.facets(filter, callerId);
         Map<UUID, String> emails = users.findEmailsByIds(
                 rows.people().stream().map(AssigneeGroup::id).toList());
@@ -331,8 +342,8 @@ class RequestService {
     }
 
     private InboxFilter inboxFilter(String status, String type, String assignee, String created, String q,
-            String sort, int page, UUID callerId) {
-        InboxQuery.Parsed parsed = InboxQuery.parse(status, type, assignee, created, q, sort, page, callerId,
+            String sla, String sort, int page, UUID callerId) {
+        InboxQuery.Parsed parsed = InboxQuery.parse(status, type, assignee, created, q, sla, sort, page, callerId,
                 Instant.now(clock));
         requireValid(parsed.errors());
         return parsed.filter();

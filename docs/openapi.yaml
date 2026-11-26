@@ -997,6 +997,35 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/rbac/runtime:
+    get:
+      tags:
+      - admin-rbac-runtime-controller
+      operationId: getRbacRuntime
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RbacRuntime"
+    put:
+      tags:
+      - admin-rbac-runtime-controller
+      operationId: updateRbacRuntime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RbacRuntimeUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RbacRuntime"
   /api/v1/admin/payment-settings/{key}:
     put:
       tags:
@@ -3560,6 +3589,16 @@ paths:
       tags:
       - notifications-controller
       operationId: markAllNotificationsRead
+      parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       responses:
         "200":
           description: OK
@@ -3567,6 +3606,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReadAllResult"
+        "400":
+          description: audience is not member or admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/step-up:
     post:
       tags:
@@ -3651,6 +3696,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/change/verify:
     post:
       tags:
@@ -3731,6 +3782,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
           content:
             application/problem+json:
               schema:
@@ -7849,6 +7906,15 @@ paths:
       - notifications-controller
       operationId: listNotifications
       parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       - name: filter
         in: query
         required: false
@@ -7872,7 +7938,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationPage"
         "400":
-          description: "filter, page or size out of range"
+          description: "audience, filter, page or size out of range"
           content:
             application/problem+json:
               schema:
@@ -7882,6 +7948,16 @@ paths:
       tags:
       - notifications-controller
       operationId: getUnreadNotificationCount
+      parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       responses:
         "200":
           description: OK
@@ -7889,6 +7965,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnreadCount"
+        "400":
+          description: audience is not member or admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone:
     get:
       tags:
@@ -8132,6 +8214,19 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/content/legal-index:
+    get:
+      tags:
+      - public-legal-index-controller
+      operationId: getLegalIndex
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalIndex"
       security: []
   /api/v1/content/documents/{slug}:
     get:
@@ -8639,6 +8734,14 @@ paths:
         schema:
           type: string
           maxLength: 100
+      - name: sla
+        in: query
+        description: Keeps only due-soon and overdue requests
+        required: false
+        schema:
+          type: string
+          enum:
+          - at_risk
       - name: sort
         in: query
         required: false
@@ -8666,7 +8769,7 @@ paths:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
           description: "validation-failed (errors.status, errors.type, errors.assignee,\
-            \ errors.created, errors.q, errors.sort, errors.page)"
+            \ errors.created, errors.q, errors.sla, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -8692,6 +8795,70 @@ paths:
                 $ref: "#/components/schemas/AdminSupportRequestDetail"
         "404":
           description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/sla-summary:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportSlaSummary
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportSlaSummary"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
           content:
             application/problem+json:
               schema:
@@ -9105,6 +9272,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/features:
+    get:
+      tags:
+      - admin-features-controller
+      operationId: listAdminFeatures
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeatureList"
   /api/v1/admin/content/documents:
     get:
       tags:
@@ -10023,6 +10202,8 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         createdAt:
           type: string
           format: date-time
@@ -10390,6 +10571,46 @@ components:
       - staff
       - superAdmin
       - system
+    RbacRuntimeUpdate:
+      type: object
+      properties:
+        mutationsEnabled:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 2000
+          minLength: 0
+      required:
+      - mutationsEnabled
+    RbacRuntime:
+      type: object
+      properties:
+        mutationsEnabled:
+          type: boolean
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        configuredValue:
+          type:
+          - boolean
+          - "null"
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - mutationsEnabled
+      - source
     PaymentSettingUpdate:
       type: object
       properties:
@@ -11464,6 +11685,25 @@ components:
           maxLength: 1000
       required:
       - question
+    SupportAssistantHandoff:
+      type: object
+      properties:
+        topic:
+          type:
+          - string
+          - "null"
+          enum:
+          - money
+          - security
+          - personal_data
+          - legal
+          - violation
+        subject:
+          type: string
+        description:
+          type: string
+      required:
+      - topic
     SupportAssistantQuota:
       type: object
       properties:
@@ -11505,10 +11745,14 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         sources:
           type: array
           items:
             $ref: "#/components/schemas/SupportAssistantSource"
+        handoff:
+          $ref: "#/components/schemas/SupportAssistantHandoff"
       required:
       - outcome
       - role
@@ -12811,17 +13055,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowArtifactStep"
+        dataStore:
+          type: array
+          description: The workflow's data-store entries; absent when it has none
+          items:
+            $ref: "#/components/schemas/WorkflowArtifactDataEntry"
       required:
       - exportedAt
       - formatVersion
       - steps
       - workflow
+    WorkflowArtifactDataEntry:
+      type: object
+      properties:
+        key:
+          type: string
+        dataType:
+          type: string
+        value:
+          description: Any JSON value
+      required:
+      - dataType
+      - key
+      - value
     WorkflowArtifactStep:
       type: object
       properties:
         stepOrder:
           type: integer
           format: int32
+          maximum: 32767
           minimum: 1
         name:
           type:
@@ -12839,8 +13102,9 @@ components:
           maxLength: 255
         config:
           type:
-          - string
+          - object
           - "null"
+          additionalProperties: {}
       required:
       - config
       - inputRef
@@ -14208,10 +14472,14 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         sources:
           type: array
           items:
             $ref: "#/components/schemas/SupportAssistantSource"
+        handoff:
+          $ref: "#/components/schemas/SupportAssistantHandoff"
         createdAt:
           type: string
           format: date-time
@@ -15095,6 +15363,30 @@ components:
         granted:
           type: integer
           format: int64
+    LegalIndex:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegalIndexEntry"
+      required:
+      - items
+    LegalIndexEntry:
+      type: object
+      properties:
+        slug:
+          type: string
+          description: "The document slug, e.g. legal-privacy"
+        path:
+          type: string
+          description: "The member page path, e.g. /legal/privacy"
+        label:
+          $ref: "#/components/schemas/LocalizedText"
+      required:
+      - label
+      - path
+      - slug
     ContentDocumentHistoryEntry:
       type: object
       properties:
@@ -15578,14 +15870,34 @@ components:
         lastActivityAt:
           type: string
           format: date-time
+        slaLevel:
+          type: string
+          enum:
+          - ok
+          - due_soon
+          - overdue
+          - paused
       required:
       - createdAt
       - lastActivityAt
       - number
       - requester
+      - slaLevel
       - status
       - subject
       - type
+    AdminSupportSlaSummary:
+      type: object
+      properties:
+        overdue:
+          type: integer
+          format: int64
+        dueSoon:
+          type: integer
+          format: int64
+      required:
+      - dueSoon
+      - overdue
     AdminSupportAssigneeFacet:
       type: object
       properties:
@@ -15860,7 +16172,18 @@ components:
           type: integer
           format: int64
           description: Codes sent in the last 24 hours
+        carrierCredential:
+          type: string
+          description: none when the wired sender holds no carrier credential; reseed_required
+            when its token chain was revoked and needs a new token; unseeded when
+            no token was loaded yet. The token is never returned
+          enum:
+          - none
+          - active
+          - reseed_required
+          - unseeded
       required:
+      - carrierCredential
       - gateEnabled
       - globalSendsPerDay
       - hashSecretConfigured
@@ -16056,6 +16379,29 @@ components:
       - page
       - size
       - total
+    AdminFeature:
+      type: object
+      properties:
+        name:
+          type: string
+        settingKey:
+          type:
+          - string
+          - "null"
+        value:
+          type: boolean
+      required:
+      - name
+      - value
+    AdminFeatureList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFeature"
+      required:
+      - items
     PageViewContentMediaItem:
       type: object
       properties:
@@ -16090,6 +16436,12 @@ components:
             type: string
         publicHistory:
           type: boolean
+        minSections:
+          type: integer
+          format: int32
+        maxSections:
+          type: integer
+          format: int32
         draftVersion:
           type: integer
           format: int32
@@ -16108,6 +16460,8 @@ components:
           format: date-time
       required:
       - draftVersion
+      - maxSections
+      - minSections
       - publicHistory
       - publishedVersion
       - sectionTypes

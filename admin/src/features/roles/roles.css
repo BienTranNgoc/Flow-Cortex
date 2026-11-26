@@ -13,6 +13,86 @@
   min-width: var(--target-min);
 }
 
+.roles-runtime {
+  margin-bottom: 1rem;
+}
+
+.roles-runtime__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.roles-runtime__label {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.roles-runtime__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
+
+.roles-runtime__change {
+  color: var(--admin-ink-4);
+  font-size: 0.88rem;
+}
+
+.roles-runtime__veto {
+  margin: 0.75rem 0 0;
+  color: var(--admin-warning);
+  font-weight: 600;
+}
+
+.roles-runtime__toggle {
+  min-width: 5rem;
+  min-height: var(--target-min);
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--admin-card-edge-strong);
+  border-radius: var(--radius-md);
+  background: var(--admin-card-surface-2);
+  color: var(--admin-ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.roles-runtime__toggle[aria-checked='true'] {
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+  color: var(--admin-primary-foreground);
+}
+
+.roles-runtime__toggle:hover:not(:disabled) {
+  background: var(--admin-chrome-hover);
+  color: var(--admin-ink);
+}
+
+.roles-runtime__toggle[aria-checked='true']:hover:not(:disabled) {
+  background: var(--admin-primary-hover);
+  color: var(--admin-primary-foreground);
+}
+
+.roles-runtime__toggle:active:not(:disabled) {
+  background: var(--admin-chrome-active);
+  color: var(--admin-ink);
+}
+
+.roles-runtime__toggle:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.roles-runtime__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .roles-detail__badges {
   display: flex;
   flex-wrap: wrap;

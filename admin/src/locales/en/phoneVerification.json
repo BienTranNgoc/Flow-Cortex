@@ -13,12 +13,20 @@
     "hashSecret": "Hash secret",
     "gate": "Phone gate",
     "dailyBudget": "Daily budget of codes",
-    "sentLast24h": "Codes sent in the last 24 hours"
+    "sentLast24h": "Codes sent in the last 24 hours",
+    "carrierCredential": "Carrier credential"
   },
   "sender": {
     "none": "None",
     "outbox": "Development outbox",
+    "vietguys": "VietGuys SMS",
     "custom": "Custom sender"
+  },
+  "carrierCredential": {
+    "none": "Not used",
+    "active": "Working",
+    "reseed_required": "Needs a new token",
+    "unseeded": "Not seeded"
   },
   "hashSecret": {
     "configured": "Configured",
