@@ -42,6 +42,12 @@ class UserActivityIT extends AbstractUserModuleIT {
 
     private static final String PASSWORD = "correct-password-1";
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    /**
+     * Statistics and index pages outlive the bulk rows, so these tables are vacuumed, re-analyzed and reindexed
+     * after removal; otherwise later ITs on the shared database plan against bloated indexes and pick others.
+     */
+    private static final List<String> PLAN_TABLES =
+            List.of("workflow", "workflow_run", "support_request", "admin_audit_event", "auth_event");
     private static final Map<String, String> OWNER_TIME_INDEX = Map.of(
             "admin_action", "idx_admin_audit_event_member_page",
             "auth", "idx_auth_event_user_id_occurred_at",
@@ -404,13 +410,20 @@ class UserActivityIT extends AbstractUserModuleIT {
             jdbc.update("INSERT INTO auth_event (id, user_id, type, occurred_at) SELECT gen_random_uuid(), ?, "
                     + "'LOGIN_SUCCESS', now() - g * interval '1 minute' FROM generate_series(1, 500) g", id);
             addOtherMembersRows(anchor, bulkActor);
-            for (String table : List.of("workflow", "workflow_run", "support_request", "admin_audit_event",
-                    "auth_event")) {
-                jdbc.execute("ANALYZE " + table);
-            }
+            analyzePlanTables();
             assertEveryPlanReadsTheOwnerIndex(id);
         } finally {
             removeBulkRows(id, anchor, bulkActor);
+            for (String table : PLAN_TABLES) {
+                jdbc.execute("VACUUM ANALYZE " + table);
+                jdbc.execute("REINDEX TABLE " + table);
+            }
+        }
+    }
+
+    private void analyzePlanTables() {
+        for (String table : PLAN_TABLES) {
+            jdbc.execute("ANALYZE " + table);
         }
     }
 

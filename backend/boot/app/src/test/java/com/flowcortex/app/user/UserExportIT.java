@@ -6,7 +6,6 @@ import static org.mockito.Mockito.doThrow;
 
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.user.api.UserView;
-import com.flowcortex.user.audit.JdbcAdminAuditWriter;
 import com.flowcortex.user.pii.PiiMask;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -23,8 +22,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -32,8 +29,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
-@TestPropertySource(properties = "flowcortex.users.export.max-rows=2")
-class UserExportIT extends AbstractUserModuleIT {
+class UserExportIT extends AbstractAuditSpyIT {
 
     private static final String PASSWORD = "correct-password-1";
     private static final String BOM = "﻿";
@@ -42,9 +38,6 @@ class UserExportIT extends AbstractUserModuleIT {
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @MockitoSpyBean
-    private JdbcAdminAuditWriter writer;
 
     private List<Map<String, Object>> exportRows(UserView actor) {
         return jdbc.queryForList("SELECT *, change_summary::text AS summary_text FROM admin_audit_event"

@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 import com.flowcortex.user.api.UserView;
-import com.flowcortex.user.audit.JdbcAdminAuditWriter;
 import com.flowcortex.user.pii.PiiMask;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +16,6 @@ import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
-class UserIdentityRevealIT extends AbstractUserModuleIT {
+class UserIdentityRevealIT extends AbstractAuditSpyIT {
 
     private static final String PASSWORD = "correct-password-1";
     private static final String LAN_NAME = "Lê Thị Lan";
@@ -35,9 +33,6 @@ class UserIdentityRevealIT extends AbstractUserModuleIT {
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @MockitoSpyBean
-    private JdbcAdminAuditWriter writer;
 
     private UserView seedAdmin(String label) {
         return userService.createInitialAdmin(uniqueEmail(label), PASSWORD, label);

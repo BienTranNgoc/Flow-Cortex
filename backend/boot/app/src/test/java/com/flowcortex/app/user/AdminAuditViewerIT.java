@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 import com.flowcortex.user.api.UserView;
-import com.flowcortex.user.audit.JdbcAdminAuditWriter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -33,12 +32,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterUtils;
 import org.springframework.jdbc.core.namedparam.ParsedSql;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
@@ -52,8 +48,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Testcontainers
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
-@TestPropertySource(properties = "flowcortex.admin-audit.export-max-rows=5")
-class AdminAuditViewerIT extends AbstractUserModuleIT {
+class AdminAuditViewerIT extends AbstractAuditSpyIT {
 
     private static final String PASSWORD = "correct-password-1";
     private static final String BASE = "/api/v1/admin/audit-log";
@@ -67,12 +62,6 @@ class AdminAuditViewerIT extends AbstractUserModuleIT {
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @MockitoSpyBean
-    private JdbcAdminAuditWriter writer;
-
-    @MockitoSpyBean
-    private NamedParameterJdbcTemplate namedJdbc;
 
     private UserView admin;
     private String adminToken;
@@ -670,6 +659,9 @@ class AdminAuditViewerIT extends AbstractUserModuleIT {
             }
         } finally {
             jdbc.update("DELETE FROM admin_audit_event");
+            // Statistics and index pages outlive the rows; later ITs on the shared database would plan against them.
+            jdbc.execute("VACUUM ANALYZE admin_audit_event");
+            jdbc.execute("REINDEX TABLE admin_audit_event");
         }
     }
 
