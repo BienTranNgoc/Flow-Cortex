@@ -15,7 +15,8 @@
     "description": "No payment setting is declared on this server."
   },
   "groups": {
-    "region": "Region"
+    "region": "Region",
+    "refund": "Refunds"
   },
   "settings": {
     "payment_region_gate_mode": {
@@ -26,6 +27,26 @@
         "shadow": "Shadow",
         "enforce": "Enforce"
       }
+    },
+    "payment_customer_refund_surface_enabled": {
+      "label": "Show the refund offer",
+      "description": "Whether the plan-page offer of the change-of-mind refund is shown to members at all. Turning it off hides that offer only; the refund block on a payment page keeps working. On by default."
+    },
+    "payment_customer_refund_enabled": {
+      "label": "Refund offer available",
+      "description": "Whether the plan-page offer says the change-of-mind refund can be requested right now. It governs only that offer and does not stop requests from the payment page. On by default."
+    },
+    "payment_change_of_mind_limit_enabled": {
+      "label": "Limit refund requests",
+      "description": "Whether a member's change-of-mind refund requests are limited to the number below within the window below. When off, a member can request without a count. The limit is advisory while every request is decided by a person, and a failed settings read turns it off. On by default."
+    },
+    "payment_change_of_mind_limit_uses": {
+      "label": "Refund requests allowed",
+      "description": "How many change-of-mind refund requests a member may have pending or approved within the window. Members who are over it after a change are told when their next request opens. Default 2."
+    },
+    "payment_change_of_mind_limit_window_months": {
+      "label": "Refund limit window (months)",
+      "description": "How many calendar months back the limit counts a member's refund requests. Default 6."
     }
   },
   "source": {

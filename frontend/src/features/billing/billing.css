@@ -354,3 +354,185 @@
   font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
+
+/* ===== Refund block and request dialog ================================== */
+
+.refund-block {
+  min-width: 0;
+  margin: 0 0 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.refund-block__title {
+  margin: 0 0 0.5rem;
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.refund-block__text {
+  margin: 0 0 0.5rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.refund-block__note {
+  margin: 0 0 0.5rem;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.refund-block__notice {
+  margin: 0 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.refund-block__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.refund-block__actions button {
+  margin-right: 0;
+}
+
+.refund-block__policy {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.refund-block__policy:hover {
+  text-decoration: underline;
+}
+
+.refund-primary {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+  .refund-primary:not(:disabled, [aria-disabled='true']):hover {
+    border-color: var(--primary-hover);
+    background: var(--primary-hover);
+  }
+}
+
+.refund-block button[aria-disabled='true'],
+.refund-dialog button[aria-disabled='true'] {
+  cursor: progress;
+}
+
+.refund-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: 100%;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.refund-dialog[open] {
+  animation: refund-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.refund-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.refund-dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.refund-dialog__text {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.refund-dialog__label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.refund-dialog__input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.refund-dialog__input:hover {
+  border-color: var(--input-border-hover);
+}
+
+.refund-dialog__input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.refund-dialog__input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.refund-dialog__hint {
+  margin: 0.4rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+.refund-dialog__error {
+  margin: 0.5rem 0 0;
+  color: var(--red);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.refund-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.refund-dialog__actions button {
+  margin-right: 0;
+}
+
+@keyframes refund-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refund-dialog[open] {
+    animation: none;
+  }
+}

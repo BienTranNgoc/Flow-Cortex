@@ -67,5 +67,46 @@
       "payment_expired": "Payment expired",
       "code": "Provider code {{code}}"
     }
+  },
+  "refund": {
+    "title": "Refund",
+    "invite": {
+      "days": "You can still ask for a refund for {{days}} more days.",
+      "today": "Today is the last day you can ask for a refund."
+    },
+    "request": "Request a refund",
+    "processing": {
+      "line": "Your refund request {{code}} is being handled.",
+      "sent": "Sent",
+      "cancel": "Cancel request",
+      "cancelling": "Cancelling…",
+      "cancelRefused": "This request is already being handled and can no longer be cancelled.",
+      "cancelFailed": "We could not cancel the request. Try again."
+    },
+    "rejected": {
+      "line": "Your refund request {{code}} was declined.",
+      "reason": "Reason: {{reason}}"
+    },
+    "refused": {
+      "window_elapsed": "The {{days}}-day window to ask for a refund on this payment has ended.",
+      "turn_limit_reached": "You have reached the limit on refund requests ({{limit}} in any {{months}}-month period). Your next request opens on {{date}}.",
+      "turn_limit_reached_no_date": "You have reached the limit on refund requests ({{limit}} in any {{months}}-month period).",
+      "not_settled": "This payment has not been completed, so there is nothing to refund yet.",
+      "already_refunded": "This payment has already been refunded or is being refunded.",
+      "previously_rejected": "A refund request for this payment was already declined, so it cannot be requested again.",
+      "generic": "A refund cannot be requested for this payment."
+    },
+    "policy": "Refund policy",
+    "policyNewTab": "(opens in a new tab)",
+    "dialog": {
+      "title": "Request a refund",
+      "description": "Tell us why you want this payment refunded. We read every request.",
+      "reasonLabel": "Reason",
+      "reasonHint": "Write at least {{min}} characters.",
+      "failure": "We could not send your request. Your text is kept; try again.",
+      "cancel": "Close",
+      "send": "Send request",
+      "sending": "Sending…"
+    }
   }
 }

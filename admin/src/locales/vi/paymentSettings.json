@@ -15,7 +15,8 @@
     "description": "Máy chủ này chưa khai báo cài đặt thanh toán nào."
   },
   "groups": {
-    "region": "Khu vực"
+    "region": "Khu vực",
+    "refund": "Hoàn tiền"
   },
   "settings": {
     "payment_region_gate_mode": {
@@ -26,6 +27,26 @@
         "shadow": "Giám sát",
         "enforce": "Chặn"
       }
+    },
+    "payment_customer_refund_surface_enabled": {
+      "label": "Hiển thị ưu đãi hoàn tiền",
+      "description": "Có hiển thị cho thành viên lời đề nghị hoàn tiền do đổi ý ở trang gói hay không. Tắt chỉ ẩn lời đề nghị đó; khối hoàn tiền trên trang thanh toán vẫn hoạt động. Mặc định bật."
+    },
+    "payment_customer_refund_enabled": {
+      "label": "Cho phép ưu đãi hoàn tiền",
+      "description": "Lời đề nghị ở trang gói có nói rằng có thể yêu cầu hoàn tiền do đổi ý ngay lúc này hay không. Công tắc này chỉ áp dụng cho lời đề nghị đó và không chặn yêu cầu gửi từ trang thanh toán. Mặc định bật."
+    },
+    "payment_change_of_mind_limit_enabled": {
+      "label": "Giới hạn yêu cầu hoàn tiền",
+      "description": "Có giới hạn số yêu cầu hoàn tiền do đổi ý của mỗi thành viên theo số lần và khoảng thời gian bên dưới hay không. Khi tắt, thành viên gửi yêu cầu không bị đếm. Giới hạn chỉ mang tính tham khảo khi mọi yêu cầu đều do người xét duyệt, và khi đọc cài đặt thất bại thì giới hạn tự tắt. Mặc định bật."
+    },
+    "payment_change_of_mind_limit_uses": {
+      "label": "Số yêu cầu hoàn tiền được phép",
+      "description": "Số yêu cầu hoàn tiền do đổi ý mà một thành viên có thể có ở trạng thái chờ hoặc đã duyệt trong khoảng thời gian giới hạn. Thành viên vượt mức sau khi bạn đổi sẽ được báo khi nào được gửi yêu cầu tiếp theo. Mặc định 2."
+    },
+    "payment_change_of_mind_limit_window_months": {
+      "label": "Khoảng thời gian giới hạn hoàn tiền (tháng)",
+      "description": "Giới hạn đếm các yêu cầu hoàn tiền của thành viên trong bao nhiêu tháng dương lịch gần nhất. Mặc định 6."
     }
   },
   "source": {
