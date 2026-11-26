@@ -162,6 +162,21 @@ export interface AccessTokenResponse {
   expiresIn?: number;
 }
 
+export interface ChatFolderName {
+  /**
+   * @minLength 1
+   * @maxLength 60
+   */
+  name?: string;
+}
+
+export interface ChatFolder {
+  id?: string;
+  name?: string;
+  conversationCount?: number;
+  createdAt?: string;
+}
+
 export interface ChatConversationTitle {
   /** @maxLength 80 */
   title?: string;
@@ -172,6 +187,21 @@ export interface ChatConversation {
   title?: string;
   lastActivityAt?: string;
   createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
+}
+
+export interface ChatConversationPin {
+  pinned: boolean;
+}
+
+export interface ChatConversationFolder {
+  /**
+   * The folder to file into; null returns the conversation to Recent
+   * @nullable
+   */
+  folderId?: string | null;
 }
 
 export interface ProfileUpdateRequest {
@@ -232,6 +262,8 @@ export const MeResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface MeResponse {
@@ -268,6 +300,41 @@ export interface LocaleRequest {
 
 export interface LocaleResponse {
   locale: string;
+}
+
+export interface AdminTrendTagOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   */
+  ids: string[];
+}
+
+export interface AdminTrendTag {
+  id: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
+}
+
+export interface AdminTrendCategoryOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   * @items.minLength 1
+   */
+  keys: string[];
+}
+
+export interface AdminTrendCategory {
+  key: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -586,6 +653,8 @@ export const RoleResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface RoleResponse {
@@ -2149,6 +2218,9 @@ export interface ChatConversationCreated {
   title?: string;
   lastActivityAt?: string;
   createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
   userMessage?: ChatMessage;
   assistantMessageId?: string;
 }
@@ -2380,6 +2452,32 @@ export interface ImportReviewResponse {
   outbound: boolean;
   issues: ImportIssueResponse[];
   outboundTargets: OutboundTargetResponse[];
+}
+
+export interface AdminTrendTagCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn: string;
+}
+
+export interface AdminTrendCategoryCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn: string;
 }
 
 export type AdminSupportRequestReplyStatus =
@@ -2752,6 +2850,34 @@ export interface PrivacySettings {
   activity?: PrivacySettingsActivity;
   message?: PrivacySettingsMessage;
   stats?: PrivacySettingsStats;
+}
+
+export interface AdminTrendTagUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn?: string;
+  visible?: boolean;
+}
+
+export interface AdminTrendCategoryUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn?: string;
+  visible?: boolean;
 }
 
 export interface UpdateRoleRequest {
@@ -3739,9 +3865,43 @@ export interface Summary {
   extraHeaderNames?: string[];
 }
 
+export interface ChatFolderList {
+  items?: ChatFolder[];
+}
+
+export interface ChatConversationListItem {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  preview?: string | null;
+  /** True when the latest text was longer than the preview cap */
+  previewTruncated?: boolean;
+}
+
 export interface ChatConversationList {
-  items?: ChatConversation[];
+  items?: ChatConversationListItem[];
+  /**
+   * Opaque cursor of the next page; null on the last page
+   * @nullable
+   */
+  nextCursor?: string | null;
   chatEnabled?: boolean;
+}
+
+export interface ChatConversationCounts {
+  total?: number;
+  pinned?: number;
+  today?: number;
+  last7Days?: number;
+  earlier?: number;
 }
 
 export interface CapabilitiesResponse {
@@ -4074,6 +4234,11 @@ export interface WorkflowReportResponse {
   series: DayCountResponse[];
 }
 
+export interface AdminTrendTaxonomy {
+  categories: AdminTrendCategory[];
+  tags: AdminTrendTag[];
+}
+
 export type AdminSupportRequestSummaryType =
   (typeof AdminSupportRequestSummaryType)[keyof typeof AdminSupportRequestSummaryType];
 
@@ -4299,6 +4464,8 @@ export const PermissionCatalogEntryKey = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface PermissionCatalogEntry {
@@ -4634,6 +4801,41 @@ export type ListDriveItemsParams = {
   role?: string;
   contentType?: string;
 };
+
+export type ListChatConversationsParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  cursor?: string;
+  sort?: ListChatConversationsSort;
+  pinned?: ListChatConversationsPinned;
+  /**
+   * A folder id, or none for conversations outside every folder
+   */
+  folder?: string;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type ListChatConversationsSort =
+  (typeof ListChatConversationsSort)[keyof typeof ListChatConversationsSort];
+
+export const ListChatConversationsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+} as const;
+
+export type ListChatConversationsPinned =
+  (typeof ListChatConversationsPinned)[keyof typeof ListChatConversationsPinned];
+
+export const ListChatConversationsPinned = {
+  only: 'only',
+  exclude: 'exclude',
+} as const;
 
 export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
 
@@ -5028,6 +5230,16 @@ export type ListContentDocumentHistoryParams = {
    * @maximum 100
    */
   size?: number;
+};
+
+export type CountChatConversationsParams = {
+  q?: string;
+  /**
+   * A folder id, or none for conversations outside every folder
+   */
+  folder?: string;
+  todayStart: string;
+  weekStart: string;
 };
 
 export type GetBuilderRunsChartParams = {
@@ -6269,6 +6481,106 @@ export const setPassword = async (
   });
 };
 
+export type renameChatFolderResponse200 = {
+  data: ChatFolder;
+  status: 200;
+};
+
+export type renameChatFolderResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameChatFolderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameChatFolderResponseSuccess = renameChatFolderResponse200 & {
+  headers: Headers;
+};
+export type renameChatFolderResponseError = (
+  renameChatFolderResponse400 | renameChatFolderResponse404
+) & {
+  headers: Headers;
+};
+
+export type renameChatFolderResponse =
+  renameChatFolderResponseSuccess | renameChatFolderResponseError;
+
+export const getRenameChatFolderUrl = (id: string) => {
+  return `/api/v1/chat/folders/${id}`;
+};
+
+export const renameChatFolder = async (
+  id: string,
+  chatFolderName: ChatFolderName,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameChatFolderResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameChatFolderResponse>(getRenameChatFolderUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatFolderName),
+  });
+};
+
+export type deleteChatFolderResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteChatFolderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteChatFolderResponseSuccess = deleteChatFolderResponse204 & {
+  headers: Headers;
+};
+export type deleteChatFolderResponseError = deleteChatFolderResponse404 & {
+  headers: Headers;
+};
+
+export type deleteChatFolderResponse =
+  deleteChatFolderResponseSuccess | deleteChatFolderResponseError;
+
+export const getDeleteChatFolderUrl = (id: string) => {
+  return `/api/v1/chat/folders/${id}`;
+};
+
+/**
+ * The folder's conversations are kept and return to Recent with their pinned state.
+ */
+export const deleteChatFolder = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteChatFolderResponse> => {
+  return customFetch<deleteChatFolderResponse>(getDeleteChatFolderUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type renameChatConversationResponse200 = {
   data: ChatConversation;
   status: 200;
@@ -6363,6 +6675,125 @@ export const deleteChatConversation = async (
   return customFetch<deleteChatConversationResponse>(getDeleteChatConversationUrl(id), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type pinChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type pinChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type pinChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pinChatConversationResponseSuccess = pinChatConversationResponse200 & {
+  headers: Headers;
+};
+export type pinChatConversationResponseError = (
+  pinChatConversationResponse400 | pinChatConversationResponse404
+) & {
+  headers: Headers;
+};
+
+export type pinChatConversationResponse =
+  pinChatConversationResponseSuccess | pinChatConversationResponseError;
+
+export const getPinChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/pin`;
+};
+
+export const pinChatConversation = async (
+  id: string,
+  chatConversationPin: ChatConversationPin,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pinChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<pinChatConversationResponse>(getPinChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationPin),
+  });
+};
+
+export type moveChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type moveChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type moveChatConversationResponseSuccess = moveChatConversationResponse200 & {
+  headers: Headers;
+};
+export type moveChatConversationResponseError = moveChatConversationResponse404 & {
+  headers: Headers;
+};
+
+export type moveChatConversationResponse =
+  moveChatConversationResponseSuccess | moveChatConversationResponseError;
+
+export const getMoveChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/folder`;
+};
+
+export const moveChatConversation = async (
+  id: string,
+  chatConversationFolder: ChatConversationFolder,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<moveChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<moveChatConversationResponse>(getMoveChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationFolder),
   });
 };
 
@@ -6588,6 +7019,130 @@ export const reorderAdminWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type reorderAdminTrendTagsResponse200 = {
+  data: AdminTrendTag[];
+  status: 200;
+};
+
+export type reorderAdminTrendTagsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendTagsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendTagsResponseSuccess = reorderAdminTrendTagsResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendTagsResponseError = (
+  reorderAdminTrendTagsResponse400 | reorderAdminTrendTagsResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendTagsResponse =
+  reorderAdminTrendTagsResponseSuccess | reorderAdminTrendTagsResponseError;
+
+export const getReorderAdminTrendTagsUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags/order`;
+};
+
+export const reorderAdminTrendTags = async (
+  adminTrendTagOrderRequest: AdminTrendTagOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendTagsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendTagsResponse>(getReorderAdminTrendTagsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagOrderRequest),
+  });
+};
+
+export type reorderAdminTrendCategoriesResponse200 = {
+  data: AdminTrendCategory[];
+  status: 200;
+};
+
+export type reorderAdminTrendCategoriesResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendCategoriesResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendCategoriesResponseSuccess = reorderAdminTrendCategoriesResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendCategoriesResponseError = (
+  reorderAdminTrendCategoriesResponse400 | reorderAdminTrendCategoriesResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendCategoriesResponse =
+  reorderAdminTrendCategoriesResponseSuccess | reorderAdminTrendCategoriesResponseError;
+
+export const getReorderAdminTrendCategoriesUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories/order`;
+};
+
+export const reorderAdminTrendCategories = async (
+  adminTrendCategoryOrderRequest: AdminTrendCategoryOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendCategoriesResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendCategoriesResponse>(getReorderAdminTrendCategoriesUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryOrderRequest),
   });
 };
 
@@ -12640,24 +13195,132 @@ export const reportClientError = async (
   });
 };
 
+export type listChatFoldersResponse200 = {
+  data: ChatFolderList;
+  status: 200;
+};
+
+export type listChatFoldersResponseSuccess = listChatFoldersResponse200 & {
+  headers: Headers;
+};
+export type listChatFoldersResponse = listChatFoldersResponseSuccess;
+
+export const getListChatFoldersUrl = () => {
+  return `/api/v1/chat/folders`;
+};
+
+export const listChatFolders = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatFoldersResponse> => {
+  return customFetch<listChatFoldersResponse>(getListChatFoldersUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createChatFolderResponse201 = {
+  data: ChatFolder;
+  status: 201;
+};
+
+export type createChatFolderResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createChatFolderResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createChatFolderResponseSuccess = createChatFolderResponse201 & {
+  headers: Headers;
+};
+export type createChatFolderResponseError = (
+  createChatFolderResponse400 | createChatFolderResponse409
+) & {
+  headers: Headers;
+};
+
+export type createChatFolderResponse =
+  createChatFolderResponseSuccess | createChatFolderResponseError;
+
+export const getCreateChatFolderUrl = () => {
+  return `/api/v1/chat/folders`;
+};
+
+export const createChatFolder = async (
+  chatFolderName: ChatFolderName,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createChatFolderResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createChatFolderResponse>(getCreateChatFolderUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatFolderName),
+  });
+};
+
 export type listChatConversationsResponse200 = {
   data: ChatConversationList;
   status: 200;
 };
 
+export type listChatConversationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type listChatConversationsResponseSuccess = listChatConversationsResponse200 & {
   headers: Headers;
 };
-export type listChatConversationsResponse = listChatConversationsResponseSuccess;
+export type listChatConversationsResponseError = listChatConversationsResponse400 & {
+  headers: Headers;
+};
 
-export const getListChatConversationsUrl = () => {
-  return `/api/v1/chat/conversations`;
+export type listChatConversationsResponse =
+  listChatConversationsResponseSuccess | listChatConversationsResponseError;
+
+export const getListChatConversationsUrl = (params?: ListChatConversationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/chat/conversations?${stringifiedParams}`
+    : `/api/v1/chat/conversations`;
 };
 
 export const listChatConversations = async (
+  params?: ListChatConversationsParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listChatConversationsResponse> => {
-  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(), {
+  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -13826,6 +14489,137 @@ export const reviewAdminWorkflowImport = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(workflowArtifact),
+  });
+};
+
+export type createAdminTrendTagResponse201 = {
+  data: AdminTrendTag;
+  status: 201;
+};
+
+export type createAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendTagResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendTagResponseSuccess = createAdminTrendTagResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendTagResponseError = (
+  createAdminTrendTagResponse400 | createAdminTrendTagResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendTagResponse =
+  createAdminTrendTagResponseSuccess | createAdminTrendTagResponseError;
+
+export const getCreateAdminTrendTagUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags`;
+};
+
+export const createAdminTrendTag = async (
+  adminTrendTagCreateRequest: AdminTrendTagCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendTagResponse>(getCreateAdminTrendTagUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagCreateRequest),
+  });
+};
+
+export type createAdminTrendCategoryResponse201 = {
+  data: AdminTrendCategory;
+  status: 201;
+};
+
+export type createAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendCategoryResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createAdminTrendCategoryResponseSuccess = createAdminTrendCategoryResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendCategoryResponseError = (
+  | createAdminTrendCategoryResponse400
+  | createAdminTrendCategoryResponse409
+  | createAdminTrendCategoryResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendCategoryResponse =
+  createAdminTrendCategoryResponseSuccess | createAdminTrendCategoryResponseError;
+
+export const getCreateAdminTrendCategoryUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories`;
+};
+
+export const createAdminTrendCategory = async (
+  adminTrendCategoryCreateRequest: AdminTrendCategoryCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendCategoryResponse>(getCreateAdminTrendCategoryUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryCreateRequest),
   });
 };
 
@@ -16213,6 +17007,207 @@ export const updateAdminWorkflowStep = async (
   });
 };
 
+export type deleteAdminTrendTagResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendTagResponseSuccess = deleteAdminTrendTagResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendTagResponseError = deleteAdminTrendTagResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendTagResponse =
+  deleteAdminTrendTagResponseSuccess | deleteAdminTrendTagResponseError;
+
+export const getDeleteAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const deleteAdminTrendTag = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendTagResponse> => {
+  return customFetch<deleteAdminTrendTagResponse>(getDeleteAdminTrendTagUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendTagResponse200 = {
+  data: AdminTrendTag;
+  status: 200;
+};
+
+export type updateAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendTagResponseSuccess = updateAdminTrendTagResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendTagResponseError = (
+  updateAdminTrendTagResponse400 | updateAdminTrendTagResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendTagResponse =
+  updateAdminTrendTagResponseSuccess | updateAdminTrendTagResponseError;
+
+export const getUpdateAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const updateAdminTrendTag = async (
+  id: string,
+  adminTrendTagUpdateRequest: AdminTrendTagUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendTagResponse>(getUpdateAdminTrendTagUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagUpdateRequest),
+  });
+};
+
+export type deleteAdminTrendCategoryResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminTrendCategoryResponseSuccess = deleteAdminTrendCategoryResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendCategoryResponseError = (
+  deleteAdminTrendCategoryResponse404 | deleteAdminTrendCategoryResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendCategoryResponse =
+  deleteAdminTrendCategoryResponseSuccess | deleteAdminTrendCategoryResponseError;
+
+export const getDeleteAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const deleteAdminTrendCategory = async (
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendCategoryResponse> => {
+  return customFetch<deleteAdminTrendCategoryResponse>(getDeleteAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendCategoryResponse200 = {
+  data: AdminTrendCategory;
+  status: 200;
+};
+
+export type updateAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendCategoryResponseSuccess = updateAdminTrendCategoryResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendCategoryResponseError = (
+  updateAdminTrendCategoryResponse400 | updateAdminTrendCategoryResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendCategoryResponse =
+  updateAdminTrendCategoryResponseSuccess | updateAdminTrendCategoryResponseError;
+
+export const getUpdateAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const updateAdminTrendCategory = async (
+  key: string,
+  adminTrendCategoryUpdateRequest: AdminTrendCategoryUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendCategoryResponse>(getUpdateAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryUpdateRequest),
+  });
+};
+
 export type getAdminRoleResponse200 = {
   data: RoleResponse;
   status: 200;
@@ -18586,6 +19581,52 @@ export const listChatMessages = async (
   });
 };
 
+export type countChatConversationsResponse200 = {
+  data: ChatConversationCounts;
+  status: 200;
+};
+
+export type countChatConversationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type countChatConversationsResponseSuccess = countChatConversationsResponse200 & {
+  headers: Headers;
+};
+export type countChatConversationsResponseError = countChatConversationsResponse400 & {
+  headers: Headers;
+};
+
+export type countChatConversationsResponse =
+  countChatConversationsResponseSuccess | countChatConversationsResponseError;
+
+export const getCountChatConversationsUrl = (params: CountChatConversationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/chat/conversations/counts?${stringifiedParams}`
+    : `/api/v1/chat/conversations/counts`;
+};
+
+export const countChatConversations = async (
+  params: CountChatConversationsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<countChatConversationsResponse> => {
+  return customFetch<countChatConversationsResponse>(getCountChatConversationsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type capabilitiesResponse200 = {
   data: CapabilitiesResponse;
   status: 200;
@@ -19270,6 +20311,29 @@ export const exportAdminWorkflows = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<exportAdminWorkflowsResponse> => {
   return customFetch<exportAdminWorkflowsResponse>(getExportAdminWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminTrendTaxonomyResponse200 = {
+  data: AdminTrendTaxonomy;
+  status: 200;
+};
+
+export type listAdminTrendTaxonomyResponseSuccess = listAdminTrendTaxonomyResponse200 & {
+  headers: Headers;
+};
+export type listAdminTrendTaxonomyResponse = listAdminTrendTaxonomyResponseSuccess;
+
+export const getListAdminTrendTaxonomyUrl = () => {
+  return `/api/v1/admin/trend/taxonomy`;
+};
+
+export const listAdminTrendTaxonomy = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminTrendTaxonomyResponse> => {
+  return customFetch<listAdminTrendTaxonomyResponse>(getListAdminTrendTaxonomyUrl(), {
     ...options,
     method: 'GET',
   });
