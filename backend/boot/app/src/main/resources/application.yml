@@ -313,6 +313,13 @@ flowcortex:
   admin-audit:
     origin-retention: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:365d}
     retention-interval: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:1h}
+  # Deleted trend templates are purged after `grace`, a pass taking at most `batch-size` of them.
+  # Grace must stay above the longest media URL lifetime plus the longest run that reads template media.
+  trend:
+    purge:
+      interval: ${FLOWCORTEX_TREND_PURGE_INTERVAL:15m}
+      grace: ${FLOWCORTEX_TREND_PURGE_GRACE:8d}
+      batch-size: ${FLOWCORTEX_TREND_PURGE_BATCH_SIZE:20}
   # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
   # gradually; over it answers 429 with Retry-After before the password is checked. Budgets are
   # shared by every backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
@@ -750,6 +757,18 @@ flowcortex:
     provider-video-max-runtime: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME:10m}
     provider-video-queue-timeout: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:15m}
     presign-ttl: 15m
+    # Video editor limits (EditorLimitProperties). An admin value from the console Settings page
+    # overrides these; a value outside its bounds fails startup naming the key.
+    editor:
+      project-max-versions: ${FLOWCORTEX_MEDIA_EDITOR_PROJECT_MAX_VERSIONS:50}
+      project-max-bytes: ${FLOWCORTEX_MEDIA_EDITOR_PROJECT_MAX_BYTES:2000000}
+      batch-max-items: ${FLOWCORTEX_MEDIA_EDITOR_BATCH_MAX_ITEMS:4}
+      take-check-daily-max: ${FLOWCORTEX_MEDIA_EDITOR_TAKE_CHECK_DAILY_MAX:14}
+      stems-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_STEMS_MAX_DURATION_SEC:600}
+      speakers-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_SPEAKERS_MAX_DURATION_SEC:600}
+      derive-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_DERIVE_MAX_DURATION_SEC:600}
+      beats-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_BEATS_MAX_DURATION_SEC:600}
+      audio-tools-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_AUDIO_TOOLS_MAX_DURATION_SEC:3600}
     upload:
       # Per-kind size caps; the kind comes from the file's canonical MIME type. The video cap
       # still honours FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES, its name before per-kind caps.
