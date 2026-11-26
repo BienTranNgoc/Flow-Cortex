@@ -444,6 +444,65 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/folders/{id}:
+    put:
+      tags:
+      - chat-folder-controller
+      operationId: renameChatFolder
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatFolderName"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatFolder"
+        "400":
+          description: validation-failed (errors.name)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-folder-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - chat-folder-controller
+      description: The folder's conversations are kept and return to Recent with their
+        pinned state.
+      operationId: deleteChatFolder
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: chat-folder-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/chat/conversations/{id}:
     put:
       tags:
@@ -497,6 +556,75 @@ paths:
           description: No Content
         "404":
           description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{id}/pin:
+    put:
+      tags:
+      - conversation-controller
+      operationId: pinChatConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConversationPin"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: validation-failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{id}/folder:
+    put:
+      tags:
+      - chat-folder-controller
+      operationId: moveChatConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConversationFolder"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "404":
+          description: chat-conversation-not-found or chat-folder-not-found; nothing
+            moves
           content:
             application/problem+json:
               schema:
@@ -4349,11 +4477,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/chat/folders:
+    get:
+      tags:
+      - chat-folder-controller
+      operationId: listChatFolders
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatFolderList"
+    post:
+      tags:
+      - chat-folder-controller
+      operationId: createChatFolder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatFolderName"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatFolder"
+        "400":
+          description: validation-failed (errors.name)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: chat-folder-limit; the member holds the most folders allowed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/chat/conversations:
     get:
       tags:
       - conversation-controller
       operationId: listChatConversations
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          maximum: 100
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - oldest
+      - name: pinned
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - only
+          - exclude
+      - name: folder
+        in: query
+        description: "A folder id, or none for conversations outside every folder"
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
       responses:
         "200":
           description: OK
@@ -4361,6 +4573,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatConversationList"
+        "400":
+          description: validation-failed; a field error per refused parameter
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
     post:
       tags:
       - conversation-controller
@@ -8780,6 +8998,48 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/counts:
+    get:
+      tags:
+      - conversation-controller
+      operationId: countChatConversations
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: folder
+        in: query
+        description: "A folder id, or none for conversations outside every folder"
+        required: false
+        schema:
+          type: string
+      - name: todayStart
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: weekStart
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversationCounts"
+        "400":
+          description: validation-failed; a field error per refused parameter
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/capabilities:
     get:
       tags:
@@ -10339,6 +10599,27 @@ components:
         expiresIn:
           type: integer
           format: int64
+    ChatFolderName:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          minLength: 1
+    ChatFolder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        conversationCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
     ChatConversationTitle:
       type: object
       properties:
@@ -10359,6 +10640,29 @@ components:
         createdAt:
           type: string
           format: date-time
+        pinned:
+          type: boolean
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+    ChatConversationPin:
+      type: object
+      properties:
+        pinned:
+          type: boolean
+      required:
+      - pinned
+    ChatConversationFolder:
+      type: object
+      properties:
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The folder to file into; null returns the conversation to Recent
     ProfileUpdateRequest:
       type: object
       properties:
@@ -13320,6 +13624,13 @@ components:
         createdAt:
           type: string
           format: date-time
+        pinned:
+          type: boolean
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
         userMessage:
           $ref: "#/components/schemas/ChatMessage"
         assistantMessageId:
@@ -16109,15 +16420,74 @@ components:
           type: array
           items:
             type: string
+    ChatFolderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatFolder"
     ChatConversationList:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/ChatConversation"
+            $ref: "#/components/schemas/ChatConversationListItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+          description: Opaque cursor of the next page; null on the last page
         chatEnabled:
           type: boolean
+    ChatConversationListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        lastActivityAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        pinned:
+          type: boolean
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        preview:
+          type:
+          - string
+          - "null"
+          maxLength: 200
+        previewTruncated:
+          type: boolean
+          description: True when the latest text was longer than the preview cap
+    ChatConversationCounts:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        pinned:
+          type: integer
+          format: int32
+        today:
+          type: integer
+          format: int32
+        last7Days:
+          type: integer
+          format: int32
+        earlier:
+          type: integer
+          format: int32
     CapabilitiesResponse:
       type: object
       properties:
