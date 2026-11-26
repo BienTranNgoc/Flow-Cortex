@@ -49,6 +49,8 @@ public enum Permission {
     PAYMENT_SETTING_VIEW("payment.setting.view", false),
     PAYMENT_SETTING_UPDATE("payment.setting.update", false),
     USER_ACCOUNT_EXPORT("user.account.export", false),
+    CONTENT_TREND_TEMPLATE_VIEW("content.trend_template.view", false),
+    CONTENT_TREND_TEMPLATE_MANAGE("content.trend_template.manage", false),
     SYSTEM_AUDIT_LOG_VIEW("system.audit_log.view", false),
     SYSTEM_AUDIT_LOG_EXPORT("system.audit_log.export", false),
     USER_ACCOUNT_VIEW_PII("user.account.view_pii", false);

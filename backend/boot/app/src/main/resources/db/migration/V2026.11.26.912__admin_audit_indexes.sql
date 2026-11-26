@@ -2,7 +2,7 @@
 -- a table that only grows is scanned. Flyway runs a script made only of CONCURRENTLY statements outside a
 -- transaction, so keep this file to those statements. A build that fails leaves an INVALID index; the DROP ... IF
 -- EXISTS lines clear it so the migration can simply be retried. The search index needs pg_trgm from
--- V2026.11.24.020.
+-- V2026.11.26.910.
 
 -- Keyset paging: every filter shape leads with its equality columns and ends in the (occurred_at, id) order.
 DROP INDEX CONCURRENTLY IF EXISTS idx_admin_audit_event_page;

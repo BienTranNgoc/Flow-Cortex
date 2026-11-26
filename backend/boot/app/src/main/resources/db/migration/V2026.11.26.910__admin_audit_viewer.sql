@@ -1,5 +1,5 @@
 -- Audit viewer and PII keys: the trigram extension its search index needs, catalog rows and default grants.
--- The audit indexes are in V2026.11.24.022, built CONCURRENTLY outside this script's transaction.
+-- The audit indexes are in V2026.11.26.912, built CONCURRENTLY outside this script's transaction.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

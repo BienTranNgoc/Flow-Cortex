@@ -195,7 +195,7 @@ class TelegramRulesTest {
         assertThat(refusal.reason()).isEqualTo("rejected");
         ConnectorException ex = refusal.exception();
         assertThat(ex.reason()).isEqualTo(Reason.REFUSED);
-        assertThat(ex.telegramReason()).isEqualTo("rejected");
+        assertThat(ex.providerReason()).isEqualTo("rejected");
         assertThat(ex.detail().code()).isEqualTo("connector.telegram.send.rejected");
         assertThat(ex.detail().args()).containsExactly("Bad Request: can't parse entities");
         assertThat(ex.retryable()).isFalse();

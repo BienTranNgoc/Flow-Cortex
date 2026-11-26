@@ -315,6 +315,7 @@ the member app reads it once per session.
 | `FLOWCORTEX_PHONE_VERIFICATION_ENABLED` | the profile offers phone verification by SMS code | the phone endpoints answer 503 and the profile hides the section |
 | `FLOWCORTEX_MEDIA_UPLOAD_CONTENT_CHECK_ENABLED` | an upload whose first bytes do not match its type is refused | the bytes are not checked (the size caps still apply) |
 | `FLOWCORTEX_WORKFLOW_CANCEL_ENABLED` | a member can stop a running run | stopping answers 503 and the button is hidden |
+| `FLOWCORTEX_WORKFLOW_SCHEDULES_ENABLED` | a member can set, pause and run workflow schedules (no timer fires them yet) | every schedule route answers 503 |
 | `FLOWCORTEX_CREDITS_ENABLED` | runs are charged per step from a 1000-credit signup grant, and refunded on system failures | no balance check, charge or refund, and no balance in the header |
 
 - **Payments region gate.** `FLOWCORTEX_BILLING_REGION_GATE_MODE` takes `off` (nobody is

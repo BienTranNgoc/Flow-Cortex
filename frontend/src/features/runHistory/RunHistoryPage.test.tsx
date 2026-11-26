@@ -1,5 +1,5 @@
 import { setToken } from '@flow-cortex/api-client';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderRoute, settled, stubApi } from '../../test/fakeApi';
 import { stubModalDialog } from '../../test/modalDialog';
@@ -122,5 +122,160 @@ describe('RunHistoryPage', () => {
     );
     expect(calls.filter((call) => call.path === '/api/v1/runs/usage-summary').length).toBeGreaterThan(1);
     expect(screen.getByRole('img', { name: 'Runs per day' })).toBeInTheDocument();
+  });
+
+  describe('result summary', () => {
+    const RESULTS = 'GET /api/v1/assets/run-results';
+    const summary = (patch: Record<string, unknown>) => ({
+      status: 200,
+      body: {
+        results: [
+          { runId: 'a1', count: 0, kinds: [], thumbnails: [], registration: 'none', ...patch },
+        ],
+      },
+    });
+
+    it('shows the count and the thumbnails of a run that produced files', async () => {
+      stubHistory([COMPLETED], {
+        [RESULTS]: summary({
+          count: 3,
+          registration: 'done',
+          thumbnails: [{ url: 'https://files/a.png' }, { url: 'https://files/b.png' }],
+        }),
+      });
+      const { container } = renderPage();
+      expect(await screen.findByText('3 files')).toBeInTheDocument();
+      const images = Array.from(container.querySelectorAll('.run-row img'));
+      expect(images.map((image) => image.getAttribute('src'))).toEqual([
+        'https://files/a.png',
+        'https://files/b.png',
+      ]);
+      expect(images.every((image) => image.getAttribute('alt') === '')).toBe(true);
+    });
+
+    it('shows "Saving files…" and no count while the registration is pending', async () => {
+      stubHistory([COMPLETED], { [RESULTS]: summary({ registration: 'pending' }) });
+      renderPage();
+      expect(await screen.findByText('Saving files…')).toBeInTheDocument();
+      expect(screen.queryByText(/\d+ files?$/)).not.toBeInTheDocument();
+    });
+
+    it('turns "Saving files…" into the count without a reload', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let registered = false;
+        const calls = stubHistory([COMPLETED], {
+          [RESULTS]: () =>
+            registered
+              ? summary({ count: 2, registration: 'done' })
+              : summary({ registration: 'pending' }),
+        });
+        renderPage();
+        await screen.findByText('Saving files…');
+
+        registered = true;
+        await act(() => vi.advanceTimersByTimeAsync(5_000));
+        expect(await screen.findByText('2 files')).toBeInTheDocument();
+        expect(screen.queryByText('Saving files…')).not.toBeInTheDocument();
+        expect(calls.filter((call) => call.path === '/api/v1/assets/run-results')).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("polls only the pending run and keeps a done row's thumbnail URL across polls", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const second = { ...COMPLETED, id: 'a2', title: 'Second cut' };
+        const requested: string[][] = [];
+        let signatures = 0;
+        let registered = false;
+        stubHistory([COMPLETED, second], {
+          [RESULTS]: () => {
+            const url = String(vi.mocked(fetch).mock.calls.at(-1)?.[0]);
+            const ids = new URLSearchParams(url.split('?')[1]).getAll('runId');
+            requested.push(ids);
+            // Each request signs afresh, as the object store does: a run asked about again gets a new URL.
+            signatures += 1;
+            return {
+              status: 200,
+              body: {
+                results: ids.map((runId) =>
+                  runId === 'a2' && !registered
+                    ? { runId, count: 0, kinds: [], thumbnails: [], registration: 'pending' }
+                    : {
+                        runId,
+                        count: 1,
+                        kinds: ['image'],
+                        thumbnails: [{ url: `https://files/${runId}.png?sig=${signatures}` }],
+                        registration: 'done',
+                      },
+                ),
+              },
+            };
+          },
+        });
+        const { container } = renderPage();
+        await screen.findByText('Saving files…');
+        const sources = () =>
+          Array.from(container.querySelectorAll('.run-row img')).map((image) =>
+            image.getAttribute('src'),
+          );
+        expect(sources()).toEqual(['https://files/a1.png?sig=1']);
+
+        await act(() => vi.advanceTimersByTimeAsync(5_000));
+        expect(requested).toEqual([['a1', 'a2'], ['a2']]);
+        expect(sources()).toEqual(['https://files/a1.png?sig=1']);
+
+        registered = true;
+        await act(() => vi.advanceTimersByTimeAsync(5_000));
+        await waitFor(() => expect(screen.queryByText('Saving files…')).not.toBeInTheDocument());
+        expect(requested).toEqual([['a1', 'a2'], ['a2'], ['a2']]);
+        expect(sources()).toEqual(['https://files/a1.png?sig=1', 'https://files/a2.png?sig=3']);
+
+        await act(() => vi.advanceTimersByTimeAsync(15_000));
+        expect(requested).toHaveLength(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('refreshes the summary of a run that finished after the summary was taken', async () => {
+      const running = { ...COMPLETED, status: 'running', finishedAt: null, durationSeconds: null };
+      let finished = false;
+      const requested: string[][] = [];
+      stubHistory([COMPLETED], {
+        'GET /api/v1/runs': () => page([finished ? COMPLETED : running]),
+        [RESULTS]: () => {
+          const url = String(vi.mocked(fetch).mock.calls.at(-1)?.[0]);
+          requested.push(new URLSearchParams(url.split('?')[1]).getAll('runId'));
+          return finished ? summary({ count: 2, registration: 'done' }) : summary({});
+        },
+      });
+      const { queryClient, container } = renderPage();
+      await screen.findByRole('link', { name: 'Open run Launch cut' });
+      await waitFor(() => expect(requested).toHaveLength(1));
+      expect(container.querySelector('.run-result')).toBeNull();
+
+      finished = true;
+      await act(() => queryClient.invalidateQueries({ queryKey: ['run-history'] }));
+
+      expect(await screen.findByText('2 files')).toBeInTheDocument();
+      expect(requested).toEqual([['a1'], ['a1']]);
+    });
+
+    it('leaves every row as it was when the summary request fails', async () => {
+      stubHistory([COMPLETED], { [RESULTS]: { status: 503, body: { status: 503 } } });
+      const { queryClient, container } = renderPage();
+      await screen.findByRole('link', { name: 'Open run Launch cut' });
+      await waitFor(
+        () => expect(queryClient.getQueryState(['run-results', ['a1']])?.status).toBe('error'),
+        { timeout: 4_000 },
+      );
+
+      expect(container.querySelector('.run-result')).toBeNull();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(container.querySelector('.run-row__workflow')).toHaveTextContent('Dub');
+    });
   });
 });

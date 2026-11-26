@@ -58,8 +58,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         List<String> orderedKeys = jdbc.queryForList("SELECT key FROM permission ORDER BY sort_order", String.class);
         assertThat(orderedKeys).isEqualTo(Arrays.stream(Permission.values()).map(Permission::key).toList());
-        assertThat(orderedKeys).hasSize(39);
-        assertThat(orderedKeys.subList(36, 39)).containsExactly(
+        assertThat(orderedKeys).hasSize(41);
+        assertThat(orderedKeys.subList(38, 41)).containsExactly(
                 "system.audit_log.view", "system.audit_log.export", "user.account.view_pii");
     }
 
@@ -74,11 +74,12 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key(),
                         Permission.CONTENT_DOCUMENT_VIEW.key(), Permission.CONTENT_DOCUMENT_MANAGE.key(),
                         Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key(),
-                        Permission.USER_ACCOUNT_EXPORT.key(), Permission.SYSTEM_AUDIT_LOG_VIEW.key(),
-                        Permission.USER_ACCOUNT_VIEW_PII.key())
+                        Permission.USER_ACCOUNT_EXPORT.key(),
+                        Permission.CONTENT_TREND_TEMPLATE_VIEW.key(), Permission.CONTENT_TREND_TEMPLATE_MANAGE.key(),
+                        Permission.SYSTEM_AUDIT_LOG_VIEW.key(), Permission.USER_ACCOUNT_VIEW_PII.key())
                 .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key(), Permission.SYSTEM_AUDIT_LOG_EXPORT.key())
                 .isEqualTo(operationManager);
-        assertThat(operationManager).hasSize(32);
+        assertThat(operationManager).hasSize(34);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
                 Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.USER_ACCOUNT_VIEW_PII,
@@ -87,7 +88,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE,
                 Permission.CONTENT_DOCUMENT_VIEW, Permission.CONTENT_DOCUMENT_MANAGE,
-                Permission.CONTENT_MEDIA_VIEW, Permission.CONTENT_MEDIA_MANAGE));
+                Permission.CONTENT_MEDIA_VIEW, Permission.CONTENT_MEDIA_MANAGE,
+                Permission.CONTENT_TREND_TEMPLATE_VIEW, Permission.CONTENT_TREND_TEMPLATE_MANAGE));
         assertThat(keysOf("PLATFORM_OPERATOR")).isEqualTo(keys(
                 Permission.PLATFORM_SETTING_VIEW, Permission.PLATFORM_SETTING_UPDATE,
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,

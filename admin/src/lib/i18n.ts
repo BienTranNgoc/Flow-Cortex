@@ -17,6 +17,7 @@ import enRuns from '../locales/en/runs.json';
 import enSettings from '../locales/en/settings.json';
 import enSmsOutbox from '../locales/en/smsOutbox.json';
 import enSupport from '../locales/en/support.json';
+import enTrend from '../locales/en/trend.json';
 import enUsers from '../locales/en/users.json';
 import enWorkflows from '../locales/en/workflows.json';
 import viAdminAccounts from '../locales/vi/adminAccounts.json';
@@ -37,6 +38,7 @@ import viRuns from '../locales/vi/runs.json';
 import viSettings from '../locales/vi/settings.json';
 import viSmsOutbox from '../locales/vi/smsOutbox.json';
 import viSupport from '../locales/vi/support.json';
+import viTrend from '../locales/vi/trend.json';
 import viUsers from '../locales/vi/users.json';
 import viWorkflows from '../locales/vi/workflows.json';
 
@@ -64,6 +66,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     onboarding: viOnboarding,
     chat: viChat,
     content: viContent,
+    trend: viTrend,
   },
   en: {
     common: enCommon,
@@ -86,6 +89,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     onboarding: enOnboarding,
     chat: enChat,
     content: enContent,
+    trend: enTrend,
   },
 });
 
