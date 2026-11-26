@@ -65,6 +65,9 @@ class RequestRepository {
     record AssigneeGroup(UUID id, long count) {
     }
 
+    record SlaCounts(long overdue, long dueSoon) {
+    }
+
     record DueReplyMail(UUID id, Instant dueAt) {
     }
 
@@ -104,6 +107,12 @@ class RequestRepository {
                 new MapSqlParameterSource("number", number), REQUEST).stream().findFirst();
     }
 
+    boolean existsByNumber(long number) {
+        Boolean exists = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM support_request WHERE number = :number)",
+                new MapSqlParameterSource("number", number), Boolean.class);
+        return Boolean.TRUE.equals(exists);
+    }
+
     Optional<RequestRow> findById(UUID id) {
         return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request WHERE id = :id",
                 new MapSqlParameterSource("id", id), REQUEST).stream().findFirst();
@@ -120,18 +129,25 @@ class RequestRepository {
                 REQUEST);
     }
 
-    List<RequestRow> page(InboxFilter filter, int offset, int limit) {
-        Where where = InboxSql.where(filter, null);
+    List<RequestRow> page(InboxFilter filter, SlaThresholds thresholds, int offset, int limit) {
+        Where where = InboxSql.where(filter, null, thresholds);
         return jdbc.query("SELECT " + REQUEST_COLUMNS + " FROM support_request" + where.sql()
                 + InboxSql.orderBy(filter.sort()) + " OFFSET :offset LIMIT :limit",
                 where.params().addValue("offset", offset).addValue("limit", limit), REQUEST);
     }
 
-    long count(InboxFilter filter) {
-        Where where = InboxSql.where(filter, null);
+    long count(InboxFilter filter, SlaThresholds thresholds) {
+        Where where = InboxSql.where(filter, null, thresholds);
         Long count = jdbc.queryForObject("SELECT count(*) FROM support_request" + where.sql(), where.params(),
                 Long.class);
         return count;
+    }
+
+    /** How many of the requests under the filter are overdue and how many are due soon. */
+    SlaCounts slaSummary(InboxFilter filter, SlaThresholds thresholds) {
+        Where where = InboxSql.where(filter, null, thresholds);
+        return jdbc.queryForObject(InboxSql.slaSummarySelect() + where.and(InboxSql.AT_RISK), where.params(),
+                (rs, n) -> new SlaCounts(rs.getLong("overdue"), rs.getLong("due_soon")));
     }
 
     /**
@@ -274,11 +290,16 @@ class RequestRepository {
                 .stream().findFirst();
     }
 
-    /** Clears the unread mark; the first read of a resolution starts its close clock. */
-    void markSeen(UUID id, Instant now) {
-        jdbc.update("UPDATE support_request SET member_unread = false, resolved_seen_at = CASE "
+    /**
+     * Clears the unread mark; the first read of a resolution starts its close clock.
+     *
+     * @return whether anything changed: an open of a request that is already seen writes nothing
+     */
+    boolean markSeen(UUID id, Instant now) {
+        return jdbc.update("UPDATE support_request SET member_unread = false, resolved_seen_at = CASE "
                 + "WHEN status = 'resolved' AND resolved_seen_at IS NULL THEN :now ELSE resolved_seen_at END "
-                + "WHERE id = :id", new MapSqlParameterSource("id", id).addValue("now", Timestamp.from(now)));
+                + "WHERE id = :id AND (member_unread OR (status = 'resolved' AND resolved_seen_at IS NULL))",
+                new MapSqlParameterSource("id", id).addValue("now", Timestamp.from(now))) > 0;
     }
 
     /** Resolutions whose member first saw them at or before {@code cutoff}. */

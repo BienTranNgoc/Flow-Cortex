@@ -1,0 +1,7 @@
+# Direct pins of the trend (role suggestion) engine; compiled into requirements-trend.txt (see its header).
+# Versions are the set Xood runs RT-DETR with, on the repo's single torch 2.4.0+cpu / numpy 1.26.4 base.
+-c requirements-torch-cpu.txt
+transformers==4.46.3
+tokenizers==0.20.3
+safetensors==0.4.5
+huggingface-hub==0.26.5

@@ -2,7 +2,9 @@ package com.flowcortex.llm.gemini;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -12,11 +14,21 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties("flowcortex.llm.gemini")
-public record GeminiSlotProperties(Map<String, Slot> slots) {
+public record GeminiSlotProperties(Map<String, Slot> slots, String safetyThreshold) {
+
+    private static final String SAFETY_KEY = "flowcortex.llm.gemini.safety-threshold";
+    private static final String DEFAULT_SAFETY_THRESHOLD = "BLOCK_MEDIUM_AND_ABOVE";
+    private static final Set<String> THINKING_VALUES = Set.of("off", "default");
 
     public GeminiSlotProperties {
         slots = slots == null ? Map.of() : Map.copyOf(slots);
+        safetyThreshold = safetyThreshold == null ? DEFAULT_SAFETY_THRESHOLD : safetyThreshold;
+        GeminiSafety.check(SAFETY_KEY, safetyThreshold);
         slots.forEach(GeminiSlotProperties::check);
+    }
+
+    static GeminiSlotProperties of(Map<String, Slot> slots) {
+        return new GeminiSlotProperties(slots, null);
     }
 
     /** @throws IllegalArgumentException when no such slot is configured */
@@ -49,17 +61,38 @@ public record GeminiSlotProperties(Map<String, Slot> slots) {
         if (slot.callTimeout() == null || slot.callTimeout().isZero() || slot.callTimeout().isNegative()) {
             throw new IllegalArgumentException(prefix + ".call-timeout must be a positive duration");
         }
+        if (slot.thinking() != null && !THINKING_VALUES.contains(slot.thinking().toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException(prefix + ".thinking must be 'off' or 'default', got '"
+                    + slot.thinking() + "'");
+        }
+        if (slot.safetyThreshold() != null) {
+            GeminiSafety.check(prefix + ".safety-threshold", slot.safetyThreshold());
+        }
     }
 
     /**
      * One chain: each model gets {@code attempts} tries, separated by {@code retryWaits} in order, each
-     * try bounded by {@code callTimeout}.
+     * try bounded by {@code callTimeout}. {@code thinking} is {@code off} or {@code default} (unset means
+     * default); {@code safetyThreshold} overrides the global one when set.
      */
-    public record Slot(List<String> models, int attempts, List<Duration> retryWaits, Duration callTimeout) {
+    public record Slot(List<String> models, int attempts, List<Duration> retryWaits, Duration callTimeout,
+            String thinking, String safetyThreshold) {
 
         public Slot {
             models = models == null ? List.of() : List.copyOf(models);
             retryWaits = retryWaits == null ? List.of() : List.copyOf(retryWaits);
+        }
+
+        static Slot of(List<String> models, int attempts, List<Duration> retryWaits, Duration callTimeout) {
+            return new Slot(models, attempts, retryWaits, callTimeout, null, null);
+        }
+
+        GeminiThinkingFloor.Mode thinkingMode() {
+            return "off".equalsIgnoreCase(thinking) ? GeminiThinkingFloor.Mode.OFF : GeminiThinkingFloor.Mode.DEFAULT;
+        }
+
+        String thresholdOr(String global) {
+            return safetyThreshold != null ? safetyThreshold : global;
         }
 
         /** Every attempt timing out and every wait taken, on every model. */

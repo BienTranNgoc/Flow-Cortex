@@ -45,7 +45,7 @@ class NotificationInboxTest {
 
         inbox.deliver(request);
 
-        verify(repository).trim(member, 3);
+        verify(repository).trim(member, Audience.MEMBER, 3);
         verify(signals).changed(member);
     }
 
@@ -57,8 +57,22 @@ class NotificationInboxTest {
 
         inbox.deliver(request);
 
-        verify(repository, never()).trim(any(), anyInt());
+        verify(repository, never()).trim(any(), any(), anyInt());
         verify(signals, never()).changed(any());
+    }
+
+    @Test
+    void anAdminAlertTrimsOnlyTheAdminAudience() {
+        NotificationRequested alert = NotificationRequested.of(member, "admin_support_sla",
+                "notification.admin.supportSla.overdue.title");
+        memberExists(true);
+        when(repository.inAppEnabled(member)).thenReturn(true);
+        when(repository.insert(alert, NOW)).thenReturn(1);
+
+        inbox.deliver(alert);
+
+        verify(repository).trim(member, Audience.ADMIN, 3);
+        verify(repository, never()).trim(member, Audience.MEMBER, 3);
     }
 
     @Test

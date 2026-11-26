@@ -62,7 +62,7 @@ class NotificationInbox {
             log(request, "duplicate", 0);
             return;
         }
-        int trimmed = repository.trim(request.memberId(), properties.maxPerMember());
+        int trimmed = repository.trim(request.memberId(), Audience.of(request.type()), properties.maxPerMember());
         signals.changed(request.memberId());
         log(request, "stored", trimmed);
     }

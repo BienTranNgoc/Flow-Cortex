@@ -1,6 +1,6 @@
 package com.flowcortex.support.assistant;
 
-import com.flowcortex.llm.api.LlmJsonRequest;
+import com.flowcortex.llm.api.LlmSlotRequest;
 import com.flowcortex.support.kb.KnowledgeBaseService.ScoredArticle;
 import java.util.List;
 import java.util.Locale;
@@ -15,7 +15,6 @@ final class PromptBuilder {
     static final int MAX_ARTICLES = 6;
     static final int MAX_BODY_CHARS = 4000;
     static final double TEMPERATURE = 0.2;
-    static final int MAX_OUTPUT_TOKENS = 800;
 
     private static final String INSTRUCTION_TEMPLATE = """
             Bạn là trợ lý hỗ trợ của Nodi. Trả lời bằng {language}, ngắn gọn, có thể dùng Markdown.
@@ -38,10 +37,10 @@ final class PromptBuilder {
     private PromptBuilder() {
     }
 
-    static LlmJsonRequest request(String model, String question, List<ScoredArticle> articles, Locale locale) {
+    static LlmSlotRequest request(String question, List<ScoredArticle> articles, Locale locale) {
         String instruction = "vi".equals(locale.getLanguage()) ? SYSTEM_INSTRUCTION_VI : SYSTEM_INSTRUCTION_EN;
-        return new LlmJsonRequest(model, instruction, userText(question, articles), RESPONSE_SCHEMA,
-                TEMPERATURE, MAX_OUTPUT_TOKENS);
+        return new LlmSlotRequest(AssistantSlot.NAME, instruction, userText(question, articles), RESPONSE_SCHEMA,
+                TEMPERATURE);
     }
 
     private static String userText(String question, List<ScoredArticle> articles) {

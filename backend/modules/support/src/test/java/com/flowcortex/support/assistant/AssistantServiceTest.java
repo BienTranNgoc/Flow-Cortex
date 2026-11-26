@@ -48,6 +48,8 @@ class AssistantServiceTest {
     private static final Asker MEMBER = new Asker.Member(UUID.randomUUID());
     private static final Asker.Guest GUEST = new Asker.Guest("session-hash", "network-hash");
     private static final String QUESTION = "Làm sao nạp credit?";
+    private static final String MONEY_QUESTION = "Tại sao tôi bị trừ tiền hai lần?";
+    private static final String SPEND_QUESTION = "tạo video quảng cáo cho shop";
     private static final ScoredArticle NAP = new ScoredArticle("nap-credit", "Nạp credit", "Vào Hồ sơ", "Credit", 4);
     private static final ScoredArticle GOI = new ScoredArticle("goi-credit", "Gói credit", "Mua gói", "Credit", 2);
 
@@ -65,9 +67,7 @@ class AssistantServiceTest {
 
     @BeforeEach
     void setUp() {
-        SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
-        service = new AssistantService(assistantSwitch, properties, conversations, quotas, minuteLimiter, retriever,
+        service = new AssistantService(assistantSwitch, conversations, quotas, minuteLimiter, retriever,
                 llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         when(assistantSwitch.available()).thenReturn(true);
         when(retriever.retrieve(anyString())).thenReturn(List.of(NAP, GOI));
@@ -289,8 +289,8 @@ class AssistantServiceTest {
     void rotatingSessionIdsFromOneAddressIsRefusedAtTheEleventhQuestionInAMinute() {
         MinuteLimiter real = AskerLimitsTest.minuteLimiter(Clock.fixed(NOW, ZoneOffset.UTC));
         SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
-        AssistantService limited = new AssistantService(assistantSwitch, properties, conversations, quotas, real,
+                2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
+        AssistantService limited = new AssistantService(assistantSwitch, conversations, quotas, real,
                 retriever, llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         GuestKeys keys = new GuestKeys(properties, "support-hash-secret-for-unit-tests-0123456789");
         when(retriever.retrieve(anyString())).thenReturn(List.of());
@@ -364,11 +364,211 @@ class AssistantServiceTest {
                 new StoredMessage("assistant", "Vào Hồ sơ.", "answered", List.of("nap-credit", "cu"), NOW)))));
         when(conversations.publishedTitles(any())).thenReturn(Map.of("nap-credit", "Nạp credit"));
 
-        ConversationView view = service.latest(MEMBER).orElseThrow();
+        ConversationView view = service.latest(MEMBER, Locale.ENGLISH).orElseThrow();
 
         assertThat(view.conversationId()).isEqualTo(conversationId);
         assertThat(view.messages()).hasSize(2);
         assertThat(view.messages().get(1).sources()).containsExactly(new Source("nap-credit", "Nạp credit"));
+        assertThat(view.messages().get(1).handoff()).isNull();
+    }
+
+    @Test
+    void aSensitiveQuestionIsHandedOffWithoutRetrievalOrProvider() {
+        when(quotas.peek(MEMBER)).thenReturn(new QuotaService.Remaining(3, Instant.parse("2026-10-19T17:00:00Z")));
+
+        AssistantReply reply = service.ask(MEMBER, null, MONEY_QUESTION, Locale.forLanguageTag("vi"));
+
+        assertThat(reply.message().outcome()).isEqualTo("handoff");
+        assertThat(reply.message().text()).isEqualTo(AssistantService.HANDOFF_TEXT);
+        assertThat(reply.message().sources()).isEmpty();
+        assertThat(reply.message().handoff().topic()).isEqualTo("money");
+        verifyNoInteractions(retriever, llm);
+        ArgumentCaptor<StoredMessage> answer = ArgumentCaptor.forClass(StoredMessage.class);
+        verify(conversations).append(eq(MEMBER), eq(null), any(), answer.capture());
+        assertThat(answer.getValue().outcome()).isEqualTo("handoff");
+        assertThat(answer.getValue().text()).isEqualTo(AssistantService.HANDOFF_TEXT);
+    }
+
+    @Test
+    void aMemberHandoffIsNotCharged() {
+        when(quotas.peek(MEMBER)).thenReturn(new QuotaService.Remaining(3, Instant.parse("2026-10-19T17:00:00Z")));
+
+        AssistantReply reply = service.ask(MEMBER, null, MONEY_QUESTION, Locale.ENGLISH);
+
+        assertThat(reply.quota().remaining()).isEqualTo(3);
+        verify(quotas).peek(MEMBER);
+        verify(quotas, never()).charge(any(), anyInt());
+        verify(quotas, never()).chargeAskerOnly(any());
+    }
+
+    @Test
+    void aMemberHandoffCarriesTheDraftFromTheConversation() {
+        String question = "Tôi bị trừ tiền hai lần cho run RUN-4821";
+        when(conversations.owns(MEMBER, conversationId)).thenReturn(true);
+        when(conversations.userMessages(conversationId, HandoffDraft.WINDOW)).thenReturn(List.of("xin chào"));
+        when(quotas.peek(MEMBER)).thenReturn(new QuotaService.Remaining(3, Instant.parse("2026-10-19T17:00:00Z")));
+
+        AssistantReply reply = service.ask(MEMBER, conversationId, question, Locale.forLanguageTag("vi"));
+
+        assertThat(reply.message().handoff().subject()).isEqualTo(question);
+        assertThat(reply.message().handoff().description()).isEqualTo(question + "\n\nMã liên quan: RUN-4821");
+    }
+
+    @Test
+    void aGuestHandoffCarriesTheTopicOnlyAndIsChargedAsNoArticle() {
+        when(quotas.chargeAskerOnly(GUEST)).thenReturn(guestCharge());
+        when(conversations.append(eq(GUEST), any(), any(), any())).thenReturn(conversationId);
+
+        AssistantReply reply = service.ask(GUEST, null, MONEY_QUESTION, Locale.ENGLISH);
+
+        assertThat(reply.message().outcome()).isEqualTo("handoff");
+        assertThat(reply.message().handoff()).isEqualTo(new AssistantService.Handoff("money", null, null));
+        assertThat(reply.quota().remaining()).isEqualTo(9);
+        verify(quotas).chargeAskerOnly(GUEST);
+        verify(quotas, never()).charge(any(), anyInt());
+        verify(conversations, never()).userMessages(any(), anyInt());
+        verifyNoInteractions(retriever, llm);
+    }
+
+    @Test
+    void aGuestSpendRequestIsASignInWithoutProvider() {
+        when(quotas.chargeAskerOnly(GUEST)).thenReturn(guestCharge());
+        when(conversations.append(eq(GUEST), any(), any(), any())).thenReturn(conversationId);
+
+        AssistantReply reply = service.ask(GUEST, null, SPEND_QUESTION, Locale.ENGLISH);
+
+        assertThat(reply.message().outcome()).isEqualTo("sign_in");
+        assertThat(reply.message().text()).isEqualTo(AssistantService.SIGN_IN_TEXT);
+        assertThat(reply.message().handoff()).isNull();
+        assertThat(reply.quota().remaining()).isEqualTo(9);
+        verifyNoInteractions(retriever, llm);
+        assertThat(meters.counter(AssistantTelemetry.OUTCOME_COUNTER, "outcome", "sign_in").count()).isEqualTo(1);
+    }
+
+    @Test
+    void aMemberSpendRequestGoesToRetrieval() {
+        answer("{\"answered\":true,\"answer\":\"Vào Hồ sơ.\",\"citedSlugs\":[\"nap-credit\"]}");
+
+        AssistantReply reply = service.ask(MEMBER, null, SPEND_QUESTION, Locale.ENGLISH);
+
+        assertThat(reply.message().outcome()).isEqualTo("answered");
+        verify(retriever).retrieve(SPEND_QUESTION);
+    }
+
+    @Test
+    void aTopicOutranksSpendIntent() {
+        when(quotas.chargeAskerOnly(GUEST)).thenReturn(guestCharge());
+        when(conversations.append(eq(GUEST), any(), any(), any())).thenReturn(conversationId);
+
+        AssistantReply reply = service.ask(GUEST, null, "tạo video bị trừ tiền", Locale.ENGLISH);
+
+        assertThat(reply.message().outcome()).isEqualTo("handoff");
+        assertThat(reply.message().handoff().topic()).isEqualTo("money");
+    }
+
+    @Test
+    void aGuestOutOfQuotaIsRefusedOnAHandoff() {
+        when(quotas.chargeAskerOnly(GUEST)).thenThrow(QuotaService.exhausted(NOW));
+
+        assertThatThrownBy(() -> service.ask(GUEST, null, SPEND_QUESTION, Locale.ENGLISH))
+                .isInstanceOfSatisfying(SupportProblemException.class, e -> {
+                    assertThat(e.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(e.code()).isEqualTo("assistant-quota");
+                });
+
+        verify(conversations, never()).append(any(), any(), any(), any());
+        verifyNoInteractions(retriever, llm);
+    }
+
+    @Test
+    void aFailureStoringAGuestHandoffRefundsIt() {
+        QuotaService.Charge guestCharge = guestCharge();
+        when(quotas.chargeAskerOnly(GUEST)).thenReturn(guestCharge);
+        when(conversations.append(eq(GUEST), any(), any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("db down"));
+
+        assertThatThrownBy(() -> service.ask(GUEST, null, MONEY_QUESTION, Locale.ENGLISH))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+
+        verify(quotas).refund(guestCharge);
+        assertThat(meters.find(AssistantTelemetry.HANDOFF_COUNTER).counters()).isEmpty();
+    }
+
+    @Test
+    void aPausedAssistantRefusesBeforeTheGuards() {
+        doThrow(new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-paused",
+                new LocalizedMessage("support.assistant.paused")))
+                .when(quotas).refuseWhenPaused();
+
+        assertThatThrownBy(() -> service.ask(MEMBER, null, MONEY_QUESTION, Locale.ENGLISH))
+                .isInstanceOfSatisfying(SupportProblemException.class,
+                        e -> assertThat(e.code()).isEqualTo("assistant-paused"));
+
+        verifyNoInteractions(retriever, llm, conversations);
+        assertThat(meters.counter(AssistantTelemetry.OUTCOME_COUNTER, "outcome", "paused").count()).isEqualTo(1);
+    }
+
+    @Test
+    void aHandoffRecordsItsOutcomeOnce() {
+        when(quotas.peek(MEMBER)).thenReturn(new QuotaService.Remaining(3, Instant.parse("2026-10-19T17:00:00Z")));
+
+        service.ask(MEMBER, null, MONEY_QUESTION, Locale.ENGLISH);
+
+        assertThat(meters.counter(AssistantTelemetry.OUTCOME_COUNTER, "outcome", "handoff").count()).isEqualTo(1);
+        assertThat(meters.counter(AssistantTelemetry.HANDOFF_COUNTER, "topic", "money").count()).isEqualTo(1);
+    }
+
+    @Test
+    void theHistoryRebuildsTheSameDraft() {
+        String question = "Tôi bị trừ tiền hai lần cho run RUN-4821";
+        Locale vi = Locale.forLanguageTag("vi");
+        when(conversations.owns(MEMBER, conversationId)).thenReturn(true);
+        when(conversations.userMessages(conversationId, HandoffDraft.WINDOW)).thenReturn(List.of("xin chào"));
+        when(quotas.peek(MEMBER)).thenReturn(new QuotaService.Remaining(3, Instant.parse("2026-10-19T17:00:00Z")));
+        AssistantService.Handoff live = service.ask(MEMBER, conversationId, question, vi).message().handoff();
+        when(conversations.latest(MEMBER)).thenReturn(Optional.of(new StoredConversation(conversationId, List.of(
+                new StoredMessage("user", "xin chào", null, List.of(), NOW),
+                new StoredMessage("assistant", AssistantService.NO_ANSWER, "no_answer", List.of(), NOW),
+                new StoredMessage("user", question, null, List.of(), NOW),
+                new StoredMessage("assistant", AssistantService.HANDOFF_TEXT, "handoff", List.of(), NOW)))));
+        when(conversations.publishedTitles(any())).thenReturn(Map.of());
+
+        ConversationView view = service.latest(MEMBER, vi).orElseThrow();
+
+        assertThat(view.messages().get(3).outcome()).isEqualTo("handoff");
+        assertThat(view.messages().get(3).handoff()).isEqualTo(live);
+        assertThat(view.messages().get(1).handoff()).isNull();
+        assertThat(view.messages().get(2).handoff()).isNull();
+    }
+
+    @Test
+    void aGuestHistoryCarriesTheTopicOnly() {
+        when(conversations.latest(GUEST)).thenReturn(Optional.of(new StoredConversation(conversationId, List.of(
+                new StoredMessage("user", MONEY_QUESTION, null, List.of(), NOW),
+                new StoredMessage("assistant", AssistantService.HANDOFF_TEXT, "handoff", List.of(), NOW)))));
+        when(conversations.publishedTitles(any())).thenReturn(Map.of());
+
+        ConversationView view = service.latest(GUEST, Locale.ENGLISH).orElseThrow();
+
+        assertThat(view.messages().get(1).handoff()).isEqualTo(new AssistantService.Handoff("money", null, null));
+        verify(conversations, never()).userMessages(any(), anyInt());
+    }
+
+    @Test
+    void aHandoffWhoseTopicNoLongerMatchesKeepsTheDraftWithANullTopic() {
+        when(conversations.latest(MEMBER)).thenReturn(Optional.of(new StoredConversation(conversationId, List.of(
+                new StoredMessage("user", QUESTION, null, List.of(), NOW),
+                new StoredMessage("assistant", AssistantService.HANDOFF_TEXT, "handoff", List.of(), NOW)))));
+        when(conversations.publishedTitles(any())).thenReturn(Map.of());
+
+        ConversationView view = service.latest(MEMBER, Locale.ENGLISH).orElseThrow();
+
+        assertThat(view.messages().get(1).handoff())
+                .isEqualTo(new AssistantService.Handoff(null, QUESTION, QUESTION));
+    }
+
+    private QuotaService.Charge guestCharge() {
+        return new QuotaService.Charge(LocalDate.of(2026, 10, 19), List.of(GUEST.subjectKey(), GUEST.networkKey()), 9);
     }
 
     private void answer(String json) {

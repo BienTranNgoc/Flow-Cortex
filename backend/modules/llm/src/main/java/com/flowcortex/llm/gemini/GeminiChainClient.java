@@ -2,8 +2,12 @@ package com.flowcortex.llm.gemini;
 
 import com.flowcortex.llm.api.LlmJsonResult;
 import com.flowcortex.llm.api.LlmJsonResult.Kind;
+import com.flowcortex.llm.api.LlmSlotRequest;
 import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.llm.api.LlmSpeechResult;
+import com.flowcortex.llm.gateway.OutputTokenPolicy;
+import com.flowcortex.llm.gateway.SlotChainResolver;
+import com.flowcortex.llm.gateway.SlotChainResolver.Resolution;
 import com.flowcortex.llm.gemini.GeminiAttempts.Attempt;
 import com.flowcortex.llm.gemini.GeminiAttempts.Interpreted;
 import com.flowcortex.llm.gemini.GeminiChainPolicy.Mode;
@@ -12,6 +16,7 @@ import com.flowcortex.llm.gemini.GeminiSlotProperties.Slot;
 import io.micrometer.observation.Observation;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,8 +27,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * {@link LlmSlots} over Gemini: walks a slot's models as {@link GeminiChainPolicy} says, one request
- * per attempt through {@link GeminiAttempts}. An interrupt ends the call with an
+ * {@link LlmSlots} over Gemini: walks a slot's models, less those the registry switched off, as
+ * {@link GeminiChainPolicy} says, one request per attempt through {@link GeminiAttempts}. An interrupt ends the call with an
  * {@link IllegalStateException} before the policy is asked, so an interrupted attempt never becomes a
  * move to the next model.
  */
@@ -52,26 +57,31 @@ final class GeminiChainClient implements LlmSlots {
 
     private final GeminiTelemetry telemetry;
 
+    private final Function<Collection<String>, Map<String, Boolean>> activity;
+
+    /** @param activity the registry's active flag by model id, for the ids that have an entry */
     GeminiChainClient(GeminiProperties properties, GeminiSlotProperties slots,
-            Function<Duration, RestClient> clientFor, Sleeper sleeper, GeminiTelemetry telemetry) {
+            Function<Duration, RestClient> clientFor, Sleeper sleeper, GeminiTelemetry telemetry,
+            Function<Collection<String>, Map<String, Boolean>> activity) {
         this.properties = properties;
         this.slots = slots;
         slots.slots().forEach((name, slot) -> clients.put(name, clientFor.apply(slot.callTimeout())));
         this.sleeper = sleeper;
         this.telemetry = telemetry;
+        this.activity = activity;
     }
 
     @Override
-    public LlmJsonResult generateJson(String slotName, String userText, String responseSchemaJson) {
+    public LlmJsonResult generateJson(LlmSlotRequest request) {
+        String slotName = request.slot();
         Slot slot = slots.slot(slotName);
-        if (userText == null || userText.isBlank()) {
-            throw new IllegalArgumentException("userText must not be blank");
-        }
+        JsonNode schema = checkedSchema(request.responseSchemaJson());
         if (!properties.hasApiKey()) {
             return new LlmJsonResult.Failed(missingKey(slotName, slot));
         }
-        byte[] body = GeminiAttempts.JSON.writeValueAsBytes(jsonBody(userText, responseSchemaJson));
-        Chained<LlmJsonResult> chained = run(slotName, slot, Mode.JSON, model -> body,
+        String threshold = slot.thresholdOr(slots.safetyThreshold());
+        Chained<LlmJsonResult> chained = run(slotName, slot, Mode.JSON,
+                model -> GeminiAttempts.JSON.writeValueAsBytes(jsonBody(request, schema, slot, model, threshold)),
                 properties.endpoint() + "/models/{model}:generateContent",
                 (model, answer) -> {
                     Interpreted interpreted = GeminiAttempts.interpretJson(model, answer);
@@ -120,7 +130,12 @@ final class GeminiChainClient implements LlmSlots {
         RestClient client = clients.get(slotName);
         boolean quotaRemembered = false;
         Kind last = Kind.UPSTREAM;
-        List<String> models = slot.models();
+        Resolution resolution = SlotChainResolver.resolve(slot.models(), () -> activity.apply(slot.models()));
+        resolution.skipped().forEach(model -> telemetry.skipped(slotName, model));
+        if (resolution.degradedReason() != null) {
+            telemetry.degraded(slotName, resolution.degradedReason());
+        }
+        List<String> models = resolution.models();
         for (int index = 0; index < models.size(); index++) {
             String model = models.get(index);
             byte[] body = bodyFor.apply(model);
@@ -186,18 +201,45 @@ final class GeminiChainClient implements LlmSlots {
         return new IllegalStateException("Interrupted while calling " + model, cause);
     }
 
-    private static ObjectNode jsonBody(String userText, String responseSchemaJson) {
+    /** The parsed schema, or {@code null} for none; a schema Gemini would answer with a 400 is refused here. */
+    private static JsonNode checkedSchema(String responseSchemaJson) {
+        if (responseSchemaJson == null) {
+            return null;
+        }
+        JsonNode schema;
+        try {
+            schema = GeminiAttempts.JSON.readTree(responseSchemaJson);
+        } catch (JacksonException ex) {
+            throw new IllegalArgumentException("responseSchemaJson is not valid JSON", ex);
+        }
+        List<String> violations = GeminiSchemaCompat.violations(schema);
+        if (!violations.isEmpty()) {
+            throw new IllegalArgumentException("responseSchemaJson would be refused by Gemini: "
+                    + String.join("; ", violations));
+        }
+        return schema;
+    }
+
+    private static ObjectNode jsonBody(LlmSlotRequest request, JsonNode schema, Slot slot, String model,
+            String threshold) {
         ObjectNode body = GeminiAttempts.JSON.createObjectNode();
-        body.putArray("contents").addObject().putArray("parts").addObject().put("text", userText);
+        if (request.systemInstruction() != null) {
+            body.putObject("systemInstruction").putArray("parts").addObject()
+                    .put("text", request.systemInstruction());
+        }
+        body.putArray("contents").addObject().putArray("parts").addObject().put("text", request.userText());
         ObjectNode generation = body.putObject("generationConfig");
         generation.put("responseMimeType", "application/json");
-        if (responseSchemaJson != null) {
-            try {
-                generation.set("responseSchema", GeminiAttempts.JSON.readTree(responseSchemaJson));
-            } catch (JacksonException ex) {
-                throw new IllegalArgumentException("responseSchemaJson is not valid JSON", ex);
-            }
+        if (schema != null) {
+            generation.set("responseSchema", schema);
         }
+        if (request.temperature() != null) {
+            generation.put("temperature", request.temperature());
+        }
+        generation.put("maxOutputTokens", OutputTokenPolicy.jsonCap(model));
+        GeminiThinkingFloor.thinkingConfig(slot.thinkingMode(), model)
+                .ifPresent(thinking -> generation.set("thinkingConfig", thinking));
+        body.set("safetySettings", GeminiSafety.settings(threshold));
         return body;
     }
 
