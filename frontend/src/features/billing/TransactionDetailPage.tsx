@@ -84,6 +84,13 @@ function TransactionFacts({ transaction }: Readonly<{ transaction: TransactionDe
 
   return (
     <>
+      {transaction.succeededAt && (
+        <p className="billing-receipt-link">
+          <Link to={`${HISTORY_PATH}/${transaction.id}/receipt`} className="action-link">
+            {t('billing.receipt.view')}
+          </Link>
+        </p>
+      )}
       <dl className="billing-facts" aria-label={t('billing.detail.factsLabel')}>
         {facts.map((fact) => (
           <div key={fact.key} className="billing-facts__item">

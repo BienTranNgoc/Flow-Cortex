@@ -143,5 +143,44 @@
       "payment_expired": "Payment expired",
       "code": "Provider code {{code}}"
     }
+  },
+  "receipt": {
+    "title": "Receipt",
+    "back": "Back to payment",
+    "view": "View receipt",
+    "download": "Download PDF",
+    "downloading": "Downloading…",
+    "downloadFailed": "We could not download the receipt. Try again.",
+    "loading": "Loading the receipt",
+    "notFound": "We could not find this payment.",
+    "notCollected": "This payment has not been collected yet, so it has no receipt.",
+    "notCollectedAction": "View payment",
+    "loadError": "We could not load this receipt.",
+    "retry": "Retry",
+    "heading": "Payment successful",
+    "orderRef": "Order reference",
+    "paidAt": "Transaction time",
+    "method": "Payment method",
+    "transactionId": "{{provider}} transaction ID",
+    "provider": "Provider",
+    "providerUnset": "Provider details are being set up.",
+    "taxCode": "Tax code",
+    "product": "Product details",
+    "quantity": "Quantity",
+    "unitPrice": "Unit price",
+    "amount": "Amount",
+    "subtotal": "Subtotal",
+    "vat": "VAT ({{rate}})",
+    "total": "Total",
+    "inWords": "In words",
+    "note": "This receipt confirms that Nodi collected the amount above and serves as an electronic payment record. It is generated automatically.",
+    "providers": {
+      "momo": "MoMo"
+    },
+    "methods": {
+      "momo": "MoMo",
+      "momo_wallet": "MoMo wallet",
+      "momo_domestic_card": "Domestic card (MoMo)"
+    }
   }
 }

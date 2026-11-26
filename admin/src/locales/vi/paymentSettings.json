@@ -48,9 +48,14 @@
     "description": "Máy chủ này chưa khai báo cài đặt thanh toán nào."
   },
   "groups": {
-    "region": "Khu vực"
+    "region": "Khu vực",
+    "receipt": "Biên nhận"
   },
   "settings": {
+    "payment_receipt_email_enabled": {
+      "label": "Gửi biên nhận thanh toán qua email",
+      "description": "Bật: mỗi khoản thanh toán được thu từ nay về sau sẽ nhận một email biên nhận kèm file PDF. Tắt: không xếp thêm email biên nhận mới; các biên nhận đã xếp hàng vẫn được gửi đi."
+    },
     "payment_region_gate_mode": {
       "label": "Chế độ chặn theo khu vực",
       "description": "Cách cổng khu vực thanh toán xử lý yêu cầu từ ngoài Việt Nam: Tắt không áp dụng gì, Giám sát chỉ đo lường, Chặn từ chối thanh toán.",

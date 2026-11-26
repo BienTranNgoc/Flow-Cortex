@@ -48,9 +48,14 @@
     "description": "No payment setting is declared on this server."
   },
   "groups": {
-    "region": "Region"
+    "region": "Region",
+    "receipt": "Receipts"
   },
   "settings": {
+    "payment_receipt_email_enabled": {
+      "label": "Email payment receipts",
+      "description": "On: each payment collected from now on gets one receipt email with the PDF attached. Off: no new receipt emails are queued; receipts already queued still go out."
+    },
     "payment_region_gate_mode": {
       "label": "Region gate mode",
       "description": "What the payments region gate does with a request from outside Vietnam: Off places nothing, Shadow only measures, Enforce refuses the payment.",

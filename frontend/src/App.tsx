@@ -16,6 +16,7 @@ import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
 import { BillingProfilesPage } from './features/billing/BillingProfilesPage';
 import { PaymentHistoryPage } from './features/billing/PaymentHistoryPage';
+import { ReceiptPage } from './features/billing/ReceiptPage';
 import { TransactionDetailPage } from './features/billing/TransactionDetailPage';
 import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
 import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
@@ -160,6 +161,7 @@ export function App() {
                 path="billing/transactions/:transactionId"
                 element={<TransactionDetailPage />}
               />
+              <Route path="billing/transactions/:transactionId/receipt" element={<ReceiptPage />} />
               <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />

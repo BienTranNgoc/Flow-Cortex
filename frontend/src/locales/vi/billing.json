@@ -143,5 +143,44 @@
       "payment_expired": "Thanh toán đã hết hạn",
       "code": "Mã nhà cung cấp {{code}}"
     }
+  },
+  "receipt": {
+    "title": "Biên nhận",
+    "back": "Quay lại khoản thanh toán",
+    "view": "Xem biên nhận",
+    "download": "Tải PDF",
+    "downloading": "Đang tải…",
+    "downloadFailed": "Không thể tải biên nhận. Hãy thử lại.",
+    "loading": "Đang tải biên nhận",
+    "notFound": "Không tìm thấy khoản thanh toán này.",
+    "notCollected": "Khoản thanh toán này chưa được thu nên chưa có biên nhận.",
+    "notCollectedAction": "Xem khoản thanh toán",
+    "loadError": "Không thể tải biên nhận này.",
+    "retry": "Thử lại",
+    "heading": "Thanh toán thành công",
+    "orderRef": "Mã đơn hàng",
+    "paidAt": "Thời gian giao dịch",
+    "method": "Phương thức thanh toán",
+    "transactionId": "Mã giao dịch {{provider}}",
+    "provider": "Đơn vị cung cấp",
+    "providerUnset": "Thông tin đơn vị cung cấp đang được thiết lập.",
+    "taxCode": "MST",
+    "product": "Chi tiết sản phẩm",
+    "quantity": "Số lượng",
+    "unitPrice": "Đơn giá",
+    "amount": "Thành tiền",
+    "subtotal": "Tạm tính",
+    "vat": "Thuế GTGT ({{rate}})",
+    "total": "Tổng cộng",
+    "inWords": "Bằng chữ",
+    "note": "Biên nhận này xác nhận Nodi đã thu khoản tiền trên và có giá trị như chứng từ thanh toán điện tử. Biên nhận được tạo tự động bởi hệ thống Nodi.",
+    "providers": {
+      "momo": "MoMo"
+    },
+    "methods": {
+      "momo": "MoMo",
+      "momo_wallet": "Ví MoMo",
+      "momo_domestic_card": "Thẻ nội địa (MoMo)"
+    }
   }
 }
