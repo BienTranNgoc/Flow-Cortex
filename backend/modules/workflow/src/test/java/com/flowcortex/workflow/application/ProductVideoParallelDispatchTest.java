@@ -20,6 +20,9 @@ import com.flowcortex.media.api.MediaLimits;
 import com.flowcortex.media.api.MediaOutput;
 import com.flowcortex.media.api.MediaResult;
 import com.flowcortex.media.api.provider.ProviderJob;
+import com.flowcortex.settings.api.SettingRead;
+import com.flowcortex.settings.api.SettingSource;
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
@@ -166,7 +169,14 @@ class ProductVideoParallelDispatchTest {
                 mock(ReviewCheckpointTransactions.class), mediaJobs, validator, null, true);
         jobControl = new WorkflowJobControl(runRepo, stepRepo);
         cancellation = new RunCancellation(runRepo, stepRepo, registry, mediaJobs,
-                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, transactions, true);
+                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, transactions, cancellationSwitchOn());
+    }
+
+    private static Settings cancellationSwitchOn() {
+        Settings settings = mock(Settings.class);
+        when(settings.get(WorkflowSettingKeys.RUN_CANCELLATION_ENABLED))
+                .thenReturn(new SettingRead<>(true, true, SettingSource.STORED));
+        return settings;
     }
 
     private void wireStatefulRepos() {

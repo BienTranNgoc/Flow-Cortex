@@ -2,8 +2,12 @@ package com.flowcortex.workflow.contract;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flowcortex.workflow.application.DataStoreJson;
 import com.flowcortex.workflow.application.StepDefinition;
 import com.flowcortex.workflow.application.WorkflowArtifacts;
+import com.flowcortex.workflow.application.WorkflowDataStore;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
@@ -67,6 +71,44 @@ class WorkflowArtifactSchemaTest {
         ObjectNode topLevel = written();
         topLevel.put("id", "x");
         assertThat(schema.validate(topLevel)).isNotEmpty();
+    }
+
+    private static ObjectNode writtenWithDataStore() {
+        ObjectMapper reader = DataStoreJson.mapper();
+        try {
+            String text = WorkflowArtifacts.write("Dub", List.of(new StepDefinition(1, null, "echo", null, null)),
+                    List.of(new WorkflowDataStore.Seed("promo", "template",
+                            reader.readTree("{\"data\":{\"brief\":[1,2.50,null]}}")),
+                            new WorkflowDataStore.Seed("count", "json", reader.readTree("3"))),
+                    Instant.parse("2026-11-09T10:00:00Z")).toString();
+            return (ObjectNode) MAPPER.readTree(text);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    void anArtifactWithADataStoreSectionValidatesAndOneWithoutStillDoes() {
+        ObjectNode artifact = writtenWithDataStore();
+
+        assertThat(artifact.has("dataStore")).isTrue();
+        assertThat(schema.validate(artifact)).isEmpty();
+        assertThat(schema.validate(written())).isEmpty();
+    }
+
+    @Test
+    void theSchemaRefusesAMalformedDataStoreEntry() {
+        ObjectNode extra = writtenWithDataStore();
+        ((ObjectNode) extra.get("dataStore").get(0)).put("sizeBytes", 3);
+        assertThat(schema.validate(extra)).isNotEmpty();
+
+        ObjectNode missing = writtenWithDataStore();
+        ((ObjectNode) missing.get("dataStore").get(0)).remove("value");
+        assertThat(schema.validate(missing)).isNotEmpty();
+
+        ObjectNode notAnArray = writtenWithDataStore();
+        notAnArray.putObject("dataStore");
+        assertThat(schema.validate(notAnArray)).isNotEmpty();
     }
 
     @Test

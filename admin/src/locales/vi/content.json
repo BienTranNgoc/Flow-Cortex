@@ -10,11 +10,26 @@
     "caption": "Chú thích",
     "mediaId": "Mục trong thư viện",
     "seoTitle": "Tiêu đề SEO",
-    "seoDescription": "Mô tả SEO"
+    "seoDescription": "Mô tả SEO",
+    "title": "Tiêu đề",
+    "docVersion": "Nhãn phiên bản",
+    "effectiveDate": "Ngày hiệu lực",
+    "slug": "Tài liệu",
+    "label": "Nhãn hiển thị",
+    "shown": "Hiển thị"
   },
   "sectionTypes": {
     "richText": "Văn bản",
-    "media": "Ảnh hoặc video"
+    "media": "Ảnh hoặc video",
+    "legalDoc": "Văn bản pháp lý",
+    "legalIndex": "Chỉ mục pháp lý"
+  },
+  "legalIndex": {
+    "addDocument": "Thêm tài liệu",
+    "moveUp": "Chuyển {{name}} lên",
+    "moveDown": "Chuyển {{name}} xuống",
+    "remove": "Xóa {{name}}",
+    "empty": "Chưa có tài liệu nào trong chỉ mục."
   },
   "dialog": {
     "cancel": "Hủy",
@@ -84,7 +99,10 @@
     "sectionRemoved": "Đã xóa phần {{n}}.",
     "addType": "Loại phần",
     "addSection": "Thêm phần",
-    "sectionLimit": "Một tài liệu có tối đa {{max}} phần.",
+    "sectionLimit_one": "Một tài liệu có tối đa {{count}} phần.",
+    "sectionLimit_other": "Một tài liệu có tối đa {{count}} phần.",
+    "requiredSection": "Thêm mục bắt buộc",
+    "sharedField": "Dùng chung cho cả hai ngôn ngữ",
     "noAddableTypes": "Trang quản trị này chưa có trình soạn cho các loại phần mà tài liệu cho phép.",
     "count": "{{current}} / {{max}} ký tự",
     "tooLong": "Văn bản này vượt quá giới hạn {{max}} ký tự nên không thể lưu.",

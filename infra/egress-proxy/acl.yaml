@@ -24,3 +24,5 @@ default:
     - api.vilao.ai
     - payment.momo.vn
     - test-payment.momo.vn
+    - api-v2.vietguys.biz
+    - cloudsms4.vietguys.biz

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flowcortex.workflow.domain.Workflow;
+import com.flowcortex.workflow.domain.WorkflowDataEntry;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import jakarta.persistence.Column;
 import java.lang.reflect.Field;
@@ -118,6 +119,57 @@ class WorkflowCarryTest {
         assertThat(copies).extracting(WorkflowStep::getType).containsExactly("translate", "echo");
         assertThat(copies).extracting(WorkflowStep::getConfig).containsExactly("{\"lang\":\"vi\"}", null);
         assertThat(copies).extracting(WorkflowStep::getInputRef).containsExactly(null, "{step:1.script}");
+    }
+
+    private static WorkflowDataEntry row(String key, String dataType, String value) {
+        return new WorkflowDataEntry(UUID.randomUUID(), SOURCE, key, dataType, value, value.length(), Instant.now());
+    }
+
+    @Test
+    void everyPersistentDataEntryFieldExceptItsOwnBookkeepingIsCarried() {
+        Set<String> bookkeeping = Set.of("id", "workflowId", "sizeBytes", "createdAt", "updatedAt");
+        Set<String> persistent = Arrays.stream(WorkflowDataEntry.class.getDeclaredFields())
+                .filter(field -> !Modifier.isStatic(field.getModifiers()))
+                .filter(field -> field.isAnnotationPresent(Column.class))
+                .map(Field::getName)
+                .filter(name -> !bookkeeping.contains(name))
+                .collect(Collectors.toCollection(TreeSet::new));
+
+        assertThat(WorkflowCarry.CARRIED_ENTRY_FIELDS).containsExactlyInAnyOrderElementsOf(persistent);
+        assertThat(Arrays.stream(WorkflowDataStore.Seed.class.getRecordComponents()).map(RecordComponent::getName))
+                .containsExactlyInAnyOrderElementsOf(WorkflowCarry.CARRIED_ENTRY_FIELDS);
+    }
+
+    @Test
+    void theArtifactDataEntryKeysAreExactlyTheCarriedEntryFields() {
+        ObjectNode written = WorkflowArtifacts.write("Demo", List.of(),
+                WorkflowCarry.seedsOf(List.of(row("promo", "template", "{\"a\":1}"))),
+                Instant.parse("2026-11-11T10:00:00Z"));
+        Set<String> writtenKeys = new TreeSet<>();
+        written.get("dataStore").get(0).fieldNames().forEachRemaining(writtenKeys::add);
+
+        assertThat(writtenKeys).isEqualTo(new TreeSet<>(WorkflowCarry.CARRIED_ENTRY_FIELDS));
+    }
+
+    @Test
+    void dataStoreRowsAreCarriedWithSameKeyTypeAndValueToTheNewWorkflow() {
+        List<WorkflowDataEntry> rows = List.of(row("promo", "template", "{\"data\":{\"price\":2.50}}"),
+                row("notes", "json", "[1,\"two\",null]"));
+
+        List<WorkflowDataStore.Seed> seeds = WorkflowCarry.seedsOf(rows);
+
+        assertThat(seeds).extracting(WorkflowDataStore.Seed::key).containsExactly("promo", "notes");
+        assertThat(seeds).extracting(WorkflowDataStore.Seed::dataType).containsExactly("template", "json");
+        assertThat(seeds).extracting(seed -> seed.value().toString())
+                .containsExactly("{\"data\":{\"price\":2.50}}", "[1,\"two\",null]");
+    }
+
+    @Test
+    void onlyTemplateRowsAreSharedWithAMemberWhoCopies() {
+        WorkflowDataEntry template = row("promo", "template", "{}");
+        WorkflowDataEntry json = row("notes", "json", "{\"secret\":1}");
+
+        assertThat(WorkflowCarry.sharedWithRunners(List.of(json, template))).containsExactly(template);
     }
 
     @Test

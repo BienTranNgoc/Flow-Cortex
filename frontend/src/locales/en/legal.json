@@ -1,0 +1,39 @@
+{
+  "nav": {
+    "label": "Legal documents"
+  },
+  "footer": {
+    "menu": "Legal"
+  },
+  "index": {
+    "title": "Legal documents",
+    "intro": "Choose a document from the list.",
+    "empty": "No legal documents are published yet",
+    "error": "The list of legal documents could not be loaded."
+  },
+  "document": {
+    "version": "Version",
+    "effectiveDate": "Effective date",
+    "publishedAt": "Published",
+    "textHeading": "Document text",
+    "earlierVersions": "Earlier versions",
+    "notAvailable": "This document is not available",
+    "error": "This document could not be loaded."
+  },
+  "history": {
+    "title": "Earlier versions",
+    "pager": "Pages",
+    "empty": "No earlier versions are published yet",
+    "previous": "Previous",
+    "next": "Next",
+    "notAvailable": "This version is not available",
+    "olderNotice": "This is an earlier version, published on {{date}}.",
+    "currentNotice": "This is the current version, published on {{date}}.",
+    "currentLink": "Read the current version",
+    "error": "The earlier versions could not be loaded."
+  },
+  "common": {
+    "retry": "Try again",
+    "loading": "Loading…"
+  }
+}

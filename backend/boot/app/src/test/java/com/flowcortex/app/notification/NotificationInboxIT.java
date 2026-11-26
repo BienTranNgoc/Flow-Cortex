@@ -209,10 +209,66 @@ class NotificationInboxIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void audiencesAreKeptApart() {
+        UserView staff = newUser("audiences");
+        Instant now = Instant.now();
+        seedOfType(staff.id(), "support_reply", now.minusSeconds(60), false);
+        seedOfType(staff.id(), "support_reply", now.minusSeconds(50), false);
+        for (int i = 0; i < 3; i++) {
+            seedOfType(staff.id(), "admin_support_sla", now.minusSeconds(40 - i), false);
+        }
+        String token = loginAs(staff);
+
+        PageView member = get("/api/v1/notifications", token, PageView.class).getBody();
+        PageView admin = get("/api/v1/notifications?audience=admin", token, PageView.class).getBody();
+
+        assertThat(member.items()).extracting(ItemView::type).containsOnly("support_reply").hasSize(2);
+        assertThat(member.unreadCount()).isEqualTo(2);
+        assertThat(admin.items()).extracting(ItemView::type).containsOnly("admin_support_sla").hasSize(3);
+        assertThat(admin.unreadCount()).isEqualTo(3);
+        assertThat(get("/api/v1/notifications/unread-count", token, CountView.class).getBody().unreadCount())
+                .isEqualTo(2);
+        assertThat(get("/api/v1/notifications/unread-count?audience=admin", token, CountView.class).getBody()
+                .unreadCount()).isEqualTo(3);
+
+        assertThat(post("/api/v1/notifications/read-all?audience=admin", token, null, MarkedView.class).getBody()
+                .marked()).isEqualTo(3);
+        assertThat(get("/api/v1/notifications/unread-count", token, CountView.class).getBody().unreadCount())
+                .isEqualTo(2);
+        assertThat(get("/api/v1/notifications/unread-count?audience=admin", token, CountView.class).getBody()
+                .unreadCount()).isZero();
+    }
+
+    @Test
+    void audiencesAreTrimmedApart() {
+        UserView staff = newUser("trim-audiences");
+        Instant now = Instant.now();
+        List<UUID> replies = List.of(
+                seedOfType(staff.id(), "support_reply", now.minusSeconds(90), false),
+                seedOfType(staff.id(), "support_reply", now.minusSeconds(80), false),
+                seedOfType(staff.id(), "support_reply", now.minusSeconds(70), false));
+        UUID oldestAlert = seedOfType(staff.id(), "admin_support_sla", now.minusSeconds(60), false);
+        seedOfType(staff.id(), "admin_support_sla", now.minusSeconds(50), false);
+        seedOfType(staff.id(), "admin_support_sla", now.minusSeconds(40), false);
+        UUID fourth = UUID.randomUUID();
+
+        publish(new NotificationRequested(fourth, staff.id(), "admin_support_sla", "notification.welcome.title", null,
+                List.of(), null));
+        awaitDelivered(fourth);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notification WHERE user_id = ? "
+                + "AND type = 'admin_support_sla'", Long.class, staff.id())).isEqualTo(3);
+        assertThat(count(oldestAlert)).isZero();
+        assertThat(count(fourth)).isEqualTo(1);
+        assertThat(replies).allSatisfy(id -> assertThat(count(id)).isEqualTo(1));
+    }
+
+    @Test
     void invalidPagingIs400() {
         String token = loginAs(newUser("invalid"));
 
-        for (String query : new String[] {"size=51", "size=0", "page=-1", "filter=archived", "page=abc"}) {
+        for (String query : new String[] {"size=51", "size=0", "page=-1", "filter=archived", "page=abc",
+                "audience=staff"}) {
             ResponseEntity<ProblemView> response = get("/api/v1/notifications?" + query, token, ProblemView.class);
 
             assertThat(response.getStatusCode()).as(query).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -376,9 +432,17 @@ class NotificationInboxIT extends AbstractWorkflowHttpIT {
     }
 
     private UUID seed(UUID userId, String titleCode, Instant createdAt, boolean read) {
+        return seed(userId, "test", titleCode, createdAt, read);
+    }
+
+    private UUID seedOfType(UUID userId, String type, Instant createdAt, boolean read) {
+        return seed(userId, type, "notification.welcome.title", createdAt, read);
+    }
+
+    private UUID seed(UUID userId, String type, String titleCode, Instant createdAt, boolean read) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO notification (id, user_id, type, title_code, created_at, read_at) "
-                + "VALUES (?, ?, 'test', ?, ?, ?)", id, userId, titleCode, Timestamp.from(createdAt),
+                + "VALUES (?, ?, ?, ?, ?, ?)", id, userId, type, titleCode, Timestamp.from(createdAt),
                 read ? Timestamp.from(createdAt) : null);
         return id;
     }
