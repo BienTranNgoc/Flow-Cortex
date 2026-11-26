@@ -161,11 +161,13 @@ public class WorkflowSharingService {
     public void admitByKey(UUID callerId, UUID workflowId, String key, ShareOrigin origin) {
         UUID admitted = readWrite.execute(status -> {
             Instant now = clock.instant();
-            Workflow workflow = resolveKey(workflowId, key, now);
+            Workflow workflow = findByKey(workflowId, key);
             if (workflow.getOwnerId().equals(callerId)) {
+                requireLiveKey(workflow, now);
                 return null;
             }
             requireUnmoderated(workflow, workflowId);
+            requireLiveKey(workflow, now);
             if (callerId != null) {
                 grantRepository.admit(workflow.getId(), callerId, key, now);
             }
@@ -183,8 +185,9 @@ public class WorkflowSharingService {
      */
     public SharedWorkflowView sharedView(UUID callerIdOrNull, String key, ShareOrigin origin) {
         OpenedLink opened = readOnly.execute(status -> {
-            Workflow workflow = resolveKey(null, key, clock.instant());
+            Workflow workflow = findByKey(null, key);
             requireUnmoderated(workflow, "link");
+            requireLiveKey(workflow, clock.instant());
             String authorName = userDirectory.findNamesByIds(List.of(workflow.getOwnerId()))
                     .get(workflow.getOwnerId());
             List<SharedWorkflowView.Step> steps = servedDefinitions.stepsFor(workflow, callerIdOrNull).stream()
@@ -256,7 +259,7 @@ public class WorkflowSharingService {
                         entry.getUserAgent()));
     }
 
-    private Workflow resolveKey(UUID workflowIdOrNull, String key, Instant now) {
+    private Workflow findByKey(UUID workflowIdOrNull, String key) {
         Object subject = workflowIdOrNull != null ? workflowIdOrNull : "link";
         if (key == null || key.isBlank()) {
             throw new NotFoundException(new LocalizedMessage("workflow.notFound", subject));
@@ -266,14 +269,21 @@ public class WorkflowSharingService {
                 .filter(found -> found.getDeletedAt() == null && found.getStatus() == WorkflowStatus.PUBLISHED
                         && found.getVisibility() == WorkflowVisibility.UNLISTED)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", subject)));
-        if (!keyIsLive(workflow, now)) {
-            throw new LocalizedStatusException(HttpStatus.GONE, new LocalizedMessage("workflow.share.keyExpired"));
-        }
         return workflow;
     }
 
     /**
-     * Kept out of {@link #resolveKey} because {@link #admitByKey} resolves the key before it recognizes the owner,
+     * Runs after {@link #requireUnmoderated} for every caller who is not the owner, so a hidden or removed workflow
+     * answers 404 whatever the key's age and never reveals that it was once shared.
+     */
+    private static void requireLiveKey(Workflow workflow, Instant now) {
+        if (!keyIsLive(workflow, now)) {
+            throw new LocalizedStatusException(HttpStatus.GONE, new LocalizedMessage("workflow.share.keyExpired"));
+        }
+    }
+
+    /**
+     * Kept out of {@link #findByKey} because {@link #admitByKey} finds the workflow before it recognizes the owner,
      * who must still be admitted to a workflow staff hid.
      */
     private static void requireUnmoderated(Workflow workflow, Object subject) {

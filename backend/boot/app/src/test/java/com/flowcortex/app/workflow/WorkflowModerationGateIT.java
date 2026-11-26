@@ -129,6 +129,41 @@ class WorkflowModerationGateIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void byKeyOfHiddenWorkflowWithExpiredKeyIs404NotGone() {
+        UserView owner = newUser("gate-bykey-expired-owner");
+        UUID id = unlistedWorkflow(owner);
+        String key = shareKey(id);
+        expireKey(id);
+        assertThat(status(HttpMethod.GET, WORKFLOWS + "by-key/" + key, null, null)).isEqualTo(HttpStatus.GONE);
+
+        moderate(id, "hidden");
+
+        assertThat(status(HttpMethod.GET, WORKFLOWS + "by-key/" + key, null, null)).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(accessLogCount(id)).isZero();
+    }
+
+    @Test
+    void keyAdmissionOfHiddenWorkflowWithExpiredKeyIs404ForNonOwnerAndGoneForOwner() {
+        UserView owner = newUser("gate-admit-expired-owner");
+        UserView lan = member(owner, "gate-admit-expired-lan");
+        UUID id = unlistedWorkflow(owner);
+        String key = shareKey(id);
+        expireKey(id);
+        assertThat(status(HttpMethod.GET, WORKFLOWS + id + "?key=" + key, loginAs(lan), null))
+                .isEqualTo(HttpStatus.GONE);
+
+        moderate(id, "hidden");
+
+        assertThat(status(HttpMethod.GET, WORKFLOWS + id + "?key=" + key, loginAs(lan), null))
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(status(HttpMethod.GET, WORKFLOWS + id + "?key=" + key, loginAs(owner), null))
+                .isEqualTo(HttpStatus.GONE);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow_link_grant WHERE workflow_id = ?", Long.class,
+                id)).isZero();
+        assertThat(accessLogCount(id)).isZero();
+    }
+
+    @Test
     void ownerListsReadsEditsAndStartsHiddenWorkflow() {
         UserView owner = newUser("gate-owner-use");
         String token = loginAs(owner);
@@ -334,6 +369,11 @@ class WorkflowModerationGateIT extends AbstractWorkflowHttpIT {
 
     private String shareKey(UUID workflowId) {
         return jdbc.queryForObject("SELECT unlisted_key FROM workflow WHERE id = ?", String.class, workflowId);
+    }
+
+    private void expireKey(UUID workflowId) {
+        jdbc.update("UPDATE workflow SET unlisted_key_expires_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofDays(1))), workflowId);
     }
 
     private void moderate(UUID workflowId, String status) {
