@@ -17,14 +17,16 @@ class AssistantTelemetryTest {
 
         Observation request = Observation.start("http.server.requests", registry);
         try (Observation.Scope scope = request.openScope()) {
-            telemetry.provider("gemini-test", new LlmJsonResult.Answered("{}", "gemini-test", 120, 30), 2);
+            telemetry.provider("support-assistant", new LlmJsonResult.Answered("{}", "gemini-test", 120, 30), 2);
         } finally {
             request.stop();
         }
 
         assertThat(registry).hasObservationWithNameEqualTo("http.server.requests").that()
                 .hasHighCardinalityKeyValue("gen_ai.system", "gcp.gemini")
-                .hasHighCardinalityKeyValue("gen_ai.request.model", "gemini-test")
+                .hasHighCardinalityKeyValue("flowcortex.llm.slot", "support-assistant")
+                .hasHighCardinalityKeyValue("gen_ai.response.model", "gemini-test")
+                .doesNotHaveHighCardinalityKeyValueWithKey("gen_ai.request.model")
                 .hasHighCardinalityKeyValue("gen_ai.usage.input_tokens", "120")
                 .hasHighCardinalityKeyValue("gen_ai.usage.output_tokens", "30")
                 .hasHighCardinalityKeyValue("support.assistant.sources", "2");
@@ -35,7 +37,7 @@ class AssistantTelemetryTest {
         TestObservationRegistry registry = TestObservationRegistry.create();
 
         new AssistantTelemetry(new SimpleMeterRegistry(), registry)
-                .provider("gemini-test", new LlmJsonResult.Blocked("SAFETY"), 0);
+                .provider("support-assistant", new LlmJsonResult.Blocked("SAFETY"), 0);
 
         assertThat(registry).doesNotHaveAnyObservation();
     }

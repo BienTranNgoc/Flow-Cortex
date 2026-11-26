@@ -577,15 +577,29 @@ flowcortex:
       connect-timeout: ${GEMINI_CONNECT_TIMEOUT:5s}
       read-timeout: ${GEMINI_READ_TIMEOUT:20s}
       answer-timeout: ${GEMINI_ANSWER_TIMEOUT:20s}
+      # Content-safety threshold sent with every slot JSON call: BLOCK_LOW_AND_ABOVE,
+      # BLOCK_MEDIUM_AND_ABOVE, BLOCK_ONLY_HIGH, BLOCK_NONE or OFF. A slot's own value overrides it.
+      safety-threshold: ${GEMINI_SAFETY_THRESHOLD:BLOCK_MEDIUM_AND_ABOVE}
       # Model chains by purpose. Per model: attempts, the waits between them and how long one call
       # may take; the models are tried in order, the later one is the fallback. The dub steps' max
-      # run times are derived from these.
+      # run times are derived from these. A model switched off in the admin registry is skipped.
       slots:
         dub-translate:
           models: gemini-3.5-flash-lite,gemini-3.8-flash
           attempts: 3
           retry-waits: 10s,30s
           call-timeout: 60s
+          # Quoted: unquoted off/OFF load as the boolean false.
+          thinking: "off"
+          # Mature dialogue in a member's film must not end a paid dub run.
+          safety-threshold: "OFF"
+        # The Help Center assistant: one attempt per model so both fit the 20s answer-timeout.
+        support-assistant:
+          models: ${FLOWCORTEX_SUPPORT_ASSISTANT_MODEL:gemini-3.5-flash-lite,gemini-3.8-flash}
+          attempts: 1
+          retry-waits:
+          call-timeout: 9s
+          thinking: "off"
         dub-speech:
           models: gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts
           attempts: 3
@@ -607,7 +621,6 @@ flowcortex:
     contact-email: ${FLOWCORTEX_SUPPORT_CONTACT_EMAIL:}
     assistant:
       enabled: ${FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED:false}
-      model: ${FLOWCORTEX_SUPPORT_ASSISTANT_MODEL:gemini-3.5-flash-lite}
       # HMAC key for guest session ids and network addresses; at least 32 bytes while the assistant is on.
       hash-secret: ${FLOWCORTEX_SUPPORT_HASH_SECRET:}
       # Questions per day over everyone; reaching it pauses the assistant until 00:00 Asia/Ho_Chi_Minh.
