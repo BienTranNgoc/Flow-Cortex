@@ -3,6 +3,8 @@ package com.flowcortex.user.web;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.user.accountdeletion.AccountDeletionGate;
+import com.flowcortex.user.accountdeletion.AccountDeletionView;
 import com.flowcortex.user.api.AccessTokenResponse;
 import com.flowcortex.user.api.AuthService;
 import com.flowcortex.user.api.AuthSession;
@@ -67,12 +69,13 @@ class AuthController {
     private final RefreshCookieSupport cookieSupport;
     private final CallerFactsLoader callerFacts;
     private final PhoneGate phoneGate;
+    private final AccountDeletionGate accountDeletionGate;
     private final RoleCatalog roleCatalog;
     private final TotpService totp;
 
     AuthController(AuthService authService, UserDirectory userDirectory, OwnProfiles ownProfiles,
             RefreshCookieSupport cookieSupport, CallerFactsLoader callerFacts, PhoneGate phoneGate,
-            RoleCatalog roleCatalog, TotpService totp) {
+            AccountDeletionGate accountDeletionGate, RoleCatalog roleCatalog, TotpService totp) {
         this.roleCatalog = roleCatalog;
         this.totp = totp;
         this.authService = authService;
@@ -81,6 +84,7 @@ class AuthController {
         this.cookieSupport = cookieSupport;
         this.callerFacts = callerFacts;
         this.phoneGate = phoneGate;
+        this.accountDeletionGate = accountDeletionGate;
     }
 
     /**
@@ -272,7 +276,8 @@ class AuthController {
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("user.notFound", id)));
         String roleName = roleCatalog.names().getOrDefault(user.role(), user.role());
         TotpState totpState = new TotpState(totp.isEnabled(id), totp.isRequired(user.role()), sessionMfa);
-        return MeResponse.from(user, roleName, callerFacts.load(id, sessionMfa), phoneGate.holds(id), totpState);
+        return MeResponse.from(user, roleName, callerFacts.load(id, sessionMfa), phoneGate.holds(id),
+                accountDeletionGate.view(id), totpState);
     }
 
     private static UUID subjectId(Jwt jwt) {
@@ -346,7 +351,9 @@ class AuthController {
      * session ends nothing gets it back in; the app sends the member to set a password first.
      * {@code permissions}: the caller's effective admin keys sorted by key (empty for an end user and
      * once deactivated); {@code adminDisabled}: the admin console access is deactivated;
-     * {@code phoneVerificationRequired}: the phone gate holds this caller until a number is verified.
+     * {@code phoneVerificationRequired}: the phone gate holds this caller until a number is verified;
+     * {@code accountDeletion}: the account's deletion request while it is pending or past its deadline,
+     * {@code null} otherwise.
      * {@code role} is the role code; {@code roleName} its current display name (the code when no role row is found).
      * {@code totp}: the second-factor state of the account and of this session.
      */
@@ -356,14 +363,16 @@ class AuthController {
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Permission> permissions,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean adminDisabled,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean phoneVerificationRequired,
+            AccountDeletionView accountDeletion,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) TotpState totp) {
         static MeResponse from(CurrentUser user, String roleName, CallerFacts facts,
-                boolean phoneVerificationRequired, TotpState totp) {
+                boolean phoneVerificationRequired, Optional<AccountDeletionView> accountDeletion,
+                TotpState totp) {
             List<Permission> keys = facts.effectiveKeys().stream()
                     .sorted(Comparator.comparing(Permission::key)).toList();
             return new MeResponse(user.id(), user.email(), user.name(), user.role(), roleName, user.status(),
                     user.hasPassword(), user.passwordSetupRequired(), keys, facts.adminDisabled(),
-                    phoneVerificationRequired, totp);
+                    phoneVerificationRequired, accountDeletion.orElse(null), totp);
         }
     }
 

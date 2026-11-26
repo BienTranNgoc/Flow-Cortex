@@ -491,6 +491,60 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
+## Batch runs (`V2026.11.26.505`)
+
+```mermaid
+erDiagram
+  app_user ||--o{ batch_run : "owner_id (no FK)"
+  workflow ||--o{ batch_run : "workflow_id"
+  batch_run ||--o| batch_run : "parent_batch_id, ON DELETE SET NULL"
+  batch_run ||--|{ batch_run_row : "batch_id, ON DELETE CASCADE"
+  workflow_run ||--o| batch_run_row : "run_id, ON DELETE SET NULL"
+
+  batch_run {
+    uuid id PK
+    uuid owner_id "no FK, like workflow_run.owner_id"
+    uuid workflow_id FK
+    uuid parent_batch_id FK "the batch a retry was made from; unique where set"
+    varchar name "NULL = unnamed; varchar(200)"
+    smallint concurrency "1-10"
+    boolean acknowledge_cost
+    varchar status "running | paused | completed | completed_with_errors | cancelled"
+    varchar pause_reason "member | insufficientCredits | unavailable"
+    varchar cancel_reason "member | workflowUnavailable | ownerInactive"
+    integer total_rows
+    timestamptz created_at
+    timestamptz finished_at "set once no row is pending, starting or running"
+    uuid lease_token "holder of the dispatch lease; every dispatcher write carries it"
+    timestamptz lease_until
+    timestamptz dispatched_at "last dispatch pass; oldest first, NULL first"
+  }
+  batch_run_row {
+    uuid id PK
+    uuid batch_id FK
+    integer row_index "unique per batch"
+    integer source_row_index "set on a retry batch's rows"
+    text input
+    varchar status "pending | starting | running | completed | failed | cancelled; starting is internal, shown as pending"
+    uuid run_id FK "NULL until the run is recorded, and after the run is removed"
+    smallint start_failures
+    boolean stop_requested
+    varchar error_code
+    varchar error_message "varchar(300)"
+    timestamptz claimed_at "when the row was claimed for start"
+    timestamptz started_at
+    timestamptz finished_at
+  }
+```
+
+Indexes: `idx_batch_run_owner_created` (`owner_id, created_at DESC, id DESC` — the member's list),
+`idx_batch_run_open` (partial `WHERE finished_at IS NULL`, `dispatched_at NULLS FIRST` — the dispatcher's
+candidates), `uq_batch_run_parent` (unique, partial `WHERE parent_batch_id IS NOT NULL` — one retry per batch),
+`idx_batch_run_row_open` (partial `WHERE status IN ('pending','starting','running')`, `batch_id, row_index`),
+`idx_batch_run_row_status` (`batch_id, status, row_index` — the grouped counts and the row list).
+
+Row counts are not stored on `batch_run`; they are one grouped read over `idx_batch_run_row_status`.
+
 ## Two-factor sign-in (`V2026.11.26.610`)
 
 ```mermaid

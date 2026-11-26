@@ -41,6 +41,8 @@ public enum AuthEventType {
     PHONE_CHANGED,
     PHONE_CHANGE_REVERTED,
 
+    ACCOUNT_DELETION_REQUESTED,
+    ACCOUNT_DELETION_CANCELLED,
     TOTP_ENABLED,
     TOTP_DISABLED,
     /** An administrator reset the account's second factor; the actor id is in the metadata. */

@@ -24,6 +24,117 @@ export interface ProblemDetail {
   properties?: ProblemDetailProperties;
 }
 
+/**
+ * @pattern daily|weekly|monthly
+ */
+export type SetScheduleRequestFrequency =
+  (typeof SetScheduleRequestFrequency)[keyof typeof SetScheduleRequestFrequency];
+
+export const SetScheduleRequestFrequency = {
+  daily: 'daily',
+  weekly: 'weekly',
+  monthly: 'monthly',
+} as const;
+
+/**
+ * @pattern monday|tuesday|wednesday|thursday|friday|saturday|sunday
+ */
+export type SetScheduleRequestDayOfWeek =
+  (typeof SetScheduleRequestDayOfWeek)[keyof typeof SetScheduleRequestDayOfWeek];
+
+export const SetScheduleRequestDayOfWeek = {
+  monday: 'monday',
+  tuesday: 'tuesday',
+  wednesday: 'wednesday',
+  thursday: 'thursday',
+  friday: 'friday',
+  saturday: 'saturday',
+  sunday: 'sunday',
+} as const;
+
+export interface SetScheduleRequest {
+  /** @pattern daily|weekly|monthly */
+  frequency: SetScheduleRequestFrequency;
+  /** @pattern monday|tuesday|wednesday|thursday|friday|saturday|sunday */
+  dayOfWeek?: SetScheduleRequestDayOfWeek;
+  /**
+   * @minimum 1
+   * @maximum 28
+   */
+  dayOfMonth?: number;
+  /**
+   * HH:mm on the quarter hour, in the schedule's time zone
+   * @pattern ([01]\d|2[0-3]):(00|15|30|45)
+   */
+  time: string;
+  /** A region id such as Asia/Ho_Chi_Minh, or UTC */
+  timezone?: string;
+  active?: boolean;
+  /**
+   * @minLength 0
+   * @maxLength 10000
+   */
+  input?: string;
+  acknowledgeCost?: boolean;
+}
+
+export type ScheduleResponseFrequency =
+  (typeof ScheduleResponseFrequency)[keyof typeof ScheduleResponseFrequency];
+
+export const ScheduleResponseFrequency = {
+  daily: 'daily',
+  weekly: 'weekly',
+  monthly: 'monthly',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ScheduleResponseDayOfWeek =
+  (typeof ScheduleResponseDayOfWeek)[keyof typeof ScheduleResponseDayOfWeek] | null;
+
+export const ScheduleResponseDayOfWeek = {
+  monday: 'monday',
+  tuesday: 'tuesday',
+  wednesday: 'wednesday',
+  thursday: 'thursday',
+  friday: 'friday',
+  saturday: 'saturday',
+  sunday: 'sunday',
+} as const;
+
+export type ScheduleResponseStatus =
+  (typeof ScheduleResponseStatus)[keyof typeof ScheduleResponseStatus];
+
+export const ScheduleResponseStatus = {
+  active: 'active',
+  paused: 'paused',
+} as const;
+
+export interface ScheduleResponse {
+  id: string;
+  workflowId: string;
+  frequency: ScheduleResponseFrequency;
+  /** @nullable */
+  dayOfWeek?: ScheduleResponseDayOfWeek;
+  /** @nullable */
+  dayOfMonth?: number | null;
+  time: string;
+  timezone: string;
+  status: ScheduleResponseStatus;
+  /** @nullable */
+  pausedAt?: string | null;
+  /** @nullable */
+  nextRunAt?: string | null;
+  /** @nullable */
+  nextRunLocal?: string | null;
+  /** @nullable */
+  input?: string | null;
+  acknowledgeCost: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface HelpfulRequest {
   helpful: boolean;
 }
@@ -223,6 +334,22 @@ export interface ProfileUpdateRequest {
   lastName?: string;
 }
 
+export type AccountDeletionViewState =
+  (typeof AccountDeletionViewState)[keyof typeof AccountDeletionViewState];
+
+export const AccountDeletionViewState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionView {
+  state: AccountDeletionViewState;
+  requestedAt: string;
+  /** When the grace period ends; the deletion can be cancelled until then */
+  scheduledAt: string;
+}
+
 export type MeResponsePermissionsItem =
   (typeof MeResponsePermissionsItem)[keyof typeof MeResponsePermissionsItem];
 
@@ -285,6 +412,7 @@ export interface MeResponse {
   permissions: MeResponsePermissionsItem[];
   adminDisabled: boolean;
   phoneVerificationRequired: boolean;
+  accountDeletion?: AccountDeletionView;
   totp: TotpState;
 }
 
@@ -952,6 +1080,39 @@ export interface AiModel {
   updatedAt: string;
 }
 
+export interface DeletionBlockConditionUpdate {
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 999
+   */
+  sortOrder: number;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  messageVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  messageEn: string;
+}
+
+export interface DeletionBlockConditionView {
+  key: string;
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 999
+   */
+  sortOrder: number;
+  messageVi: string;
+  messageEn: string;
+  updatedBy?: string;
+  updatedAt: string;
+}
+
 export interface CreateWorkflowRequest {
   /**
    * @minLength 0
@@ -1083,43 +1244,6 @@ export interface CreateStepRequest {
   config?: string;
 }
 
-/**
- * @pattern female|male
- */
-export type RunOptionsRequestVoice =
-  (typeof RunOptionsRequestVoice)[keyof typeof RunOptionsRequestVoice];
-
-export const RunOptionsRequestVoice = {
-  female: 'female',
-  male: 'male',
-} as const;
-
-export interface RunOptionsRequest {
-  /** @pattern female|male */
-  voice?: RunOptionsRequestVoice;
-}
-
-export interface StartRunRequest {
-  /**
-   * @minLength 0
-   * @maxLength 10000
-   */
-  input?: string;
-  uploadId?: string;
-  /**
-   * @minItems 1
-   * @maxItems 10
-   */
-  uploadIds?: string[];
-  /**
-   * @minLength 0
-   * @maxLength 1024
-   */
-  originalName?: string;
-  options?: RunOptionsRequest;
-  acknowledgeCost?: boolean;
-}
-
 export interface RunStepOutputResponse {
   name: string;
   mime: string;
@@ -1176,6 +1300,43 @@ export interface RunResponse {
   finishedAt?: string;
   steps?: RunStepResponse[];
   chargedCredits?: number;
+}
+
+/**
+ * @pattern female|male
+ */
+export type RunOptionsRequestVoice =
+  (typeof RunOptionsRequestVoice)[keyof typeof RunOptionsRequestVoice];
+
+export const RunOptionsRequestVoice = {
+  female: 'female',
+  male: 'male',
+} as const;
+
+export interface RunOptionsRequest {
+  /** @pattern female|male */
+  voice?: RunOptionsRequestVoice;
+}
+
+export interface StartRunRequest {
+  /**
+   * @minLength 0
+   * @maxLength 10000
+   */
+  input?: string;
+  uploadId?: string;
+  /**
+   * @minItems 1
+   * @maxItems 10
+   */
+  uploadIds?: string[];
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  originalName?: string;
+  options?: RunOptionsRequest;
+  acknowledgeCost?: boolean;
 }
 
 export type ReportRequestReason = (typeof ReportRequestReason)[keyof typeof ReportRequestReason];
@@ -1268,6 +1429,87 @@ export interface HotfixRequest {
    * @maxLength 200
    */
   note?: string;
+}
+
+export type CreateBatchRequestFormat =
+  (typeof CreateBatchRequestFormat)[keyof typeof CreateBatchRequestFormat];
+
+export const CreateBatchRequestFormat = {
+  csv: 'csv',
+  json: 'json',
+  jsonl: 'jsonl',
+} as const;
+
+export interface CreateBatchRequest {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  name?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2000000
+   */
+  content?: string;
+  /**
+   * @minItems 0
+   * @maxItems 500
+   * @items.minLength 0
+   * @items.maxLength 10000
+   */
+  rows?: string[];
+  format?: CreateBatchRequestFormat;
+  skipFirstLine?: boolean;
+  concurrency?: number;
+  acknowledgeCost?: boolean;
+}
+
+export type BatchResponseStatus = (typeof BatchResponseStatus)[keyof typeof BatchResponseStatus];
+
+export const BatchResponseStatus = {
+  running: 'running',
+  paused: 'paused',
+  completed: 'completed',
+  completed_with_errors: 'completed_with_errors',
+  cancelled: 'cancelled',
+} as const;
+
+export type BatchResponsePauseReason =
+  (typeof BatchResponsePauseReason)[keyof typeof BatchResponsePauseReason];
+
+export const BatchResponsePauseReason = {
+  member: 'member',
+  insufficientCredits: 'insufficientCredits',
+  unavailable: 'unavailable',
+} as const;
+
+export type BatchResponseCancelReason =
+  (typeof BatchResponseCancelReason)[keyof typeof BatchResponseCancelReason];
+
+export const BatchResponseCancelReason = {
+  member: 'member',
+  workflowUnavailable: 'workflowUnavailable',
+  ownerInactive: 'ownerInactive',
+} as const;
+
+export interface BatchResponse {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  name?: string;
+  status: BatchResponseStatus;
+  concurrency: number;
+  totalRows: number;
+  pendingRows: number;
+  runningRows: number;
+  completedRows: number;
+  failedRows: number;
+  cancelledRows: number;
+  pauseReason?: BatchResponsePauseReason;
+  cancelReason?: BatchResponseCancelReason;
+  parentBatchId?: string;
+  createdAt: string;
+  finishedAt?: string;
 }
 
 export interface CreateUserRequest {
@@ -1907,6 +2149,7 @@ export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof St
 export const StepUpRequestPurpose = {
   PAT_CREATE: 'PAT_CREATE',
   PHONE_CHANGE: 'PHONE_CHANGE',
+  ACCOUNT_DELETION: 'ACCOUNT_DELETION',
 } as const;
 
 export interface StepUpRequest {
@@ -1989,6 +2232,42 @@ export interface CreatedApiToken {
   token: string;
   createdAt: string;
   expiresAt: string;
+}
+
+export interface AccountDeletionRequestBody {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  stepUpProof: string;
+}
+
+export type AccountDeletionAcceptedState =
+  (typeof AccountDeletionAcceptedState)[keyof typeof AccountDeletionAcceptedState];
+
+export const AccountDeletionAcceptedState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionAccepted {
+  requestId: string;
+  state: AccountDeletionAcceptedState;
+  requestedAt: string;
+  scheduledAt: string;
+}
+
+export type AccountDeletionCancelledState =
+  (typeof AccountDeletionCancelledState)[keyof typeof AccountDeletionCancelledState];
+
+export const AccountDeletionCancelledState = {
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export interface AccountDeletionCancelled {
+  state: AccountDeletionCancelledState;
+  cancelledAt: string;
 }
 
 export type CreateEntityRequestKind =
@@ -2292,6 +2571,10 @@ export interface Saved {
   label?: string;
   authType?: string;
   baseUrl?: string;
+}
+
+export interface GoogleAuthorizeResponse {
+  authorizationUrl?: string;
 }
 
 export interface Attachment {
@@ -3161,6 +3444,46 @@ export interface WorkflowVersionDetailResponse {
   snapshot: SnapshotResponse;
 }
 
+export type ScheduleFireResponseTrigger =
+  (typeof ScheduleFireResponseTrigger)[keyof typeof ScheduleFireResponseTrigger];
+
+export const ScheduleFireResponseTrigger = {
+  manual: 'manual',
+  scheduled: 'scheduled',
+} as const;
+
+export type ScheduleFireResponseStatus =
+  (typeof ScheduleFireResponseStatus)[keyof typeof ScheduleFireResponseStatus];
+
+export const ScheduleFireResponseStatus = {
+  starting: 'starting',
+  started: 'started',
+  failed: 'failed',
+} as const;
+
+export interface ScheduleFireResponse {
+  id: string;
+  trigger: ScheduleFireResponseTrigger;
+  scheduledAt: string;
+  status: ScheduleFireResponseStatus;
+  /** @nullable */
+  runId?: string | null;
+  /** @nullable */
+  runStatus?: string | null;
+  /** @nullable */
+  errorCode?: string | null;
+  /** @nullable */
+  errorMessage?: string | null;
+  createdAt: string;
+}
+
+export interface PageViewScheduleFireResponse {
+  items: ScheduleFireResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface ReviewListItemResponse {
   id: string;
   rating: number;
@@ -3871,6 +4194,36 @@ export interface ApiTokenView {
   expired: boolean;
 }
 
+export type AccountDeletionStatusState =
+  (typeof AccountDeletionStatusState)[keyof typeof AccountDeletionStatusState];
+
+export const AccountDeletionStatusState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionStatus {
+  enabled: boolean;
+  gracePeriodDays: number;
+  state: AccountDeletionStatusState;
+  /** Null while the state is NONE */
+  requestedAt?: string;
+  /** When the grace period ends; null while the state is NONE */
+  scheduledAt?: string;
+}
+
+export interface DeletionReasonView {
+  key: string;
+  /** Already in the caller's language */
+  message: string;
+}
+
+export interface DeletionEligibilityView {
+  eligible: boolean;
+  reasons: DeletionReasonView[];
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -4136,6 +4489,57 @@ export interface Summary {
   extraHeaderNames?: string[];
 }
 
+export interface GoogleConnection {
+  provider?: string;
+  email?: string;
+  scopes?: string[];
+  missingScopes?: string[];
+  expiresAt?: string;
+  usageEnabled?: boolean;
+}
+
+export interface Spreadsheet {
+  id?: string;
+  name?: string;
+  modifiedAt?: string;
+  ownerEmail?: string;
+  webViewUrl?: string;
+}
+
+export interface SpreadsheetPage {
+  items?: Spreadsheet[];
+  nextCursor?: string;
+}
+
+export interface Tab {
+  sheetId?: number;
+  title?: string;
+  rowCount?: number;
+  columnCount?: number;
+}
+
+export interface Tabs {
+  spreadsheetId?: string;
+  title?: string;
+  tabs?: Tab[];
+}
+
+export type PreviewRowsItem = { [key: string]: string };
+
+export interface Preview {
+  spreadsheetId?: string;
+  tab?: string;
+  range?: string;
+  header?: string[];
+  rows?: PreviewRowsItem[];
+}
+
+export interface GoogleHealth {
+  valid?: boolean;
+  email?: string;
+  reason?: string;
+}
+
 export interface ChatFolderList {
   items?: ChatFolder[];
 }
@@ -4318,6 +4722,43 @@ export interface TransactionDetailResponse {
   /** @nullable */
   outcomeCode: string | null;
   timeline: TransactionTimelineEvent[];
+}
+
+export interface PageViewBatchResponse {
+  items: BatchResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export type BatchRowResponseStatus =
+  (typeof BatchRowResponseStatus)[keyof typeof BatchRowResponseStatus];
+
+export const BatchRowResponseStatus = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface BatchRowResponse {
+  rowIndex: number;
+  sourceRowIndex?: number;
+  input: string;
+  status: BatchRowResponseStatus;
+  runId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface PageViewBatchRowResponse {
+  items: BatchRowResponse[];
+  page: number;
+  size: number;
+  total: number;
 }
 
 export interface TotpStatusResponse {
@@ -5205,6 +5646,19 @@ export type GetWorkflowVisibilityAuditParams = {
   cursor?: string;
 };
 
+export type ListWorkflowScheduleRunsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
 export type ListWorkflowReviewsParams = {
   /**
    * @pattern newest|helpful
@@ -5583,6 +6037,25 @@ export type ListContentDocumentHistoryParams = {
   size?: number;
 };
 
+export type ListGoogleSpreadsheetsParams = {
+  q?: string;
+  limit?: string;
+  cursor?: string;
+};
+
+export type PreviewGoogleSpreadsheetTabParams = {
+  tab?: string;
+  range?: string;
+  limit?: string;
+  hasHeader?: string;
+};
+
+export type GoogleCallbackParams = {
+  state?: string;
+  code?: string;
+  error?: string;
+};
+
 export type CountChatConversationsParams = {
   q?: string;
   /**
@@ -5627,6 +6100,43 @@ export type ListBillingTransactionsParams = {
    */
   settled?: boolean;
 };
+
+export type ListBatchesParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
+export type ListBatchRowsParams = {
+  status?: ListBatchRowsStatus;
+  /**
+   * @minimum 0
+   * @maximum 10737418
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  size?: number;
+};
+
+export type ListBatchRowsStatus = (typeof ListBatchRowsStatus)[keyof typeof ListBatchRowsStatus];
+
+export const ListBatchRowsStatus = {
+  pending: 'pending',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
 
 export type CallbackParams = {
   code?: string;
@@ -6192,6 +6702,186 @@ export const reorderWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type getWorkflowScheduleResponse200 = {
+  data: ScheduleResponse;
+  status: 200;
+};
+
+export type getWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getWorkflowScheduleResponseSuccess = getWorkflowScheduleResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowScheduleResponseError = (
+  getWorkflowScheduleResponse404 | getWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowScheduleResponse =
+  getWorkflowScheduleResponseSuccess | getWorkflowScheduleResponseError;
+
+export const getGetWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule`;
+};
+
+/**
+ * @summary The caller's schedule for the workflow
+ */
+export const getWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowScheduleResponse> => {
+  return customFetch<getWorkflowScheduleResponse>(getGetWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type setWorkflowScheduleResponse200 = {
+  data: ScheduleResponse;
+  status: 200;
+};
+
+export type setWorkflowScheduleResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type setWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type setWorkflowScheduleResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type setWorkflowScheduleResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type setWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type setWorkflowScheduleResponseSuccess = setWorkflowScheduleResponse200 & {
+  headers: Headers;
+};
+export type setWorkflowScheduleResponseError = (
+  | setWorkflowScheduleResponse400
+  | setWorkflowScheduleResponse404
+  | setWorkflowScheduleResponse422
+  | setWorkflowScheduleResponse429
+  | setWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type setWorkflowScheduleResponse =
+  setWorkflowScheduleResponseSuccess | setWorkflowScheduleResponseError;
+
+export const getSetWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule`;
+};
+
+/**
+ * @summary Create or replace the caller's schedule
+ */
+export const setWorkflowSchedule = async (
+  id: string,
+  setScheduleRequest: SetScheduleRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setWorkflowScheduleResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<setWorkflowScheduleResponse>(getSetWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(setScheduleRequest),
+  });
+};
+
+export type deleteWorkflowScheduleResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteWorkflowScheduleResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type deleteWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type deleteWorkflowScheduleResponseSuccess = deleteWorkflowScheduleResponse204 & {
+  headers: Headers;
+};
+export type deleteWorkflowScheduleResponseError = (
+  | deleteWorkflowScheduleResponse404
+  | deleteWorkflowScheduleResponse429
+  | deleteWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type deleteWorkflowScheduleResponse =
+  deleteWorkflowScheduleResponseSuccess | deleteWorkflowScheduleResponseError;
+
+export const getDeleteWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule`;
+};
+
+/**
+ * @summary Delete the caller's schedule; its fires stay
+ */
+export const deleteWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteWorkflowScheduleResponse> => {
+  return customFetch<deleteWorkflowScheduleResponse>(getDeleteWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'DELETE',
   });
 };
 
@@ -8820,6 +9510,73 @@ export const deleteAdminAiModel = async (
   });
 };
 
+export type updateAdminDeletionBlockConditionResponse200 = {
+  data: DeletionBlockConditionView;
+  status: 200;
+};
+
+export type updateAdminDeletionBlockConditionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminDeletionBlockConditionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminDeletionBlockConditionResponseSuccess =
+  updateAdminDeletionBlockConditionResponse200 & {
+    headers: Headers;
+  };
+export type updateAdminDeletionBlockConditionResponseError = (
+  updateAdminDeletionBlockConditionResponse400 | updateAdminDeletionBlockConditionResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminDeletionBlockConditionResponse =
+  updateAdminDeletionBlockConditionResponseSuccess | updateAdminDeletionBlockConditionResponseError;
+
+export const getUpdateAdminDeletionBlockConditionUrl = (key: string) => {
+  return `/api/v1/admin/account-deletion/block-conditions/${key}`;
+};
+
+export const updateAdminDeletionBlockCondition = async (
+  key: string,
+  deletionBlockConditionUpdate: DeletionBlockConditionUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminDeletionBlockConditionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminDeletionBlockConditionResponse>(
+    getUpdateAdminDeletionBlockConditionUrl(key),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(deletionBlockConditionUpdate),
+    },
+  );
+};
+
 export type listWorkflowsResponse200 = {
   data: WorkflowResponse[];
   status: 200;
@@ -9258,6 +10015,219 @@ export const addStep = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createStepRequest),
+  });
+};
+
+export type runWorkflowScheduleNowResponse201 = {
+  data: RunResponse;
+  status: 201;
+};
+
+export type runWorkflowScheduleNowResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type runWorkflowScheduleNowResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type runWorkflowScheduleNowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type runWorkflowScheduleNowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type runWorkflowScheduleNowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type runWorkflowScheduleNowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type runWorkflowScheduleNowResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type runWorkflowScheduleNowResponseSuccess = runWorkflowScheduleNowResponse201 & {
+  headers: Headers;
+};
+export type runWorkflowScheduleNowResponseError = (
+  | runWorkflowScheduleNowResponse400
+  | runWorkflowScheduleNowResponse402
+  | runWorkflowScheduleNowResponse404
+  | runWorkflowScheduleNowResponse409
+  | runWorkflowScheduleNowResponse422
+  | runWorkflowScheduleNowResponse429
+  | runWorkflowScheduleNowResponse503
+) & {
+  headers: Headers;
+};
+
+export type runWorkflowScheduleNowResponse =
+  runWorkflowScheduleNowResponseSuccess | runWorkflowScheduleNowResponseError;
+
+export const getRunWorkflowScheduleNowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule/run-now`;
+};
+
+/**
+ * @summary Start one run with the schedule's input now, without changing the schedule
+ */
+export const runWorkflowScheduleNow = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<runWorkflowScheduleNowResponse> => {
+  return customFetch<runWorkflowScheduleNowResponse>(getRunWorkflowScheduleNowUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type resumeWorkflowScheduleResponse200 = {
+  data: ScheduleResponse;
+  status: 200;
+};
+
+export type resumeWorkflowScheduleResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type resumeWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resumeWorkflowScheduleResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type resumeWorkflowScheduleResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type resumeWorkflowScheduleResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type resumeWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type resumeWorkflowScheduleResponseSuccess = resumeWorkflowScheduleResponse200 & {
+  headers: Headers;
+};
+export type resumeWorkflowScheduleResponseError = (
+  | resumeWorkflowScheduleResponse400
+  | resumeWorkflowScheduleResponse404
+  | resumeWorkflowScheduleResponse409
+  | resumeWorkflowScheduleResponse422
+  | resumeWorkflowScheduleResponse429
+  | resumeWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type resumeWorkflowScheduleResponse =
+  resumeWorkflowScheduleResponseSuccess | resumeWorkflowScheduleResponseError;
+
+export const getResumeWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule/resume`;
+};
+
+/**
+ * @summary Resume the caller's schedule
+ */
+export const resumeWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resumeWorkflowScheduleResponse> => {
+  return customFetch<resumeWorkflowScheduleResponse>(getResumeWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type pauseWorkflowScheduleResponse200 = {
+  data: ScheduleResponse;
+  status: 200;
+};
+
+export type pauseWorkflowScheduleResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type pauseWorkflowScheduleResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pauseWorkflowScheduleResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type pauseWorkflowScheduleResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type pauseWorkflowScheduleResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type pauseWorkflowScheduleResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type pauseWorkflowScheduleResponseSuccess = pauseWorkflowScheduleResponse200 & {
+  headers: Headers;
+};
+export type pauseWorkflowScheduleResponseError = (
+  | pauseWorkflowScheduleResponse400
+  | pauseWorkflowScheduleResponse404
+  | pauseWorkflowScheduleResponse409
+  | pauseWorkflowScheduleResponse422
+  | pauseWorkflowScheduleResponse429
+  | pauseWorkflowScheduleResponse503
+) & {
+  headers: Headers;
+};
+
+export type pauseWorkflowScheduleResponse =
+  pauseWorkflowScheduleResponseSuccess | pauseWorkflowScheduleResponseError;
+
+export const getPauseWorkflowScheduleUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/schedule/pause`;
+};
+
+/**
+ * @summary Pause the caller's schedule
+ */
+export const pauseWorkflowSchedule = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pauseWorkflowScheduleResponse> => {
+  return customFetch<pauseWorkflowScheduleResponse>(getPauseWorkflowScheduleUrl(id), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -9887,6 +10857,105 @@ export const forkWorkflow = async (
   return customFetch<forkWorkflowResponse>(getForkWorkflowUrl(id), {
     ...options,
     method: 'POST',
+  });
+};
+
+export type createBatchResponse201 = {
+  data: BatchResponse;
+  status: 201;
+};
+
+export type createBatchResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createBatchResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type createBatchResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type createBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type createBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createBatchResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createBatchResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type createBatchResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type createBatchResponseSuccess = createBatchResponse201 & {
+  headers: Headers;
+};
+export type createBatchResponseError = (
+  | createBatchResponse400
+  | createBatchResponse401
+  | createBatchResponse402
+  | createBatchResponse404
+  | createBatchResponse409
+  | createBatchResponse422
+  | createBatchResponse429
+  | createBatchResponse503
+) & {
+  headers: Headers;
+};
+
+export type createBatchResponse = createBatchResponseSuccess | createBatchResponseError;
+
+export const getCreateBatchUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/batches`;
+};
+
+export const createBatch = async (
+  id: string,
+  createBatchRequest: CreateBatchRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createBatchResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createBatchResponse>(getCreateBatchUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createBatchRequest),
   });
 };
 
@@ -13029,6 +14098,144 @@ export const createApiToken = async (
   });
 };
 
+export type getAccountDeletionStatusResponse200 = {
+  data: AccountDeletionStatus;
+  status: 200;
+};
+
+export type getAccountDeletionStatusResponseSuccess = getAccountDeletionStatusResponse200 & {
+  headers: Headers;
+};
+export type getAccountDeletionStatusResponse = getAccountDeletionStatusResponseSuccess;
+
+export const getGetAccountDeletionStatusUrl = () => {
+  return `/api/v1/me/account-deletion`;
+};
+
+export const getAccountDeletionStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountDeletionStatusResponse> => {
+  return customFetch<getAccountDeletionStatusResponse>(getGetAccountDeletionStatusUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type requestAccountDeletionResponse202 = {
+  data: AccountDeletionAccepted;
+  status: 202;
+};
+
+export type requestAccountDeletionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type requestAccountDeletionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type requestAccountDeletionResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type requestAccountDeletionResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type requestAccountDeletionResponseSuccess = requestAccountDeletionResponse202 & {
+  headers: Headers;
+};
+export type requestAccountDeletionResponseError = (
+  | requestAccountDeletionResponse400
+  | requestAccountDeletionResponse403
+  | requestAccountDeletionResponse409
+  | requestAccountDeletionResponse503
+) & {
+  headers: Headers;
+};
+
+export type requestAccountDeletionResponse =
+  requestAccountDeletionResponseSuccess | requestAccountDeletionResponseError;
+
+export const getRequestAccountDeletionUrl = () => {
+  return `/api/v1/me/account-deletion`;
+};
+
+export const requestAccountDeletion = async (
+  accountDeletionRequestBody: AccountDeletionRequestBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestAccountDeletionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestAccountDeletionResponse>(getRequestAccountDeletionUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountDeletionRequestBody),
+  });
+};
+
+export type cancelAccountDeletionResponse200 = {
+  data: AccountDeletionCancelled;
+  status: 200;
+};
+
+export type cancelAccountDeletionResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelAccountDeletionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type cancelAccountDeletionResponseSuccess = cancelAccountDeletionResponse200 & {
+  headers: Headers;
+};
+export type cancelAccountDeletionResponseError = (
+  cancelAccountDeletionResponse409 | cancelAccountDeletionResponse422
+) & {
+  headers: Headers;
+};
+
+export type cancelAccountDeletionResponse =
+  cancelAccountDeletionResponseSuccess | cancelAccountDeletionResponseError;
+
+export const getCancelAccountDeletionUrl = () => {
+  return `/api/v1/me/account-deletion/cancel`;
+};
+
+export const cancelAccountDeletion = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelAccountDeletionResponse> => {
+  return customFetch<cancelAccountDeletionResponse>(getCancelAccountDeletionUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type listEntitiesResponse200 = {
   data: EntityListResponse;
   status: 200;
@@ -13625,6 +14832,45 @@ export const save = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(saveRequest),
+  });
+};
+
+export type googleAuthorizeResponse200 = {
+  data: GoogleAuthorizeResponse;
+  status: 200;
+};
+
+export type googleAuthorizeResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleAuthorizeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleAuthorizeResponseSuccess = googleAuthorizeResponse200 & {
+  headers: Headers;
+};
+export type googleAuthorizeResponseError = (
+  googleAuthorizeResponse403 | googleAuthorizeResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleAuthorizeResponse = googleAuthorizeResponseSuccess | googleAuthorizeResponseError;
+
+export const getGoogleAuthorizeUrl = () => {
+  return `/api/v1/connectors/google/authorize`;
+};
+
+export const googleAuthorize = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleAuthorizeResponse> => {
+  return customFetch<googleAuthorizeResponse>(getGoogleAuthorizeUrl(), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -14244,6 +15490,185 @@ export const recordPaymentJourneyEvent = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(recordPaymentJourneyEventBody),
+  });
+};
+
+export type retryBatchResponse201 = {
+  data: BatchResponse;
+  status: 201;
+};
+
+export type retryBatchResponse401 = {
+  data: ProblemDetail;
+  status: 401;
+};
+
+export type retryBatchResponse402 = {
+  data: ProblemDetail;
+  status: 402;
+};
+
+export type retryBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type retryBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type retryBatchResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type retryBatchResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type retryBatchResponseSuccess = retryBatchResponse201 & {
+  headers: Headers;
+};
+export type retryBatchResponseError = (
+  | retryBatchResponse401
+  | retryBatchResponse402
+  | retryBatchResponse404
+  | retryBatchResponse409
+  | retryBatchResponse422
+  | retryBatchResponse503
+) & {
+  headers: Headers;
+};
+
+export type retryBatchResponse = retryBatchResponseSuccess | retryBatchResponseError;
+
+export const getRetryBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/retry`;
+};
+
+export const retryBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<retryBatchResponse> => {
+  return customFetch<retryBatchResponse>(getRetryBatchUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type resumeBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type resumeBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resumeBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type resumeBatchResponseSuccess = resumeBatchResponse200 & {
+  headers: Headers;
+};
+export type resumeBatchResponseError = (resumeBatchResponse404 | resumeBatchResponse409) & {
+  headers: Headers;
+};
+
+export type resumeBatchResponse = resumeBatchResponseSuccess | resumeBatchResponseError;
+
+export const getResumeBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/resume`;
+};
+
+export const resumeBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resumeBatchResponse> => {
+  return customFetch<resumeBatchResponse>(getResumeBatchUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type pauseBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type pauseBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pauseBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type pauseBatchResponseSuccess = pauseBatchResponse200 & {
+  headers: Headers;
+};
+export type pauseBatchResponseError = (pauseBatchResponse404 | pauseBatchResponse409) & {
+  headers: Headers;
+};
+
+export type pauseBatchResponse = pauseBatchResponseSuccess | pauseBatchResponseError;
+
+export const getPauseBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/pause`;
+};
+
+export const pauseBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pauseBatchResponse> => {
+  return customFetch<pauseBatchResponse>(getPauseBatchUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type cancelBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type cancelBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type cancelBatchResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelBatchResponseSuccess = cancelBatchResponse200 & {
+  headers: Headers;
+};
+export type cancelBatchResponseError = (cancelBatchResponse404 | cancelBatchResponse409) & {
+  headers: Headers;
+};
+
+export type cancelBatchResponse = cancelBatchResponseSuccess | cancelBatchResponseError;
+
+export const getCancelBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}/cancel`;
+};
+
+export const cancelBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelBatchResponse> => {
+  return customFetch<cancelBatchResponse>(getCancelBatchUrl(id), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -18416,6 +19841,66 @@ export const getWorkflowSharing = async (
   });
 };
 
+export type listWorkflowScheduleRunsResponse200 = {
+  data: PageViewScheduleFireResponse;
+  status: 200;
+};
+
+export type listWorkflowScheduleRunsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listWorkflowScheduleRunsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listWorkflowScheduleRunsResponseSuccess = listWorkflowScheduleRunsResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowScheduleRunsResponseError = (
+  listWorkflowScheduleRunsResponse400 | listWorkflowScheduleRunsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listWorkflowScheduleRunsResponse =
+  listWorkflowScheduleRunsResponseSuccess | listWorkflowScheduleRunsResponseError;
+
+export const getListWorkflowScheduleRunsUrl = (
+  id: string,
+  params?: ListWorkflowScheduleRunsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/workflows/${id}/schedule/runs?${stringifiedParams}`
+    : `/api/v1/workflows/${id}/schedule/runs`;
+};
+
+/**
+ * @summary The caller's fires of the workflow, newest first
+ */
+export const listWorkflowScheduleRuns = async (
+  id: string,
+  params?: ListWorkflowScheduleRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowScheduleRunsResponse> => {
+  return customFetch<listWorkflowScheduleRunsResponse>(getListWorkflowScheduleRunsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listWorkflowReviewsResponse200 = {
   data: ReviewPageResponse;
   status: 200;
@@ -20033,6 +21518,41 @@ export const getDriveMigration = async (
   });
 };
 
+export type getAccountDeletionEligibilityResponse200 = {
+  data: DeletionEligibilityView;
+  status: 200;
+};
+
+export type getAccountDeletionEligibilityResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getAccountDeletionEligibilityResponseSuccess =
+  getAccountDeletionEligibilityResponse200 & {
+    headers: Headers;
+  };
+export type getAccountDeletionEligibilityResponseError =
+  getAccountDeletionEligibilityResponse503 & {
+    headers: Headers;
+  };
+
+export type getAccountDeletionEligibilityResponse =
+  getAccountDeletionEligibilityResponseSuccess | getAccountDeletionEligibilityResponseError;
+
+export const getGetAccountDeletionEligibilityUrl = () => {
+  return `/api/v1/me/account-deletion/eligibility`;
+};
+
+export const getAccountDeletionEligibility = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountDeletionEligibilityResponse> => {
+  return customFetch<getAccountDeletionEligibilityResponse>(getGetAccountDeletionEligibilityUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;
@@ -20668,6 +22188,386 @@ export const getTelegramConnectorHealth = async (
   });
 };
 
+export type googleReadResponse200 = {
+  data: GoogleConnection;
+  status: 200;
+};
+
+export type googleReadResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleReadResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type googleReadResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleReadResponseSuccess = googleReadResponse200 & {
+  headers: Headers;
+};
+export type googleReadResponseError = (
+  googleReadResponse403 | googleReadResponse404 | googleReadResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleReadResponse = googleReadResponseSuccess | googleReadResponseError;
+
+export const getGoogleReadUrl = () => {
+  return `/api/v1/connectors/google`;
+};
+
+export const googleRead = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleReadResponse> => {
+  return customFetch<googleReadResponse>(getGoogleReadUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listGoogleSpreadsheetsResponse200 = {
+  data: SpreadsheetPage;
+  status: 200;
+};
+
+export type listGoogleSpreadsheetsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listGoogleSpreadsheetsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listGoogleSpreadsheetsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listGoogleSpreadsheetsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listGoogleSpreadsheetsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listGoogleSpreadsheetsResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type listGoogleSpreadsheetsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listGoogleSpreadsheetsResponseSuccess = listGoogleSpreadsheetsResponse200 & {
+  headers: Headers;
+};
+export type listGoogleSpreadsheetsResponseError = (
+  | listGoogleSpreadsheetsResponse400
+  | listGoogleSpreadsheetsResponse403
+  | listGoogleSpreadsheetsResponse404
+  | listGoogleSpreadsheetsResponse409
+  | listGoogleSpreadsheetsResponse422
+  | listGoogleSpreadsheetsResponse502
+  | listGoogleSpreadsheetsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listGoogleSpreadsheetsResponse =
+  listGoogleSpreadsheetsResponseSuccess | listGoogleSpreadsheetsResponseError;
+
+export const getListGoogleSpreadsheetsUrl = (params?: ListGoogleSpreadsheetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/sheets?${stringifiedParams}`
+    : `/api/v1/connectors/google/sheets`;
+};
+
+export const listGoogleSpreadsheets = async (
+  params?: ListGoogleSpreadsheetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listGoogleSpreadsheetsResponse> => {
+  return customFetch<listGoogleSpreadsheetsResponse>(getListGoogleSpreadsheetsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listGoogleSpreadsheetTabsResponse200 = {
+  data: Tabs;
+  status: 200;
+};
+
+export type listGoogleSpreadsheetTabsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listGoogleSpreadsheetTabsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listGoogleSpreadsheetTabsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listGoogleSpreadsheetTabsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listGoogleSpreadsheetTabsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listGoogleSpreadsheetTabsResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type listGoogleSpreadsheetTabsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listGoogleSpreadsheetTabsResponseSuccess = listGoogleSpreadsheetTabsResponse200 & {
+  headers: Headers;
+};
+export type listGoogleSpreadsheetTabsResponseError = (
+  | listGoogleSpreadsheetTabsResponse400
+  | listGoogleSpreadsheetTabsResponse403
+  | listGoogleSpreadsheetTabsResponse404
+  | listGoogleSpreadsheetTabsResponse409
+  | listGoogleSpreadsheetTabsResponse422
+  | listGoogleSpreadsheetTabsResponse502
+  | listGoogleSpreadsheetTabsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listGoogleSpreadsheetTabsResponse =
+  listGoogleSpreadsheetTabsResponseSuccess | listGoogleSpreadsheetTabsResponseError;
+
+export const getListGoogleSpreadsheetTabsUrl = (id: string) => {
+  return `/api/v1/connectors/google/sheets/${id}/tabs`;
+};
+
+export const listGoogleSpreadsheetTabs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listGoogleSpreadsheetTabsResponse> => {
+  return customFetch<listGoogleSpreadsheetTabsResponse>(getListGoogleSpreadsheetTabsUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type previewGoogleSpreadsheetTabResponse200 = {
+  data: Preview;
+  status: 200;
+};
+
+export type previewGoogleSpreadsheetTabResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type previewGoogleSpreadsheetTabResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type previewGoogleSpreadsheetTabResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type previewGoogleSpreadsheetTabResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type previewGoogleSpreadsheetTabResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type previewGoogleSpreadsheetTabResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type previewGoogleSpreadsheetTabResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type previewGoogleSpreadsheetTabResponseSuccess = previewGoogleSpreadsheetTabResponse200 & {
+  headers: Headers;
+};
+export type previewGoogleSpreadsheetTabResponseError = (
+  | previewGoogleSpreadsheetTabResponse400
+  | previewGoogleSpreadsheetTabResponse403
+  | previewGoogleSpreadsheetTabResponse404
+  | previewGoogleSpreadsheetTabResponse409
+  | previewGoogleSpreadsheetTabResponse422
+  | previewGoogleSpreadsheetTabResponse502
+  | previewGoogleSpreadsheetTabResponse503
+) & {
+  headers: Headers;
+};
+
+export type previewGoogleSpreadsheetTabResponse =
+  previewGoogleSpreadsheetTabResponseSuccess | previewGoogleSpreadsheetTabResponseError;
+
+export const getPreviewGoogleSpreadsheetTabUrl = (
+  id: string,
+  params?: PreviewGoogleSpreadsheetTabParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/sheets/${id}/preview?${stringifiedParams}`
+    : `/api/v1/connectors/google/sheets/${id}/preview`;
+};
+
+export const previewGoogleSpreadsheetTab = async (
+  id: string,
+  params?: PreviewGoogleSpreadsheetTabParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<previewGoogleSpreadsheetTabResponse> => {
+  return customFetch<previewGoogleSpreadsheetTabResponse>(
+    getPreviewGoogleSpreadsheetTabUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type googleHealthResponse200 = {
+  data: GoogleHealth;
+  status: 200;
+};
+
+export type googleHealthResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleHealthResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type googleHealthResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type googleHealthResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleHealthResponseSuccess = googleHealthResponse200 & {
+  headers: Headers;
+};
+export type googleHealthResponseError = (
+  | googleHealthResponse403
+  | googleHealthResponse404
+  | googleHealthResponse502
+  | googleHealthResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleHealthResponse = googleHealthResponseSuccess | googleHealthResponseError;
+
+export const getGoogleHealthUrl = () => {
+  return `/api/v1/connectors/google/health`;
+};
+
+export const googleHealth = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleHealthResponse> => {
+  return customFetch<googleHealthResponse>(getGoogleHealthUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type googleCallbackResponse302 = {
+  data: void;
+  status: 302;
+};
+
+export type googleCallbackResponseError = googleCallbackResponse302 & {
+  headers: Headers;
+};
+
+export type googleCallbackResponse = googleCallbackResponseError;
+
+export const getGoogleCallbackUrl = (params?: GoogleCallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/callback?${stringifiedParams}`
+    : `/api/v1/connectors/google/callback`;
+};
+
+export const googleCallback = async (
+  params?: GoogleCallbackParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleCallbackResponse> => {
+  return customFetch<googleCallbackResponse>(getGoogleCallbackUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listChatMessagesResponse200 = {
   data: ChatMessage[];
   status: 200;
@@ -20977,6 +22877,124 @@ export const getBillingTransactionByOrder = async (
       method: 'GET',
     },
   );
+};
+
+export type listBatchesResponse200 = {
+  data: PageViewBatchResponse;
+  status: 200;
+};
+
+export type listBatchesResponseSuccess = listBatchesResponse200 & {
+  headers: Headers;
+};
+export type listBatchesResponse = listBatchesResponseSuccess;
+
+export const getListBatchesUrl = (params?: ListBatchesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/batches?${stringifiedParams}` : `/api/v1/batches`;
+};
+
+export const listBatches = async (
+  params?: ListBatchesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBatchesResponse> => {
+  return customFetch<listBatchesResponse>(getListBatchesUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getBatchResponse200 = {
+  data: BatchResponse;
+  status: 200;
+};
+
+export type getBatchResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBatchResponseSuccess = getBatchResponse200 & {
+  headers: Headers;
+};
+export type getBatchResponseError = getBatchResponse404 & {
+  headers: Headers;
+};
+
+export type getBatchResponse = getBatchResponseSuccess | getBatchResponseError;
+
+export const getGetBatchUrl = (id: string) => {
+  return `/api/v1/batches/${id}`;
+};
+
+export const getBatch = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBatchResponse> => {
+  return customFetch<getBatchResponse>(getGetBatchUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listBatchRowsResponse200 = {
+  data: PageViewBatchRowResponse;
+  status: 200;
+};
+
+export type listBatchRowsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listBatchRowsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listBatchRowsResponseSuccess = listBatchRowsResponse200 & {
+  headers: Headers;
+};
+export type listBatchRowsResponseError = (listBatchRowsResponse400 | listBatchRowsResponse404) & {
+  headers: Headers;
+};
+
+export type listBatchRowsResponse = listBatchRowsResponseSuccess | listBatchRowsResponseError;
+
+export const getListBatchRowsUrl = (id: string, params?: ListBatchRowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/batches/${id}/rows?${stringifiedParams}`
+    : `/api/v1/batches/${id}/rows`;
+};
+
+export const listBatchRows = async (
+  id: string,
+  params?: ListBatchRowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBatchRowsResponse> => {
+  return customFetch<listBatchRowsResponse>(getListBatchRowsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type getTotpStatusResponse200 = {
@@ -22335,6 +24353,34 @@ export const listAdminAccounts = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listAdminDeletionBlockConditionsResponse200 = {
+  data: DeletionBlockConditionView[];
+  status: 200;
+};
+
+export type listAdminDeletionBlockConditionsResponseSuccess =
+  listAdminDeletionBlockConditionsResponse200 & {
+    headers: Headers;
+  };
+export type listAdminDeletionBlockConditionsResponse =
+  listAdminDeletionBlockConditionsResponseSuccess;
+
+export const getListAdminDeletionBlockConditionsUrl = () => {
+  return `/api/v1/admin/account-deletion/block-conditions`;
+};
+
+export const listAdminDeletionBlockConditions = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminDeletionBlockConditionsResponse> => {
+  return customFetch<listAdminDeletionBlockConditionsResponse>(
+    getListAdminDeletionBlockConditionsUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type oauthMetadataResponse200 = {

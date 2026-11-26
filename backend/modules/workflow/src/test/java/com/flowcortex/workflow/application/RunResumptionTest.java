@@ -57,6 +57,7 @@ class RunResumptionTest {
         when(tts.type()).thenReturn("tts");
         when(tts.mode()).thenReturn(StepExecutor.Mode.INLINE);
         when(tts.available()).thenReturn(ttsAvailable);
+        when(tts.unavailableRefusal()).thenCallRealMethod();
         doAnswer(call -> {
             Consumer<TransactionStatus> body = call.getArgument(0);
             body.accept(null);
