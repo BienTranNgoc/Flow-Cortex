@@ -1,0 +1,51 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName Arial
+|Thành viên|
+start
+:Nhập thông tin và chọn ảnh sản phẩm;
+:Gửi yêu cầu khởi chạy;
+|Hệ thống|
+if (Yêu cầu hợp lệ?) then (Có)
+  :Tạo lượt chạy và sinh kịch bản;
+else (Không)
+  :Trả lỗi đầu vào hoặc trạng thái khả dụng;
+  stop
+endif
+|Thành viên|
+:Xem kịch bản;
+while (Cần chỉnh sửa?) is (Có)
+  :Gửi nội dung chỉnh sửa;
+  |Hệ thống|
+  :Lưu bản sửa mới;
+  |Thành viên|
+  :Xem bản sửa hiện tại;
+endwhile (Không)
+:Gửi yêu cầu duyệt bản hiện tại;
+|Hệ thống|
+:Sinh storyboard từ bản được duyệt;
+:Sinh lời đọc;
+fork
+  :Tạo clip 1;
+  if (Clip 1 lỗi?) then (Có)
+    :Ghi lỗi và yêu cầu hủy clip 2 nếu còn chạy;
+    stop
+  endif
+fork again
+  :Tạo clip 2;
+  if (Clip 2 lỗi?) then (Có)
+    :Ghi lỗi và yêu cầu hủy clip 1 nếu còn chạy;
+    stop
+  endif
+end fork
+:Kết xuất theo thứ tự clip 1 rồi clip 2;
+if (Kết xuất thành công?) then (Có)
+  |Thành viên|
+  :Xem video kết quả;
+  stop
+else (Không)
+  |Hệ thống|
+  :Ghi lỗi kết xuất;
+  stop
+endif
+@enduml

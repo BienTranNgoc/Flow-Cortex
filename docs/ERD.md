@@ -1,12 +1,10 @@
-# Entity–Relationship Diagram — Flow-Cortex
+# Sơ đồ thực thể và quan hệ — Flow-Cortex
 
-Source of truth for the schema is the Flyway migration set under
-`backend/boot/app/src/main/resources/db/migration/` (ADR-0004: migration-first,
-Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
-in the same PR as any migration that changes it. Column notes list only what a
-reader cannot infer from the name.
+Đối chiếu schema với [các migration Flyway](../backend/boot/app/src/main/resources/db/migration) theo ADR-0004. Hibernate dùng `ddl-auto: validate`. Cập nhật sơ đồ trong cùng PR khi migration thay đổi schema được mô tả. Chú thích cột bổ sung ý nghĩa và ràng buộc cần thiết.
 
-## Current schema (`V2026.09.22.001` – `V2026.11.11.280`)
+## Sơ đồ tổng quan
+
+Sơ đồ nhóm các bảng tài khoản, workflow và dữ liệu hỗ trợ được trình bày chung. Các phần hồ sơ, MCP OAuth và cấu hình runtime có sơ đồ riêng bên dưới. Phạm vi của mỗi sơ đồ được xác định bởi các bảng được liệt kê.
 
 ```mermaid
 erDiagram
@@ -308,32 +306,23 @@ erDiagram
   }
 ```
 
-Indexes: `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
-`idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` — the admin Runs
-list, newest first), `idx_run_step_run_id`, `idx_run_step_running` (partial, `WHERE status = 'running'` —
-the reaper scan), `idx_review_task_run_id`, `idx_review_task_pending_expiry` (partial, `WHERE status = 'pending'` — the
-expiry sweep), `idx_script_revision_run`,
-`idx_step_up_proof_expires_at`, `idx_pat_user_live` (partial, `WHERE revoked_at IS NULL`), `idx_event_publication_serialized_event` (hash),
+Các chỉ mục gồm `idx_app_user_owner_id`, `idx_workflow_owner_id`, `idx_workflow_run_owner_id`,
+`idx_workflow_run_workflow_id`, `idx_workflow_run_started_at` (`started_at DESC, id DESC` cho danh sách lượt chạy phía admin),
+`idx_run_step_run_id`, `idx_run_step_running` (chỉ các hàng có `status = 'running'` để quét bước chạy),
+`idx_review_task_run_id`, `idx_review_task_pending_expiry` (chỉ các hàng có `status = 'pending'` để quét tác vụ hết hạn),
+`idx_script_revision_run`, `idx_step_up_proof_expires_at`, `idx_pat_user_live` (chỉ các hàng có `revoked_at IS NULL`), `idx_event_publication_serialized_event` (hash),
 `idx_event_publication_completion_date`,
-`idx_workflow_bookmark_page` (`user_id, created_at DESC, workflow_id DESC` — the saved list),
+`idx_workflow_bookmark_page` (`user_id, created_at DESC, workflow_id DESC` cho danh sách đã lưu),
 `idx_workflow_review_newest` (`workflow_id, created_at DESC, id DESC`), `idx_workflow_review_helpful`
 (`workflow_id, helpful_count DESC, created_at DESC, id DESC`).
 
-`owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
-owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is
-enforced in the application, not by a cross-module constraint.
+Các cột `owner_id` thể hiện quan hệ sở hữu do ứng dụng kiểm soát. Schema giữ ranh giới mô-đun theo ADR-0003. Mô-đun user sở hữu `app_user`, còn mô-đun workflow sở hữu các bảng liên quan đến workflow.
 
-`run_step` *is* the media job: its `id` is the `jobId` on the broker, so no separate job table exists, and
-no upload table either — an upload is an object at a server-derived key. `input_rejected` = the uploaded
-object was missing or over size when the worker checked it. Objects never live in the database: uploads in
-the bucket `flowcortex-uploads`, the objects `outputs` references in `flowcortex-media`.
+`run_step.id` được dùng làm `jobId` trên broker. Máy chủ xác định khóa đối tượng tải lên trong bucket `flowcortex-uploads`. Trường `outputs` tham chiếu các đối tượng trong `flowcortex-media`. Worker trả `input_rejected` khi đối tượng tải lên bị thiếu hoặc vượt giới hạn kích thước.
 
-`script_revision` is append-only: an edit inserts a row and moves `review_task.current_revision_id`
-forward, never overwrites one. Approval names a revision id and the task `version` it read, so a browser
-tab holding older text loses the approval with a 409 instead of approving something it never showed. The
-payload `generate_speech` consumes is the approved revision's content, not whatever sits in the task.
+Mỗi lần sửa kịch bản thêm một hàng vào `script_revision` và chuyển `review_task.current_revision_id` sang bản mới. Yêu cầu duyệt gửi mã bản sửa và `version` của tác vụ đã đọc. Phiên bản cũ nhận `409`. Bước `generate_speech` dùng nội dung của bản được duyệt.
 
-## Profile settings and images (`V2026.11.11.090` – `V2026.11.11.091`)
+## Cấu hình và ảnh hồ sơ (`V2026.11.11.090` – `V2026.11.11.091`)
 
 ```mermaid
 erDiagram
@@ -368,16 +357,11 @@ erDiagram
   }
 ```
 
-Indexes: `uq_profile_image_current` (unique, partial `WHERE role = 'current'` — one shown image per member
-and slot, which also makes concurrent saves exactly-once), `idx_profile_image_history` (partial
-`WHERE role = 'original'`, newest first).
+Chỉ mục duy nhất `uq_profile_image_current` áp dụng khi `role = 'current'`, bảo đảm mỗi thành viên chỉ có một ảnh hiển thị trên mỗi vị trí ngay cả khi lưu đồng thời. Chỉ mục `idx_profile_image_history` sắp ảnh gốc mới nhất trước với điều kiện `role = 'original'`.
 
-`username_hold` and `account_preference` live in the user module and cascade with `app_user`.
-`profile_image` belongs to the profile module and carries no foreign key to `app_user`, like the other
-cross-module tables: the module boundary is kept at the schema level, and a deleted account leaves its
-rows behind.
+`username_hold` và `account_preference` thuộc mô-đun user và được xóa dây chuyền theo `app_user`. `profile_image` thuộc mô-đun profile. Các hàng ảnh được giữ khi xóa tài khoản vì schema giữ ranh giới mô-đun tại quan hệ này.
 
-## MCP authorization server and token call guards (`V2026.11.15.225` – `V2026.11.15.226`)
+## Máy chủ ủy quyền MCP và kiểm soát yêu cầu qua token (`V2026.11.15.225` – `V2026.11.15.226`)
 
 ```mermaid
 erDiagram
@@ -436,15 +420,13 @@ erDiagram
   }
 ```
 
-Indexes: `idx_oauth_client_created_at`, `idx_oauth_code_expires_at`, `idx_oauth_issued_token_client`,
+Các chỉ mục gồm `idx_oauth_client_created_at`, `idx_oauth_code_expires_at`, `idx_oauth_issued_token_client`,
 `idx_api_token_call_user_time` (`user_id, occurred_at`), `idx_api_token_call_occurred_at`,
 `idx_api_token_idempotency_expires_at`.
 
-`api_token_call` and `api_token_idempotency` carry no foreign key on purpose: the audit trail and the
-stored answers outlive the token and the account until the retention job deletes them.
-`user.mcp-oauth-retention` deletes spent codes, unused clients, old call rows and ended reservations.
+`api_token_call` và `api_token_idempotency` giữ lịch sử và phản hồi đã lưu sau khi xóa token hoặc tài khoản. Job `user.mcp-oauth-retention` xóa mã đã dùng, client không sử dụng, lịch sử yêu cầu cũ và lượt giữ chỗ đã kết thúc.
 
-## Runtime settings (`V2026.11.11.180`, `V2026.11.11.320`)
+## Cấu hình runtime (`V2026.11.11.180`, `V2026.11.11.320`)
 
 ```mermaid
 erDiagram
@@ -465,14 +447,13 @@ erDiagram
   }
 ```
 
-`app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
-the value, and a write of the value already stored records none.
+`app_setting_change` là lịch sử chỉ thêm. Giao dịch lưu hoặc đặt lại giá trị ghi một hàng khi giá trị thay đổi.
 
-## Roadmap tables (each arrives with its own change)
+## Các bảng dự kiến
 
-| Table | Purpose | Arrives with |
+| Bảng | Mục đích | Hạng mục triển khai |
 |---|---|---|
-| `provider` | provider catalogue + fallback order per capability | Providers page / first real capability |
-| `usage_event` | per-step provider units and cost | first paid provider |
-| `audit_log` | admin actions with before/after | first admin write beyond Users |
-| `channel_account` | publish targets with encrypted tokens | Publish step |
+| `provider` | Danh mục nhà cung cấp và thứ tự dự phòng theo năng lực | Trang nhà cung cấp hoặc năng lực đầu tiên |
+| `usage_event` | Mức sử dụng và chi phí nhà cung cấp theo bước | Nhà cung cấp trả phí đầu tiên |
+| `audit_log` | Thao tác quản trị và dữ liệu trước/sau | Thao tác ghi đầu tiên ngoài quản lý người dùng |
+| `channel_account` | Đích xuất bản và token mã hóa | Bước xuất bản |
