@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 class AssistantTelemetry {
 
     static final String OUTCOME_COUNTER = "support.assistant.outcome";
+    static final String HANDOFF_COUNTER = "support.assistant.handoff";
 
     private static final Logger LOG = LoggerFactory.getLogger(AssistantTelemetry.class);
 
@@ -27,23 +28,36 @@ class AssistantTelemetry {
         this.observations = observations;
     }
 
+    /** Counts a handoff by its topic; the question and the draft never reach this. */
+    void handoff(TopicGuard.Topic topic) {
+        if (topic == null) {
+            return;
+        }
+        meters.counter(HANDOFF_COUNTER, "topic", topic.value()).increment();
+        LOG.info("support.assistant.handoff topic={}", topic.value());
+    }
+
     void record(String outcome, int sources, int questionLength, long startedNanos) {
         meters.counter(OUTCOME_COUNTER, "outcome", outcome).increment();
         LOG.info("support.assistant outcome={} sources={} length={} latency_ms={}", outcome, sources, questionLength,
                 (System.nanoTime() - startedNanos) / 1_000_000);
     }
 
-    /** Tags the current request span; high-cardinality, so the values never become metric tags. */
-    void provider(String model, LlmJsonResult result, int sources) {
+    /**
+     * Tags the current request span; high-cardinality, so the values never become metric tags. The model
+     * is the one that answered, known only after the call, so no request model is set.
+     */
+    void provider(String slot, LlmJsonResult result, int sources) {
         Observation current = observations.getCurrentObservation();
         if (current == null) {
             return;
         }
         current.highCardinalityKeyValue("gen_ai.system", "gcp.gemini")
-                .highCardinalityKeyValue("gen_ai.request.model", model)
+                .highCardinalityKeyValue("flowcortex.llm.slot", slot)
                 .highCardinalityKeyValue("support.assistant.sources", Integer.toString(sources));
         if (result instanceof LlmJsonResult.Answered answered) {
-            current.highCardinalityKeyValue("gen_ai.usage.input_tokens", Integer.toString(answered.inputTokens()))
+            current.highCardinalityKeyValue("gen_ai.response.model", answered.model())
+                    .highCardinalityKeyValue("gen_ai.usage.input_tokens", Integer.toString(answered.inputTokens()))
                     .highCardinalityKeyValue("gen_ai.usage.output_tokens", Integer.toString(answered.outputTokens()));
         }
     }

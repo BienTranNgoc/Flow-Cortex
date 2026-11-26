@@ -81,7 +81,7 @@ final class RequestViews {
     record ConversationMessage(
             @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"user", "assistant"}) String role,
             @Schema(requiredMode = RequiredMode.REQUIRED) String text,
-            @Schema(allowableValues = {"answered", "no_answer", "blocked"}) String outcome,
+            @Schema(allowableValues = {"answered", "no_answer", "blocked", "handoff", "sign_in"}) String outcome,
             @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt) {
     }
 
@@ -96,7 +96,16 @@ final class RequestViews {
             @Schema(requiredMode = RequiredMode.REQUIRED) Requester requester,
             SupportAssignee assignee,
             @Schema(requiredMode = RequiredMode.REQUIRED) Instant createdAt,
-            @Schema(requiredMode = RequiredMode.REQUIRED) Instant lastActivityAt) {
+            @Schema(requiredMode = RequiredMode.REQUIRED) Instant lastActivityAt,
+            @Schema(requiredMode = RequiredMode.REQUIRED,
+                    allowableValues = {"ok", "due_soon", "overdue", "paused"}) String slaLevel) {
+    }
+
+    /** Of the requests the inbox would show under the same filters, how many are overdue and how many due soon. */
+    @Schema(name = "AdminSupportSlaSummary")
+    record SlaSummary(
+            @Schema(requiredMode = RequiredMode.REQUIRED) long overdue,
+            @Schema(requiredMode = RequiredMode.REQUIRED) long dueSoon) {
     }
 
     @Schema(name = "AdminSupportRequestPage")

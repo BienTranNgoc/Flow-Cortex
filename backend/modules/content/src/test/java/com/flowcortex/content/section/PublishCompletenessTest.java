@@ -71,6 +71,16 @@ class PublishCompletenessTest {
     }
 
     @Test
+    void listsSectionsFirstWhenFewerThanTheDefinitionRequires() {
+        ContentDocumentDefinition required = new ContentDocumentDefinition(
+                "legal-x", new LocalizedText("Pháp lý", "Legal"), List.of("richText"), true, 1, 1);
+
+        assertThat(completeness.missing(required, json("[]"), seo("", "", "d")))
+                .containsExactly("sections", "seoMeta.title.vi", "seoMeta.title.en");
+        assertThat(completeness.missing(required, json("[" + rich("a", "b") + "]"), seo("t", "t", "d"))).isEmpty();
+    }
+
+    @Test
     void aCompleteDocumentHasNothingMissing() {
         assertThat(completeness.missing(DEF, json("[" + rich("a", "b") + "," + media("a", "b", "c") + "]"), seo("t", "t", "d")))
                 .isEmpty();

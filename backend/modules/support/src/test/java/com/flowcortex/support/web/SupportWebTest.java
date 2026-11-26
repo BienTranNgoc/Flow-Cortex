@@ -57,7 +57,7 @@ class SupportWebTest {
         for (String path : List.of("/api/v1/support/assistant/messages",
                 "/api/v1/support/assistant/guest/messages")) {
             HandlerExceptionResolver pathResolver = mock(HandlerExceptionResolver.class);
-            new SupportSwitchFilter(properties(true, false, null), pathResolver)
+            new SupportSwitchFilter(properties(true, false, null), helpCenter(true), pathResolver)
                     .doFilter(new MockHttpServletRequest("POST", path), new MockHttpServletResponse(), chain);
             ArgumentCaptor<Exception> refusal = ArgumentCaptor.forClass(Exception.class);
             verify(pathResolver).resolveException(any(), any(), eq(null), refusal.capture());
@@ -136,7 +136,14 @@ class SupportWebTest {
     }
 
     private SupportSwitchFilter filter(boolean enabled, boolean assistantEnabled) {
-        return new SupportSwitchFilter(properties(enabled, assistantEnabled, null), resolver);
+        return new SupportSwitchFilter(properties(enabled, assistantEnabled, null), helpCenter(enabled), resolver);
+    }
+
+    private static Settings helpCenter(boolean enabled) {
+        Settings registry = mock(Settings.class);
+        when(registry.get(SupportSettingKeys.HELP_CENTER_ENABLED))
+                .thenReturn(new SettingRead<>(enabled, enabled, SettingSource.STORED));
+        return registry;
     }
 
     @Test
@@ -175,7 +182,7 @@ class SupportWebTest {
 
     private static SupportProperties properties(boolean enabled, boolean assistantEnabled, String contact) {
         return new SupportProperties(enabled, contact,
-                new SupportProperties.Assistant(assistantEnabled, "gemini-3.5-flash-lite", 2000, 50, 10, 100),
+                new SupportProperties.Assistant(assistantEnabled, 2000, 50, 10, 100),
                 new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
     }
 

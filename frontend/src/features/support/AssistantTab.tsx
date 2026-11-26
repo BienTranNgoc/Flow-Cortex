@@ -38,39 +38,77 @@ function Speaker({ name }: Readonly<{ name: string }>) {
   return <span className="assistant-visually-hidden">{name}: </span>;
 }
 
+function SignInOffers() {
+  const { t } = useTranslation();
+  return (
+    <div className="assistant-offers">
+      <Link className="support-button assistant-offers__link" to="/login">
+        {t('support.assistant.signIn')}
+      </Link>
+      <Link className="support-button assistant-offers__link" to="/register">
+        {t('support.assistant.register')}
+      </Link>
+    </div>
+  );
+}
+
+type Outcome = NonNullable<SupportAssistantHistoryMessage['outcome']>;
+
+/** Replies whose text the widget never shows: it renders its own copy for the outcome. */
+const FIXED_COPY: Partial<Record<Outcome, string>> = {
+  blocked: 'support.assistant.blocked',
+  no_answer: 'support.assistant.noAnswer',
+  handoff: 'support.assistant.handoff',
+  sign_in: 'support.assistant.signInToCreate',
+};
+
 /** What follows a reply: escalation for a member, sign-in and the contact line for a guest. */
 function ReplyOffers({
-  answered,
+  outcome,
   prefill,
-}: Readonly<{ answered: boolean; prefill: RequestPrefill }>) {
+}: Readonly<{ outcome: Outcome; prefill: RequestPrefill }>) {
   const { t } = useTranslation();
   const { dispatch, member } = useSupportPanel();
+  if (outcome === 'sign_in') return <SignInOffers />;
+  const answered = outcome === 'answered';
   if (member) {
+    let className = 'support-button';
+    let label = t('support.assistant.newRequest');
+    if (outcome === 'handoff') {
+      className = 'support-button support-button--primary';
+      label = t('support.assistant.sendToTeam');
+    } else if (answered) {
+      className = 'assistant-link';
+      label = t('support.assistant.escalate');
+    }
     return (
       <button
         type="button"
-        className={answered ? 'assistant-link' : 'support-button'}
+        className={className}
         onClick={() => dispatch({ type: 'startRequest', prefill })}
       >
-        {answered ? t('support.assistant.escalate') : t('support.assistant.newRequest')}
+        {label}
       </button>
     );
   }
   return (
     <>
-      {!answered && (
-        <div className="assistant-offers">
-          <Link className="support-button assistant-offers__link" to="/login">
-            {t('support.assistant.signIn')}
-          </Link>
-          <Link className="support-button assistant-offers__link" to="/register">
-            {t('support.assistant.register')}
-          </Link>
-        </div>
-      )}
+      {!answered && <SignInOffers />}
       <ContactLine />
     </>
   );
+}
+
+/** The drafted request of a handoff over what the asked question alone would prefill. */
+function handoffPrefill(
+  base: RequestPrefill,
+  handoff: SupportAssistantHistoryMessage['handoff'],
+): RequestPrefill {
+  return {
+    ...base,
+    ...(handoff?.subject ? { subject: handoff.subject } : {}),
+    ...(handoff?.description ? { description: handoff.description } : {}),
+  };
 }
 
 function AssistantMessage({
@@ -82,16 +120,23 @@ function AssistantMessage({
   const outcome = message.outcome ?? 'answered';
   // Messages saved before sources were recorded carry none.
   const sources = message.sources ?? [];
+  const fixedCopy = FIXED_COPY[outcome];
 
   return (
     <li className="assistant-message assistant-message--assistant">
       <Speaker name={t('support.assistant.assistantName')} />
-      {outcome === 'answered' ? (
-        <Markdown mode="answer">{message.text}</Markdown>
-      ) : (
-        <p className="assistant-message__fixed">
-          {outcome === 'blocked' ? t('support.assistant.blocked') : t('support.assistant.noAnswer')}
+      {fixedCopy ? (
+        <p
+          className={
+            outcome === 'handoff'
+              ? 'assistant-message__fixed assistant-message__fixed--handoff'
+              : 'assistant-message__fixed'
+          }
+        >
+          {t(fixedCopy)}
         </p>
+      ) : (
+        <Markdown mode="answer">{message.text}</Markdown>
       )}
       {outcome === 'answered' && sources.length > 0 && (
         <div className="assistant-sources">
@@ -111,7 +156,10 @@ function AssistantMessage({
           </ul>
         </div>
       )}
-      <ReplyOffers answered={outcome === 'answered'} prefill={prefill} />
+      <ReplyOffers
+        outcome={outcome}
+        prefill={outcome === 'handoff' ? handoffPrefill(prefill, message.handoff) : prefill}
+      />
     </li>
   );
 }

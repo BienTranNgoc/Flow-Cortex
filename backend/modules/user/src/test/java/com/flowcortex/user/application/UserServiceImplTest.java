@@ -32,6 +32,7 @@ import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
 import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import com.flowcortex.user.roles.RbacMutationSwitch;
 import com.flowcortex.user.totp.TotpService;
 import java.sql.SQLException;
 import java.time.Clock;
@@ -65,14 +66,15 @@ class UserServiceImplTest {
     private final SuperAdminInvariant superAdminInvariant = mock(SuperAdminInvariant.class);
     private final RegistrationOwnerGuard registrationOwnerGuard = mock(RegistrationOwnerGuard.class);
     private final RoleCatalog roleCatalog = mock(RoleCatalog.class);
+    private final RbacMutationSwitch mutationSwitch = mock(RbacMutationSwitch.class);
     private final UserDirectoryRepository directory = mock(UserDirectoryRepository.class);
     private final TotpService totp = mock(TotpService.class);
     private final AuditEventWriter audit = mock(AuditEventWriter.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-08T03:04:05Z"), ZoneOffset.UTC);
     private final UserServiceImpl service =
             new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks,
-                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog, directory, totp,
-                    audit, clock);
+                    adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog, mutationSwitch,
+                    directory, totp, audit, clock);
 
     UserServiceImplTest() {
         when(roleCatalog.require(any())).thenAnswer(invocation -> roleRow(invocation.getArgument(0)));

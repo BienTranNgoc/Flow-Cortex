@@ -11,7 +11,9 @@ import { useMeQuery } from '../auth/useAuth';
 import { DeleteRoleDialog } from './DeleteRoleDialog';
 import { missingViewFeatures } from './permissionSet';
 import { PermissionMatrix } from './PermissionMatrix';
+import { RbacRuntimeNotice } from './RbacRuntimeNotice';
 import { roleDisplayName } from './roleDisplay';
+import { useRolesEditable } from './useRbacRuntime';
 import {
   ROLE_CODE_PATTERN,
   useCreateRoleMutation,
@@ -176,7 +178,7 @@ function RoleEditor({
   const navigate = useNavigate();
   const location = useLocation();
   const me = useMeQuery().data;
-  const canManage = can(me, 'system.role.manage');
+  const { canManage, runtime, editable } = useRolesEditable();
   const canSeeAccounts = can(me, 'system.admin_account.view');
   const isNew = role === undefined;
   const nameId = useId();
@@ -392,6 +394,7 @@ function RoleEditor({
           {superAdmin && <StatusPill tone="warning" label={t('roles.detail.badges.superAdmin')} />}
         </p>
       )}
+      {canManage && <RbacRuntimeNotice runtime={runtime} />}
       {note && <p className="roles-detail__note">{note}</p>}
       {noticeText && (
         <p role="status" className="cortex-admin-form-success">
@@ -435,7 +438,7 @@ function RoleEditor({
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          if (canManage && !saving && (isNew || dirty)) void save();
+          if (editable && !saving && (isNew || dirty)) void save();
         }}
       >
         <div className="cortex-admin-field">
@@ -444,7 +447,7 @@ function RoleEditor({
             id={nameId}
             value={name}
             maxLength={NAME_MAX}
-            disabled={!textEditable || saving}
+            disabled={!textEditable || !editable || saving}
             aria-invalid={fieldErrors.name ? true : undefined}
             aria-describedby={fieldErrors.name ? `${nameId}-error` : undefined}
             onChange={(event) => setName(event.target.value)}
@@ -462,7 +465,7 @@ function RoleEditor({
             rows={3}
             value={description}
             maxLength={DESCRIPTION_MAX}
-            disabled={!textEditable || saving}
+            disabled={!textEditable || !editable || saving}
             aria-invalid={fieldErrors.description ? true : undefined}
             aria-describedby={fieldErrors.description ? `${descriptionId}-error` : undefined}
             onChange={(event) => setDescription(event.target.value)}
@@ -486,7 +489,7 @@ function RoleEditor({
             keys={keys}
             roleName={displayName}
             superAdmin={superAdmin}
-            disabled={!keysEditable || saving}
+            disabled={!keysEditable || !editable || saving}
             onChange={setKeys}
           />
         )}
@@ -496,7 +499,7 @@ function RoleEditor({
             <button
               type="submit"
               className="cortex-admin-btn cortex-admin-btn--primary"
-              disabled={saving || (!isNew && !dirty)}
+              disabled={!editable || saving || (!isNew && !dirty)}
             >
               {isNew
                 ? t(saving ? 'roles.detail.actions.creating' : 'roles.detail.actions.create')
@@ -506,7 +509,7 @@ function RoleEditor({
               <button
                 type="button"
                 className="cortex-admin-btn cortex-admin-btn--danger"
-                disabled={saving}
+                disabled={!editable || saving}
                 onClick={() => {
                   setDeleteError(null);
                   setDeleting(true);

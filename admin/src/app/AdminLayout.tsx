@@ -15,6 +15,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { logout, useMeQuery } from '../features/auth/useAuth';
 import { roleLabel } from '../features/users/enumLabels';
 import { AppLanguageToggle } from '../lib/AppLanguageToggle';
+import { AdminBell } from './AdminBell';
 import { Sidebar } from './Sidebar';
 import { useIsDesktop } from './useIsDesktop';
 import { useLiveNav } from './useLiveNav';
@@ -152,6 +153,7 @@ export function AdminLayout() {
             <List aria-hidden="true" size={20} />
           </button>
           <div className="cortex-admin-header__actions">
+            {me && <AdminBell />}
             <AppLanguageToggle />
             <ThemeToggle
               theme={theme}

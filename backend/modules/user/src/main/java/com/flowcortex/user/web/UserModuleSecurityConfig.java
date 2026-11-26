@@ -16,8 +16,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Security policy for this module's HTTP surface ({@code /api/v1/auth}, {@code /api/v1/users})
- * — a second, narrowly-matched {@link SecurityFilterChain} evaluated before {@code
+ * Security policy for this module's HTTP surface ({@code /api/v1/auth}, {@code /api/v1/users},
+ * {@code /api/v1/oauth} and the OAuth metadata document, whose client routes are public and whose
+ * consent routes need a session) — a second, narrowly-matched {@link SecurityFilterChain} evaluated before {@code
  * :shared:security}'s broad default chain. Needed because the shared chain can't express two
  * things without editing its internals:
  * <ol>
@@ -44,7 +45,8 @@ class UserModuleSecurityConfig {
                 exceptionResolver.resolveException(request, response, null, authException);
 
         http
-                .securityMatcher("/api/v1/auth/**", "/api/v1/users/**")
+                .securityMatcher("/api/v1/auth/**", "/api/v1/users/**", "/api/v1/oauth/**",
+                        "/.well-known/oauth-authorization-server")
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -60,6 +62,9 @@ class UserModuleSecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/api/v1/auth/oauth/google/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/.well-known/oauth-authorization-server").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/oauth/register", "/api/v1/oauth/token",
+                                "/api/v1/oauth/revoke").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
                         .accessDeniedHandler((request, response, ex) ->

@@ -262,4 +262,165 @@ class WorkflowArtifactsTest {
 
         assertThat(slug).hasSizeLessThanOrEqualTo(80).doesNotEndWith("-").doesNotStartWith("-");
     }
+
+    private static String stepWithConfig(String config) {
+        return document("\"a\"", step(1, "\"name\":null,\"type\":\"echo\",\"inputRef\":null,\"config\":" + config));
+    }
+
+    /** {@code levels} objects inside one another under the single key {@code key}, the innermost empty. */
+    private static String nested(int levels, String key) {
+        String open = "{\"" + key + "\":";
+        return open.repeat(levels - 1) + "{}" + "}".repeat(levels - 1);
+    }
+
+    @Test
+    void aDocumentNestedPastTheLimitIsRefusedAsNotJson() {
+        // Root, steps array and step take 3 levels, so a config of 61 objects is the deepest that fits.
+        assertThat(isValid(stepWithConfig(nested(WorkflowArtifacts.MAX_NESTING_DEPTH - 3, "k")))).isTrue();
+
+        assertThat(faults(stepWithConfig(nested(WorkflowArtifacts.MAX_NESTING_DEPTH - 2, "k"))))
+                .containsOnly(Map.entry("$", "not_json"));
+        assertThat(faults(stepWithConfig(nested(1_000, "k")))).containsOnly(Map.entry("$", "not_json"));
+    }
+
+    @Test
+    void anObjectKeyPastTheLimitIsRefusedAsNotJson() {
+        String atLimit = "k".repeat(WorkflowArtifacts.MAX_KEY_LENGTH);
+
+        assertThat(isValid(stepWithConfig("{\"" + atLimit + "\":1}"))).isTrue();
+        assertThat(faults(stepWithConfig("{\"" + atLimit + "k\":1}"))).containsOnly(Map.entry("$", "not_json"));
+    }
+
+    @Test
+    void aCraftedFileInsideTwoMebibytesIsRefusedWithoutAllocatingMuchMemory() {
+        String crafted = stepWithConfig(nested(1_000, "k".repeat(2_000)));
+        assertThat(crafted.length()).isLessThan(WorkflowTransferService.MAX_ARTIFACT_BYTES);
+        byte[] body = crafted.getBytes(StandardCharsets.UTF_8);
+        com.sun.management.ThreadMXBean threads =
+                (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long before = threads.getCurrentThreadAllocatedBytes();
+
+        ReadResult result = WorkflowArtifacts.read(body);
+
+        assertThat(result).isInstanceOf(Invalid.class);
+        assertThat(threads.getCurrentThreadAllocatedBytes() - before).isLessThan(8L * 1024 * 1024);
+    }
+
+    @Test
+    void aDocumentAtTheLimitsReadsWithoutQuadraticPathWork() {
+        // 61 levels of 700-character keys: the largest config that stays inside the 50,000-character cap.
+        String deepest = nested(WorkflowArtifacts.MAX_NESTING_DEPTH - 3, "k".repeat(700));
+        byte[] body = stepWithConfig(deepest).getBytes(StandardCharsets.UTF_8);
+        com.sun.management.ThreadMXBean threads =
+                (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long before = threads.getCurrentThreadAllocatedBytes();
+
+        ReadResult result = WorkflowArtifacts.read(body);
+
+        assertThat(result).isInstanceOf(Parsed.class);
+        // The tree keeps each key once (43 KB); a path string per level would add 700 * 61 * 61 / 2 = 1.3 MB more.
+        assertThat(threads.getCurrentThreadAllocatedBytes() - before).isLessThan(1024L * 1024);
+    }
+
+    @Test
+    void aDuplicateKeyIsNamedByItsFullPathThroughObjectsAndArrays() {
+        String body = "\"name\":null,\"type\":\"echo\",\"inputRef\":null,\"config\":{\"a\":[{\"b\":1},{\"c\":{\"d\":1,\"d\":2}}]}";
+
+        assertThat(faults(document("\"a\"", step(1, body)))).containsOnlyKeys("steps[0].config.a[1].c.d");
+    }
+
+    @Test
+    void aDuplicateKeyAtTheRootIsNamedByItsKey() {
+        assertThat(faults(document("\"a\"", step(1, ECHO)).replace("\"formatVersion\":1,",
+                "\"formatVersion\":1,\"formatVersion\":1,"))).containsOnlyKeys("formatVersion");
+    }
+
+    @Test
+    void aFileOfManyFaultsRecordsNoMoreThanTheCap() {
+        String[] steps = new String[WorkflowArtifacts.MAX_RECORDED_FAULTS + 500];
+        for (int i = 0; i < steps.length; i++) {
+            steps[i] = step(i + 1, ECHO + ",\"extra\":1");
+        }
+
+        assertThat(faults(document("\"a\"", steps))).hasSize(WorkflowArtifacts.MAX_RECORDED_FAULTS);
+    }
+
+    @Test
+    void anExportedFileOverTheReadLimitsIsReportedAsNotReadable() {
+        assertThat(WorkflowArtifacts.withinReadLimits(document("\"a\"", step(1, ECHO)).getBytes(StandardCharsets.UTF_8)))
+                .isTrue();
+        assertThat(WorkflowArtifacts.withinReadLimits(stepWithConfig(nested(1_000, "k")).getBytes(StandardCharsets.UTF_8)))
+                .isFalse();
+    }
+
+    private static WorkflowDataStore.Seed seed(String key, String dataType, String json) throws Exception {
+        return new WorkflowDataStore.Seed(key, dataType, DataStoreJson.mapper().readTree(json));
+    }
+
+    private static String withDataStore(String section) {
+        String base = document("\"a\"", step(1, ECHO));
+        return base.substring(0, base.length() - 1) + ",\"dataStore\":" + section + "}";
+    }
+
+    @Test
+    void anArtifactWithoutDataStoreReadsAsEmpty() {
+        ReadResult result = read(document("\"a\"", step(1, ECHO)));
+
+        assertThat(result).isInstanceOf(Parsed.class);
+        assertThat(((Parsed) result).artifact().dataStore()).isEmpty();
+    }
+
+    @Test
+    void theDataStoreSectionRoundTripsSortedByKeyWithValuesAsWritten() throws Exception {
+        List<WorkflowDataStore.Seed> seeds = List.of(
+                seed("promo", "template", "{\"data\":{\"price\":2.50,\"tags\":[\"a\",null,true]}}"),
+                seed("notes", "json", "\"text\""),
+                seed("nothing", "json", "null"));
+
+        ObjectNode written = WorkflowArtifacts.write("a", List.of(), seeds, AT);
+        ReadResult result = WorkflowArtifacts.read(written.toString().getBytes(StandardCharsets.UTF_8));
+
+        assertThat(written.get("dataStore")).extracting(entry -> entry.get("key").asText())
+                .containsExactly("notes", "nothing", "promo");
+        assertThat(result).isInstanceOf(Parsed.class);
+        List<WorkflowDataStore.Seed> back = ((Parsed) result).artifact().dataStore();
+        assertThat(back).containsExactlyInAnyOrderElementsOf(seeds);
+        assertThat(back).filteredOn(entry -> entry.key().equals("promo")).singleElement()
+                .satisfies(entry -> assertThat(entry.value().toString()).contains("2.50"));
+    }
+
+    @Test
+    void aDataStoreEntryTheStoreWouldRefuseStillReadsSoItCanBeGraded() {
+        ReadResult result = read(withDataStore("[{\"key\":\"bad key\",\"dataType\":\"Not A Type\",\"value\":1}]"));
+
+        assertThat(result).isInstanceOf(Parsed.class);
+        assertThat(((Parsed) result).artifact().dataStore()).extracting(WorkflowDataStore.Seed::key)
+                .containsExactly("bad key");
+    }
+
+    @Test
+    void aMalformedDataStoreIsNamedByPath() {
+        assertThat(faults(withDataStore("{}"))).containsOnly(Map.entry("dataStore", "wrong_type"));
+        assertThat(faults(withDataStore("[1]"))).containsOnly(Map.entry("dataStore[0]", "wrong_type"));
+        assertThat(faults(withDataStore("[{\"key\":\"a\",\"dataType\":\"json\"}]")))
+                .containsOnly(Map.entry("dataStore[0].value", "missing_key"));
+        assertThat(faults(withDataStore("[{\"key\":\"a\",\"dataType\":\"json\",\"value\":1,\"size\":3}]")))
+                .containsOnly(Map.entry("dataStore[0].size", "unknown_key"));
+        assertThat(faults(withDataStore("[{\"key\":1,\"dataType\":null,\"value\":1}]")))
+                .containsOnly(Map.entry("dataStore[0].key", "wrong_type"), Map.entry("dataStore[0].dataType", "wrong_type"));
+    }
+
+    @Test
+    void dataStoreTextTheDatabaseCannotStoreIsInvalid() {
+        assertThat(faults(withDataStore("[{\"key\":\"a\\u0000\",\"dataType\":\"json\",\"value\":1}]")))
+                .containsOnly(Map.entry("dataStore[0].key", "invalid_text"));
+        assertThat(faults(withDataStore("[{\"key\":\"a\",\"dataType\":\"json\",\"value\":{\"x\":\"\\ud800\"}}]")))
+                .containsOnly(Map.entry("dataStore[0].value", "invalid_text"));
+    }
+
+    @Test
+    void anUnknownRootKeyIsStillRefusedNextToTheOptionalSection() {
+        assertThat(faults(withDataStore("[]").replace("\"dataStore\"", "\"datastore\"")))
+                .containsOnly(Map.entry("datastore", "unknown_key"));
+    }
 }

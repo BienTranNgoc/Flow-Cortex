@@ -2,9 +2,10 @@ import { ArrowCounterClockwise } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { linkNeedsRenewal } from '../../lib/signedLinks';
 import type { ProductBrief } from './productVideoSchemas';
 import { MAX_IMAGES } from './productVideoUpload';
-import { inputUrlNeedsRenewal, useRunInputsQuery } from './useWorkflows';
+import { useRunInputsQuery } from './useWorkflows';
 
 interface ProductBriefBannerProps {
   runId: string;
@@ -37,7 +38,7 @@ export function ProductBriefBanner({
 
   const onImageError = () => {
     if (!firstImage?.url) return;
-    if (inputUrlNeedsRenewal(firstImage.expiresAt)) {
+    if (linkNeedsRenewal(firstImage.expiresAt)) {
       void inputsQuery.refetch();
       return;
     }
