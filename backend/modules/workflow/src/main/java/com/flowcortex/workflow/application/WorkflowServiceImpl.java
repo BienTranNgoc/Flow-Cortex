@@ -425,11 +425,12 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     }
 
     /**
-     * A connector call step runs with the workflow owner's credential, so only the owner may add or edit one; an
-     * admin passes {@link WorkflowWriteAccess#lockForWrite} on any workflow but is refused here.
+     * A step that reads a member connector (a connector call, a drive read) runs with the workflow owner's
+     * credential, so only the owner may add or edit one; an admin passes {@link WorkflowWriteAccess#lockForWrite} on
+     * any workflow but is refused here.
      */
     private static void requireMayAuthor(Caller caller, Workflow workflow, String stepType) {
-        if (ConnectorStepOwnerGuard.isConnectorCall(stepType)
+        if (ConnectorStepOwnerGuard.readsMemberConnector(stepType)
                 && !ConnectorStepOwnerGuard.mayAuthor(caller.userId(), workflow.getOwnerId())) {
             throw new LocalizedStatusException(HttpStatus.FORBIDDEN, new LocalizedMessage("workflow.notOwner"));
         }

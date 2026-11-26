@@ -4,12 +4,14 @@ import com.flowcortex.media.api.MediaJobs;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowStep;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -67,7 +69,8 @@ class RunStartPreflight {
      * The steps a run of {@code workflow} would execute, once the media and dub availability and every start guard
      * have passed.
      * @throws LocalizedStatusException 503 when a remote step needs the media engine while it is off
-     * @throws DubDisabledException when a step's type is not available
+     * @throws LocalizedStatusException the refusal of the first step type, an iterate step's children included,
+     *     that may not run now
      */
     List<WorkflowStep> checkSteps(UUID ownerId, Workflow workflow, boolean acknowledgeCost) {
         List<WorkflowStep> stepDefs = servedDefinitions.stepsFor(workflow, ownerId);
@@ -75,8 +78,11 @@ class RunStartPreflight {
         if (stepDefs.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (stepDefs.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
-            throw new DubDisabledException();
+        Optional<StepExecutor> unavailable = registry.firstUnavailable(stepDefs.stream()
+                .flatMap(step -> IterateStepConfig.effectiveTypes(step.getType(), step.getConfig()).stream())
+                .toList());
+        if (unavailable.isPresent()) {
+            throw unavailable.get().unavailableRefusal();
         }
         runStartGuards.check(ownerId, workflow.getId(), stepDefs, new StartContext(acknowledgeCost));
         return stepDefs;

@@ -415,6 +415,17 @@ flowcortex:
       api-base-url: https://api.telegram.org
       read-timeout: 8s
       send-timeout: 15s
+    # Off means every Google route and call answers 503 and no request leaves for Google (disconnect and the
+    # callback still answer). On needs the client and the redirect URI, or startup fails. *.googleapis.com must
+    # stay on the egress proxy's allowlist; drive.readonly is a restricted scope, so a public launch needs Google's
+    # app verification first.
+    google:
+      enabled: ${FLOWCORTEX_CONNECTORS_GOOGLE_ENABLED:false}
+      client-id: ${GOOGLE_CONNECTOR_CLIENT_ID:}
+      client-secret: ${GOOGLE_CONNECTOR_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_CONNECTOR_REDIRECT_URI:http://localhost:5173/api/v1/connectors/google/callback}
+      return-path: /integrations
+      read-timeout: 30s
   # Where SMS go. Empty: nowhere. "outbox": the sms_outbox table, read in the admin console
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:
