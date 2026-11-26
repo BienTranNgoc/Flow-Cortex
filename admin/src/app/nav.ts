@@ -150,8 +150,7 @@ export const NAV: NavGroup[] = [
         label: 'common.shell.nav.items.features',
         path: '/features',
         icon: GearSix,
-        disabled: true,
-        tag: COMING_SOON,
+        key: 'platform.setting.view',
       },
       {
         label: 'common.shell.nav.items.auditLog',

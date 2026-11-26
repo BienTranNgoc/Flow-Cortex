@@ -84,8 +84,8 @@ class AssistantController {
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @GetMapping(value = "/conversations/latest", produces = MediaType.APPLICATION_JSON_VALUE)
-    ConversationView latest(@AuthenticationPrincipal Jwt jwt) {
-        return assistant.latest(member(jwt)).orElseThrow(AssistantService::conversationNotFound);
+    ConversationView latest(@AuthenticationPrincipal Jwt jwt, Locale locale) {
+        return assistant.latest(member(jwt), locale).orElseThrow(AssistantService::conversationNotFound);
     }
 
     @SecurityRequirements
@@ -131,12 +131,12 @@ class AssistantController {
             @Parameter(required = true, description = "Version 4 UUID the browser keeps for the guest",
                     schema = @Schema(format = "uuid"))
             @RequestHeader(name = SESSION_HEADER, required = false) String session,
-            HttpServletRequest request) {
+            HttpServletRequest request, Locale locale) {
         String validSession = validSession(session);
         if (!guestKeys.configured()) {
             throw AssistantService.conversationNotFound();
         }
-        return assistant.latest(guestKeys.guest(validSession, request.getRemoteAddr()))
+        return assistant.latest(guestKeys.guest(validSession, request.getRemoteAddr()), locale)
                 .orElseThrow(AssistantService::conversationNotFound);
     }
 
