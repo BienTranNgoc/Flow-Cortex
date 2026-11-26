@@ -83,6 +83,39 @@
   color: var(--ink);
 }
 
+/* The Input node as a button: it looks like a step node and answers hover, press and focus the
+   same way. */
+button.run-canvas__input--button {
+  margin: 0;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    transform var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard);
+}
+
+button.run-canvas__input--button:hover {
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+button.run-canvas__input--button:active {
+  transform: scale(0.98);
+}
+
+button.run-canvas__input--button[aria-pressed='true'] {
+  border-color: var(--primary);
+  border-left-color: var(--line-2);
+  box-shadow: var(--focus-ring);
+}
+
+button.run-canvas__input--button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .run-canvas__input-title {
   color: var(--ink-3);
   font-size: 0.75rem;

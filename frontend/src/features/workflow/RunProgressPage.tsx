@@ -18,14 +18,19 @@ import {
   parseProductBrief,
 } from './productVideoSchemas';
 import { RunCanvas, useRunCanvasWide } from './RunCanvas';
+import { RunInputPanel } from './RunInputPanel';
 import { RunInputs } from './RunInputs';
 import { RunLogPanel } from './RunLogPanel';
+import { RunMetaRow } from './RunMetaRow';
+import { stepPosition } from './runResultModel';
 import { RunSplitHandle } from './RunSplitHandle';
 import { StepDetail } from './StepDetail';
 import { StopRunDialog } from './StopRunDialog';
 import { looksLikeJson } from './runCanvasModel';
 import {
+  RUN_INPUT_KEY,
   choiceTakenBack,
+  inputPicked,
   needsYouStep,
   selectedStep,
   stateWord,
@@ -150,6 +155,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const { t } = useTranslation();
   const panelId = useId();
   const panelRef = useRef<HTMLElement>(null);
+  const inputPanelRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -182,20 +188,24 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const capabilitiesQuery = useCapabilitiesQuery();
   const isProductVideo = isProductVideoRun(run, capabilitiesQuery.data?.productVideoWorkflowId);
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
-  const announcement =
-    selected && selectedState
-      ? `${stepLabel(selected, t, steps, isProductVideo)}, ${stateWord(selectedState, t)}`
-      : '';
+  // The run input is shown only where the canvas is, and never on a Product Video run.
+  const inputShown = wide && !isProductVideo && inputPicked(steps, run.status, choice);
+  let announcement = '';
+  if (inputShown) {
+    announcement = t('workflow.inputPanel.title');
+  } else if (selected && selectedState) {
+    announcement = `${stepLabel(selected, t, steps, isProductVideo)}, ${stateWord(selectedState, t)}`;
+  }
 
-  const selectedKey = selected && stepKey(selected);
+  const shownKey = inputShown ? RUN_INPUT_KEY : selected && stepKey(selected);
   const [announced, setAnnounced] = useState('');
-  const previousKey = useRef(selectedKey);
+  const previousKey = useRef(shownKey);
   useEffect(() => {
-    if (previousKey.current !== selectedKey) {
-      previousKey.current = selectedKey;
+    if (previousKey.current !== shownKey) {
+      previousKey.current = shownKey;
       setAnnounced(announcement);
     }
-  }, [selectedKey, announcement]);
+  }, [shownKey, announcement]);
 
   const startsWithUpload = steps[0]?.mode === 'remote';
   const fileName =
@@ -207,17 +217,31 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const finalVideo =
     isProductVideo && run.status === 'completed' ? findFinalVideoArtifact(steps) : null;
 
+  // The panel that is shown after the pick is the one to bring into view, so the scroll waits for
+  // the render the pick causes.
+  const scrollPending = useRef(false);
+  useEffect(() => {
+    if (!scrollPending.current) {
+      return;
+    }
+    scrollPending.current = false;
+    const reduced =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (inputShown ? inputPanelRef : panelRef).current?.scrollIntoView({
+      block: 'nearest',
+      behavior: reduced ? 'auto' : 'smooth',
+    });
+  });
+
   const onSelect = (stepId: string) => {
     const waitingOn = needsYouStep(steps, run.status);
+    scrollPending.current = true;
     setChoice({
       stepId,
       runStatus: run.status,
       needsYouId: waitingOn && stepKey(waitingOn),
     });
-    const reduced =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    panelRef.current?.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
   };
 
   const pipelineSteps = steps.map((step) => ({
@@ -225,20 +249,32 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
     name: stepLabel(step, t, steps, isProductVideo),
     run: step,
   }));
+  // The step details stay mounted behind the input panel, so an unsaved approval edit survives a look
+  // at the input.
   const detail = selected && (
     <div className="run-layout-detail">
-      <StepDetail
-        id={panelId}
-        panelRef={panelRef}
-        runId={runId}
-        step={selected}
-        awaitingApproval={needsYouStep(steps, run.status) !== undefined}
-        needsYou={selectedState === 'needs-you'}
-        fileName={fileName}
-        isProductVideo={isProductVideo}
-        stepTitle={stepLabel(selected, t, steps, isProductVideo)}
-        productName={brief?.productName}
-      />
+      {inputShown && (
+        <RunInputPanel id={panelId} panelRef={inputPanelRef} run={run} runId={runId} />
+      )}
+      <div hidden={inputShown}>
+        <StepDetail
+          id={inputShown ? `${panelId}-step` : panelId}
+          panelRef={panelRef}
+          runId={runId}
+          step={selected}
+          awaitingApproval={needsYouStep(steps, run.status) !== undefined}
+          needsYou={selectedState === 'needs-you'}
+          state={stepState(selected, steps, run.status)}
+          position={stepPosition(steps, selected)}
+          name={stepLabel(selected, t, steps, isProductVideo)}
+          runStatus={run.status}
+          runStartedAt={run.startedAt}
+          fileName={fileName}
+          isProductVideo={isProductVideo}
+          stepTitle={stepLabel(selected, t, steps, isProductVideo)}
+          productName={brief?.productName}
+        />
+      </div>
     </div>
   );
 
@@ -268,6 +304,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
       ) : (
         <>
           <PageHeading ref={headingRef} title={runHeading(run.status, t)} />
+          <RunMetaRow run={run} />
           {stopButton}
         </>
       )}
@@ -308,9 +345,10 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
             <RunCanvas
               run={run}
               steps={pipelineSteps}
-              selectedId={stepKey(selected)}
+              selectedId={shownKey}
               onSelect={onSelect}
               panelId={panelId}
+              inputSelectable={!isProductVideo}
             />
           </div>
           <RunSplitHandle binding={split.handle} />

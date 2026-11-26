@@ -71,6 +71,7 @@ import {
 } from './runCanvasModel';
 import './RunCanvas.css';
 import {
+  RUN_INPUT_KEY,
   formatSeconds,
   stepLabel,
   stepNameId,
@@ -132,6 +133,8 @@ interface NodeInfo {
 interface CanvasContextValue {
   info: ReadonlyMap<string, NodeInfo>;
   input: InputSummary;
+  /** The Input node is a button that selects the run input; false leaves it a plain node. */
+  inputSelectable: boolean;
   selectedId: string | undefined;
   panelId: string | undefined;
   onSelect: (id: string) => void;
@@ -179,18 +182,15 @@ function resetScroll(element: HTMLElement) {
   element.scrollLeft = 0;
 }
 
-function StepNode({ id }: Readonly<NodeProps>) {
+/**
+ * The focus handlers of a node that holds a button: a pointer pick never moves the view; keyboard
+ * focus brings its node whole into the canvas.
+ */
+function useNodeFocus(id: string) {
   const context = useCanvasContext();
   const { getInternalNode, getViewport, setViewport } = useReactFlow();
   const pointerFocus = useRef(false);
-  const { registerButton } = context;
-  const buttonRef = useCallback(
-    (button: HTMLButtonElement | null) => registerButton?.(id, button),
-    [id, registerButton],
-  );
-  const info = context.info.get(id);
 
-  // A pointer pick never moves the view; keyboard focus brings its node whole into the canvas.
   const onFocus = (event: FocusEvent<HTMLDivElement>) => {
     const flow = event.currentTarget.closest<HTMLElement>(FLOW_CLASS);
     if (!flow) {
@@ -214,23 +214,35 @@ function StepNode({ id }: Readonly<NodeProps>) {
     }
   };
 
+  return {
+    onFocus,
+    onBlur: () => {
+      pointerFocus.current = false;
+    },
+    onPointerDown: () => {
+      pointerFocus.current = true;
+    },
+    onPointerUp: () => {
+      pointerFocus.current = false;
+    },
+  };
+}
+
+function StepNode({ id }: Readonly<NodeProps>) {
+  const context = useCanvasContext();
+  const focusHandlers = useNodeFocus(id);
+  const { registerButton } = context;
+  const buttonRef = useCallback(
+    (button: HTMLButtonElement | null) => registerButton?.(id, button),
+    [id, registerButton],
+  );
+  const info = context.info.get(id);
+
   if (!info) {
     return null;
   }
   return (
-    <div
-      className="run-canvas__node"
-      onFocus={onFocus}
-      onBlur={() => {
-        pointerFocus.current = false;
-      }}
-      onPointerDown={() => {
-        pointerFocus.current = true;
-      }}
-      onPointerUp={() => {
-        pointerFocus.current = false;
-      }}
-    >
+    <div className="run-canvas__node" {...focusHandlers}>
       <Handle type="target" position={Position.Left} isConnectable={false} className="run-canvas__handle" />
       <PipelineNode
         step={info.step}
@@ -249,20 +261,48 @@ function StepNode({ id }: Readonly<NodeProps>) {
   );
 }
 
-function InputNode() {
+function InputNode({ id }: Readonly<NodeProps>) {
   const { t } = useTranslation();
-  const { input } = useCanvasContext();
+  const context = useCanvasContext();
+  const focusHandlers = useNodeFocus(id);
+  const { input, inputSelectable, registerButton } = context;
+  const buttonRef = useCallback(
+    (button: HTMLButtonElement | null) => registerButton?.(id, button),
+    [id, registerButton],
+  );
+  // The panel is named by the title alone, never by the summary beside it.
+  const content = (
+    <>
+      <span
+        className="run-canvas__input-title"
+        id={inputSelectable ? `${stepNameId(RUN_INPUT_KEY)}${context.nameSuffix}` : undefined}
+      >
+        {t('workflow.canvas.input')}
+      </span>
+      <span
+        className="run-canvas__input-text"
+        title={input.kind === 'text' ? input.title : undefined}
+      >
+        {input.kind === 'label' ? t('workflow.canvas.runInput') : input.text}
+      </span>
+    </>
+  );
   return (
-    <div className="run-canvas__node">
-      <div className="run-canvas__input">
-        <span className="run-canvas__input-title">{t('workflow.canvas.input')}</span>
-        <span
-          className="run-canvas__input-text"
-          title={input.kind === 'text' ? input.title : undefined}
+    <div className="run-canvas__node" {...focusHandlers}>
+      {inputSelectable ? (
+        <button
+          ref={buttonRef}
+          type="button"
+          className="run-canvas__input run-canvas__input--button"
+          aria-pressed={context.selectedId === RUN_INPUT_KEY}
+          aria-controls={context.panelId}
+          onClick={() => context.onSelect(RUN_INPUT_KEY)}
         >
-          {input.kind === 'label' ? t('workflow.canvas.runInput') : input.text}
-        </span>
-      </div>
+          {content}
+        </button>
+      ) : (
+        <div className="run-canvas__input">{content}</div>
+      )}
       <Handle type="source" position={Position.Right} isConnectable={false} className="run-canvas__handle" />
     </div>
   );
@@ -597,13 +637,22 @@ export interface RunCanvasProps {
   selectedId: string | undefined;
   onSelect: (id: string) => void;
   panelId?: string | undefined;
+  /** Whether the Input node selects the run input; the default is yes. */
+  inputSelectable?: boolean;
 }
 
 /**
  * The run as a pannable, zoomable chain: the Input node, then one node per step, drawn with the
  * list's own node. Selection comes in and goes out exactly as for the list.
  */
-export function RunCanvas({ run, steps, selectedId, onSelect, panelId }: Readonly<RunCanvasProps>) {
+export function RunCanvas({
+  run,
+  steps,
+  selectedId,
+  onSelect,
+  panelId,
+  inputSelectable = true,
+}: Readonly<RunCanvasProps>) {
   const { t } = useTranslation();
   const [viewDuration] = useState(() => {
     const standard = readStandardDuration();
@@ -669,7 +718,7 @@ export function RunCanvas({ run, steps, selectedId, onSelect, panelId }: Readonl
   }
 
   const input = inputSummary(run);
-  const shared = { info, input, selectedId, panelId, viewDuration };
+  const shared = { info, input, inputSelectable, selectedId, panelId, viewDuration };
   const pageContext: CanvasContextValue = {
     ...shared,
     onSelect: selectOnPage,

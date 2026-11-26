@@ -1,5 +1,12 @@
 import type { RunResponse, RunStepResponse } from '@flow-cortex/api-client';
-import { edgeState, stepKey, stepState, type EdgeState, type StepState } from './stepDisplay';
+import {
+  RUN_INPUT_KEY,
+  edgeState,
+  stepKey,
+  stepState,
+  type EdgeState,
+  type StepState,
+} from './stepDisplay';
 import { isLiveRunStatus } from './useRunEvents';
 
 export const NODE_PITCH = 340;
@@ -13,7 +20,7 @@ export const SPLIT_MAX = 75;
 export const SPLIT_DEFAULT = 40;
 export const SPLIT_STEP = 2;
 export const INPUT_PREVIEW = 60;
-export const INPUT_NODE_ID = 'run-input';
+export const INPUT_NODE_ID = RUN_INPUT_KEY;
 
 /** Gap kept between a node panned into view and the canvas edge, so its focus ring is not clipped. */
 const FOCUS_MARGIN = 16;
@@ -68,7 +75,8 @@ export interface RunProgress {
   total: number;
 }
 
-function orderedSteps(steps: readonly RunStepResponse[] | undefined): RunStepResponse[] {
+/** The steps by ascending `stepOrder`: the one ordering canvas nodes, progress and positions use. */
+export function orderedSteps(steps: readonly RunStepResponse[] | undefined): RunStepResponse[] {
   return [...(steps ?? [])].sort((a, b) => (a.stepOrder ?? 0) - (b.stepOrder ?? 0));
 }
 

@@ -19,6 +19,7 @@ import {
   type FakeReply,
   type Handler,
 } from '../../test/fakeApi';
+import { stubMatchMedia } from '../../test/matchMedia';
 import { stubModalDialog } from '../../test/modalDialog';
 import { openInCurrentTab } from './browser';
 import { RunProgressPage } from './RunProgressPage';
@@ -286,9 +287,9 @@ describe('RunProgressPage', () => {
     );
 
     await screen.findByText('Waiting to start…');
-    const pills = [...screen.getByRole('main').querySelectorAll('.run-step-status')].map(
-      (pill) => pill.textContent,
-    );
+    const pills = [
+      ...screen.getByRole('main').querySelectorAll('.pipeline-node .run-step-status'),
+    ].map((pill) => pill.textContent);
     expect(pills).toEqual(['Waiting', 'Running']);
   });
 
@@ -2658,6 +2659,489 @@ describe('RunProgressPage', () => {
       renderRun(customRun);
 
       await expectGenericView();
+    });
+  });
+
+  describe('the result panel and the run meta row', () => {
+    const SAVED = 'The result is saved when the step finishes — you can leave this page.';
+    const LONG = 'This run keeps going on the server even if you close this tab.';
+    const VERY_LONG = 'Taking longer than usual — still running. You can close this tab.';
+    const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+    it('opens the details with the label, the step glyph, "N. name" and the status word, named by the node', async () => {
+      renderRun(completedPipeline());
+
+      const panel = await screen.findByRole('region', { name: 'Extract source audio' });
+      expect(within(panel).getByText('Result')).toBeInTheDocument();
+      expect(within(panel).getByText('2. Extract source audio')).toBeInTheDocument();
+      expect(within(panel).getByText('Completed')).toBeInTheDocument();
+    });
+
+    it('shows no result header on a Product Video run', async () => {
+      productVideoWorkflowId = 'w1';
+      renderRun(
+        run([step({ type: 'generate_video', pickedUpAt: ago(1000) })], {
+          input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+        }),
+      );
+
+      await waitFor(() => expect(document.querySelector('.pv-run-shell')).not.toBeNull());
+      expect(screen.queryByText('Result')).not.toBeInTheDocument();
+    });
+
+    it('shows skeleton lines hidden from assistive technology, "Working on it…" in a polite status, and the progress outside it', async () => {
+      renderRun(run([step({ pickedUpAt: ago(1000), progressPercent: 40 })], { startedAt: ago(5000) }));
+
+      const working = await screen.findByText('Working on it…');
+      expect(working.closest('[role="status"]')).not.toBeNull();
+      const bar = screen.getByRole('progressbar');
+      expect(bar).toHaveAttribute('value', '40');
+      expect(bar.closest('[role="status"]')).toBeNull();
+      expect(screen.getByText('40 %')).toBeInTheDocument();
+      const skeleton = document.querySelector('.step-result-skeleton');
+      expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+      expect(skeleton?.children).toHaveLength(3);
+    });
+
+    it('shows "Waiting to start…" and no skeleton for a step not picked up', async () => {
+      renderRun(run([step()], { startedAt: ago(5000) }));
+
+      expect(await screen.findByText('Waiting to start…')).toBeInTheDocument();
+      expect(document.querySelector('.step-result-skeleton')).toBeNull();
+    });
+
+    it('shows the saved note once 30 seconds have passed since pickup, without a reload', async () => {
+      renderRun(run([step({ pickedUpAt: ago(29_700) })], { startedAt: ago(29_700) }));
+
+      await screen.findByText('Working on it…');
+      expect(screen.queryByText(SAVED)).not.toBeInTheDocument();
+      expect(await screen.findByText(SAVED, {}, { timeout: 3000 })).toBeInTheDocument();
+    });
+
+    it('shows the 5-minute note at its threshold without a reload', async () => {
+      renderRun(run([step({ pickedUpAt: ago(60_000) })], { startedAt: ago(299_700) }));
+
+      await screen.findByText('Working on it…');
+      expect(screen.queryByText(LONG)).not.toBeInTheDocument();
+      expect(await screen.findByText(LONG, {}, { timeout: 3000 })).toBeInTheDocument();
+    });
+
+    it('shows the 10-minute note instead of the 5-minute one', async () => {
+      renderRun(run([step({ pickedUpAt: ago(60_000) })], { startedAt: ago(600_000) }));
+
+      expect(await screen.findByText(VERY_LONG)).toBeInTheDocument();
+      expect(screen.queryByText(LONG)).not.toBeInTheDocument();
+    });
+
+    it('shows no running note on a run that is not running', async () => {
+      renderRun(
+        run([step({ pickedUpAt: ago(60_000) })], { status: 'cancelling', startedAt: ago(1_200_000) }),
+      );
+
+      await screen.findByText('Working on it…');
+      expect(screen.queryByText(SAVED)).not.toBeInTheDocument();
+      expect(screen.queryByText(LONG)).not.toBeInTheDocument();
+      expect(screen.queryByText(VERY_LONG)).not.toBeInTheDocument();
+    });
+
+    it('says a pending step has no result yet, a skipped one was skipped and an empty one finished without a result', async () => {
+      const user = userEvent.setup();
+      renderRun(
+        run(
+          [
+            step({ id: 's1', status: 'completed', type: 'echo', mode: 'inline' }),
+            step({ id: 's2', stepOrder: 2, status: 'pending', type: 'echo', mode: 'inline' }),
+            step({ id: 's3', stepOrder: 3, status: 'skipped', type: 'echo', mode: 'inline' }),
+          ],
+          { status: 'running' },
+        ),
+      );
+
+      expect(await screen.findByText('This step finished without a result.')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Step 2/ }));
+      expect(screen.getByText('No result for this step yet.')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Step 3/ }));
+      expect(screen.getByText('This step was skipped.')).toBeInTheDocument();
+    });
+
+    it('draws a table result, with its size', async () => {
+      renderRun(
+        run(
+          [
+            step({
+              type: 'echo',
+              mode: 'inline',
+              status: 'completed',
+              output: '[{"name":"A","views":10},{"name":"B","views":2}]',
+            }),
+          ],
+          { status: 'completed' },
+        ),
+      );
+
+      expect(await screen.findByText('1 table · 2 rows · 2 columns')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sort by views' })).toBeInTheDocument();
+    });
+
+    it('states the position of a live run under its heading, with no finish time', async () => {
+      renderRun(
+        run(
+          [
+            step({ id: 's1', status: 'completed' }),
+            step({ id: 's2', stepOrder: 2, pickedUpAt: ago(1000) }),
+            step({ id: 's3', stepOrder: 3, status: 'pending' }),
+            step({ id: 's4', stepOrder: 4, status: 'pending' }),
+          ],
+          { status: 'running' },
+        ),
+      );
+
+      const meta = await screen.findByRole('group', { name: 'Run details' });
+      expect(meta).toHaveTextContent('Step 2 of 4 · Inspect the file');
+      expect(meta.querySelectorAll('span')).toHaveLength(1);
+      expect(meta.closest('[role="status"]')).toBeNull();
+    });
+
+    it('states finish time, duration and credits of a finished run, and no position', async () => {
+      renderRun({
+        ...completedPipeline(),
+        startedAt: '2026-10-01T10:00:00Z',
+        finishedAt: '2026-10-01T10:01:20Z',
+        chargedCredits: 12,
+      });
+
+      const meta = await screen.findByRole('group', { name: 'Run details' });
+      expect(meta).toHaveTextContent('1m 20s');
+      expect(meta).toHaveTextContent('12 credits');
+      expect(meta).toHaveTextContent(/2026/);
+      expect(meta).not.toHaveTextContent('Step 2 of');
+    });
+
+    it('shows no credits when they are switched off', async () => {
+      renderRun({
+        ...completedPipeline(),
+        startedAt: '2026-10-01T10:00:00Z',
+        finishedAt: '2026-10-01T10:01:20Z',
+      });
+
+      expect(await screen.findByRole('group', { name: 'Run details' })).not.toHaveTextContent(
+        'credit',
+      );
+    });
+
+    it('shows no row at all when nothing is known', async () => {
+      renderRun(completedPipeline());
+      await screen.findByRole('region', { name: 'Extract source audio' });
+      expect(screen.queryByRole('group', { name: 'Run details' })).not.toBeInTheDocument();
+    });
+
+    it('shows no meta row on a Product Video run', async () => {
+      productVideoWorkflowId = 'w1';
+      renderRun(
+        run([step({ type: 'generate_video', pickedUpAt: ago(1000) })], {
+          startedAt: ago(5000),
+          input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+        }),
+      );
+
+      await waitFor(() => expect(document.querySelector('.pv-run-shell')).not.toBeNull());
+      expect(screen.queryByRole('group', { name: 'Run details' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('the run input on the canvas', () => {
+    const TASKS_PATH = 'GET /api/v1/runs/r1/review-tasks';
+    const TASK = {
+      id: 't1',
+      runId: 'r1',
+      runStepId: 's2',
+      reviewType: 'APPROVAL_CHECKPOINT',
+      status: 'pending',
+      originalPayload: 'Draft caption',
+    };
+
+    /** React Flow measures nodes through ResizeObserver and element sizes, which jsdom lacks. */
+    function stubFlowEnvironment() {
+      class Observer {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe(target: Element) {
+          this.callback(
+            [{ target, contentRect: { width: 1000, height: 600 } } as ResizeObserverEntry],
+            this as unknown as ResizeObserver,
+          );
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+      vi.stubGlobal('ResizeObserver', Observer);
+      vi.stubGlobal(
+        'DOMMatrixReadOnly',
+        class {
+          m22 = 1;
+        },
+      );
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(240);
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(80);
+      Object.assign(SVGElement.prototype, { getBBox: () => ({ x: 0, y: 0, width: 0, height: 0 }) });
+    }
+
+    const twoSteps = (overrides: Partial<RunResponse> = {}, second: Partial<RunStepResponse> = {}) =>
+      run(
+        [
+          step({ id: 's1', status: 'completed', output: PROBE_OUTPUT }),
+          step({
+            id: 's2',
+            stepOrder: 2,
+            type: 'extract_audio',
+            status: 'running',
+            pickedUpAt: '2026-10-01T10:00:02Z',
+            ...second,
+          }),
+        ],
+        { status: 'running', ...overrides },
+      );
+
+    const completedTwo = (overrides: Partial<RunResponse> = {}) =>
+      run(
+        [
+          step({ id: 's1', status: 'completed', output: PROBE_OUTPUT }),
+          step({
+            id: 's2',
+            stepOrder: 2,
+            type: 'extract_audio',
+            status: 'completed',
+            output: '{"sampleRate":16000}',
+          }),
+        ],
+        { status: 'completed', ...overrides },
+      );
+
+    const waitingRun = () =>
+      run(
+        [
+          step({ id: 's1', type: 'echo', mode: 'inline', status: 'completed', output: 'Draft caption' }),
+          step({
+            id: 's2',
+            stepOrder: 2,
+            type: 'APPROVAL_CHECKPOINT',
+            mode: 'inline',
+            status: 'pending',
+          }),
+        ],
+        { status: 'waiting_approval', input: 'Draft caption' },
+      );
+
+    const textRun = (overrides: Partial<RunResponse> = {}) =>
+      run([step({ id: 's1', type: 'echo', mode: 'inline', status: 'completed', output: 'x' })], {
+        status: 'completed',
+        ...overrides,
+      });
+
+    /** The run a pushed update returns is whatever `served.body` holds when the page reads it. */
+    function renderWide(initial: RunResponse, extra: Record<string, Handler> = {}) {
+      const served = { body: initial };
+      const media = stubMatchMedia(true);
+      stubFlowEnvironment();
+      const calls = stubApi({
+        'GET /api/v1/runs/r1': () => ({ status: 200, body: served.body }),
+        [TASKS_PATH]: { status: 200, body: [TASK] },
+        ...extra,
+      });
+      renderRoute('/workflows/:workflowId/runs/:runId', '/workflows/w1/runs/r1', <RunProgressPage />);
+      return { served, media, calls };
+    }
+
+    // The canvas pans on a mouse press, which jsdom's synthetic events cannot carry; a click is enough.
+    const press = (element: HTMLElement) => fireEvent.click(element);
+    const inputNode = () => screen.findByRole('button', { name: /^Input/ });
+    const stepNode = (name: RegExp) => screen.getByRole('button', { name });
+    const inputPanel = () => screen.queryByRole('region', { name: 'Input' });
+    const announcement = () =>
+      screen.getByRole('main').querySelector('div.visually-hidden[role="status"]');
+
+    async function pushRun(
+      served: { body: RunResponse },
+      calls: Array<{ path: string }>,
+      body: RunResponse,
+    ) {
+      served.body = body;
+      const reads = runReads(calls);
+      push();
+      await waitFor(() => expect(runReads(calls)).toBeGreaterThan(reads));
+    }
+
+    it('shows the Input node as a button that selects the run input and labels the panel "Input"', async () => {
+      renderWide(completedTwo());
+
+      press(await inputNode());
+
+      expect(await inputNode()).toHaveAttribute('aria-pressed', 'true');
+      expect(stepNode(/Extract source audio/)).toHaveAttribute('aria-pressed', 'false');
+      expect(inputPanel()).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Extract source audio' })).not.toBeInTheDocument();
+    });
+
+    it('reaches the Input node before the step nodes', async () => {
+      renderWide(completedTwo());
+
+      const input = await inputNode();
+      const nodes = screen
+        .getAllByRole('button')
+        .filter((button) => button.hasAttribute('aria-pressed'));
+      expect(nodes[0]).toBe(input);
+      expect(nodes).toHaveLength(3);
+    });
+
+    it('keeps a picked input across a pushed update', async () => {
+      const { served, calls } = renderWide(twoSteps());
+
+      press(await inputNode());
+      await pushRun(served, calls, twoSteps({}, { progressPercent: 60 }));
+
+      expect(inputPanel()).toBeInTheDocument();
+      expect(await inputNode()).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('takes the input pick back when the run waits for approval', async () => {
+      const { served, calls } = renderWide(twoSteps());
+
+      press(await inputNode());
+      await pushRun(served, calls, waitingRun());
+
+      await waitFor(() => expect(inputPanel()).not.toBeInTheDocument());
+      expect(stepNode(/Review/)).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('takes the input pick back when the run ends in error', async () => {
+      const { served, calls } = renderWide(twoSteps());
+
+      press(await inputNode());
+      await pushRun(
+        served,
+        calls,
+        twoSteps({ status: 'error' }, { status: 'error', errorCode: 'queue_timeout' }),
+      );
+
+      await waitFor(() => expect(inputPanel()).not.toBeInTheDocument());
+      expect(
+        screen.getByText('The media engine was too busy to start this in time. Try running again.'),
+      ).toBeInTheDocument();
+    });
+
+    it('keeps the unsaved edit of the approval form when the member looks at the input and comes back', async () => {
+      const user = userEvent.setup();
+      renderWide(waitingRun());
+
+      const content = await screen.findByLabelText('Content to approve');
+      await user.clear(content);
+      await user.type(content, 'Edited caption');
+      press(await inputNode());
+      expect(inputPanel()).toBeInTheDocument();
+      expect(screen.getByLabelText('Content to approve')).not.toBeVisible();
+      press(stepNode(/Review/));
+
+      expect(await screen.findByLabelText('Content to approve')).toHaveValue('Edited caption');
+    });
+
+    it('announces "Input", then the default step again when the member goes back to it', async () => {
+      renderWide(completedTwo());
+
+      press(await inputNode());
+      expect(announcement()).toHaveTextContent('Input');
+      press(stepNode(/Extract source audio/));
+
+      expect(announcement()).toHaveTextContent('Extract source audio, Completed');
+    });
+
+    it('shows the default step again when the window narrows', async () => {
+      const { media } = renderWide(completedTwo());
+
+      press(await inputNode());
+      expect(inputPanel()).toBeInTheDocument();
+      act(() => media.setMatches(false));
+
+      expect(await screen.findByRole('region', { name: 'Extract source audio' })).toBeInTheDocument();
+      expect(inputPanel()).not.toBeInTheDocument();
+    });
+
+    it('shows the full text of a text input, without Copy', async () => {
+      renderWide(textRun({ input: 'Summarise this article about rice prices' }));
+
+      press(await inputNode());
+
+      expect(inputPanel()).toHaveTextContent('Summarise this article about rice prices');
+      expect(within(inputPanel()!).queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument();
+    });
+
+    it('lists the fields of a JSON input as written', async () => {
+      renderWide(
+        textRun({
+          input: '{"sourceUrl":"https://www.tiktok.com/@a/video/1","count":3,"tags":["x"]}',
+        }),
+      );
+
+      press(await inputNode());
+
+      const panel = inputPanel()!;
+      expect(within(panel).getByText('sourceUrl')).toBeInTheDocument();
+      expect(within(panel).getByText('https://www.tiktok.com/@a/video/1')).toBeInTheDocument();
+      expect(within(panel).getByText('3')).toBeInTheDocument();
+      expect(within(panel).getByText('["x"]')).toBeInTheDocument();
+    });
+
+    it('says the run started without input when it has no input and no upload', async () => {
+      renderWide(textRun({ input: '' }));
+
+      press(await inputNode());
+
+      expect(await screen.findByText('This run started without input.')).toBeInTheDocument();
+    });
+
+    it('counts the uploads instead of showing them again, and does not claim the run had no input', async () => {
+      const upload = (key: string) => ({
+        bindingKey: key,
+        kind: 'image',
+        mimeType: 'image/png',
+        url: `http://localhost:9000/in/${key}.png`,
+        expiresAt: '2099-01-01T00:00:00Z',
+      });
+      renderWide(textRun({ input: '' }), {
+        'GET /api/v1/runs/r1/inputs': { status: 200, body: [upload('a'), upload('b')] },
+      });
+
+      await screen.findAllByAltText(/Input image/);
+      press(await inputNode());
+
+      expect(await within(inputPanel()!).findByText('2 images')).toBeInTheDocument();
+      expect(screen.queryByText('This run started without input.')).not.toBeInTheDocument();
+      expect(screen.getAllByAltText(/Input image/)).toHaveLength(2);
+    });
+
+    it('shows no JSON rows for a file run that holds a JSON reference', async () => {
+      renderWide(
+        run([step({ id: 's1', status: 'completed' })], {
+          status: 'completed',
+          input: '{"objectKey":"u/1"}',
+        }),
+      );
+
+      press(await inputNode());
+
+      expect(inputPanel()).not.toHaveTextContent('objectKey');
+    });
+
+    it('leaves the Input node a plain node on a Product Video run', async () => {
+      productVideoWorkflowId = 'w1';
+      renderWide(
+        run([step({ id: 's1', type: 'generate_video', mode: 'remote', status: 'completed' })], {
+          status: 'completed',
+          input: JSON.stringify({ productName: 'Cup', description: 'Nice cup' }),
+        }),
+      );
+
+      await waitFor(() => expect(document.querySelector('.pv-run-shell')).not.toBeNull());
+      await waitFor(() => expect(document.querySelector('.run-canvas__input')).not.toBeNull());
+      expect(screen.queryByRole('button', { name: /^Input/ })).not.toBeInTheDocument();
     });
   });
 });

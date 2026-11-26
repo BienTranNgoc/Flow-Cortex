@@ -136,6 +136,56 @@
     "minimap": "Diagram overview",
     "splitHandle": "Resize diagram and details"
   },
+  "result": {
+    "label": "Result",
+    "working": "Working on it…",
+    "savedNote": "The result is saved when the step finishes — you can leave this page.",
+    "longRunNote": "This run keeps going on the server even if you close this tab.",
+    "veryLongRunNote": "Taking longer than usual — still running. You can close this tab.",
+    "noResultYet": "No result for this step yet.",
+    "skipped": "This step was skipped.",
+    "empty": "This step finished without a result.",
+    "tableSummary": "1 table · {{rows}} rows · {{cols}} columns",
+    "tableLimited": "Showing the first {{shown}} of {{total}} rows.",
+    "tableRegion": "Result table",
+    "sortBy": "Sort by {{column}}",
+    "characters_one": "{{n}} character",
+    "characters_other": "{{n}} characters",
+    "textRegion": "Result text",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy. Select the text instead.",
+    "files": {
+      "video_one": "{{count}} video",
+      "video_other": "{{count}} videos",
+      "audio_one": "{{count}} audio file",
+      "audio_other": "{{count}} audio files",
+      "image_one": "{{count}} image",
+      "image_other": "{{count}} images",
+      "file_one": "{{count}} file",
+      "file_other": "{{count}} files"
+    },
+    "viewImage": "View image",
+    "hideImage": "Hide image",
+    "loadingImage": "Loading the image…",
+    "imageFailed": "This image can't be shown right now.",
+    "iterateSummary": "{{succeeded}} of {{total}} items succeeded",
+    "item": "Item {{n}}",
+    "itemFiles_one": "{{count}} file",
+    "itemFiles_other": "{{count}} files"
+  },
+  "runMeta": {
+    "label": "Run details",
+    "position": "Step {{current}} of {{total}} · {{name}}",
+    "credits_one": "{{amount}} credit",
+    "credits_other": "{{amount}} credits"
+  },
+  "inputPanel": {
+    "title": "Input",
+    "file": "File: {{name}}",
+    "empty": "This run started without input.",
+    "textRegion": "Run input text"
+  },
   "run": {
     "heading": {
       "pending": "Run pending",
