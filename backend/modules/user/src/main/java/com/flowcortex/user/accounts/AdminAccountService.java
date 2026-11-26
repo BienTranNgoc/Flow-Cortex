@@ -13,6 +13,8 @@ import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.Role;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
+import com.flowcortex.user.roles.RbacMutationSwitch;
+import com.flowcortex.user.roles.RbacMutationSwitch.RbacOperation;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -40,15 +42,17 @@ class AdminAccountService {
     private final RoleCatalog roleCatalog;
 
     private final AccountCredentials accountCredentials;
+    private final RbacMutationSwitch mutationSwitch;
 
     AdminAccountService(AppUserRepository users, SuperAdminInvariant superAdminInvariant,
             RegistrationOwnerGuard registrationOwnerGuard, RoleCatalog roleCatalog,
-            AccountCredentials accountCredentials) {
+            AccountCredentials accountCredentials, RbacMutationSwitch mutationSwitch) {
         this.users = users;
         this.superAdminInvariant = superAdminInvariant;
         this.registrationOwnerGuard = registrationOwnerGuard;
         this.roleCatalog = roleCatalog;
         this.accountCredentials = accountCredentials;
+        this.mutationSwitch = mutationSwitch;
     }
 
     /**
@@ -73,6 +77,7 @@ class AdminAccountService {
 
     @Transactional
     AdminAccountResponse changeRole(UUID callerId, UUID id, String role) {
+        mutationSwitch.requireEnabled(RbacOperation.ACCOUNT_ROLE_CHANGE, callerId);
         RoleRow newRoleRow = roleCatalog.require(role);
         Role newRole = Role.of(newRoleRow.code());
         if (id.equals(callerId)) {

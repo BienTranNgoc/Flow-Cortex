@@ -57,6 +57,22 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
     }
 
     @Test
+    void theWorkflowArtifactPublishesAStepConfigAsAnObjectAndTheOptionalDataStore() {
+        ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        tools.jackson.databind.JsonNode schemas = JSON.readTree(response.getBody()).at("/components/schemas");
+
+        tools.jackson.databind.JsonNode config = schemas.at("/WorkflowArtifactStep/properties/config");
+        assertThat(config.get("type").toString()).contains("object").contains("null").doesNotContain("string");
+        assertThat(schemas.at("/WorkflowArtifactStep/properties/stepOrder/maximum").asInt()).isEqualTo(32767);
+        assertThat(schemas.at("/WorkflowArtifact/properties/dataStore/items/$ref").asText())
+                .endsWith("/WorkflowArtifactDataEntry");
+        assertThat(schemas.at("/WorkflowArtifact/required").toString()).doesNotContain("dataStore");
+        assertThat(schemas.at("/WorkflowArtifactDataEntry/required").toString()).contains("key", "dataType", "value");
+    }
+
+    @Test
     void theOAuthErrorAnswersAreTypedAsTheOAuthErrorObject() throws IOException {
         JsonNode paths = liveDocument().get("paths");
         String[][] errorAnswers = {

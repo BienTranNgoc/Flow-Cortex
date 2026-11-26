@@ -1,7 +1,9 @@
 package com.flowcortex.support.web;
 
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.config.SupportProperties;
+import com.flowcortex.support.config.SupportSettingKeys;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,8 +21,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * The Help Center kill switches on the member and guest routes ({@code /api/v1/support/**}): off
- * answers 503 {@code support-disabled}, and with the assistant switch off a question answers 503
+ * The Help Center kill switches on the member and guest routes ({@code /api/v1/support/**}): the
+ * {@code support.help_center.enabled} key, read per request, off answers 503 {@code support-disabled}
+ * (a degraded read counts as off), and with the assistant switch off a question answers 503
  * {@code assistant-disabled} while the conversation history stays readable, as under the console
  * switch. The admin routes live elsewhere and stay up. Runs before the security chain, so a
  * switched-off route answers 503 whoever calls it.
@@ -36,11 +39,13 @@ class SupportSwitchFilter extends OncePerRequestFilter {
                     .matcher(HttpMethod.POST, "/api/v1/support/assistant/guest/messages"));
 
     private final SupportProperties properties;
+    private final Settings settings;
     private final HandlerExceptionResolver exceptionResolver;
 
-    SupportSwitchFilter(SupportProperties properties,
+    SupportSwitchFilter(SupportProperties properties, Settings settings,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
         this.properties = properties;
+        this.settings = settings;
         this.exceptionResolver = exceptionResolver;
     }
 
@@ -52,7 +57,7 @@ class SupportSwitchFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (!properties.enabled()) {
+        if (!settings.get(SupportSettingKeys.HELP_CENTER_ENABLED).effective()) {
             refuse(request, response, "support-disabled", new LocalizedMessage("support.disabled"));
             return;
         }

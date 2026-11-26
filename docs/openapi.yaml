@@ -997,6 +997,35 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/rbac/runtime:
+    get:
+      tags:
+      - admin-rbac-runtime-controller
+      operationId: getRbacRuntime
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RbacRuntime"
+    put:
+      tags:
+      - admin-rbac-runtime-controller
+      operationId: updateRbacRuntime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RbacRuntimeUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RbacRuntime"
   /api/v1/admin/payment-settings/{key}:
     put:
       tags:
@@ -2291,6 +2320,122 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/trash/restore:
+    post:
+      tags:
+      - trash-actions-controller
+      summary: Restore items from the Trash
+      operationId: restoreTrashItems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashItemsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashBulkResult"
+        "400":
+          description: validation-failed (errors.items)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (a single item that is not in the caller's Trash)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: conflict (a single item the owning module cannot restore now)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/trash/purge:
+    post:
+      tags:
+      - trash-actions-controller
+      summary: Delete items from the Trash for good
+      operationId: purgeTrashItems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashItemsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashBulkResult"
+        "400":
+          description: validation-failed (errors.items)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (a single item that is not in the caller's Trash)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: conflict (a single item the owning module cannot delete now)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/trash/empty:
+    post:
+      tags:
+      - trash-actions-controller
+      summary: "Delete the caller's Trash for good, at most 500 entries a call"
+      operationId: emptyTrash
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashEmptyRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashEmptyResult"
+        "400":
+          description: validation-failed (errors.next)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/uploads:
     post:
       tags:
@@ -3633,6 +3778,16 @@ paths:
       tags:
       - notifications-controller
       operationId: markAllNotificationsRead
+      parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       responses:
         "200":
           description: OK
@@ -3640,6 +3795,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReadAllResult"
+        "400":
+          description: audience is not member or admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/step-up:
     post:
       tags:
@@ -3724,6 +3885,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SendCodeResponse"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone/change/verify:
     post:
       tags:
@@ -3804,6 +3971,12 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
           content:
             application/problem+json:
               schema:
@@ -7329,6 +7502,71 @@ paths:
               schema:
                 type: string
                 format: byte
+  /api/v1/trash:
+    get:
+      tags:
+      - trash-list-controller
+      summary: List the caller's Trash with the badge counts
+      operationId: listTrash
+      parameters:
+      - name: type
+        in: query
+        description: Only entries of this type
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        description: "Search text, at most 100 characters; matches names without case\
+          \ or diacritics"
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: recent
+          enum:
+          - recent
+          - expiring
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashList"
+        "400":
+          description: "validation-failed (errors names type, q, sort, page or size)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/settings:
     get:
       tags:
@@ -8070,6 +8308,15 @@ paths:
       - notifications-controller
       operationId: listNotifications
       parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       - name: filter
         in: query
         required: false
@@ -8093,7 +8340,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationPage"
         "400":
-          description: "filter, page or size out of range"
+          description: "audience, filter, page or size out of range"
           content:
             application/problem+json:
               schema:
@@ -8103,6 +8350,16 @@ paths:
       tags:
       - notifications-controller
       operationId: getUnreadNotificationCount
+      parameters:
+      - name: audience
+        in: query
+        required: false
+        schema:
+          type: string
+          default: member
+          enum:
+          - member
+          - admin
       responses:
         "200":
           description: OK
@@ -8110,6 +8367,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnreadCount"
+        "400":
+          description: audience is not member or admin
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/me/phone:
     get:
       tags:
@@ -8353,6 +8616,19 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+      security: []
+  /api/v1/content/legal-index:
+    get:
+      tags:
+      - public-legal-index-controller
+      operationId: getLegalIndex
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LegalIndex"
       security: []
   /api/v1/content/documents/{slug}:
     get:
@@ -8976,6 +9252,14 @@ paths:
         schema:
           type: string
           maxLength: 100
+      - name: sla
+        in: query
+        description: Keeps only due-soon and overdue requests
+        required: false
+        schema:
+          type: string
+          enum:
+          - at_risk
       - name: sort
         in: query
         required: false
@@ -9003,7 +9287,7 @@ paths:
                 $ref: "#/components/schemas/AdminSupportRequestPage"
         "400":
           description: "validation-failed (errors.status, errors.type, errors.assignee,\
-            \ errors.created, errors.q, errors.sort, errors.page)"
+            \ errors.created, errors.q, errors.sla, errors.sort, errors.page)"
           content:
             application/problem+json:
               schema:
@@ -9029,6 +9313,70 @@ paths:
                 $ref: "#/components/schemas/AdminSupportRequestDetail"
         "404":
           description: request-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/support/requests/sla-summary:
+    get:
+      tags:
+      - admin-request-controller
+      operationId: getAdminSupportSlaSummary
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - new
+          - in_progress
+          - waiting_member
+          - resolved
+          - closed
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - account
+          - credit
+          - workflow
+          - technical
+          - other
+      - name: assignee
+        in: query
+        description: "me, unassigned or an account id"
+        required: false
+        schema:
+          type: string
+      - name: created
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - today
+          - 7d
+          - 30d
+          - older
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSupportSlaSummary"
+        "400":
+          description: "validation-failed (errors.status, errors.type, errors.assignee,\
+            \ errors.created, errors.q)"
           content:
             application/problem+json:
               schema:
@@ -9442,6 +9790,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/features:
+    get:
+      tags:
+      - admin-features-controller
+      operationId: listAdminFeatures
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeatureList"
   /api/v1/admin/content/documents:
     get:
       tags:
@@ -10360,6 +10720,8 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         createdAt:
           type: string
           format: date-time
@@ -10727,6 +11089,46 @@ components:
       - staff
       - superAdmin
       - system
+    RbacRuntimeUpdate:
+      type: object
+      properties:
+        mutationsEnabled:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 2000
+          minLength: 0
+      required:
+      - mutationsEnabled
+    RbacRuntime:
+      type: object
+      properties:
+        mutationsEnabled:
+          type: boolean
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        configuredValue:
+          type:
+          - boolean
+          - "null"
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - mutationsEnabled
+      - source
     PaymentSettingUpdate:
       type: object
       properties:
@@ -11762,6 +12164,100 @@ components:
       - name
       - password
       - role
+    TrashItemKey:
+      type: object
+      properties:
+        type:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+      required:
+      - id
+      - type
+    TrashItemsRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItemKey"
+          maxItems: 100
+          minItems: 1
+      required:
+      - items
+    TrashBulkResult:
+      type: object
+      properties:
+        succeeded:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItemKey"
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashSkippedItem"
+      required:
+      - skipped
+      - succeeded
+    TrashSkippedItem:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+        reason:
+          type: string
+          enum:
+          - notFound
+          - conflict
+          - blocked
+          - failed
+        message:
+          type: string
+      required:
+      - id
+      - reason
+      - type
+    TrashEmptyRequest:
+      type: object
+      properties:
+        next:
+          type:
+          - string
+          - "null"
+          description: The next of the previous answer; absent starts from the first
+            entry
+    TrashEmptyResult:
+      type: object
+      properties:
+        purged:
+          type: integer
+          format: int64
+        blocked:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        remaining:
+          type: integer
+          format: int64
+          description: Entries still in the Trash after this call
+        next:
+          type:
+          - string
+          - "null"
+          description: Send back as next to continue; null when every entry has been
+            examined
+      required:
+      - blocked
+      - failed
+      - next
+      - purged
+      - remaining
     SupportUploadRequest:
       type: object
       properties:
@@ -11909,6 +12405,25 @@ components:
           maxLength: 1000
       required:
       - question
+    SupportAssistantHandoff:
+      type: object
+      properties:
+        topic:
+          type:
+          - string
+          - "null"
+          enum:
+          - money
+          - security
+          - personal_data
+          - legal
+          - violation
+        subject:
+          type: string
+        description:
+          type: string
+      required:
+      - topic
     SupportAssistantQuota:
       type: object
       properties:
@@ -11950,10 +12465,14 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         sources:
           type: array
           items:
             $ref: "#/components/schemas/SupportAssistantSource"
+        handoff:
+          $ref: "#/components/schemas/SupportAssistantHandoff"
       required:
       - outcome
       - role
@@ -13256,17 +13775,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/WorkflowArtifactStep"
+        dataStore:
+          type: array
+          description: The workflow's data-store entries; absent when it has none
+          items:
+            $ref: "#/components/schemas/WorkflowArtifactDataEntry"
       required:
       - exportedAt
       - formatVersion
       - steps
       - workflow
+    WorkflowArtifactDataEntry:
+      type: object
+      properties:
+        key:
+          type: string
+        dataType:
+          type: string
+        value:
+          description: Any JSON value
+      required:
+      - dataType
+      - key
+      - value
     WorkflowArtifactStep:
       type: object
       properties:
         stepOrder:
           type: integer
           format: int32
+          maximum: 32767
           minimum: 1
         name:
           type:
@@ -13284,8 +13822,9 @@ components:
           maxLength: 255
         config:
           type:
-          - string
+          - object
           - "null"
+          additionalProperties: {}
       required:
       - config
       - inputRef
@@ -14482,6 +15021,70 @@ components:
         newLast7Days:
           type: integer
           format: int64
+    TrashItem:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The owning module's item type key
+        id:
+          type: string
+          description: The item's id within its type
+        name:
+          type: string
+        location:
+          type: string
+          description: Where the item lived before it was deleted
+        deletedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the sweep deletes the item for good
+        remainingDays:
+          type: integer
+          format: int32
+          description: "Whole days to expiresAt, rounded up, never below 0"
+          minimum: 0
+      required:
+      - deletedAt
+      - expiresAt
+      - id
+      - location
+      - name
+      - remainingDays
+      - type
+    TrashList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItem"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+          description: Entries matching type and q
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: "Entries per provided type and under 'all', whatever type,\
+            \ q and paging say"
+      required:
+      - counts
+      - items
+      - page
+      - size
+      - total
     SupportSettings:
       type: object
       properties:
@@ -14653,10 +15256,14 @@ components:
           - answered
           - no_answer
           - blocked
+          - handoff
+          - sign_in
         sources:
           type: array
           items:
             $ref: "#/components/schemas/SupportAssistantSource"
+        handoff:
+          $ref: "#/components/schemas/SupportAssistantHandoff"
         createdAt:
           type: string
           format: date-time
@@ -15540,6 +16147,30 @@ components:
         granted:
           type: integer
           format: int64
+    LegalIndex:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LegalIndexEntry"
+      required:
+      - items
+    LegalIndexEntry:
+      type: object
+      properties:
+        slug:
+          type: string
+          description: "The document slug, e.g. legal-privacy"
+        path:
+          type: string
+          description: "The member page path, e.g. /legal/privacy"
+        label:
+          $ref: "#/components/schemas/LocalizedText"
+      required:
+      - label
+      - path
+      - slug
     ContentDocumentHistoryEntry:
       type: object
       properties:
@@ -16101,14 +16732,34 @@ components:
         lastActivityAt:
           type: string
           format: date-time
+        slaLevel:
+          type: string
+          enum:
+          - ok
+          - due_soon
+          - overdue
+          - paused
       required:
       - createdAt
       - lastActivityAt
       - number
       - requester
+      - slaLevel
       - status
       - subject
       - type
+    AdminSupportSlaSummary:
+      type: object
+      properties:
+        overdue:
+          type: integer
+          format: int64
+        dueSoon:
+          type: integer
+          format: int64
+      required:
+      - dueSoon
+      - overdue
     AdminSupportAssigneeFacet:
       type: object
       properties:
@@ -16383,7 +17034,18 @@ components:
           type: integer
           format: int64
           description: Codes sent in the last 24 hours
+        carrierCredential:
+          type: string
+          description: none when the wired sender holds no carrier credential; reseed_required
+            when its token chain was revoked and needs a new token; unseeded when
+            no token was loaded yet. The token is never returned
+          enum:
+          - none
+          - active
+          - reseed_required
+          - unseeded
       required:
+      - carrierCredential
       - gateEnabled
       - globalSendsPerDay
       - hashSecretConfigured
@@ -16579,6 +17241,29 @@ components:
       - page
       - size
       - total
+    AdminFeature:
+      type: object
+      properties:
+        name:
+          type: string
+        settingKey:
+          type:
+          - string
+          - "null"
+        value:
+          type: boolean
+      required:
+      - name
+      - value
+    AdminFeatureList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFeature"
+      required:
+      - items
     PageViewContentMediaItem:
       type: object
       properties:
@@ -16613,6 +17298,12 @@ components:
             type: string
         publicHistory:
           type: boolean
+        minSections:
+          type: integer
+          format: int32
+        maxSections:
+          type: integer
+          format: int32
         draftVersion:
           type: integer
           format: int32
@@ -16631,6 +17322,8 @@ components:
           format: date-time
       required:
       - draftVersion
+      - maxSections
+      - minSections
       - publicHistory
       - publishedVersion
       - sectionTypes

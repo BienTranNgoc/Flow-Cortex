@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 
 import pytest
 from conftest import FakeConnection, assert_valid, job_body, published, run_consumer, settled
 
 from flowcortex_worker.errors import PermanentError
-from flowcortex_worker.handlers import registry, render_video
+from flowcortex_worker.handlers import registry, render_video, role_suggest
 from flowcortex_worker.roles import RoleError
 
 BROKEN = "flowcortex_worker.handlers.not_installed"
@@ -145,3 +147,22 @@ def test_an_audio_only_worker_loads_just_its_handler() -> None:
     handlers = registry.load_handlers(frozenset({"separate_audio"}))
 
     assert set(handlers) == {"separate_audio"}
+
+
+def test_role_suggest_loads_alone() -> None:
+    handlers = registry.load_handlers(frozenset({"role_suggest"}))
+
+    assert set(handlers) == {"role_suggest"}
+    assert handlers["role_suggest"] is role_suggest.handle
+
+
+def test_the_role_suggest_module_imports_without_the_detector_libraries() -> None:
+    check = (
+        "import flowcortex_worker.handlers.role_suggest, sys; "
+        "heavy = [m for m in ('torch', 'transformers') if m in sys.modules]; "
+        "sys.exit(f'imported {heavy}' if heavy else 0)"
+    )
+
+    completed = subprocess.run([sys.executable, "-c", check], capture_output=True, text=True)
+
+    assert completed.returncode == 0, completed.stderr

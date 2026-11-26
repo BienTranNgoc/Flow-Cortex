@@ -30,6 +30,7 @@ import {
   useSubmitKey,
   useUploadedIds,
 } from './useAdminRequests';
+import { useRequestStream } from './useRequestStream';
 
 const REPLY_STATUSES = Object.values(AdminSupportRequestReplyStatus);
 /** One broken image reads the request again at most this often, so an object that never loads cannot loop. */
@@ -47,6 +48,7 @@ export function RequestDetailPage() {
   const title = t('support.requests.detailTitle', { number });
   usePageTitle(title);
   const detail = useRequestDetail(number);
+  useRequestStream(number);
   const lastImageRetry = useRef(0);
 
   const valid = Number.isSafeInteger(number) && number > 0;
@@ -250,7 +252,7 @@ function Conversation({ request }: Readonly<{ request: AdminSupportRequestDetail
 function ConversationMessage({ message }: Readonly<{ message: SupportConversationMessage }>) {
   const { t } = useTranslation();
   const outcome =
-    message.outcome === 'no_answer' || message.outcome === 'blocked'
+    message.outcome && message.outcome !== 'answered'
       ? t(`support.requests.outcome.${message.outcome}`)
       : undefined;
   return (
