@@ -17,6 +17,7 @@ import com.flowcortex.workflow.domain.VisibilityChangeTrigger;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowAccessLogEntry;
 import com.flowcortex.workflow.domain.WorkflowLinkGrant;
+import com.flowcortex.workflow.domain.WorkflowModerationStatus;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.domain.WorkflowVisibilityAuditEntry;
 import com.flowcortex.workflow.infrastructure.WorkflowAccessLogRepository;
@@ -164,6 +165,7 @@ public class WorkflowSharingService {
             if (workflow.getOwnerId().equals(callerId)) {
                 return null;
             }
+            requireUnmoderated(workflow, workflowId);
             if (callerId != null) {
                 grantRepository.admit(workflow.getId(), callerId, key, now);
             }
@@ -182,6 +184,7 @@ public class WorkflowSharingService {
     public SharedWorkflowView sharedView(UUID callerIdOrNull, String key, ShareOrigin origin) {
         OpenedLink opened = readOnly.execute(status -> {
             Workflow workflow = resolveKey(null, key, clock.instant());
+            requireUnmoderated(workflow, "link");
             String authorName = userDirectory.findNamesByIds(List.of(workflow.getOwnerId()))
                     .get(workflow.getOwnerId());
             List<SharedWorkflowView.Step> steps = servedDefinitions.stepsFor(workflow, callerIdOrNull).stream()
@@ -267,6 +270,16 @@ public class WorkflowSharingService {
             throw new LocalizedStatusException(HttpStatus.GONE, new LocalizedMessage("workflow.share.keyExpired"));
         }
         return workflow;
+    }
+
+    /**
+     * Kept out of {@link #resolveKey} because {@link #admitByKey} resolves the key before it recognizes the owner,
+     * who must still be admitted to a workflow staff hid.
+     */
+    private static void requireUnmoderated(Workflow workflow, Object subject) {
+        if (workflow.getModerationStatus() != WorkflowModerationStatus.VISIBLE) {
+            throw new NotFoundException(new LocalizedMessage("workflow.notFound", subject));
+        }
     }
 
     private static boolean keyIsLive(Workflow workflow, Instant now) {

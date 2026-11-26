@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.11.11.280`)
+## Current schema (`V2026.09.22.001` – `V2026.11.24.030`)
 
 ```mermaid
 erDiagram
@@ -28,6 +28,9 @@ erDiagram
   workflow_review ||--o{ workflow_review_image : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_helpful : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_report : "review_id, ON DELETE CASCADE"
+  workflow ||--o{ workflow_report : "workflow_id, ON DELETE CASCADE"
+  workflow ||--o{ workflow_moderation_action : "workflow_id, ON DELETE CASCADE"
+  workflow_report ||--o{ workflow_moderation_action : "report_id, ON DELETE SET NULL"
   media_asset ||--o| space_asset : "media_asset_id, UNIQUE (no FK)"
 
   app_user {
@@ -47,6 +50,7 @@ erDiagram
     uuid owner_id
     varchar name
     boolean is_shared "true = listed to every authenticated user"
+    varchar moderation_status "visible | hidden | removed, default visible; only a visible workflow reaches non-owners"
     timestamptz created_at
     timestamptz updated_at
   }
@@ -245,6 +249,31 @@ erDiagram
     varchar details "up to 1000"
     timestamptz created_at
   }
+  workflow_report {
+    uuid id PK
+    uuid workflow_id FK "UNIQUE (workflow_id, reporter_id) — one report per member"
+    uuid reporter_id "no FK"
+    varchar reason "spam | harmful | scam | inappropriate | copyright | pii_data_leak | misleading | other"
+    varchar details "up to 1000"
+    varchar status "pending | dismissed | resolved | hidden | removed"
+    varchar resolution "dismiss | resolve | hide | remove | restore; NULL while pending"
+    uuid reviewer_id "no FK; NULL exactly while pending, with reviewed_at and resolution"
+    timestamptz reviewed_at
+    varchar internal_note "staff only, up to 1000"
+    timestamptz created_at
+  }
+  workflow_moderation_action {
+    uuid id PK
+    uuid workflow_id FK
+    uuid report_id FK "NULL for a direct action, and after the report is deleted"
+    varchar source "report | direct"
+    varchar action "dismiss | resolve | hide | remove | restore; a direct action is hide, remove or restore"
+    uuid moderator_id "no FK"
+    varchar reason "required (non-blank) for hide, remove and restore"
+    varchar internal_note "up to 1000"
+    varchar moderation_status "the workflow status after the action"
+    timestamptz created_at
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -317,7 +346,11 @@ expiry sweep), `idx_script_revision_run`,
 `idx_event_publication_completion_date`,
 `idx_workflow_bookmark_page` (`user_id, created_at DESC, workflow_id DESC` — the saved list),
 `idx_workflow_review_newest` (`workflow_id, created_at DESC, id DESC`), `idx_workflow_review_helpful`
-(`workflow_id, helpful_count DESC, created_at DESC, id DESC`).
+(`workflow_id, helpful_count DESC, created_at DESC, id DESC`),
+`idx_workflow_report_queue` (`created_at DESC, id DESC` — the report queue), `idx_workflow_report_status_queue`
+(`status, created_at DESC, id DESC` — the queue filtered by status), `idx_workflow_report_reporter`
+(`reporter_id, created_at DESC` — the per-reporter hourly bound), `idx_wma_workflow_history`
+(`workflow_id, created_at DESC, id DESC` — a workflow's moderation history).
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is

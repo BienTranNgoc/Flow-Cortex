@@ -75,7 +75,7 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
                 Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
-                Permission.WORKFLOW_WORKFLOW_VIEW));
+                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.MODERATION_REPORT_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE,
@@ -86,7 +86,8 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY,
                 Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
                 Permission.AI_PROVIDER_VIEW, Permission.AI_PROVIDER_UPDATE, Permission.WORKFLOW_RUN_EXPORT,
-                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT));
+                Permission.WORKFLOW_WORKFLOW_VIEW, Permission.WORKFLOW_WORKFLOW_EXPORT,
+                Permission.MODERATION_CONTENT_HIDE));
 
         Integer workflowManageHolders = jdbc.queryForObject(
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
@@ -120,6 +121,21 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         assertThat(keysOf("CONTENT_EDITOR")).doesNotContain(export);
         assertThat(keysOf("PLATFORM_OPERATOR")).doesNotContain(export);
         assertThat(keysOf("ADMIN")).isEmpty();
+    }
+
+    @Test
+    void theModerationKeysAreSeededForStaffAndNotSuperAdminOnly() {
+        Set<String> moderationKeys = keys(Permission.MODERATION_REPORT_VIEW, Permission.MODERATION_REPORT_RESOLVE,
+                Permission.MODERATION_CONTENT_HIDE);
+
+        assertThat(jdbc.queryForList("SELECT key FROM permission WHERE module = 'moderation' AND NOT super_admin_only",
+                String.class)).containsExactlyInAnyOrderElementsOf(moderationKeys);
+        assertThat(keysOf("OPERATION_MANAGER")).containsAll(moderationKeys);
+        assertThat(keysOf("CUSTOMER_SUPPORT")).contains(Permission.MODERATION_REPORT_VIEW.key())
+                .doesNotContain(Permission.MODERATION_REPORT_RESOLVE.key(), Permission.MODERATION_CONTENT_HIDE.key());
+        assertThat(keysOf("PLATFORM_OPERATOR")).contains(Permission.MODERATION_CONTENT_HIDE.key())
+                .doesNotContain(Permission.MODERATION_REPORT_VIEW.key(), Permission.MODERATION_REPORT_RESOLVE.key());
+        assertThat(keysOf("CONTENT_EDITOR")).doesNotContainAnyElementsOf(moderationKeys);
     }
 
     @Test
