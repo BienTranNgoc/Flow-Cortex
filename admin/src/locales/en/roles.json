@@ -109,7 +109,8 @@
       "platform": "Platform",
       "system": "System",
       "ai": "AI",
-      "payment": "Payments"
+      "payment": "Payments",
+      "moderation": "Moderation"
     },
     "features": {
       "user": {
@@ -141,6 +142,10 @@
       },
       "payment": {
         "setting": "Payment settings"
+      },
+      "moderation": {
+        "report": "Workflow reports",
+        "content": "Workflow content"
       }
     },
     "actions": {
@@ -222,6 +227,15 @@
         "setting": {
           "view": "View payment settings",
           "update": "Change payment settings"
+        }
+      },
+      "moderation": {
+        "report": {
+          "view": "View workflow reports",
+          "resolve": "Resolve workflow reports"
+        },
+        "content": {
+          "hide": "Hide or remove workflows"
         }
       }
     }

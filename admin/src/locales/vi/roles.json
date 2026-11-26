@@ -109,7 +109,8 @@
       "platform": "Nền tảng",
       "system": "Hệ thống",
       "ai": "AI",
-      "payment": "Thanh toán"
+      "payment": "Thanh toán",
+      "moderation": "Kiểm duyệt"
     },
     "features": {
       "user": {
@@ -141,6 +142,10 @@
       },
       "payment": {
         "setting": "Cài đặt thanh toán"
+      },
+      "moderation": {
+        "report": "Báo cáo quy trình",
+        "content": "Nội dung quy trình"
       }
     },
     "actions": {
@@ -222,6 +227,15 @@
         "setting": {
           "view": "Xem cài đặt thanh toán",
           "update": "Đổi cài đặt thanh toán"
+        }
+      },
+      "moderation": {
+        "report": {
+          "view": "Xem báo cáo quy trình",
+          "resolve": "Xử lý báo cáo quy trình"
+        },
+        "content": {
+          "hide": "Ẩn hoặc gỡ quy trình"
         }
       }
     }

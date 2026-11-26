@@ -9,6 +9,7 @@ import {
   Cube,
   DeviceMobile,
   FileText,
+  Flag,
   GearSix,
   Headset,
   Images,
@@ -78,6 +79,12 @@ export const NAV: NavGroup[] = [
         key: 'workflow.workflow.view',
       },
       { label: 'common.shell.nav.items.runs', path: '/runs', icon: Play, key: 'workflow.run.view' },
+      {
+        label: 'common.shell.nav.items.workflowReports',
+        path: '/workflow-reports',
+        icon: Flag,
+        key: 'moderation.report.view',
+      },
       {
         label: 'common.shell.nav.items.approvals',
         path: '/approvals',
