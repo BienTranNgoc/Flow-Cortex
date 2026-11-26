@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 from ..assembly.compose import EVEN_CROP, BackgroundSource, audio_graph
 from ..assembly.duration import plan, resolve_policy
@@ -17,6 +16,7 @@ from ..runtime import ProcessRunner
 from . import HandlerOutcome, OutputFile
 from ._assembly_io import (
     ceil_ms,
+    flag_param,
     has_stream,
     input_args,
     input_seconds,
@@ -47,7 +47,7 @@ def handle(
 ) -> HandlerOutcome:
     picture_key = _check_keys(inputs)
     policy = resolve_policy(job.params.get("durationPolicy"))
-    use_video_audio = _flag(job.params, "videoAudioAsBackground")
+    use_video_audio = flag_param(job.params, "videoAudioAsBackground")
 
     picture = inputs[picture_key]
     voice = inputs[VOICE_KEY]
@@ -73,6 +73,12 @@ def handle(
         music = "video"
 
     chosen = plan(video_s, voice_s, policy, keep_longer=False)
+    if ceil_ms(chosen.target) > LIMIT_SECONDS * 1000:
+        raise PermanentError(
+            "duration_exceeded",
+            f"input '{VOICE_KEY}' would make the output longer than the limit of "
+            f"{LIMIT_SECONDS} seconds",
+        )
     if chosen.mismatch:
         log.warning(
             "the voice and the picture differ in length",
@@ -127,17 +133,6 @@ def _check_keys(inputs: Mapping[str, Path]) -> str:
     raise PermanentError(
         "contract_violation", f"the job needs an input '{VIDEO_KEY}' or '{UPLOAD_KEY}'"
     )
-
-
-def _flag(params: Mapping[str, Any], name: str) -> bool:
-    value = params.get(name)
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        raise PermanentError(
-            "contract_violation", f"param '{name}' must be true or false (got {value!r})"
-        )
-    return value
 
 
 def _gains(

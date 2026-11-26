@@ -295,6 +295,33 @@ def test_twenty_clips_of_30_seconds_are_at_the_limit_and_join(tmp_path: Path, bu
     assert len(runner.normalised()) == 20
 
 
+@pytest.mark.parametrize("policy", ["match_audio", "pad"])
+def test_a_narration_that_would_stretch_the_film_past_ten_minutes_is_refused_before_normalising(
+    tmp_path: Path, build: Build, policy: str
+) -> None:
+    inputs = staged(tmp_path, "clip_1", "clip_2", "narration")
+    runner = build(clips_for(inputs, narration=Clip(36_000.0, video=False)))
+
+    with pytest.raises(PermanentError) as failure:
+        concat_video.handle(job_with(durationPolicy=policy), inputs, runner)
+
+    assert failure.value.code == "duration_exceeded"
+    assert "600" in failure.value.message
+    assert runner.stages() == []
+
+
+def test_a_long_narration_under_match_video_is_cut_to_the_film_not_refused(
+    tmp_path: Path, build: Build
+) -> None:
+    inputs = staged(tmp_path, "clip_1", "clip_2", "narration")
+    runner = build(clips_for(inputs, narration=Clip(36_000.0, video=False)))
+
+    concat_video.handle(job_with(durationPolicy="match_video"), inputs, runner)
+
+    [overlay] = runner.overlays()
+    assert flag_value(overlay, "-t") == "12.000"
+
+
 # --- normalising --------------------------------------------------------------------------
 
 

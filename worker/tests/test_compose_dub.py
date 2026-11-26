@@ -246,6 +246,34 @@ def test_a_picture_of_exactly_ten_minutes_is_accepted(tmp_path: Path, build: Bui
     assert len(runner.encodes()) == 1
 
 
+@pytest.mark.parametrize("policy", ["match_audio", "pad"])
+def test_a_voice_that_would_stretch_the_output_past_ten_minutes_is_refused_before_any_ffmpeg(
+    tmp_path: Path, build: Build, policy: str
+) -> None:
+    inputs = staged(tmp_path, "media", "voice", "background")
+    runner = build(media_for(inputs, voice=Media(video=False, seconds=36_000.0)))
+
+    with pytest.raises(PermanentError) as failure:
+        compose_dub.handle(job_with(durationPolicy=policy), inputs, runner)
+
+    assert failure.value.code == "duration_exceeded"
+    assert "600" in failure.value.message
+    assert runner.measures() == []
+    assert runner.encodes() == []
+
+
+def test_a_long_voice_under_match_video_is_cut_to_the_picture_not_refused(
+    tmp_path: Path, build: Build
+) -> None:
+    inputs = staged(tmp_path, "media", "voice")
+    runner = build(media_for(inputs, voice=Media(video=False, seconds=36_000.0)))
+
+    compose_dub.handle(job_with(durationPolicy="match_video"), inputs, runner)
+
+    [encode] = runner.encodes()
+    assert encode[encode.index("-t") + 1] == "10.000"
+
+
 @pytest.mark.parametrize("key", ["voice", "background", "effects"])
 def test_an_audio_input_without_audio_is_named_and_no_encode_runs(
     tmp_path: Path, build: Build, key: str

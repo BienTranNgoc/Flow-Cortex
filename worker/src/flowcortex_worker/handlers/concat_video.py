@@ -15,6 +15,7 @@ from . import HandlerOutcome, OutputFile
 from ._assembly_io import (
     ceil_ms,
     duration_seconds,
+    flag_param,
     has_stream,
     input_args,
     input_seconds,
@@ -45,7 +46,7 @@ def handle(
 ) -> HandlerOutcome:
     ordered, roles = numbered(inputs, PREFIX, MIN_CLIPS, MAX_CLIPS, extra=(NARRATION_KEY,))
     frame = _frame(job.params)
-    drop_audio = _flag(job.params, "dropAudio")
+    drop_audio = flag_param(job.params, "dropAudio")
     policy = resolve_policy(job.params.get("durationPolicy"))
     # A muted join wins over a narration: the narration is neither read nor probed.
     narration = None if drop_audio else roles.get(NARRATION_KEY)
@@ -67,6 +68,13 @@ def handle(
         narration_seconds = input_seconds(
             NARRATION_KEY, narration, processes, "audio_extraction_failed"
         )
+        planned = plan(total_seconds, narration_seconds, policy, keep_longer=True)
+        if ceil_ms(planned.target) > LIMIT_SECONDS * 1000:
+            raise PermanentError(
+                "duration_exceeded",
+                f"input '{NARRATION_KEY}' would make the film longer than the limit of "
+                f"{LIMIT_SECONDS} seconds",
+            )
 
     scratch = processes.scratch_dir()
     hide = mask_dir([*ordered, *([narration] if narration is not None else [])], scratch)
@@ -125,17 +133,6 @@ def _frame(params: Mapping[str, Any]) -> tuple[int, int]:
             f"param 'aspectRatio' must be one of {', '.join(ASPECT_DIMS)} (got {value!r})",
         )
     return ASPECT_DIMS[value]
-
-
-def _flag(params: Mapping[str, Any], name: str) -> bool:
-    value = params.get(name)
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        raise PermanentError(
-            "contract_violation", f"param '{name}' must be true or false (got {value!r})"
-        )
-    return value
 
 
 def _has_audio(key: str, path: Path, processes: ProcessRunner) -> bool:

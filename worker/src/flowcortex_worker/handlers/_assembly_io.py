@@ -6,15 +6,28 @@ import math
 import os
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from ..errors import ErrorCode, PermanentError
 from ..runtime import ProcessRunner
 from ._audio_input import _run_tool, last_line
 
 _INTEGRATED = re.compile(r"^\s*I:\s*(-?\d+(?:\.\d+)?) LUFS", re.MULTILINE)
+
+
+def flag_param(params: Mapping[str, Any], name: str) -> bool:
+    """A boolean job param: absent is false, anything but true or false is a
+    `contract_violation` naming it."""
+    value = params.get(name)
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        raise PermanentError(
+            "contract_violation", f"param '{name}' must be true or false (got {value!r})"
+        )
+    return value
 
 
 def input_args(path: Path) -> tuple[str, ...]:
