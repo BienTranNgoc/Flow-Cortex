@@ -10413,6 +10413,37 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/topup-packages:
+    get:
+      tags:
+      - catalogue-controller
+      summary: List the top-up packages on sale
+      description: "Anyone may read it. Packages by position, then price."
+      operationId: listTopupPackages
+      responses:
+        "200":
+          description: The top-up packages on sale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopupPackageListResponse"
+      security: []
+  /api/v1/billing/plans:
+    get:
+      tags:
+      - catalogue-controller
+      summary: List the plans on sale
+      description: "Anyone may read it. Tiers by position, each with the cycles it\
+        \ is sold on."
+      operationId: listBillingPlans
+      responses:
+        "200":
+          description: The tiers on sale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanListResponse"
+      security: []
   /api/v1/batches:
     get:
       tags:
@@ -19287,6 +19318,145 @@ components:
       - at
       - code
       - kind
+    TopupPackageItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        nameEn:
+          type:
+          - string
+          - "null"
+        description:
+          type:
+          - string
+          - "null"
+        descriptionEn:
+          type:
+          - string
+          - "null"
+        eyebrow:
+          type:
+          - string
+          - "null"
+        eyebrowEn:
+          type:
+          - string
+          - "null"
+        priceVnd:
+          type: integer
+          format: int64
+        credits:
+          type: integer
+          format: int64
+        groupKey:
+          type:
+          - string
+          - "null"
+        sortOrder:
+          type: integer
+          format: int32
+      required:
+      - credits
+      - description
+      - descriptionEn
+      - eyebrow
+      - eyebrowEn
+      - groupKey
+      - id
+      - name
+      - nameEn
+      - priceVnd
+      - sortOrder
+    TopupPackageListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopupPackageItem"
+      required:
+      - data
+    PlanCycle:
+      type: object
+      properties:
+        billingCycle:
+          type: string
+          enum:
+          - monthly
+          - yearly
+        priceVnd:
+          type: integer
+          format: int64
+        includedCreditsPerMonth:
+          type: integer
+          format: int64
+      required:
+      - billingCycle
+      - includedCreditsPerMonth
+      - priceVnd
+    PlanItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        nameEn:
+          type:
+          - string
+          - "null"
+        taglineVi:
+          type:
+          - string
+          - "null"
+        taglineEn:
+          type:
+          - string
+          - "null"
+        marketingFeatures:
+          $ref: "#/components/schemas/PlanMarketingFeatures"
+        isPopular:
+          type: boolean
+        cycles:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanCycle"
+      required:
+      - cycles
+      - id
+      - isPopular
+      - marketingFeatures
+      - name
+      - nameEn
+      - taglineEn
+      - taglineVi
+    PlanListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanItem"
+      required:
+      - data
+    PlanMarketingFeatures:
+      type: object
+      properties:
+        vi:
+          type: array
+          items:
+            type: string
+        en:
+          type: array
+          items:
+            type: string
+      required:
+      - en
+      - vi
     PageViewBatchResponse:
       type: object
       properties:
