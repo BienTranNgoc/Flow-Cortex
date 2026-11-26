@@ -4371,6 +4371,104 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/entities:
+    get:
+      tags:
+      - entities-controller
+      operationId: listEntities
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: tag
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityListResponse"
+    post:
+      tags:
+      - entities-controller
+      operationId: createEntity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntityRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResponse"
+  /api/v1/entities/{id}/versions/{n}/restore:
+    post:
+      tags:
+      - entity-versions-controller
+      operationId: restoreEntityVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: "n"
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreEntityRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityRestoreResponse"
   /api/v1/email-links/{token}/unsubscribe:
     post:
       tags:
@@ -6817,6 +6915,60 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/entities/{id}:
+    get:
+      tags:
+      - entities-controller
+      operationId: getEntity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResponse"
+    delete:
+      tags:
+      - entities-controller
+      operationId: deleteEntity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - entities-controller
+      operationId: updateEntity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEntityRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResponse"
   /api/v1/drive/items/{id}:
     get:
       tags:
@@ -8906,6 +9058,188 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeaturesResponse"
       security: []
+  /api/v1/entities/{id}/versions:
+    get:
+      tags:
+      - entity-versions-controller
+      operationId: listEntityVersions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewEntityVersionResponse"
+  /api/v1/entities/{id}/versions/{n}:
+    get:
+      tags:
+      - entity-versions-controller
+      operationId: getEntityVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: "n"
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityVersionDetailResponse"
+  /api/v1/entities/{id}/runs:
+    get:
+      tags:
+      - entity-runs-controller
+      operationId: listEntityRuns
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewEntityRunResponse"
+  /api/v1/entities/tags:
+    get:
+      tags:
+      - entity-suggestions-controller
+      operationId: listEntityTags
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+          maximum: 20
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityTagSuggestionResponse"
+  /api/v1/entities/labels:
+    get:
+      tags:
+      - entity-suggestions-controller
+      operationId: listEntityLabels
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 8
+          maximum: 20
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitySuggestionResponse"
+  /api/v1/entities/categories:
+    get:
+      tags:
+      - entity-suggestions-controller
+      operationId: listEntityCategories
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitySuggestionResponse"
   /api/v1/email-links/{token}:
     get:
       tags:
@@ -13865,6 +14199,220 @@ components:
       required:
       - cancelledAt
       - state
+    CreateEntityRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - brand
+          - product
+          - character
+          - voice
+        name:
+          type: string
+        handle:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartRequest"
+        tags:
+          type: array
+          items:
+            type: string
+        categoryLabel:
+          type: string
+      required:
+      - kind
+      - name
+    EntityPartRequest:
+      type: object
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        role:
+          type: string
+        label:
+          type: string
+      required:
+      - assetId
+      - role
+    EntityPartAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - video
+          - image
+          - audio
+        title:
+          type: string
+        mimeType:
+          type: string
+      required:
+      - id
+      - kind
+      - mimeType
+      - title
+    EntityPartResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+        label:
+          type: string
+        sort:
+          type: integer
+          format: int32
+        asset:
+          $ref: "#/components/schemas/EntityPartAsset"
+      required:
+      - asset
+      - id
+      - role
+      - sort
+    EntityResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - brand
+          - product
+          - character
+          - voice
+        handle:
+          type: string
+        name:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        categoryLabel:
+          type:
+          - string
+          - "null"
+        tags:
+          type: array
+          items:
+            type: string
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartResponse"
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - fields
+      - handle
+      - id
+      - kind
+      - name
+      - parts
+      - tags
+      - updatedAt
+      - version
+    RestoreEntityRequest:
+      type: object
+      properties:
+        baseVersion:
+          type: integer
+          format: int32
+      required:
+      - baseVersion
+    EntityDroppedPart:
+      type: object
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        role:
+          type: string
+        label:
+          type: string
+      required:
+      - assetId
+      - role
+    EntityRestoreResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - brand
+          - product
+          - character
+          - voice
+        handle:
+          type: string
+        name:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        categoryLabel:
+          type:
+          - string
+          - "null"
+        tags:
+          type: array
+          items:
+            type: string
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartResponse"
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        droppedParts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityDroppedPart"
+      required:
+      - createdAt
+      - droppedParts
+      - fields
+      - handle
+      - id
+      - kind
+      - name
+      - parts
+      - tags
+      - updatedAt
+      - version
     EmailLinkUnsubscribed:
       type: object
       properties:
@@ -15069,6 +15617,35 @@ components:
           type: boolean
         marketingEmail:
           type: boolean
+    UpdateEntityRequest:
+      type: object
+      properties:
+        baseVersion:
+          type: integer
+          format: int32
+        kind:
+          type: string
+        name:
+          type: string
+        handle:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartRequest"
+        tags:
+          type: array
+          items:
+            type: string
+        categoryLabel:
+          type:
+          - string
+          - "null"
+      required:
+      - baseVersion
     UpdateDriveItemRequest:
       type: object
       properties:
@@ -16639,6 +17216,222 @@ components:
       - supportAssistant
       - supportWidget
       - uploadContentCheck
+    EntityKindCounts:
+      type: object
+      properties:
+        brand:
+          type: integer
+          format: int64
+        product:
+          type: integer
+          format: int64
+        character:
+          type: integer
+          format: int64
+        voice:
+          type: integer
+          format: int64
+      required:
+      - brand
+      - character
+      - product
+      - voice
+    EntityListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+        counts:
+          $ref: "#/components/schemas/EntityKindCounts"
+      required:
+      - counts
+      - items
+      - page
+      - size
+      - total
+    EntityChangeResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - created
+          - renamed
+          - handleChanged
+          - fieldsChanged
+          - partsChanged
+          - tagsChanged
+          - categoryChanged
+          - restored
+        added:
+          type: array
+          items:
+            type: string
+        removed:
+          type: array
+          items:
+            type: string
+        from:
+          type: integer
+          format: int32
+      required:
+      - code
+    EntityVersionResponse:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityChangeResponse"
+        usedInRuns:
+          type: integer
+          format: int32
+      required:
+      - changes
+      - createdAt
+      - current
+      - usedInRuns
+      - version
+    PageViewEntityVersionResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityVersionResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    EntityVersionDetailResponse:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
+        entity:
+          $ref: "#/components/schemas/EntityResponse"
+      required:
+      - createdAt
+      - current
+      - entity
+      - version
+    EntityRunResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        version:
+          type: integer
+          format: int32
+        completedAt:
+          type: string
+          format: date-time
+      required:
+      - completedAt
+      - runId
+      - version
+    PageViewEntityRunResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRunResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    EntityTagSuggestionItem:
+      type: object
+      properties:
+        tag:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - tag
+    EntityTagSuggestionResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityTagSuggestionItem"
+      required:
+      - items
+    EntitySuggestionItem:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - label
+    EntitySuggestionResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitySuggestionItem"
+      required:
+      - items
     EmailLinkView:
       type: object
       properties:
