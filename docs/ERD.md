@@ -491,7 +491,7 @@ erDiagram
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
 
-## Two-factor sign-in (`V2026.11.24.010`)
+## Two-factor sign-in (`V2026.11.26.610`)
 
 ```mermaid
 erDiagram
