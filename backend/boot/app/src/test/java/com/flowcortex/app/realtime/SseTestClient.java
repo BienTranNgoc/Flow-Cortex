@@ -26,9 +26,9 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
 /** A plain HTTP client for the realtime stream, plus a token minter whose expiry is exact. */
-final class SseTestClient {
+public final class SseTestClient {
 
-    static final Duration WAIT = Duration.ofSeconds(15);
+    public static final Duration WAIT = Duration.ofSeconds(15);
 
     private SseTestClient() {
     }
@@ -46,7 +46,7 @@ final class SseTestClient {
         return encoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
 
-    static Open open(HttpClient http, int port, String query, String token, String lastEventId)
+    public static Open open(HttpClient http, int port, String query, String token, String lastEventId)
             throws IOException, InterruptedException {
         HttpRequest.Builder request = HttpRequest
                 .newBuilder(URI.create("http://localhost:" + port + "/api/v1/realtime/stream" + query))
@@ -61,7 +61,7 @@ final class SseTestClient {
     }
 
     /** One response: its status and headers at once, its lines as they arrive. */
-    static final class Open {
+    public static final class Open {
 
         private final HttpResponse<InputStream> response;
         private final BlockingQueue<String> lines = new LinkedBlockingQueue<>();
@@ -99,29 +99,29 @@ final class SseTestClient {
             return line.substring(0, colon) + ": " + line.substring(colon + 1).stripLeading();
         }
 
-        int status() {
+        public int status() {
             return response.statusCode();
         }
 
-        String header(String name) {
+        public String header(String name) {
             return response.headers().firstValue(name).orElse("");
         }
 
         /** The whole body of a response that is not a stream. */
-        String body() {
+        public String body() {
             Awaitility.await().atMost(WAIT).until(() -> ended);
             return String.join("\n", seen);
         }
 
-        List<String> seen() {
+        public List<String> seen() {
             return seen;
         }
 
-        long count(Predicate<String> wanted) {
+        public long count(Predicate<String> wanted) {
             return seen.stream().filter(wanted).count();
         }
 
-        void await(Predicate<String> wanted) throws InterruptedException {
+        public void await(Predicate<String> wanted) throws InterruptedException {
             long deadline = System.nanoTime() + WAIT.toNanos();
             while (System.nanoTime() < deadline) {
                 String line = lines.poll(200, TimeUnit.MILLISECONDS);
@@ -132,11 +132,11 @@ final class SseTestClient {
             assertThat(seen).as("a wanted line within " + WAIT).anyMatch(wanted);
         }
 
-        void awaitEnd() {
+        public void awaitEnd() {
             Awaitility.await().atMost(WAIT).until(() -> ended);
         }
 
-        void close() {
+        public void close() {
             try {
                 response.body().close();
             } catch (IOException ignored) {

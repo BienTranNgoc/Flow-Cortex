@@ -298,6 +298,10 @@ apply a change with `docker compose up -d backend`.
 - `FLOWCORTEX_SPACES_ENABLED=false` (the default outside compose): the session space
   answers 503 "This feature is turned off"; personal spaces are still provisioned when
   an account is activated, so nothing is lost when it is turned on.
+- `FLOWCORTEX_TRASH_ENABLED=false` (the default, in compose too): every `/api/v1/trash`
+  route answers 503 "This feature is turned off" and the expiry sweep and reminder jobs
+  do nothing; deletes are still recorded, so nothing is lost when it is turned on.
+  Turning it on also needs `FLOWCORTEX_APP_PUBLIC_URL`, or the backend refuses to start.
 
 **Demo switches.** Compose turns all five on; `application.yml` keeps the first four
 off for a bare `bootRun` and any environment that does not set them. Same mechanism

@@ -17,8 +17,15 @@ app.{$DOMAIN} {
 }
 
 admin.{$DOMAIN} {
-	encode zstd gzip
-	reverse_proxy admin:8080
+	@realtime path /api/v1/realtime/*
+	handle @realtime {
+		reverse_proxy admin:8080
+	}
+
+	handle {
+		encode zstd gzip
+		reverse_proxy admin:8080
+	}
 }
 
 media.{$DOMAIN} {
