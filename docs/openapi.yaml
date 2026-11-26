@@ -2211,6 +2211,122 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/trash/restore:
+    post:
+      tags:
+      - trash-actions-controller
+      summary: Restore items from the Trash
+      operationId: restoreTrashItems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashItemsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashBulkResult"
+        "400":
+          description: validation-failed (errors.items)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (a single item that is not in the caller's Trash)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: conflict (a single item the owning module cannot restore now)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/trash/purge:
+    post:
+      tags:
+      - trash-actions-controller
+      summary: Delete items from the Trash for good
+      operationId: purgeTrashItems
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashItemsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashBulkResult"
+        "400":
+          description: validation-failed (errors.items)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: not-found (a single item that is not in the caller's Trash)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: conflict (a single item the owning module cannot delete now)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/trash/empty:
+    post:
+      tags:
+      - trash-actions-controller
+      summary: "Delete the caller's Trash for good, at most 500 entries a call"
+      operationId: emptyTrash
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrashEmptyRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashEmptyResult"
+        "400":
+          description: validation-failed (errors.next)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/uploads:
     post:
       tags:
@@ -7076,6 +7192,71 @@ paths:
               schema:
                 type: string
                 format: byte
+  /api/v1/trash:
+    get:
+      tags:
+      - trash-list-controller
+      summary: List the caller's Trash with the badge counts
+      operationId: listTrash
+      parameters:
+      - name: type
+        in: query
+        description: Only entries of this type
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        description: "Search text, at most 100 characters; matches names without case\
+          \ or diacritics"
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: recent
+          enum:
+          - recent
+          - expiring
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrashList"
+        "400":
+          description: "validation-failed (errors names type, q, sort, page or size)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: the Trash is switched off
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/support/settings:
     get:
       tags:
@@ -11655,6 +11836,100 @@ components:
       - name
       - password
       - role
+    TrashItemKey:
+      type: object
+      properties:
+        type:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        id:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{1,64}$"
+      required:
+      - id
+      - type
+    TrashItemsRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItemKey"
+          maxItems: 100
+          minItems: 1
+      required:
+      - items
+    TrashBulkResult:
+      type: object
+      properties:
+        succeeded:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItemKey"
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashSkippedItem"
+      required:
+      - skipped
+      - succeeded
+    TrashSkippedItem:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+        reason:
+          type: string
+          enum:
+          - notFound
+          - conflict
+          - blocked
+          - failed
+        message:
+          type: string
+      required:
+      - id
+      - reason
+      - type
+    TrashEmptyRequest:
+      type: object
+      properties:
+        next:
+          type:
+          - string
+          - "null"
+          description: The next of the previous answer; absent starts from the first
+            entry
+    TrashEmptyResult:
+      type: object
+      properties:
+        purged:
+          type: integer
+          format: int64
+        blocked:
+          type: integer
+          format: int64
+        failed:
+          type: integer
+          format: int64
+        remaining:
+          type: integer
+          format: int64
+          description: Entries still in the Trash after this call
+        next:
+          type:
+          - string
+          - "null"
+          description: Send back as next to continue; null when every entry has been
+            examined
+      required:
+      - blocked
+      - failed
+      - next
+      - purged
+      - remaining
     SupportUploadRequest:
       type: object
       properties:
@@ -14377,6 +14652,70 @@ components:
         newLast7Days:
           type: integer
           format: int64
+    TrashItem:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The owning module's item type key
+        id:
+          type: string
+          description: The item's id within its type
+        name:
+          type: string
+        location:
+          type: string
+          description: Where the item lived before it was deleted
+        deletedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+          description: When the sweep deletes the item for good
+        remainingDays:
+          type: integer
+          format: int32
+          description: "Whole days to expiresAt, rounded up, never below 0"
+          minimum: 0
+      required:
+      - deletedAt
+      - expiresAt
+      - id
+      - location
+      - name
+      - remainingDays
+      - type
+    TrashList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrashItem"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+          description: Entries matching type and q
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: "Entries per provided type and under 'all', whatever type,\
+            \ q and paging say"
+      required:
+      - counts
+      - items
+      - page
+      - size
+      - total
     SupportSettings:
       type: object
       properties:
