@@ -10444,6 +10444,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/PlanListResponse"
       security: []
+  /api/v1/billing/plan:
+    get:
+      tags:
+      - member-plan-controller
+      summary: Read the plan the member holds
+      description: Free with no period when no paid plan is held; nextPlan is the
+        plan recorded for the next cycle until its period begins.
+      operationId: getMyBillingPlan
+      responses:
+        "200":
+          description: The plan held now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberPlanResponse"
+        "401":
+          description: Not signed in
   /api/v1/batches:
     get:
       tags:
@@ -19457,6 +19474,85 @@ components:
       required:
       - en
       - vi
+    MemberPlanResponse:
+      type: object
+      properties:
+        tierId:
+          type: string
+        name:
+          type: string
+        nameEn:
+          type:
+          - string
+          - "null"
+        held:
+          type: boolean
+        billingCycle:
+          type:
+          - string
+          - "null"
+          enum:
+          - monthly
+          - yearly
+        billingMode:
+          type:
+          - string
+          - "null"
+          enum:
+          - manual
+          - auto_debit
+        startsAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        renewsAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        nextPlan:
+          type: "null"
+          $ref: "#/components/schemas/NextPlan"
+      required:
+      - billingCycle
+      - billingMode
+      - held
+      - name
+      - nameEn
+      - nextPlan
+      - renewsAt
+      - startsAt
+      - tierId
+    NextPlan:
+      type: object
+      properties:
+        tierId:
+          type: string
+        name:
+          type: string
+        nameEn:
+          type:
+          - string
+          - "null"
+        billingCycle:
+          type: string
+          enum:
+          - monthly
+          - yearly
+        startsAt:
+          type: string
+          format: date-time
+        renewsAt:
+          type: string
+          format: date-time
+      required:
+      - billingCycle
+      - name
+      - nameEn
+      - renewsAt
+      - startsAt
+      - tierId
     PageViewBatchResponse:
       type: object
       properties:

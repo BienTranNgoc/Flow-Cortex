@@ -4734,6 +4734,63 @@ export interface PlanListResponse {
   data: PlanItem[];
 }
 
+/**
+ * @nullable
+ */
+export type MemberPlanResponseBillingCycle =
+  (typeof MemberPlanResponseBillingCycle)[keyof typeof MemberPlanResponseBillingCycle] | null;
+
+export const MemberPlanResponseBillingCycle = {
+  monthly: 'monthly',
+  yearly: 'yearly',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MemberPlanResponseBillingMode =
+  (typeof MemberPlanResponseBillingMode)[keyof typeof MemberPlanResponseBillingMode] | null;
+
+export const MemberPlanResponseBillingMode = {
+  manual: 'manual',
+  auto_debit: 'auto_debit',
+} as const;
+
+export type NextPlanBillingCycle = (typeof NextPlanBillingCycle)[keyof typeof NextPlanBillingCycle];
+
+export const NextPlanBillingCycle = {
+  monthly: 'monthly',
+  yearly: 'yearly',
+} as const;
+
+export interface NextPlan {
+  tierId: string;
+  name: string;
+  /** @nullable */
+  nameEn: string | null;
+  billingCycle: NextPlanBillingCycle;
+  startsAt: string;
+  renewsAt: string;
+}
+
+export interface MemberPlanResponse {
+  tierId: string;
+  name: string;
+  /** @nullable */
+  nameEn: string | null;
+  held: boolean;
+  /** @nullable */
+  billingCycle: MemberPlanResponseBillingCycle;
+  /** @nullable */
+  billingMode: MemberPlanResponseBillingMode;
+  /** @nullable */
+  startsAt: string | null;
+  /** @nullable */
+  renewsAt: string | null;
+  /** @nullable */
+  nextPlan: NextPlan;
+}
+
 export interface PageViewBatchResponse {
   items: BatchResponse[];
   page: number;
@@ -22588,6 +22645,43 @@ export const listBillingPlans = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listBillingPlansResponse> => {
   return customFetch<listBillingPlansResponse>(getListBillingPlansUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getMyBillingPlanResponse200 = {
+  data: MemberPlanResponse;
+  status: 200;
+};
+
+export type getMyBillingPlanResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getMyBillingPlanResponseSuccess = getMyBillingPlanResponse200 & {
+  headers: Headers;
+};
+export type getMyBillingPlanResponseError = getMyBillingPlanResponse401 & {
+  headers: Headers;
+};
+
+export type getMyBillingPlanResponse =
+  getMyBillingPlanResponseSuccess | getMyBillingPlanResponseError;
+
+export const getGetMyBillingPlanUrl = () => {
+  return `/api/v1/billing/plan`;
+};
+
+/**
+ * Free with no period when no paid plan is held; nextPlan is the plan recorded for the next cycle until its period begins.
+ * @summary Read the plan the member holds
+ */
+export const getMyBillingPlan = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getMyBillingPlanResponse> => {
+  return customFetch<getMyBillingPlanResponse>(getGetMyBillingPlanUrl(), {
     ...options,
     method: 'GET',
   });
