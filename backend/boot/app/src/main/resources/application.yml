@@ -343,6 +343,10 @@ flowcortex:
   # role checks; /api/v1/users is not affected. Env var + restart, like the workflow one below.
   admin:
     enabled: ${FLOWCORTEX_ADMIN_ENABLED:true}
+  authz:
+    rbac-mutations:
+      # false forces role and permission edits off; unset lets the super admin decide
+      enabled: ${FLOWCORTEX_AUTHZ_RBAC_MUTATIONS_ENABLED:}
   # Public self-registration. Accounts belong to the ADMIN named here, who lists and suspends them
   # under /api/v1/users; empty, unknown, not an ADMIN or not ACTIVE closes registration (403).
   # Each client IP and each email (trimmed, lower-cased) gets `capacity` attempts per `period`,

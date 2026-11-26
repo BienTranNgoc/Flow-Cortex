@@ -997,6 +997,35 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/rbac/runtime:
+    get:
+      tags:
+      - admin-rbac-runtime-controller
+      operationId: getRbacRuntime
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RbacRuntime"
+    put:
+      tags:
+      - admin-rbac-runtime-controller
+      operationId: updateRbacRuntime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RbacRuntimeUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RbacRuntime"
   /api/v1/admin/payment-settings/{key}:
     put:
       tags:
@@ -8987,6 +9016,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewMediaJobResponse"
+  /api/v1/admin/features:
+    get:
+      tags:
+      - admin-features-controller
+      operationId: listAdminFeatures
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminFeatureList"
   /api/v1/admin/content/documents:
     get:
       tags:
@@ -10235,6 +10276,46 @@ components:
       - staff
       - superAdmin
       - system
+    RbacRuntimeUpdate:
+      type: object
+      properties:
+        mutationsEnabled:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 2000
+          minLength: 0
+      required:
+      - mutationsEnabled
+    RbacRuntime:
+      type: object
+      properties:
+        mutationsEnabled:
+          type: boolean
+        source:
+          type: string
+          enum:
+          - STORED
+          - CONFIGURED
+          - DEFAULT
+          - VETOED
+          - DEGRADED
+        configuredValue:
+          type:
+          - boolean
+          - "null"
+        updatedBy:
+          type:
+          - string
+          - "null"
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - mutationsEnabled
+      - source
     PaymentSettingUpdate:
       type: object
       properties:
@@ -15799,6 +15880,29 @@ components:
       - page
       - size
       - total
+    AdminFeature:
+      type: object
+      properties:
+        name:
+          type: string
+        settingKey:
+          type:
+          - string
+          - "null"
+        value:
+          type: boolean
+      required:
+      - name
+      - value
+    AdminFeatureList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFeature"
+      required:
+      - items
     PageViewContentMediaItem:
       type: object
       properties:

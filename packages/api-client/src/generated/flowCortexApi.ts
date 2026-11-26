@@ -599,6 +599,36 @@ export interface RoleResponse {
   accountCount: number;
 }
 
+export interface RbacRuntimeUpdate {
+  mutationsEnabled: boolean;
+  /**
+   * @minLength 0
+   * @maxLength 2000
+   */
+  reason?: string;
+}
+
+export type RbacRuntimeSource = (typeof RbacRuntimeSource)[keyof typeof RbacRuntimeSource];
+
+export const RbacRuntimeSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface RbacRuntime {
+  mutationsEnabled: boolean;
+  source: RbacRuntimeSource;
+  /** @nullable */
+  configuredValue?: boolean | null;
+  /** @nullable */
+  updatedBy?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
 export interface PaymentSettingUpdate {
   value: string | boolean | number;
   /**
@@ -4049,6 +4079,17 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export interface AdminFeature {
+  name: string;
+  /** @nullable */
+  settingKey?: string | null;
+  value: boolean;
+}
+
+export interface AdminFeatureList {
+  items: AdminFeature[];
+}
+
 export interface PageViewContentMediaItem {
   items: ContentMediaItem[];
   page: number;
@@ -6670,6 +6711,74 @@ export const replaceAdminRolePermissions = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(replacePermissionsRequest),
+  });
+};
+
+export type getRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type getRbacRuntimeResponseSuccess = getRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type getRbacRuntimeResponse = getRbacRuntimeResponseSuccess;
+
+export const getGetRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const getRbacRuntime = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRbacRuntimeResponse> => {
+  return customFetch<getRbacRuntimeResponse>(getGetRbacRuntimeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type updateRbacRuntimeResponseSuccess = updateRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type updateRbacRuntimeResponse = updateRbacRuntimeResponseSuccess;
+
+export const getUpdateRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const updateRbacRuntime = async (
+  rbacRuntimeUpdate: RbacRuntimeUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateRbacRuntimeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateRbacRuntimeResponse>(getUpdateRbacRuntimeUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rbacRuntimeUpdate),
   });
 };
 
@@ -18588,6 +18697,29 @@ export const listAdminMediaJobs = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminFeaturesResponse200 = {
+  data: AdminFeatureList;
+  status: 200;
+};
+
+export type listAdminFeaturesResponseSuccess = listAdminFeaturesResponse200 & {
+  headers: Headers;
+};
+export type listAdminFeaturesResponse = listAdminFeaturesResponseSuccess;
+
+export const getListAdminFeaturesUrl = () => {
+  return `/api/v1/admin/features`;
+};
+
+export const listAdminFeatures = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminFeaturesResponse> => {
+  return customFetch<listAdminFeaturesResponse>(getListAdminFeaturesUrl(), {
     ...options,
     method: 'GET',
   });
