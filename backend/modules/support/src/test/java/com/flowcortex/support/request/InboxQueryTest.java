@@ -16,7 +16,32 @@ class InboxQueryTest {
     private static final UUID CALLER = UUID.randomUUID();
 
     private static Parsed parse(String assignee, String created, String q, String sort, int page) {
-        return InboxQuery.parse(null, null, assignee, created, q, sort, page, CALLER, NOW);
+        return InboxQuery.parse(null, null, assignee, created, q, null, sort, page, CALLER, NOW);
+    }
+
+    private static Parsed parseSla(String sla) {
+        return InboxQuery.parse(null, null, null, null, null, sla, null, 0, CALLER, NOW);
+    }
+
+    @Test
+    void atRiskIsAccepted() {
+        assertThat(parseSla("at_risk").filter().atRisk()).isTrue();
+        assertThat(parseSla(" at_risk ").filter().atRisk()).isTrue();
+    }
+
+    @Test
+    void anAbsentSlaIsNoFilter() {
+        assertThat(parseSla(null).filter().atRisk()).isFalse();
+        assertThat(parseSla("  ").filter().atRisk()).isFalse();
+    }
+
+    @Test
+    void anotherSlaValueIsAFieldError() {
+        Parsed parsed = parseSla("late");
+
+        assertThat(parsed.filter()).isNull();
+        assertThat(parsed.errors()).containsOnlyKeys("sla");
+        assertThat(parseSla("AT_RISK").errors()).containsOnlyKeys("sla");
     }
 
     @Test
@@ -101,12 +126,14 @@ class InboxQueryTest {
 
     @Test
     void statusTypeAndPageAreCheckedAsBeforeAndAllErrorsAreReportedTogether() {
-        Parsed parsed = InboxQuery.parse("open", "billing", "bob", "yesterday", "  ", "top", -1, CALLER, NOW);
+        Parsed parsed = InboxQuery.parse("open", "billing", "bob", "yesterday", "  ", "late", "top", -1, CALLER, NOW);
 
-        assertThat(parsed.errors()).containsOnlyKeys("status", "type", "assignee", "created", "q", "sort", "page");
-        assertThat(InboxQuery.parse(null, null, null, null, null, null, 10_001, CALLER, NOW).errors())
+        assertThat(parsed.errors()).containsOnlyKeys("status", "type", "assignee", "created", "q", "sla", "sort",
+                "page");
+        assertThat(InboxQuery.parse(null, null, null, null, null, null, null, 10_001, CALLER, NOW).errors())
                 .containsOnlyKeys("page");
-        InboxQuery.InboxFilter ok = InboxQuery.parse(" new ", "credit", null, null, null, null, 2, CALLER, NOW).filter();
+        InboxQuery.InboxFilter ok = InboxQuery.parse(" new ", "credit", null, null, null, null, null, 2, CALLER, NOW)
+                .filter();
         assertThat(ok.status()).isEqualTo("new");
         assertThat(ok.type()).isEqualTo("credit");
         assertThat(ok.page()).isEqualTo(2);

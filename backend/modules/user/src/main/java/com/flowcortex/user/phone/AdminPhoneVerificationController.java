@@ -25,10 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 class AdminPhoneVerificationController {
 
     /** Sender names reported as themselves; a carrier adds its value here, anything else reads {@code custom}. */
-    static final Set<String> KNOWN_SENDERS = Set.of("outbox");
+    static final Set<String> KNOWN_SENDERS = Set.of("outbox", "vietguys");
 
     static final String NO_SENDER = "none";
     static final String CUSTOM_SENDER = "custom";
+    static final String NO_CREDENTIAL = "none";
 
     private static final Duration SENT_WINDOW = Duration.ofHours(24);
 
@@ -36,6 +37,7 @@ class AdminPhoneVerificationController {
     private final boolean gateEnabled;
     private final String configuredSender;
     private final ObjectProvider<SmsSender> smsSender;
+    private final ObjectProvider<CarrierCredentialStatus> carrierCredential;
     private final PhoneNumberHasher hasher;
     private final PhoneSendLimits limits;
     private final PhoneSendAttemptStore attempts;
@@ -46,6 +48,7 @@ class AdminPhoneVerificationController {
             @Value("${flowcortex.phone-gate.enabled:false}") boolean gateEnabled,
             @Value("${flowcortex.sms.sender:}") String configuredSender,
             ObjectProvider<SmsSender> smsSender,
+            ObjectProvider<CarrierCredentialStatus> carrierCredential,
             PhoneNumberHasher hasher,
             PhoneSendLimits limits,
             PhoneSendAttemptStore attempts,
@@ -54,6 +57,7 @@ class AdminPhoneVerificationController {
         this.gateEnabled = gateEnabled;
         this.configuredSender = configuredSender;
         this.smsSender = smsSender;
+        this.carrierCredential = carrierCredential;
         this.hasher = hasher;
         this.limits = limits;
         this.attempts = attempts;
@@ -70,7 +74,13 @@ class AdminPhoneVerificationController {
                 hasher.configured(),
                 gateEnabled,
                 limits.globalSendsPerDay(),
-                attempts.sentSince(clock.instant().minus(SENT_WINDOW)));
+                attempts.sentSince(clock.instant().minus(SENT_WINDOW)),
+                credentialState());
+    }
+
+    private String credentialState() {
+        CarrierCredentialStatus status = carrierCredential.getIfAvailable();
+        return status == null ? NO_CREDENTIAL : status.state();
     }
 
     private String senderName() {
@@ -93,6 +103,11 @@ class AdminPhoneVerificationController {
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean gateEnabled,
             @Schema(requiredMode = RequiredMode.REQUIRED, description = "Cap on codes sent from every member per 24 hours")
             int globalSendsPerDay,
-            @Schema(requiredMode = RequiredMode.REQUIRED, description = "Codes sent in the last 24 hours") long sentLast24h) {
+            @Schema(requiredMode = RequiredMode.REQUIRED, description = "Codes sent in the last 24 hours") long sentLast24h,
+            @Schema(requiredMode = RequiredMode.REQUIRED,
+                    allowableValues = {"none", "active", "reseed_required", "unseeded"},
+                    description = "none when the wired sender holds no carrier credential; reseed_required when its token chain "
+                            + "was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned")
+            String carrierCredential) {
     }
 }

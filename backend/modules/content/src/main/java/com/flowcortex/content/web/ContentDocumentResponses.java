@@ -45,6 +45,8 @@ final class ContentDocumentResponses {
             @Schema(requiredMode = RequiredMode.REQUIRED) LocalizedText title,
             @Schema(requiredMode = RequiredMode.REQUIRED) List<String> sectionTypes,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean publicHistory,
+            @Schema(requiredMode = RequiredMode.REQUIRED) int minSections,
+            @Schema(requiredMode = RequiredMode.REQUIRED) int maxSections,
             @Schema(requiredMode = RequiredMode.REQUIRED) int draftVersion,
             @Schema(nullable = true) Instant draftUpdatedAt,
             @Schema(requiredMode = RequiredMode.REQUIRED) int publishedVersion,
@@ -53,6 +55,7 @@ final class ContentDocumentResponses {
         static DocumentSummaryResponse of(DocumentSummary summary) {
             return new DocumentSummaryResponse(summary.definition().slug(), summary.definition().title(),
                     summary.definition().sectionTypes(), summary.definition().publicHistory(),
+                    summary.definition().minSections(), summary.definition().maxSections(),
                     summary.draftVersion(), summary.draftUpdatedAt(), summary.publishedVersion(),
                     summary.publishedAt());
         }
