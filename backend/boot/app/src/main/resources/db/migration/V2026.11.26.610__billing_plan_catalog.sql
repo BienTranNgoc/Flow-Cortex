@@ -11,7 +11,7 @@
 -- tables missing.
 --   BEGIN;
 --   DROP TABLE pricing_tier_version, pricing_tier, topup_package;
---   DELETE FROM flyway_schema_history WHERE version = '2026.11.24.200';
+--   DELETE FROM flyway_schema_history WHERE version = '2026.11.26.610';
 --   COMMIT;
 -- This holds only until a later migration references these tables; after that, roll back with a forward
 -- migration.
