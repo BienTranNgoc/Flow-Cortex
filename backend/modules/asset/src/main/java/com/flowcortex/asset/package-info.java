@@ -3,7 +3,7 @@
  * that registers them.
  * <p>
  * This is a Spring Modulith application module. It reads other modules only through their public
- * {@code api} ports; nothing depends on it.
+ * {@code api} ports; other modules read it through {@code SpaceAssets}.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Asset",
