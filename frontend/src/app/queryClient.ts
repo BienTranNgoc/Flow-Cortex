@@ -2,20 +2,23 @@ import { ApiError } from '@flow-cortex/api-client';
 import { reportClientError } from '@flow-cortex/ui-kit';
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 
-const PHONE_VERIFICATION_REQUIRED = 'PHONE_VERIFICATION_REQUIRED';
+const HELD_CODES: ReadonlySet<unknown> = new Set([
+  'PHONE_VERIFICATION_REQUIRED',
+  'ACCOUNT_DELETION_PENDING',
+]);
 
-function isPhoneGateRefusal(error: unknown): boolean {
+function isGateRefusal(error: unknown): boolean {
   const problem = error instanceof ApiError && error.status === 403 ? error.problem : undefined;
-  return problem !== undefined && (problem as { code?: unknown }).code === PHONE_VERIFICATION_REQUIRED;
+  return problem !== undefined && HELD_CODES.has((problem as { code?: unknown }).code);
 }
 
 /**
- * The server holds a member whose phone is unverified: any call but the exempt ones answers 403
- * PHONE_VERIFICATION_REQUIRED. Refetching `/me` lets `PhoneGate` move the member to the
- * verification page; `/me` itself is exempt, so its own failure never loops back here.
+ * The server holds a member whose phone is unverified or whose account is scheduled for deletion:
+ * every call but the exempt ones answers 403 with a `HELD_CODES` code. Refetching `/me` lets the
+ * matching gate move the member; `/me` is exempt, so its own failure never loops back here.
  */
 function refetchMeWhenHeld(error: unknown, queryKey?: readonly unknown[]) {
-  if (isPhoneGateRefusal(error) && queryKey?.[0] !== 'me') {
+  if (isGateRefusal(error) && queryKey?.[0] !== 'me') {
     void queryClient.invalidateQueries({ queryKey: ['me'] });
   }
 }

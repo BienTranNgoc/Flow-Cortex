@@ -319,6 +319,7 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
             Map<String, Long> expected = Map.ofEntries(
                     Map.entry("jobs.publication-resubmitter", 60_000L),
                     Map.entry("workflow.lease-reaper", 30_000L),
+                    Map.entry("workflow.batch-dispatch", 5_000L),
                     Map.entry("user.auth-retention", 3_600_000L),
                     Map.entry("user.unconfirmed-account-purge", 3_600_000L),
                     Map.entry("user.phone-retention", 3_600_000L),
@@ -329,7 +330,10 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     Map.entry("support.request-retention", 21_600_000L),
                     Map.entry("support.sla-sweep", 300_000L),
                     Map.entry("asset.registration-sweep", 120_000L),
+                    Map.entry("trash.purge-sweep", 3_600_000L),
+                    Map.entry("trash.expiry-reminder", 3_600_000L),
                     Map.entry("user.mcp-oauth-retention", 3_600_000L),
+                    Map.entry("trend.template-purge", 900_000L),
                     Map.entry("billing.catalogue-check", 86_400_000L),
                     Map.entry("billing.plan-activation", 300_000L),
                     Map.entry("billing.payment-reconcile-ageing", 300_000L),

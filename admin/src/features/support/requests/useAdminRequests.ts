@@ -33,7 +33,7 @@ export const PAGE_SIZE = 20;
 
 const REQUESTS_KEY = ['admin', 'support', 'requests'] as const;
 const DETAIL = 'detail';
-const detailKey = (number: number) => [...REQUESTS_KEY, DETAIL, number] as const;
+export const detailKey = (number: number) => [...REQUESTS_KEY, DETAIL, number] as const;
 
 /** The inbox filter as the URL carries it; an absent key means no filter on that dimension. */
 export interface RequestFilter {

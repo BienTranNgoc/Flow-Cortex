@@ -29,6 +29,7 @@ erDiagram
   workflow_review ||--o{ workflow_review_helpful : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_report : "review_id, ON DELETE CASCADE"
   media_asset ||--o| space_asset : "media_asset_id, UNIQUE (no FK)"
+  space_asset ||--o{ space_asset_tag : "asset_id, ON DELETE CASCADE"
 
   app_user {
     uuid id PK
@@ -134,6 +135,16 @@ erDiagram
     uuid run_step_id "NOT NULL exactly when source = run"
     uuid workflow_id
     text workflow_name "copied at registration"
+    timestamptz created_at "index (space_id, created_at DESC, id DESC) serves the newest-first walk"
+    boolean favorite "default false"
+    timestamptz missing_at "set by a link route when the stored file is gone, NULL otherwise"
+    text title_search "generated: asset_search_fold(title), accents/case/d-stroke folded"
+  }
+  space_asset_tag {
+    uuid asset_id PK,FK "ON DELETE CASCADE"
+    uuid space_id "copied for the per-space tag list, no FK"
+    text label "1-40 characters, first label kept per tag_key"
+    text tag_key PK "generated: asset_search_fold(label)"
     timestamptz created_at
   }
   space_asset_registration {
@@ -149,6 +160,18 @@ erDiagram
     uuid lease_token "fences finish and retry"
     timestamptz created_at
     timestamptz updated_at "finished rows deleted after 30 days"
+  }
+  trash_entry {
+    uuid id PK
+    varchar item_type "lowercase key, UNIQUE with item_id; the owning module's provider type"
+    varchar item_id "the trashed row's id in its own module, no FK"
+    uuid owner_id "the account that sees and acts on the entry, no FK"
+    uuid deleted_by "no FK"
+    text name "1-200 characters; NULL = untitled"
+    text name_key "folded search key written by Java; empty when untitled"
+    varchar location_code "message code of where the item lived"
+    timestamptz deleted_at "expiry = deleted_at + retention, never stored"
+    timestamptz reminded_at "NULL until the expiry reminder claims it; cleared when the item is deleted again"
   }
   product_video_input {
     uuid run_id PK,FK
@@ -467,6 +490,156 @@ erDiagram
 
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
+
+## Batch runs (`V2026.11.26.505`)
+
+```mermaid
+erDiagram
+  app_user ||--o{ batch_run : "owner_id (no FK)"
+  workflow ||--o{ batch_run : "workflow_id"
+  batch_run ||--o| batch_run : "parent_batch_id, ON DELETE SET NULL"
+  batch_run ||--|{ batch_run_row : "batch_id, ON DELETE CASCADE"
+  workflow_run ||--o| batch_run_row : "run_id, ON DELETE SET NULL"
+
+  batch_run {
+    uuid id PK
+    uuid owner_id "no FK, like workflow_run.owner_id"
+    uuid workflow_id FK
+    uuid parent_batch_id FK "the batch a retry was made from; unique where set"
+    varchar name "NULL = unnamed; varchar(200)"
+    smallint concurrency "1-10"
+    boolean acknowledge_cost
+    varchar status "running | paused | completed | completed_with_errors | cancelled"
+    varchar pause_reason "member | insufficientCredits | unavailable"
+    varchar cancel_reason "member | workflowUnavailable | ownerInactive"
+    integer total_rows
+    timestamptz created_at
+    timestamptz finished_at "set once no row is pending, starting or running"
+    uuid lease_token "holder of the dispatch lease; every dispatcher write carries it"
+    timestamptz lease_until
+    timestamptz dispatched_at "last dispatch pass; oldest first, NULL first"
+  }
+  batch_run_row {
+    uuid id PK
+    uuid batch_id FK
+    integer row_index "unique per batch"
+    integer source_row_index "set on a retry batch's rows"
+    text input
+    varchar status "pending | starting | running | completed | failed | cancelled; starting is internal, shown as pending"
+    uuid run_id FK "NULL until the run is recorded, and after the run is removed"
+    smallint start_failures
+    boolean stop_requested
+    varchar error_code
+    varchar error_message "varchar(300)"
+    timestamptz claimed_at "when the row was claimed for start"
+    timestamptz started_at
+    timestamptz finished_at
+  }
+```
+
+Indexes: `idx_batch_run_owner_created` (`owner_id, created_at DESC, id DESC` — the member's list),
+`idx_batch_run_open` (partial `WHERE finished_at IS NULL`, `dispatched_at NULLS FIRST` — the dispatcher's
+candidates), `uq_batch_run_parent` (unique, partial `WHERE parent_batch_id IS NOT NULL` — one retry per batch),
+`idx_batch_run_row_open` (partial `WHERE status IN ('pending','starting','running')`, `batch_id, row_index`),
+`idx_batch_run_row_status` (`batch_id, status, row_index` — the grouped counts and the row list).
+
+Row counts are not stored on `batch_run`; they are one grouped read over `idx_batch_run_row_status`.
+
+## Space entities (`V2026.11.26.501`)
+
+```mermaid
+erDiagram
+  space ||--o{ space_entity : "space_id (no FK)"
+  space_asset ||--o{ space_entity_part : "asset_id (no FK)"
+  workflow_run ||--o{ space_entity_run : "run_id (no FK)"
+  space_entity ||--o{ space_entity_part : "entity_id, ON DELETE CASCADE"
+  space_entity ||--o{ space_entity_tag : "entity_id, ON DELETE CASCADE"
+  space_entity ||--|{ space_entity_version : "entity_id, ON DELETE CASCADE"
+  space_entity ||--o{ space_entity_run : "entity_id, ON DELETE CASCADE"
+
+  space_entity {
+    uuid id PK
+    uuid space_id "owning space, no FK; UNIQUE (space_id, handle) WHERE deleted_at IS NULL"
+    varchar kind "brand | product | character | voice"
+    varchar handle "2-48 of a-z 0-9 hyphen"
+    text name "1-200 code points"
+    text search_key "normalised key of name, computed in Java"
+    jsonb fields "per-kind field values"
+    varchar category_label "NULL = no category; NULL exactly when category_key is"
+    text category_key
+    integer version "current version, 1 on create"
+    uuid created_by "no FK"
+    timestamptz created_at
+    timestamptz updated_at "INDEX (space_id, updated_at DESC, id) WHERE deleted_at IS NULL"
+    timestamptz deleted_at "trash; NULL exactly when deleted_by is, frees the handle"
+    uuid deleted_by "no FK"
+  }
+  space_entity_part {
+    uuid id PK
+    uuid entity_id FK "UNIQUE (entity_id, sort)"
+    uuid asset_id "library asset, no FK; INDEX"
+    varchar role "checked against the kind by the application"
+    varchar label "optional, up to 60 code points; NULL exactly when label_key is"
+    text label_key
+    integer sort "0-19"
+    timestamptz created_at
+  }
+  space_entity_tag {
+    uuid entity_id PK,FK
+    text tag_key PK "normalised key; INDEX"
+    varchar tag_label "40 code points, the space's first spelling"
+    timestamptz created_at
+  }
+  space_entity_version {
+    uuid entity_id PK,FK
+    integer version PK
+    jsonb snapshot "name, handle, fields, category, tags, parts; no URL"
+    jsonb changes "change codes of this version"
+    timestamptz created_at
+  }
+  space_entity_run {
+    uuid run_id PK "no FK"
+    uuid entity_id PK,FK
+    uuid space_id "no FK"
+    integer version "entity version at the time of the run"
+    uuid workflow_id "no FK"
+    text workflow_name "copied at recording"
+    timestamptz created_at
+    timestamptz completed_at "NULL while the run is open; partial INDEX (entity_id, completed_at DESC, run_id)"
+  }
+```
+
+An entity is trashed by stamping `deleted_at`/`deleted_by`, never deleted; the partial unique index on
+`handle` only covers live rows, so a trashed entity's handle is free again. `ON DELETE CASCADE` matters only
+for a future purge.
+
+## Trend taxonomy (`V2026.11.15.260`)
+
+```mermaid
+erDiagram
+  trend_category {
+    varchar key PK "derived from name_vi, 1-64 chars of a-z0-9 joined by single hyphens (CHECK); never changes after create"
+    varchar name_vi "varchar(60)"
+    varchar name_en "varchar(60)"
+    int display_order "ties are read in key order"
+    boolean visible "hidden categories stay stored"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  trend_tag {
+    uuid id PK "generated in the application"
+    varchar name_vi "varchar(30)"
+    varchar name_en "varchar(30)"
+    int display_order "ties are read in creation order"
+    boolean visible
+    timestamptz created_at
+    timestamptz updated_at
+  }
+```
+
+No relations yet: the template table and its category foreign key arrive with the template change. The
+migration seeds four categories (`nguoi`, `san-pham`, `thu-cung`, `nhay-chuyen-canh`) and the two
+`content.trend_template.*` permission keys.
 
 ## Roadmap tables (each arrives with its own change)
 

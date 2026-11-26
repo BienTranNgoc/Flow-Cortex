@@ -41,8 +41,8 @@ class ConnectorExceptionAdvice {
         problem.setType(URI.create(PROBLEM_BASE + slug(ex.reason())));
         problem.setProperty("code", ex.reason().name());
         problem.setProperty("retryable", ex.retryable());
-        if (ex.telegramReason() != null) {
-            problem.setProperty("reason", ex.telegramReason());
+        if (ex.providerReason() != null) {
+            problem.setProperty("reason", ex.providerReason());
         }
         ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
         if (ex.reason() == ConnectorException.Reason.RATE_LIMITED && ex.retryAfter() != null) {

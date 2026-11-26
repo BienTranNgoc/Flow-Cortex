@@ -1,4 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import {
   authHeaders,
   createChatConversation,
@@ -10,45 +17,74 @@ import {
   sendChatMessage,
   unwrap,
   type Attachment,
-  type ChatConversation,
-  type ChatConversationList,
   type ChatFirstMessage,
+  type CountChatConversationsParams,
+  type ListChatConversationsParams,
 } from '@flow-cortex/api-client';
 import { newUuidV4 } from '../support/uuid';
 import { chatProblemCode } from './chatProblem';
 
+/** The list query parameters that pick a view; the cursor and page size belong to the paging. */
+export type ConversationFilters = Omit<ListChatConversationsParams, 'cursor' | 'limit'>;
+
+/** Everything in no folder and not pinned: the sidebar's Recent group. */
+export const RECENT_FILTERS: ConversationFilters = { pinned: 'exclude', folder: 'none' };
+
+/** `list`, `counts` and `folders` are prefixes: invalidating one refetches every open view under it. */
 export const chatKeys = {
   list: ['chat', 'conversations'] as const,
+  page: (filters: ConversationFilters) => ['chat', 'conversations', filters] as const,
+  counts: ['chat', 'counts'] as const,
+  countsFor: (filters: CountChatConversationsParams) => ['chat', 'counts', filters] as const,
+  folders: ['chat', 'folders'] as const,
   messages: (conversationId: string) => ['chat', 'messages', conversationId] as const,
 };
 
 type SuccessData<T> = Extract<T, { status: 200 | 201 | 202 | 204 }> extends { data: infer D } ? D : never;
 
 /** `unwrap` narrowed to the success body: it throws for every status >= 400. */
-async function unwrapChat<T extends { status: number; data: unknown }>(
+export async function unwrapChat<T extends { status: number; data: unknown }>(
   request: Promise<T>,
 ): Promise<SuccessData<T>> {
   return (await unwrap(request)) as SuccessData<T>;
 }
 
-function requestInit(idempotencyKey?: string): RequestInit {
+export function requestInit(idempotencyKey?: string): RequestInit {
   const base = authHeaders().headers as Record<string, string> | undefined;
   return { headers: { ...base, ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) } };
 }
 
-function mapItems(
-  list: ChatConversationList | undefined,
-  change: (items: ChatConversation[]) => ChatConversation[],
-): ChatConversationList | undefined {
-  return list && { ...list, items: change(list.items ?? []) };
+/**
+ * Marks every conversation list and count view stale (open ones refetch). `folders` also marks the
+ * folder list, whose conversation counts change when a conversation moves, goes or is added.
+ */
+export function invalidateConversationViews(
+  queryClient: QueryClient,
+  { folders = false }: { folders?: boolean } = {},
+): Promise<unknown> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: chatKeys.list }),
+    queryClient.invalidateQueries({ queryKey: chatKeys.counts }),
+    folders ? queryClient.invalidateQueries({ queryKey: chatKeys.folders }) : undefined,
+  ]);
 }
 
-/** Conversations as served: newest activity first. */
-export function useConversationList() {
-  return useQuery({
-    queryKey: chatKeys.list,
-    queryFn: () => unwrapChat(listChatConversations(requestInit())),
+/** One cursor-paged view of the list; each distinct filter set is its own cache entry. */
+export function conversationPagesOptions(filters: ConversationFilters) {
+  return infiniteQueryOptions({
+    queryKey: chatKeys.page(filters),
+    queryFn: ({ pageParam }) =>
+      unwrapChat(
+        listChatConversations(pageParam ? { ...filters, cursor: pageParam } : filters, requestInit()),
+      ),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
+}
+
+/** The sidebar's Recent pages; `ChatPage` reads `chatEnabled` from this same cache entry. */
+export function useConversationList() {
+  return useInfiniteQuery(conversationPagesOptions(RECENT_FILTERS));
 }
 
 export function useMessages(conversationId: string | undefined) {
@@ -70,14 +106,8 @@ export function useCreateConversation() {
   return useMutation({
     mutationFn: ({ firstMessage, key }: CreateConversationInput) =>
       unwrapChat(createChatConversation({ firstMessage }, requestInit(key))),
-    onSuccess: (created) => {
-      const { userMessage: _first, assistantMessageId: _answer, ...conversation } = created;
-      queryClient.setQueryData<ChatConversationList>(chatKeys.list, (list) =>
-        mapItems(list, (items) => [
-          conversation,
-          ...items.filter((item) => item.id !== conversation.id),
-        ]),
-      );
+    onSuccess: () => {
+      void invalidateConversationViews(queryClient);
     },
   });
 }
@@ -87,17 +117,7 @@ export function useRenameConversation() {
   return useMutation({
     mutationFn: ({ id, title }: { id: string; title: string }) =>
       unwrapChat(renameChatConversation(id, { title }, requestInit())),
-    onSuccess: (renamed) => {
-      queryClient.setQueryData<ChatConversationList>(chatKeys.list, (list) =>
-        mapItems(list, (items) =>
-          items.map((item) =>
-            item.id === renamed.id && renamed.title !== undefined
-              ? { ...item, title: renamed.title }
-              : item,
-          ),
-        ),
-      );
-    },
+    onSuccess: () => invalidateConversationViews(queryClient),
   });
 }
 
@@ -114,10 +134,8 @@ export function useDeleteConversation() {
       return id;
     },
     onSuccess: (id) => {
-      queryClient.setQueryData<ChatConversationList>(chatKeys.list, (list) =>
-        mapItems(list, (items) => items.filter((item) => item.id !== id)),
-      );
       queryClient.removeQueries({ queryKey: chatKeys.messages(id) });
+      return invalidateConversationViews(queryClient, { folders: true });
     },
   });
 }
@@ -136,7 +154,7 @@ export function useRetryMessage(conversationId: string, messageId: string) {
     mutationFn: () => unwrapChat(retryChatMessage(conversationId, messageId, requestInit(newUuidV4()))),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) });
-      void queryClient.invalidateQueries({ queryKey: chatKeys.list });
+      void invalidateConversationViews(queryClient);
     },
   });
 }
@@ -155,7 +173,7 @@ export function useSendMessage(conversationId: string) {
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: chatKeys.messages(conversationId) });
-      void queryClient.invalidateQueries({ queryKey: chatKeys.list });
+      void invalidateConversationViews(queryClient);
     },
   });
 }

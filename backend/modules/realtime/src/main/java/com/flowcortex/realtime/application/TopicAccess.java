@@ -20,15 +20,18 @@ public final class TopicAccess {
     /** How a request's topics were judged. */
     public enum Status { OK, INVALID, NOT_FOUND }
 
-    /** The verdict, with the canonical topics when it is {@link Status#OK}. */
-    public record Outcome(Status status, Set<String> topics) {
+    /**
+     * The verdict, with the canonical topics when it is {@link Status#OK}; {@code rechecks} maps the
+     * topics whose authorizer is revocable to it, in request order.
+     */
+    public record Outcome(Status status, Set<String> topics, Map<String, TopicAuthorizer> rechecks) {
     }
 
     private static final String USER_TOPIC = "user";
     // A parse guard, three times the longest topic any authorizer claims (chat:<uuid>, 41 characters).
     private static final Pattern WELL_FORMED = Pattern.compile("[A-Za-z0-9:_-]{1,128}");
-    private static final Outcome INVALID = new Outcome(Status.INVALID, Set.of());
-    private static final Outcome NOT_FOUND = new Outcome(Status.NOT_FOUND, Set.of());
+    private static final Outcome INVALID = new Outcome(Status.INVALID, Set.of(), Map.of());
+    private static final Outcome NOT_FOUND = new Outcome(Status.NOT_FOUND, Set.of(), Map.of());
 
     private TopicAccess() {
     }
@@ -56,12 +59,19 @@ public final class TopicAccess {
         if (claimed.size() > maxTopics) {
             return INVALID;
         }
+        Map<String, TopicAuthorizer> rechecks = new LinkedHashMap<>();
         for (Map.Entry<String, TopicAuthorizer> entry : claimed.entrySet()) {
             TopicAuthorizer owner = entry.getValue();
-            if (owner != null && !owner.authorize(userId, entry.getKey())) {
+            if (owner == null) {
+                continue;
+            }
+            if (!owner.authorize(userId, entry.getKey())) {
                 return NOT_FOUND;
             }
+            if (owner.revocable()) {
+                rechecks.put(entry.getKey(), owner);
+            }
         }
-        return new Outcome(Status.OK, new LinkedHashSet<>(claimed.keySet()));
+        return new Outcome(Status.OK, new LinkedHashSet<>(claimed.keySet()), rechecks);
     }
 }

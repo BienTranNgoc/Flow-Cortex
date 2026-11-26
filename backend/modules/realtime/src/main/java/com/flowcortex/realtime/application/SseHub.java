@@ -1,5 +1,6 @@
 package com.flowcortex.realtime.application;
 
+import com.flowcortex.realtime.api.TopicAuthorizer;
 import com.flowcortex.realtime.application.ReplayBuffer.Event;
 import com.flowcortex.realtime.application.ReplayBuffer.Replay;
 import com.flowcortex.realtime.application.StreamRegistry.Slot;
@@ -10,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -46,6 +48,8 @@ public class SseHub implements ApplicationListener<ContextClosedEvent> {
     private final StreamRegistry registry;
     private final int maxPendingFrames;
     private final ScheduledThreadPoolExecutor scheduler;
+    // Authorizers may query a database, so rechecks never share the threads that write heartbeats and events.
+    private final ScheduledThreadPoolExecutor rechecker;
     private final Set<Stream> streams = ConcurrentHashMap.newKeySet();
     private final Object lock = new Object();
     // Guarded by lock.
@@ -71,6 +75,13 @@ public class SseHub implements ApplicationListener<ContextClosedEvent> {
         this.scheduler.setRemoveOnCancelPolicy(true);
         long heartbeatMs = properties.heartbeat().toMillis();
         this.scheduler.scheduleWithFixedDelay(this::heartbeat, heartbeatMs, heartbeatMs, TimeUnit.MILLISECONDS);
+        this.rechecker = new ScheduledThreadPoolExecutor(1, task -> {
+            Thread thread = new Thread(task, "realtime-recheck");
+            thread.setDaemon(true);
+            return thread;
+        });
+        long recheckMs = properties.recheckInterval().toMillis();
+        this.rechecker.scheduleWithFixedDelay(this::recheck, recheckMs, recheckMs, TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -79,13 +90,22 @@ public class SseHub implements ApplicationListener<ContextClosedEvent> {
      * except that a closed hub completes it.
      */
     public Admission register(UUID userId, Set<String> topics, Instant expiresAt, String lastEventId, StreamSink sink) {
+        return register(userId, topics, Map.of(), expiresAt, lastEventId, sink);
+    }
+
+    /**
+     * As above, and every {@code rechecks} entry (a topic of {@code topics} and the authorizer that
+     * may withdraw access to it) is asked again each recheck interval.
+     */
+    public Admission register(UUID userId, Set<String> topics, Map<String, TopicAuthorizer> rechecks, Instant expiresAt,
+            String lastEventId, StreamSink sink) {
         synchronized (lock) {
             if (!closed) {
                 Optional<Slot> slot = registry.tryAdmit(userId);
                 if (slot.isEmpty()) {
                     return Admission.LIMIT_REACHED;
                 }
-                Stream stream = new Stream(topics, sink, slot.get());
+                Stream stream = new Stream(userId, topics, Map.copyOf(rechecks), sink, slot.get());
                 sink.onClose(() -> stream.close(false));
                 Replay replay = buffer.replay(lastEventId, topics);
                 if (replay.kind() == ReplayBuffer.Kind.RESYNC) {
@@ -132,6 +152,58 @@ public class SseHub implements ApplicationListener<ContextClosedEvent> {
         }
     }
 
+    /**
+     * Asks again about every revocable topic of every open stream and completes a stream whose access
+     * was withdrawn. An authorizer that throws leaves its stream open until the next round.
+     */
+    private void recheck() {
+        try {
+            List<Stream> watched;
+            synchronized (lock) {
+                watched = streams.stream().filter(stream -> !stream.rechecks.isEmpty()).toList();
+            }
+            for (Stream stream : watched) {
+                recheck(stream);
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Realtime recheck failed", e);
+        }
+    }
+
+    private void recheck(Stream stream) {
+        for (Map.Entry<String, TopicAuthorizer> entry : stream.rechecks.entrySet()) {
+            if (stream.ended.get()) {
+                return;
+            }
+            boolean allowed;
+            try {
+                allowed = entry.getValue().authorize(stream.userId, entry.getKey());
+            } catch (RuntimeException e) {
+                LOG.warn("Realtime recheck of a {} topic failed, keeping the stream: {}", family(entry.getKey()), e.toString());
+                continue;
+            }
+            if (!allowed) {
+                LOG.info("realtime.stream outcome=revoked topic={}", family(entry.getKey()));
+                completeOnScheduler(stream);
+                return;
+            }
+        }
+    }
+
+    private void completeOnScheduler(Stream stream) {
+        try {
+            scheduler.execute(() -> stream.close(true));
+        } catch (RejectedExecutionException shuttingDown) {
+            stream.close(true);
+        }
+    }
+
+    /** The topic without its last segment ({@code support:request:42} is {@code support:request}): no ids in logs. */
+    private static String family(String topic) {
+        int cut = topic.lastIndexOf(':');
+        return cut > 0 ? topic.substring(0, cut) : topic;
+    }
+
     private void broadcast(SseFrame frame) {
         List<Stream> overflowed = new ArrayList<>();
         synchronized (lock) {
@@ -162,18 +234,22 @@ public class SseHub implements ApplicationListener<ContextClosedEvent> {
             closed = true;
             open = List.copyOf(streams);
         }
+        rechecker.shutdownNow();
         open.forEach(stream -> stream.close(true));
         scheduler.shutdownNow();
     }
 
     @PreDestroy
     void destroy() {
+        rechecker.shutdownNow();
         scheduler.shutdownNow();
     }
 
     private final class Stream {
 
+        final UUID userId;
         final Set<String> topics;
+        final Map<String, TopicAuthorizer> rechecks;
         final StreamSink sink;
         private final Slot slot;
         private final ConcurrentLinkedQueue<SseFrame> pending = new ConcurrentLinkedQueue<>();
@@ -182,8 +258,10 @@ public class SseHub implements ApplicationListener<ContextClosedEvent> {
         private final AtomicBoolean ended = new AtomicBoolean();
         volatile ScheduledFuture<?> expiry;
 
-        Stream(Set<String> topics, StreamSink sink, Slot slot) {
+        Stream(UUID userId, Set<String> topics, Map<String, TopicAuthorizer> rechecks, StreamSink sink, Slot slot) {
+            this.userId = userId;
             this.topics = topics;
+            this.rechecks = rechecks;
             this.sink = sink;
             this.slot = slot;
         }
