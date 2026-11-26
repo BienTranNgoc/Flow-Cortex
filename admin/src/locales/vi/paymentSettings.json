@@ -5,7 +5,40 @@
   "tabs": {
     "label": "Các mục cài đặt thanh toán",
     "settings": "Cài đặt",
-    "history": "Lịch sử"
+    "history": "Lịch sử",
+    "vat": "Thuế GTGT"
+  },
+  "vat": {
+    "loading": "Đang tải thuế suất GTGT…",
+    "loadFailed": "Không tải được thuế suất GTGT.",
+    "forbidden": "Bạn không có quyền xem thuế suất GTGT.",
+    "currentTitle": "Thuế suất đang áp dụng hôm nay",
+    "since": "Áp dụng từ {{date}}",
+    "noNote": "Chưa ghi nguồn cho thuế suất này.",
+    "notSet": "Không có thuế suất nào áp dụng cho hôm nay. Hãy đặt một mức trước khi thu khoản thanh toán tiếp theo.",
+    "setRate": "Đặt thuế suất",
+    "readOnly": "Đặt thuế suất cần quyền cập nhật cài đặt thanh toán.",
+    "rateSet": "Đã đặt thuế suất {{rate}} từ {{date}}.",
+    "timelineTitle": "Lịch sử thuế suất",
+    "tableLabel": "Lịch sử thuế suất GTGT, mới nhất trước",
+    "columns": {
+      "rate": "Thuế suất",
+      "from": "Từ ngày",
+      "to": "Đến ngày (không tính)",
+      "note": "Ghi chú nguồn"
+    },
+    "openEnded": "Không có ngày kết thúc",
+    "errors": {
+      "save": "Không đặt được thuế suất. Vui lòng thử lại."
+    },
+    "dialog": {
+      "title": "Đặt thuế suất GTGT",
+      "description": "Thuế suất mới áp dụng từ hôm nay, {{date}} (giờ Việt Nam), và thay thế mọi mức đã hẹn sau hôm nay.",
+      "percentLabel": "Thuế suất (phần trăm)",
+      "invalidPercent": "Nhập phần trăm từ 0 đến 100, tối đa hai chữ số thập phân, ví dụ 8 hoặc 8,5.",
+      "noteLabel": "Ghi chú nguồn (không bắt buộc)",
+      "save": "Đặt thuế suất"
+    }
   },
   "loading": "Đang tải…",
   "loadFailed": "Không tải được cài đặt thanh toán.",

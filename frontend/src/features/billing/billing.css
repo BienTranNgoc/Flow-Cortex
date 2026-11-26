@@ -354,3 +354,178 @@
   font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
+
+/* ===== Invoice details =================================================== */
+
+.billing-profiles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.billing-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.billing-profile__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.billing-profile__name {
+  flex: 1 1 12rem;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+
+.billing-profile__facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.billing-profile__facts dt {
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+.billing-profile__facts dd {
+  margin: 0.125rem 0 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.billing-profile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.billing-dialog {
+  max-width: min(32rem, calc(100vw - 2rem));
+}
+
+.billing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.billing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.billing-field label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.billing-field :is(input, select, textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--control-h);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  background: var(--input-bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.billing-field :is(input, select, textarea):hover:not(:disabled) {
+  border-color: var(--input-border-hover);
+}
+
+.billing-field :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.billing-field[data-invalid='true'] :is(input, select, textarea) {
+  border-color: var(--red);
+}
+
+.billing-field textarea {
+  resize: vertical;
+}
+
+.billing-field__hint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+.billing-field__error {
+  margin: 0;
+  color: var(--red);
+  font-size: 0.875rem;
+}
+
+.billing-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: var(--target-min);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.billing-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.billing-check input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.billing-form__failure {
+  margin: 0;
+  color: var(--red);
+}
+
+.billing-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .billing-profiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .billing-field :is(input, select, textarea) {
+    transition: none;
+  }
+}

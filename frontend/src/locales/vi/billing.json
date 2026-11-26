@@ -1,6 +1,82 @@
 {
   "menu": {
-    "paymentHistory": "Lịch sử thanh toán"
+    "paymentHistory": "Lịch sử thanh toán",
+    "invoiceDetails": "Thông tin xuất hoá đơn"
+  },
+  "profiles": {
+    "title": "Thông tin xuất hoá đơn",
+    "lede": "Tên, mã số thuế và địa chỉ mà hoá đơn được xuất cho. Mục mặc định được dùng trừ khi bạn chọn mục khác.",
+    "add": "Thêm thông tin xuất hoá đơn",
+    "listLabel": "Thông tin xuất hoá đơn của bạn",
+    "loadError": "Không tải được thông tin xuất hoá đơn của bạn.",
+    "retry": "Thử lại",
+    "empty": "Bạn chưa có thông tin xuất hoá đơn. Hãy thêm để chúng tôi xuất hoá đơn cho bạn.",
+    "default": "Mặc định",
+    "type": {
+      "personal": "Cá nhân",
+      "business": "Doanh nghiệp",
+      "household": "Hộ kinh doanh"
+    },
+    "field": {
+      "type": "Loại",
+      "legalName": "Tên trên hoá đơn",
+      "taxCode": "Mã số thuế",
+      "personalIdNumber": "Số định danh cá nhân",
+      "address": "Địa chỉ",
+      "email": "Email nhận hoá đơn",
+      "isDefault": "Dùng làm mặc định"
+    },
+    "hint": {
+      "legalName": "Biểu tượng cảm xúc sẽ bị loại khỏi tên khi xuất hoá đơn.",
+      "taxCode": "10 chữ số, hoặc 10 chữ số, dấu gạch ngang và 3 chữ số với chi nhánh.",
+      "personalIdNumber": "Số 12 chữ số trên thẻ căn cước công dân.",
+      "email": "Không bắt buộc."
+    },
+    "action": {
+      "edit": "Sửa",
+      "delete": "Xoá",
+      "setDefault": "Đặt làm mặc định",
+      "save": "Lưu",
+      "saving": "Đang lưu…",
+      "cancel": "Huỷ"
+    },
+    "dialog": {
+      "createTitle": "Thêm thông tin xuất hoá đơn",
+      "editTitle": "Sửa thông tin xuất hoá đơn"
+    },
+    "confirmDelete": {
+      "title": "Xoá thông tin xuất hoá đơn này?",
+      "message": "{{name}} sẽ bị xoá khỏi tài khoản của bạn. Các hoá đơn đã xuất không bị ảnh hưởng.",
+      "confirm": "Xoá",
+      "busy": "Đang xoá…"
+    },
+    "error": {
+      "save": "Không lưu được. Vui lòng thử lại.",
+      "delete": "Không xoá được. Vui lòng thử lại.",
+      "setDefault": "Không đặt được mặc định. Vui lòng thử lại.",
+      "notFound": "Thông tin xuất hoá đơn này không còn tồn tại.",
+      "legalName": {
+        "required": "Nhập tên in trên hoá đơn.",
+        "tooLong": "Tên tối đa 400 ký tự.",
+        "unreadable": "Tên cần có ký tự đọc được; biểu tượng cảm xúc sẽ bị loại khỏi hoá đơn."
+      },
+      "taxCode": {
+        "required": "Nhập mã số thuế.",
+        "invalid": "Mã số thuế gồm 10 chữ số, có thể thêm dấu gạch ngang và 3 chữ số."
+      },
+      "personalIdNumber": {
+        "required": "Nhập số định danh cá nhân gồm 12 chữ số.",
+        "invalid": "Số định danh cá nhân phải gồm đúng 12 chữ số."
+      },
+      "address": {
+        "required": "Nhập địa chỉ.",
+        "tooLong": "Địa chỉ tối đa 500 ký tự."
+      },
+      "email": {
+        "invalid": "Nhập địa chỉ email hợp lệ.",
+        "tooLong": "Địa chỉ email tối đa 255 ký tự."
+      }
+    }
   },
   "amount": "{{amount}} ₫",
   "none": "Không có",

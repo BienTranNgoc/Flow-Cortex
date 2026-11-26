@@ -1,6 +1,82 @@
 {
   "menu": {
-    "paymentHistory": "Payment history"
+    "paymentHistory": "Payment history",
+    "invoiceDetails": "Invoice details"
+  },
+  "profiles": {
+    "title": "Invoice details",
+    "lede": "The name, tax code and address an invoice is issued to. The default is used unless you choose another.",
+    "add": "Add invoice details",
+    "listLabel": "Your invoice details",
+    "loadError": "Could not load your invoice details.",
+    "retry": "Retry",
+    "empty": "You have no invoice details yet. Add them so an invoice can be issued to you.",
+    "default": "Default",
+    "type": {
+      "personal": "Individual",
+      "business": "Business",
+      "household": "Household business"
+    },
+    "field": {
+      "type": "Type",
+      "legalName": "Name on the invoice",
+      "taxCode": "Tax code",
+      "personalIdNumber": "Personal ID number",
+      "address": "Address",
+      "email": "Email for the invoice",
+      "isDefault": "Use as my default"
+    },
+    "hint": {
+      "legalName": "Emoji are removed from the name when an invoice is issued.",
+      "taxCode": "10 digits, or 10 digits, a dash and 3 digits for a branch.",
+      "personalIdNumber": "The 12-digit number on your citizen ID card.",
+      "email": "Optional."
+    },
+    "action": {
+      "edit": "Edit",
+      "delete": "Delete",
+      "setDefault": "Set as default",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel"
+    },
+    "dialog": {
+      "createTitle": "Add invoice details",
+      "editTitle": "Edit invoice details"
+    },
+    "confirmDelete": {
+      "title": "Delete these invoice details?",
+      "message": "{{name}} will be removed from your account. Invoices already issued are not affected.",
+      "confirm": "Delete",
+      "busy": "Deleting…"
+    },
+    "error": {
+      "save": "Could not save. Please try again.",
+      "delete": "Could not delete. Please try again.",
+      "setDefault": "Could not set the default. Please try again.",
+      "notFound": "These invoice details no longer exist.",
+      "legalName": {
+        "required": "Enter the name to print on the invoice.",
+        "tooLong": "The name can be at most 400 characters.",
+        "unreadable": "The name needs a readable character; emoji are removed on the invoice."
+      },
+      "taxCode": {
+        "required": "Enter the tax code.",
+        "invalid": "The tax code must be 10 digits, optionally followed by a dash and 3 digits."
+      },
+      "personalIdNumber": {
+        "required": "Enter the 12-digit personal ID number.",
+        "invalid": "The personal ID number must be exactly 12 digits."
+      },
+      "address": {
+        "required": "Enter the address.",
+        "tooLong": "The address can be at most 500 characters."
+      },
+      "email": {
+        "invalid": "Enter a valid email address.",
+        "tooLong": "The email address can be at most 255 characters."
+      }
+    }
   },
   "amount": "{{amount}} ₫",
   "none": "Not available",

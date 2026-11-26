@@ -153,6 +153,13 @@ export function UserMenu({ name, email }: Readonly<UserMenuProps>) {
           >
             <span>{t('billing.menu.paymentHistory')}</span>
           </Link>
+          <Link
+            to="/billing/profiles"
+            className="cortex-user-menu__item"
+            onClick={() => setOpen(false)}
+          >
+            <span>{t('billing.menu.invoiceDetails')}</span>
+          </Link>
           {demoPagesEnabled() && (
             <Link
               to="/integrations"
