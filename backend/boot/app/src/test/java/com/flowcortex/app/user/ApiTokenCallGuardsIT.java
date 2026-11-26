@@ -186,12 +186,13 @@ class ApiTokenCallGuardsIT extends AbstractUserModuleIT {
         Owner owner = owner("call-private");
         UUID workflow = createWorkflow(owner, "Private").getBody().id();
 
-        exchange(WORKFLOWS + "/" + workflow + "?secret=abc", HttpMethod.PATCH, owner.token(),
+        // The row's uuids are hex, so the sentinel carries non-hex letters and cannot match one by chance.
+        exchange(WORKFLOWS + "/" + workflow + "?secret=qzx-query", HttpMethod.PATCH, owner.token(),
                 Map.of("name", "Bí mật"), String.class);
 
         String everything = jdbc.queryForList("SELECT row_to_json(c)::text FROM api_token_call c WHERE user_id = ?",
                 String.class, owner.id()).toString();
-        assertThat(everything).doesNotContain("secret").doesNotContain("abc").doesNotContain("Bí mật");
+        assertThat(everything).doesNotContain("secret").doesNotContain("qzx-query").doesNotContain("Bí mật");
     }
 
     @Test
