@@ -11096,6 +11096,45 @@ components:
       - itemIndex
       - outputs
       - status
+    RunStepFailureResponse:
+      type: object
+      properties:
+        category:
+          type: string
+          enum:
+          - validation
+          - handoff
+          - configuration
+          - contract
+          - review_rejected
+          - insufficient_credits
+          - timeout
+          - provider_error
+          - quota_exceeded
+          - unavailable
+          - processing
+          - internal
+        source:
+          type: string
+          enum:
+          - user
+          - provider
+          - system
+        retryable:
+          type: boolean
+        recovery:
+          type: string
+          enum:
+          - retry
+          - top_up
+          - change_input
+          - edit_workflow
+          - none
+      required:
+      - category
+      - recovery
+      - retryable
+      - source
     RunStepOutputResponse:
       type: object
       properties:
@@ -11162,6 +11201,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RunStepChildResponse"
+        failure:
+          $ref: "#/components/schemas/RunStepFailureResponse"
       required:
       - attempt
       - children
