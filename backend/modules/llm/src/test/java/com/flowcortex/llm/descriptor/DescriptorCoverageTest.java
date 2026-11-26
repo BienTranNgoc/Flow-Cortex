@@ -100,6 +100,29 @@ class DescriptorCoverageTest {
     }
 
     @Test
+    void theSeededSetHasNoViolationsAndIsExactlyTheTwoSeededIdsSortedById() {
+        SeededModelDescriptors seeded = new SeededModelDescriptors();
+
+        assertThat(DescriptorRules.violations(seeded.all())).isEmpty();
+        assertThat(seeded.all()).extracting(ModelDescriptor::id)
+                .containsExactly("gemini-3.5-flash-lite", "gemini-3.8-flash");
+    }
+
+    @Test
+    void aSeededModelIsDescribedForGeminiWithTextInputAndOutputWithinContext() {
+        ModelDescriptor flash = new SeededModelDescriptors().describe("gemini-3.8-flash").orElseThrow();
+
+        assertThat(flash.providerKey()).isEqualTo("gemini");
+        assertThat(flash.inputModalities()).contains(Modality.TEXT);
+        assertThat(flash.limits().output()).isLessThanOrEqualTo(flash.limits().context());
+    }
+
+    @Test
+    void anUnknownIdIsNotDescribedAndRaisesNothing() {
+        assertThat(new SeededModelDescriptors().describe("gpt-5")).isEmpty();
+    }
+
+    @Test
     void everyBrokenPropertyIsReportedInMapOrder() {
         Map<String, List<String>> ids = new LinkedHashMap<>();
         ids.put("first.property", List.of("nope"));
