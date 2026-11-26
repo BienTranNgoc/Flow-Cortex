@@ -1,9 +1,11 @@
 package com.flowcortex.llm.gemini;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.llm.api.LlmTimeouts;
+import com.flowcortex.llm.registry.ModelActivity;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
@@ -14,6 +16,7 @@ class GeminiConfigTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+            .withBean(ModelActivity.class, () -> mock(ModelActivity.class))
             .withUserConfiguration(GeminiConfig.class);
 
     @Test

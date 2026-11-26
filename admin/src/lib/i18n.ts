@@ -5,6 +5,7 @@ import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
 import enContent from '../locales/en/content.json';
 import enDashboard from '../locales/en/dashboard.json';
+import enFeatureSwitches from '../locales/en/featureSwitches.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
 import enOnboarding from '../locales/en/onboarding.json';
 import enRoles from '../locales/en/roles.json';
@@ -23,6 +24,7 @@ import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viContent from '../locales/vi/content.json';
 import viDashboard from '../locales/vi/dashboard.json';
+import viFeatureSwitches from '../locales/vi/featureSwitches.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
 import viOnboarding from '../locales/vi/onboarding.json';
 import viRoles from '../locales/vi/roles.json';
@@ -53,6 +55,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     smsOutbox: viSmsOutbox,
     phoneVerification: viPhoneVerification,
     settings: viSettings,
+    featureSwitches: viFeatureSwitches,
     paymentSettings: viPaymentSettings,
     support: viSupport,
     onboarding: viOnboarding,
@@ -73,6 +76,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     smsOutbox: enSmsOutbox,
     phoneVerification: enPhoneVerification,
     settings: enSettings,
+    featureSwitches: enFeatureSwitches,
     paymentSettings: enPaymentSettings,
     support: enSupport,
     onboarding: enOnboarding,

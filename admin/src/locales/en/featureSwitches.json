@@ -1,0 +1,45 @@
+{
+  "eyebrow": "Administration",
+  "title": "Feature Switches",
+  "description": "Every member-facing feature switch. Runtime switches take effect from the next request; the rest follow the server configuration.",
+  "envOnly": "Changes need a server restart",
+  "loading": "Loading…",
+  "loadFailed": "Could not load the feature switches.",
+  "refreshFailed": "Could not refresh the latest feature switches — showing the version loaded earlier.",
+  "retry": "Retry",
+  "empty": "There are no feature switches to show.",
+  "items": {
+    "emailConfirmation": {
+      "label": "Email confirmation",
+      "help": "New accounts must confirm their email address before signing in."
+    },
+    "phoneVerification": {
+      "label": "Phone verification",
+      "help": "Members verify a phone number with a one-time code."
+    },
+    "uploadContentCheck": {
+      "label": "Upload content check",
+      "help": "An upload whose first bytes do not match its declared kind is refused."
+    },
+    "credits": {
+      "label": "Credits",
+      "help": "Credit balances, usage and top-ups for members."
+    },
+    "personalAccessTokens": {
+      "label": "API tokens",
+      "help": "Members can create personal access tokens for the API."
+    },
+    "onboarding": {
+      "label": "Onboarding",
+      "help": "New members are guided through their first workflow."
+    },
+    "chat": {
+      "label": "Chat",
+      "help": "Members can use the Chat page."
+    },
+    "drive": {
+      "label": "Drive",
+      "help": "Members can use the Drive page and their personal space."
+    }
+  }
+}

@@ -250,7 +250,7 @@ function Conversation({ request }: Readonly<{ request: AdminSupportRequestDetail
 function ConversationMessage({ message }: Readonly<{ message: SupportConversationMessage }>) {
   const { t } = useTranslation();
   const outcome =
-    message.outcome === 'no_answer' || message.outcome === 'blocked'
+    message.outcome && message.outcome !== 'answered'
       ? t(`support.requests.outcome.${message.outcome}`)
       : undefined;
   return (
