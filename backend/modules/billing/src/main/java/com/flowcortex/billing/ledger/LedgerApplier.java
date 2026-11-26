@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessResourceException;
@@ -27,7 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Applies accepted provider callbacks to payments. Each callback is decided in one transaction that holds
  * its inbox row and then its payment row, so concurrent passes and instances decide a callback once and two
  * callbacks for one payment one after the other. A callback that fails for any reason but a refusal is held
- * back with a growing wait and the pass goes on, so one bad callback never stops the others.
+ * back with a growing wait and the pass goes on, so one bad callback never stops the others. A move to
+ * {@code succeeded} also runs every {@link SettledPlanPurchase} in that transaction, so its effects commit with it.
  */
 @Component
 @EnableConfigurationProperties(LedgerApplyProperties.class)
@@ -46,15 +48,18 @@ public class LedgerApplier {
     private final LedgerApplyProperties properties;
     private final Clock clock;
     private final TransactionTemplate transactions;
+    private final ObjectProvider<SettledPlanPurchase> settledEffects;
 
     LedgerApplier(CallbackInbox inbox, PaymentTransactionRepository payments, LedgerTelemetry telemetry,
-            LedgerApplyProperties properties, Clock clock, PlatformTransactionManager transactionManager) {
+            LedgerApplyProperties properties, Clock clock, PlatformTransactionManager transactionManager,
+            ObjectProvider<SettledPlanPurchase> settledEffects) {
         this.inbox = inbox;
         this.payments = payments;
         this.telemetry = telemetry;
         this.properties = properties;
         this.clock = clock;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.settledEffects = settledEffects;
     }
 
     /** One timed pass, unless the applier is switched off. */
@@ -123,6 +128,9 @@ public class LedgerApplier {
                 }
                 payments.insertHistory(paymentId, applied.from(), applied.to(), "provider_code:" + resultCode,
                         resultCode, claimed.id().toString(), applied.facts().providerTimestamp(), now);
+                if (applied.to() == MoneyStatus.SUCCEEDED) {
+                    settledEffects.orderedStream().forEach(effect -> effect.onSucceeded(paymentId, now));
+                }
                 mark(claimed, "applied", "provider_code:" + resultCode, paymentId, now);
             }
             case Skipped skipped -> mark(claimed, "skipped", skipped.reason(), paymentId, now);

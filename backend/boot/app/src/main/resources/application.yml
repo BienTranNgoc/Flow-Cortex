@@ -480,6 +480,13 @@ flowcortex:
       check:
         enabled: ${FLOWCORTEX_BILLING_CATALOGUE_CHECK_ENABLED:true}
         interval: ${FLOWCORTEX_BILLING_CATALOGUE_CHECK_INTERVAL:PT24H}
+    # Makes a member's next-cycle plan the held plan once its period begins; switched off, the member's own next
+    # payment still activates it.
+    entitlement:
+      activation:
+        enabled: ${FLOWCORTEX_BILLING_ENTITLEMENT_ACTIVATION_ENABLED:true}
+        interval: ${FLOWCORTEX_BILLING_ENTITLEMENT_ACTIVATION_INTERVAL:PT5M}
+        batch-size: ${FLOWCORTEX_BILLING_ENTITLEMENT_ACTIVATION_BATCH_SIZE:100}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.

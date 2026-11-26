@@ -50,6 +50,33 @@ class OpenPaymentTest {
     }
 
     @Test
+    void aPlanReferenceParsesIntoItsTierAndCycle() {
+        assertThat(PlanItemRef.parse("basic:monthly")).contains(new PlanItemRef("basic", "monthly"));
+        assertThat(PlanItemRef.parse("advanced:yearly")).contains(new PlanItemRef("advanced", "yearly"));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"pkg-50k", "basic:weekly", "Basic:monthly", "basic:", ":monthly", "abcdefghijklmnopqrstu:monthly",
+            "basic:monthly:extra"})
+    void aReferenceThatIsNotATierAndCycleDoesNotParse(String itemRef) {
+        assertThat(PlanItemRef.parse(itemRef)).isEmpty();
+    }
+
+    @Test
+    void aPlanPurchaseOpenedWithATierAndCycleBuilds() {
+        assertThat(new OpenPayment(MEMBER, "plan_purchase", "advanced:yearly", "Advanced", 1_990_000L, "momo", "M1",
+                Optional.empty()).itemRef()).isEqualTo("advanced:yearly");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pkg-50k", "basic:weekly"})
+    void aPlanPurchaseNamingNoPlanIsRefused(String itemRef) {
+        assertRefused("itemRef", () -> new OpenPayment(MEMBER, "plan_purchase", itemRef, "Basic", 199_000L, "momo", "M1",
+                Optional.empty()));
+    }
+
+    @Test
     void anOpeningStatedWithAnAbsentInstrumentReadsAsNoInstrument() {
         assertThat(new OpenPayment(MEMBER, "topup", "pkg-50k", "Nạp", 50_000L, "momo", "M1", null).instrument()).isEmpty();
     }

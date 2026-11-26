@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  * pending payment the provider would refuse to charge is one nothing ever closes.
  *
  * @param kind {@code plan_purchase} or {@code topup}
- * @param itemRef the caller's reference to what is bought
+ * @param itemRef the caller's reference to what is bought; for a plan purchase {@code <tier>:<cycle>}
  * @param description the text the member sees and the provider receives
  * @param instrument how the payer pays, when already chosen; an absent value reads as none
  */
@@ -37,6 +37,7 @@ public record OpenPayment(
         require(userId != null, "userId");
         require(kind != null && KINDS.contains(kind), "kind");
         require(itemRef != null && ITEM_REF.matcher(itemRef).matches(), "itemRef");
+        require(!"plan_purchase".equals(kind) || PlanItemRef.parse(itemRef).isPresent(), "itemRef");
         require(isAcceptableDescription(description), "description");
         require(amountVnd > 0 && !PaymentAmountLimits.outsideProviderRange(amountVnd), "amountVnd");
         require(provider != null && PROVIDER.matcher(provider).matches(), "provider");
