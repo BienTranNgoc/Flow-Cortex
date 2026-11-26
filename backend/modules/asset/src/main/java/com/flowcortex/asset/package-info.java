@@ -12,6 +12,7 @@
                 "media :: api",
                 "space :: api",
                 "jobs :: api",
+                "user :: api",
                 "shared :: web"
         }
 )

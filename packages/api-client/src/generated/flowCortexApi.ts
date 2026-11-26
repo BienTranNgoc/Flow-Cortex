@@ -4460,6 +4460,134 @@ export interface PreferencesView {
   privacy: PrivacySettings;
 }
 
+export interface AssetCountsResponse {
+  all: number;
+  video: number;
+  image: number;
+  audio: number;
+  favorite: number;
+}
+
+export type AssetItemResponseKind =
+  (typeof AssetItemResponseKind)[keyof typeof AssetItemResponseKind];
+
+export const AssetItemResponseKind = {
+  video: 'video',
+  image: 'image',
+  audio: 'audio',
+} as const;
+
+export type AssetItemResponseSource =
+  (typeof AssetItemResponseSource)[keyof typeof AssetItemResponseSource];
+
+export const AssetItemResponseSource = {
+  run: 'run',
+  upload: 'upload',
+} as const;
+
+export interface AssetItemResponse {
+  id: string;
+  kind: AssetItemResponseKind;
+  title: string;
+  source: AssetItemResponseSource;
+  mimeType: string;
+  bytes: number;
+  createdAt: string;
+  runId: string;
+  workflowId?: string;
+  workflowName?: string;
+  favorite: boolean;
+  tags: string[];
+  missing: boolean;
+  thumbnailUrl?: string;
+}
+
+export interface AssetPageMetaResponse {
+  total: number;
+  counts: AssetCountsResponse;
+  nextCursor?: string;
+  mark: string;
+}
+
+export interface AssetPageResponse {
+  items: AssetItemResponse[];
+  meta: AssetPageMetaResponse;
+}
+
+export interface AssetLinkResponse {
+  url: string;
+  expiresAt: string;
+}
+
+export interface AssetUsageEntryResponse {
+  count: number;
+  bytes: number;
+}
+
+export interface AssetUsageByKindResponse {
+  video: AssetUsageEntryResponse;
+  image: AssetUsageEntryResponse;
+  audio: AssetUsageEntryResponse;
+}
+
+export interface AssetUsageResponse {
+  total: AssetUsageEntryResponse;
+  byKind: AssetUsageByKindResponse;
+}
+
+export interface AssetTagResponse {
+  label: string;
+  count: number;
+}
+
+export interface AssetTagListResponse {
+  tags: AssetTagResponse[];
+}
+
+export interface RunResultThumbnailResponse {
+  url: string;
+}
+
+export type RunResultResponseRegistration =
+  (typeof RunResultResponseRegistration)[keyof typeof RunResultResponseRegistration];
+
+export const RunResultResponseRegistration = {
+  pending: 'pending',
+  done: 'done',
+  none: 'none',
+} as const;
+
+export interface RunResultResponse {
+  runId: string;
+  count: number;
+  kinds: string[];
+  thumbnails: RunResultThumbnailResponse[];
+  registration: RunResultResponseRegistration;
+}
+
+export interface RunResultListResponse {
+  results: RunResultResponse[];
+}
+
+export interface AssetGroupPageMetaResponse {
+  totalGroups: number;
+  mark: string;
+}
+
+export interface AssetGroupResponse {
+  key: string;
+  title?: string;
+  count: number;
+  runCount: number;
+  latestAt: string;
+  items: AssetItemResponse[];
+}
+
+export interface AssetGroupPageResponse {
+  groups: AssetGroupResponse[];
+  meta: AssetGroupPageMetaResponse;
+}
+
 export type AdminWorkflowResponseStatus =
   (typeof AdminWorkflowResponseStatus)[keyof typeof AdminWorkflowResponseStatus];
 
@@ -5677,6 +5805,145 @@ export type AuthorizeParams = {
   remember_me?: boolean;
   return_to?: string;
 };
+
+export type ListAssetsParams = {
+  /**
+   * Comma-separated kinds: video, image, audio
+   */
+  kind?: string;
+  /**
+   * Comma-separated sources: run, upload
+   */
+  source?: string;
+  /**
+   * A group key: workflow:<id>, upload or day:<YYYY-MM-DD>
+   */
+  group?: string;
+  runId?: string;
+  /**
+   * Search in titles and tags, at most 200 characters
+   */
+  q?: string;
+  tag?: string;
+  favorite?: boolean;
+  time?: ListAssetsTime;
+  /**
+   * First day, Asia/Ho_Chi_Minh; with time=custom
+   */
+  from?: string;
+  /**
+   * Last day, inclusive; with time=custom
+   */
+  to?: string;
+  sort?: ListAssetsSort;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
+  /**
+   * meta.nextCursor of the previous page
+   */
+  cursor?: string;
+  /**
+   * Snapshot instant of a walk
+   */
+  mark?: string;
+};
+
+export type ListAssetsTime = (typeof ListAssetsTime)[keyof typeof ListAssetsTime];
+
+export const ListAssetsTime = {
+  all: 'all',
+  '7d': '7d',
+  '30d': '30d',
+  custom: 'custom',
+} as const;
+
+export type ListAssetsSort = (typeof ListAssetsSort)[keyof typeof ListAssetsSort];
+
+export const ListAssetsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  size_desc: 'size_desc',
+  size_asc: 'size_asc',
+} as const;
+
+export type ListRunResultsParams = {
+  /**
+   * 1-100 distinct run ids; a repeated id answers once
+   * @minItems 1
+   * @maxItems 100
+   */
+  runId: string[];
+};
+
+export type ListAssetGroupsParams = {
+  groupBy?: ListAssetGroupsGroupBy;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 30
+   */
+  pageSize?: number;
+  /**
+   * @minimum 1
+   * @maximum 12
+   */
+  itemsPerGroup?: number;
+  /**
+   * Comma-separated kinds: video, image, audio
+   */
+  kind?: string;
+  /**
+   * Comma-separated sources: run, upload
+   */
+  source?: string;
+  runId?: string;
+  q?: string;
+  tag?: string;
+  favorite?: boolean;
+  time?: ListAssetGroupsTime;
+  from?: string;
+  to?: string;
+  /**
+   * Order of the items inside each group
+   */
+  sort?: ListAssetGroupsSort;
+  /**
+   * meta.mark of page 1, sent with every later page
+   */
+  mark?: string;
+};
+
+export type ListAssetGroupsGroupBy =
+  (typeof ListAssetGroupsGroupBy)[keyof typeof ListAssetGroupsGroupBy];
+
+export const ListAssetGroupsGroupBy = {
+  workflow: 'workflow',
+  day: 'day',
+} as const;
+
+export type ListAssetGroupsTime = (typeof ListAssetGroupsTime)[keyof typeof ListAssetGroupsTime];
+
+export const ListAssetGroupsTime = {
+  all: 'all',
+  '7d': '7d',
+  '30d': '30d',
+  custom: 'custom',
+} as const;
+
+export type ListAssetGroupsSort = (typeof ListAssetGroupsSort)[keyof typeof ListAssetGroupsSort];
+
+export const ListAssetGroupsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  size_desc: 'size_desc',
+  size_asc: 'size_asc',
+} as const;
 
 export type ExportAdminWorkflowsParams = {
   /**
@@ -21067,6 +21334,235 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAssetsResponse200 = {
+  data: AssetPageResponse;
+  status: 200;
+};
+
+export type listAssetsResponseSuccess = listAssetsResponse200 & {
+  headers: Headers;
+};
+export type listAssetsResponse = listAssetsResponseSuccess;
+
+export const getListAssetsUrl = (params?: ListAssetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/assets?${stringifiedParams}` : `/api/v1/assets`;
+};
+
+export const listAssets = async (
+  params?: ListAssetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAssetsResponse> => {
+  return customFetch<listAssetsResponse>(getListAssetsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetResponse200 = {
+  data: AssetItemResponse;
+  status: 200;
+};
+
+export type getAssetResponseSuccess = getAssetResponse200 & {
+  headers: Headers;
+};
+export type getAssetResponse = getAssetResponseSuccess;
+
+export const getGetAssetUrl = (id: string) => {
+  return `/api/v1/assets/${id}`;
+};
+
+export const getAsset = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetResponse> => {
+  return customFetch<getAssetResponse>(getGetAssetUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetViewUrlResponse200 = {
+  data: AssetLinkResponse;
+  status: 200;
+};
+
+export type getAssetViewUrlResponseSuccess = getAssetViewUrlResponse200 & {
+  headers: Headers;
+};
+export type getAssetViewUrlResponse = getAssetViewUrlResponseSuccess;
+
+export const getGetAssetViewUrlUrl = (id: string) => {
+  return `/api/v1/assets/${id}/view-url`;
+};
+
+export const getAssetViewUrl = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetViewUrlResponse> => {
+  return customFetch<getAssetViewUrlResponse>(getGetAssetViewUrlUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetDownloadUrlResponse200 = {
+  data: AssetLinkResponse;
+  status: 200;
+};
+
+export type getAssetDownloadUrlResponseSuccess = getAssetDownloadUrlResponse200 & {
+  headers: Headers;
+};
+export type getAssetDownloadUrlResponse = getAssetDownloadUrlResponseSuccess;
+
+export const getGetAssetDownloadUrlUrl = (id: string) => {
+  return `/api/v1/assets/${id}/download-url`;
+};
+
+export const getAssetDownloadUrl = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetDownloadUrlResponse> => {
+  return customFetch<getAssetDownloadUrlResponse>(getGetAssetDownloadUrlUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetUsageResponse200 = {
+  data: AssetUsageResponse;
+  status: 200;
+};
+
+export type getAssetUsageResponseSuccess = getAssetUsageResponse200 & {
+  headers: Headers;
+};
+export type getAssetUsageResponse = getAssetUsageResponseSuccess;
+
+export const getGetAssetUsageUrl = () => {
+  return `/api/v1/assets/usage`;
+};
+
+export const getAssetUsage = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetUsageResponse> => {
+  return customFetch<getAssetUsageResponse>(getGetAssetUsageUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAssetTagsResponse200 = {
+  data: AssetTagListResponse;
+  status: 200;
+};
+
+export type listAssetTagsResponseSuccess = listAssetTagsResponse200 & {
+  headers: Headers;
+};
+export type listAssetTagsResponse = listAssetTagsResponseSuccess;
+
+export const getListAssetTagsUrl = () => {
+  return `/api/v1/assets/tags`;
+};
+
+export const listAssetTags = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAssetTagsResponse> => {
+  return customFetch<listAssetTagsResponse>(getListAssetTagsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listRunResultsResponse200 = {
+  data: RunResultListResponse;
+  status: 200;
+};
+
+export type listRunResultsResponseSuccess = listRunResultsResponse200 & {
+  headers: Headers;
+};
+export type listRunResultsResponse = listRunResultsResponseSuccess;
+
+export const getListRunResultsUrl = (params: ListRunResultsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ['runId'];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/assets/run-results?${stringifiedParams}`
+    : `/api/v1/assets/run-results`;
+};
+
+export const listRunResults = async (
+  params: ListRunResultsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listRunResultsResponse> => {
+  return customFetch<listRunResultsResponse>(getListRunResultsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAssetGroupsResponse200 = {
+  data: AssetGroupPageResponse;
+  status: 200;
+};
+
+export type listAssetGroupsResponseSuccess = listAssetGroupsResponse200 & {
+  headers: Headers;
+};
+export type listAssetGroupsResponse = listAssetGroupsResponseSuccess;
+
+export const getListAssetGroupsUrl = (params?: ListAssetGroupsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/assets/groups?${stringifiedParams}`
+    : `/api/v1/assets/groups`;
+};
+
+export const listAssetGroups = async (
+  params?: ListAssetGroupsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAssetGroupsResponse> => {
+  return customFetch<listAssetGroupsResponse>(getListAssetGroupsUrl(params), {
     ...options,
     method: 'GET',
   });
