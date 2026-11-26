@@ -3540,6 +3540,18 @@ export interface BalanceResponse {
   granted?: number;
 }
 
+export interface LegalIndexEntry {
+  /** The document slug, e.g. legal-privacy */
+  slug: string;
+  /** The member page path, e.g. /legal/privacy */
+  path: string;
+  label: LocalizedText;
+}
+
+export interface LegalIndex {
+  items: LegalIndexEntry[];
+}
+
 export interface ContentDocumentHistoryEntry {
   revisionId: string;
   publishedAt: string;
@@ -4049,6 +4061,8 @@ export interface ContentDocumentSummary {
   title: LocalizedText;
   sectionTypes: string[];
   publicHistory: boolean;
+  minSections: number;
+  maxSections: number;
   draftVersion: number;
   /** @nullable */
   draftUpdatedAt?: string | null;
@@ -17375,6 +17389,29 @@ export const getContentMedia = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getContentMediaResponse> => {
   return customFetch<getContentMediaResponse>(getGetContentMediaUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getLegalIndexResponse200 = {
+  data: LegalIndex;
+  status: 200;
+};
+
+export type getLegalIndexResponseSuccess = getLegalIndexResponse200 & {
+  headers: Headers;
+};
+export type getLegalIndexResponse = getLegalIndexResponseSuccess;
+
+export const getGetLegalIndexUrl = () => {
+  return `/api/v1/content/legal-index`;
+};
+
+export const getLegalIndex = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getLegalIndexResponse> => {
+  return customFetch<getLegalIndexResponse>(getGetLegalIndexUrl(), {
     ...options,
     method: 'GET',
   });

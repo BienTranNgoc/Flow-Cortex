@@ -1,6 +1,6 @@
 import type { ContentSection, ContentSeoMeta } from '@flow-cortex/api-client';
 
-export const LOCALES =['vi', 'en'] as const;
+export const LOCALES = ['vi', 'en'] as const;
 export type ContentLocale = (typeof LOCALES)[number];
 export type LocalizedText = Record<ContentLocale, string>;
 
@@ -8,10 +8,15 @@ export type LocalizedText = Record<ContentLocale, string>;
 export const MAX_TEXT_CHARS = 50_000;
 export const MAX_SEO_TITLE_CHARS = 200;
 export const MAX_SEO_DESCRIPTION_CHARS = 500;
-export const MAX_SECTIONS = 100;
+export const MAX_TITLE_CHARS = 200;
+export const MAX_DOC_VERSION_CHARS = 32;
 
 export const RICH_TEXT = 'richText';
 export const MEDIA = 'media';
+export const LEGAL_DOC = 'legalDoc';
+export const LEGAL_INDEX = 'legalIndex';
+export const DOC_VERSION = 'docVersion';
+export const EFFECTIVE_DATE = 'effectiveDate';
 
 export interface Section {
   /** Client-side identity that keeps a section's DOM and focus with it across moves; never sent. */
@@ -94,6 +99,20 @@ export function toWire(content: DocumentContent): {
 /** An empty section of a built-in type. A media section has no `mediaId` until one is picked. */
 export function newSection(type: string): Section {
   const id = nextSectionId();
+  if (type === LEGAL_DOC) {
+    return {
+      id,
+      type,
+      schemaVersion: 1,
+      data: {
+        title: { ...EMPTY_TEXT },
+        body: { ...EMPTY_TEXT },
+        docVersion: '',
+        effectiveDate: '',
+      },
+    };
+  }
+  if (type === LEGAL_INDEX) return { id, type, schemaVersion: 1, data: { items: [] } };
   if (type === MEDIA) {
     return {
       id,
@@ -107,7 +126,62 @@ export function newSection(type: string): Section {
 
 /** The section types the console has an editor for. */
 export function isEditable(type: string): boolean {
-  return type === RICH_TEXT || type === MEDIA;
+  return type === RICH_TEXT || type === MEDIA || type === LEGAL_DOC || type === LEGAL_INDEX;
+}
+
+/** A plain string field of a section, such as the version label or the effective date. */
+export function withField(section: Section, field: string, value: string): Section {
+  return { ...section, data: { ...section.data, [field]: value } };
+}
+
+/** One row of a `legalIndex` section; a label key is present only when staff typed an override. */
+export interface IndexItem {
+  slug: string;
+  visible: boolean;
+  label: Partial<LocalizedText>;
+}
+
+/** The rows of a `legalIndex` section from the wire; a row without a slug is dropped. */
+export function indexItems(section: Section): IndexItem[] {
+  const items = section.data.items;
+  if (!Array.isArray(items)) return [];
+  return items.filter(isRecord).flatMap((item) => {
+    if (typeof item.slug !== 'string') return [];
+    const label = isRecord(item.label) ? item.label : {};
+    return [
+      {
+        slug: item.slug,
+        visible: item.visible !== false,
+        label: {
+          ...(typeof label.vi === 'string' ? { vi: label.vi } : {}),
+          ...(typeof label.en === 'string' ? { en: label.en } : {}),
+        },
+      },
+    ];
+  });
+}
+
+/** The section holding `items`; a row with no override saves without a `label` key. */
+export function withIndexItems(section: Section, items: readonly IndexItem[]): Section {
+  return {
+    ...section,
+    data: {
+      ...section.data,
+      items: items.map(({ slug, visible, label }) => ({
+        slug,
+        visible,
+        ...(Object.keys(label).length > 0 ? { label } : {}),
+      })),
+    },
+  };
+}
+
+/** The row with the label override of one language set, or removed when `value` is empty. */
+export function withItemLabel(item: IndexItem, locale: ContentLocale, value: string): IndexItem {
+  const label = { ...item.label };
+  if (value === '') delete label[locale];
+  else label[locale] = value;
+  return { ...item, label };
 }
 
 export function withText(
