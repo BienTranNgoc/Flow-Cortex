@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from flowcortex_worker import roles
 from flowcortex_worker.contracts.media_job import MediaJob
 from flowcortex_worker.errors import PermanentError
-from flowcortex_worker.handlers import compose_dub, registry, render_video
+from flowcortex_worker.handlers import compose_dub, registry, render_video, role_suggest
 from flowcortex_worker.roles import RoleError
 
 BROKEN = "flowcortex_worker.handlers.not_installed"
@@ -214,3 +214,22 @@ def test_importing_the_assembly_modules_pulls_in_only_the_standard_library_and_t
 
     added = {name for name in completed.stdout.strip().split(",") if name}
     assert not added - sys.stdlib_module_names - {"flowcortex_worker"}
+
+
+def test_role_suggest_loads_alone() -> None:
+    handlers = registry.load_handlers(frozenset({"role_suggest"}))
+
+    assert set(handlers) == {"role_suggest"}
+    assert handlers["role_suggest"] is role_suggest.handle
+
+
+def test_the_role_suggest_module_imports_without_the_detector_libraries() -> None:
+    check = (
+        "import flowcortex_worker.handlers.role_suggest, sys; "
+        "heavy = [m for m in ('torch', 'transformers') if m in sys.modules]; "
+        "sys.exit(f'imported {heavy}' if heavy else 0)"
+    )
+
+    completed = subprocess.run([sys.executable, "-c", check], capture_output=True, text=True)
+
+    assert completed.returncode == 0, completed.stderr
