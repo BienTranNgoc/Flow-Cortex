@@ -232,6 +232,8 @@ export const MeResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface MeResponse {
@@ -268,6 +270,41 @@ export interface LocaleRequest {
 
 export interface LocaleResponse {
   locale: string;
+}
+
+export interface AdminTrendTagOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   */
+  ids: string[];
+}
+
+export interface AdminTrendTag {
+  id: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
+}
+
+export interface AdminTrendCategoryOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   * @items.minLength 1
+   */
+  keys: string[];
+}
+
+export interface AdminTrendCategory {
+  key: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -586,6 +623,8 @@ export const RoleResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface RoleResponse {
@@ -1208,6 +1247,64 @@ export interface CreateUserRequest {
    * @maxLength 20
    */
   role: string;
+}
+
+export interface TrashItemKey {
+  /** @pattern ^[a-z][a-z0-9_]{1,31}$ */
+  type: string;
+  /** @pattern ^[A-Za-z0-9_-]{1,64}$ */
+  id: string;
+}
+
+export interface TrashItemsRequest {
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  items: TrashItemKey[];
+}
+
+export type TrashSkippedItemReason =
+  (typeof TrashSkippedItemReason)[keyof typeof TrashSkippedItemReason];
+
+export const TrashSkippedItemReason = {
+  notFound: 'notFound',
+  conflict: 'conflict',
+  blocked: 'blocked',
+  failed: 'failed',
+} as const;
+
+export interface TrashSkippedItem {
+  type: string;
+  id: string;
+  reason: TrashSkippedItemReason;
+  message?: string;
+}
+
+export interface TrashBulkResult {
+  succeeded: TrashItemKey[];
+  skipped: TrashSkippedItem[];
+}
+
+export interface TrashEmptyRequest {
+  /**
+   * The next of the previous answer; absent starts from the first entry
+   * @nullable
+   */
+  next?: string | null;
+}
+
+export interface TrashEmptyResult {
+  purged: number;
+  blocked: number;
+  failed: number;
+  /** Entries still in the Trash after this call */
+  remaining: number;
+  /**
+   * Send back as next to continue; null when every entry has been examined
+   * @nullable
+   */
+  next: string | null;
 }
 
 export interface SupportUploadRequest {
@@ -2324,6 +2421,32 @@ export interface ImportReviewResponse {
   outboundTargets: OutboundTargetResponse[];
 }
 
+export interface AdminTrendTagCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn: string;
+}
+
+export interface AdminTrendCategoryCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn: string;
+}
+
 export type AdminSupportRequestReplyStatus =
   (typeof AdminSupportRequestReplyStatus)[keyof typeof AdminSupportRequestReplyStatus];
 
@@ -2696,6 +2819,34 @@ export interface PrivacySettings {
   stats?: PrivacySettingsStats;
 }
 
+export interface AdminTrendTagUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn?: string;
+  visible?: boolean;
+}
+
+export interface AdminTrendCategoryUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn?: string;
+  visible?: boolean;
+}
+
 export interface UpdateRoleRequest {
   /**
    * @minLength 0
@@ -3011,6 +3162,39 @@ export interface UserStats {
   locked?: number;
   suspended?: number;
   newLast7Days?: number;
+}
+
+export interface TrashItem {
+  /** The owning module's item type key */
+  type: string;
+  /** The item's id within its type */
+  id: string;
+  name: string;
+  /** Where the item lived before it was deleted */
+  location: string;
+  deletedAt: string;
+  /** When the sweep deletes the item for good */
+  expiresAt: string;
+  /**
+   * Whole days to expiresAt, rounded up, never below 0
+   * @minimum 0
+   */
+  remainingDays: number;
+}
+
+/**
+ * Entries per provided type and under 'all', whatever type, q and paging say
+ */
+export type TrashListCounts = { [key: string]: number };
+
+export interface TrashList {
+  items: TrashItem[];
+  page: number;
+  size: number;
+  /** Entries matching type and q */
+  total: number;
+  /** Entries per provided type and under 'all', whatever type, q and paging say */
+  counts: TrashListCounts;
 }
 
 export interface SupportSettings {
@@ -3855,6 +4039,11 @@ export interface WorkflowReportResponse {
   series: DayCountResponse[];
 }
 
+export interface AdminTrendTaxonomy {
+  categories: AdminTrendCategory[];
+  tags: AdminTrendTag[];
+}
+
 export type AdminSupportRequestSummaryType =
   (typeof AdminSupportRequestSummaryType)[keyof typeof AdminSupportRequestSummaryType];
 
@@ -4080,6 +4269,8 @@ export const PermissionCatalogEntryKey = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
 } as const;
 
 export interface PermissionCatalogEntry {
@@ -4583,6 +4774,34 @@ export const ExportUsersSort = {
   oldest: 'oldest',
   email: 'email',
   name: 'name',
+} as const;
+
+export type ListTrashParams = {
+  /**
+   * Only entries of this type
+   */
+  type?: string;
+  /**
+   * Search text, at most 100 characters; matches names without case or diacritics
+   */
+  q?: string;
+  sort?: ListTrashSort;
+  /**
+   * @minimum 0
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListTrashSort = (typeof ListTrashSort)[keyof typeof ListTrashSort];
+
+export const ListTrashSort = {
+  recent: 'recent',
+  expiring: 'expiring',
 } as const;
 
 export type SearchSupportKbParams = {
@@ -6202,6 +6421,130 @@ export const reorderAdminWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type reorderAdminTrendTagsResponse200 = {
+  data: AdminTrendTag[];
+  status: 200;
+};
+
+export type reorderAdminTrendTagsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendTagsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendTagsResponseSuccess = reorderAdminTrendTagsResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendTagsResponseError = (
+  reorderAdminTrendTagsResponse400 | reorderAdminTrendTagsResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendTagsResponse =
+  reorderAdminTrendTagsResponseSuccess | reorderAdminTrendTagsResponseError;
+
+export const getReorderAdminTrendTagsUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags/order`;
+};
+
+export const reorderAdminTrendTags = async (
+  adminTrendTagOrderRequest: AdminTrendTagOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendTagsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendTagsResponse>(getReorderAdminTrendTagsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagOrderRequest),
+  });
+};
+
+export type reorderAdminTrendCategoriesResponse200 = {
+  data: AdminTrendCategory[];
+  status: 200;
+};
+
+export type reorderAdminTrendCategoriesResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendCategoriesResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendCategoriesResponseSuccess = reorderAdminTrendCategoriesResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendCategoriesResponseError = (
+  reorderAdminTrendCategoriesResponse400 | reorderAdminTrendCategoriesResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendCategoriesResponse =
+  reorderAdminTrendCategoriesResponseSuccess | reorderAdminTrendCategoriesResponseError;
+
+export const getReorderAdminTrendCategoriesUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories/order`;
+};
+
+export const reorderAdminTrendCategories = async (
+  adminTrendCategoryOrderRequest: AdminTrendCategoryOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendCategoriesResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendCategoriesResponse>(getReorderAdminTrendCategoriesUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryOrderRequest),
   });
 };
 
@@ -8789,6 +9132,223 @@ export const requestUpload = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(uploadRequest),
+  });
+};
+
+export type restoreTrashItemsResponse200 = {
+  data: TrashBulkResult;
+  status: 200;
+};
+
+export type restoreTrashItemsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type restoreTrashItemsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type restoreTrashItemsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type restoreTrashItemsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type restoreTrashItemsResponseSuccess = restoreTrashItemsResponse200 & {
+  headers: Headers;
+};
+export type restoreTrashItemsResponseError = (
+  | restoreTrashItemsResponse400
+  | restoreTrashItemsResponse404
+  | restoreTrashItemsResponse409
+  | restoreTrashItemsResponse503
+) & {
+  headers: Headers;
+};
+
+export type restoreTrashItemsResponse =
+  restoreTrashItemsResponseSuccess | restoreTrashItemsResponseError;
+
+export const getRestoreTrashItemsUrl = () => {
+  return `/api/v1/trash/restore`;
+};
+
+/**
+ * @summary Restore items from the Trash
+ */
+export const restoreTrashItems = async (
+  trashItemsRequest: TrashItemsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreTrashItemsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreTrashItemsResponse>(getRestoreTrashItemsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashItemsRequest),
+  });
+};
+
+export type purgeTrashItemsResponse200 = {
+  data: TrashBulkResult;
+  status: 200;
+};
+
+export type purgeTrashItemsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type purgeTrashItemsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type purgeTrashItemsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type purgeTrashItemsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type purgeTrashItemsResponseSuccess = purgeTrashItemsResponse200 & {
+  headers: Headers;
+};
+export type purgeTrashItemsResponseError = (
+  | purgeTrashItemsResponse400
+  | purgeTrashItemsResponse404
+  | purgeTrashItemsResponse409
+  | purgeTrashItemsResponse503
+) & {
+  headers: Headers;
+};
+
+export type purgeTrashItemsResponse = purgeTrashItemsResponseSuccess | purgeTrashItemsResponseError;
+
+export const getPurgeTrashItemsUrl = () => {
+  return `/api/v1/trash/purge`;
+};
+
+/**
+ * @summary Delete items from the Trash for good
+ */
+export const purgeTrashItems = async (
+  trashItemsRequest: TrashItemsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<purgeTrashItemsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<purgeTrashItemsResponse>(getPurgeTrashItemsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashItemsRequest),
+  });
+};
+
+export type emptyTrashResponse200 = {
+  data: TrashEmptyResult;
+  status: 200;
+};
+
+export type emptyTrashResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type emptyTrashResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type emptyTrashResponseSuccess = emptyTrashResponse200 & {
+  headers: Headers;
+};
+export type emptyTrashResponseError = (emptyTrashResponse400 | emptyTrashResponse503) & {
+  headers: Headers;
+};
+
+export type emptyTrashResponse = emptyTrashResponseSuccess | emptyTrashResponseError;
+
+export const getEmptyTrashUrl = () => {
+  return `/api/v1/trash/empty`;
+};
+
+/**
+ * @summary Delete the caller's Trash for good, at most 500 entries a call
+ */
+export const emptyTrash = async (
+  trashEmptyRequest?: TrashEmptyRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<emptyTrashResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<emptyTrashResponse>(getEmptyTrashUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashEmptyRequest),
   });
 };
 
@@ -13226,6 +13786,137 @@ export const reviewAdminWorkflowImport = async (
   });
 };
 
+export type createAdminTrendTagResponse201 = {
+  data: AdminTrendTag;
+  status: 201;
+};
+
+export type createAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendTagResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendTagResponseSuccess = createAdminTrendTagResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendTagResponseError = (
+  createAdminTrendTagResponse400 | createAdminTrendTagResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendTagResponse =
+  createAdminTrendTagResponseSuccess | createAdminTrendTagResponseError;
+
+export const getCreateAdminTrendTagUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags`;
+};
+
+export const createAdminTrendTag = async (
+  adminTrendTagCreateRequest: AdminTrendTagCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendTagResponse>(getCreateAdminTrendTagUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagCreateRequest),
+  });
+};
+
+export type createAdminTrendCategoryResponse201 = {
+  data: AdminTrendCategory;
+  status: 201;
+};
+
+export type createAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendCategoryResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createAdminTrendCategoryResponseSuccess = createAdminTrendCategoryResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendCategoryResponseError = (
+  | createAdminTrendCategoryResponse400
+  | createAdminTrendCategoryResponse409
+  | createAdminTrendCategoryResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendCategoryResponse =
+  createAdminTrendCategoryResponseSuccess | createAdminTrendCategoryResponseError;
+
+export const getCreateAdminTrendCategoryUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories`;
+};
+
+export const createAdminTrendCategory = async (
+  adminTrendCategoryCreateRequest: AdminTrendCategoryCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendCategoryResponse>(getCreateAdminTrendCategoryUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryCreateRequest),
+  });
+};
+
 export type replyToAdminSupportRequestResponse201 = {
   data: AdminSupportRequestDetail;
   status: 201;
@@ -15610,6 +16301,207 @@ export const updateAdminWorkflowStep = async (
   });
 };
 
+export type deleteAdminTrendTagResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendTagResponseSuccess = deleteAdminTrendTagResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendTagResponseError = deleteAdminTrendTagResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendTagResponse =
+  deleteAdminTrendTagResponseSuccess | deleteAdminTrendTagResponseError;
+
+export const getDeleteAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const deleteAdminTrendTag = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendTagResponse> => {
+  return customFetch<deleteAdminTrendTagResponse>(getDeleteAdminTrendTagUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendTagResponse200 = {
+  data: AdminTrendTag;
+  status: 200;
+};
+
+export type updateAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendTagResponseSuccess = updateAdminTrendTagResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendTagResponseError = (
+  updateAdminTrendTagResponse400 | updateAdminTrendTagResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendTagResponse =
+  updateAdminTrendTagResponseSuccess | updateAdminTrendTagResponseError;
+
+export const getUpdateAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const updateAdminTrendTag = async (
+  id: string,
+  adminTrendTagUpdateRequest: AdminTrendTagUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendTagResponse>(getUpdateAdminTrendTagUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagUpdateRequest),
+  });
+};
+
+export type deleteAdminTrendCategoryResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminTrendCategoryResponseSuccess = deleteAdminTrendCategoryResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendCategoryResponseError = (
+  deleteAdminTrendCategoryResponse404 | deleteAdminTrendCategoryResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendCategoryResponse =
+  deleteAdminTrendCategoryResponseSuccess | deleteAdminTrendCategoryResponseError;
+
+export const getDeleteAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const deleteAdminTrendCategory = async (
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendCategoryResponse> => {
+  return customFetch<deleteAdminTrendCategoryResponse>(getDeleteAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendCategoryResponse200 = {
+  data: AdminTrendCategory;
+  status: 200;
+};
+
+export type updateAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendCategoryResponseSuccess = updateAdminTrendCategoryResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendCategoryResponseError = (
+  updateAdminTrendCategoryResponse400 | updateAdminTrendCategoryResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendCategoryResponse =
+  updateAdminTrendCategoryResponseSuccess | updateAdminTrendCategoryResponseError;
+
+export const getUpdateAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const updateAdminTrendCategory = async (
+  key: string,
+  adminTrendCategoryUpdateRequest: AdminTrendCategoryUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendCategoryResponse>(getUpdateAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryUpdateRequest),
+  });
+};
+
 export type getAdminRoleResponse200 = {
   data: RoleResponse;
   status: 200;
@@ -16462,6 +17354,57 @@ export const exportUsers = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<exportUsersResponse> => {
   return customFetch<exportUsersResponse>(getExportUsersUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listTrashResponse200 = {
+  data: TrashList;
+  status: 200;
+};
+
+export type listTrashResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listTrashResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listTrashResponseSuccess = listTrashResponse200 & {
+  headers: Headers;
+};
+export type listTrashResponseError = (listTrashResponse400 | listTrashResponse503) & {
+  headers: Headers;
+};
+
+export type listTrashResponse = listTrashResponseSuccess | listTrashResponseError;
+
+export const getListTrashUrl = (params?: ListTrashParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/trash?${stringifiedParams}` : `/api/v1/trash`;
+};
+
+/**
+ * @summary List the caller's Trash with the badge counts
+ */
+export const listTrash = async (
+  params?: ListTrashParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listTrashResponse> => {
+  return customFetch<listTrashResponse>(getListTrashUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -18387,6 +19330,29 @@ export const exportAdminWorkflows = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<exportAdminWorkflowsResponse> => {
   return customFetch<exportAdminWorkflowsResponse>(getExportAdminWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminTrendTaxonomyResponse200 = {
+  data: AdminTrendTaxonomy;
+  status: 200;
+};
+
+export type listAdminTrendTaxonomyResponseSuccess = listAdminTrendTaxonomyResponse200 & {
+  headers: Headers;
+};
+export type listAdminTrendTaxonomyResponse = listAdminTrendTaxonomyResponseSuccess;
+
+export const getListAdminTrendTaxonomyUrl = () => {
+  return `/api/v1/admin/trend/taxonomy`;
+};
+
+export const listAdminTrendTaxonomy = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminTrendTaxonomyResponse> => {
+  return customFetch<listAdminTrendTaxonomyResponse>(getListAdminTrendTaxonomyUrl(), {
     ...options,
     method: 'GET',
   });

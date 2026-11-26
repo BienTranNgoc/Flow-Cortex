@@ -18,7 +18,16 @@ class TopicAccessTest {
     private static final String CHAT = "chat:22222222-2222-2222-2222-222222222222";
 
     private static TopicAuthorizer chatAuthorizer(BiPredicate<UUID, String> allow) {
+        return chatAuthorizer(allow, false);
+    }
+
+    private static TopicAuthorizer chatAuthorizer(BiPredicate<UUID, String> allow, boolean revocable) {
         return new TopicAuthorizer() {
+            @Override
+            public boolean revocable() {
+                return revocable;
+            }
+
             @Override
             public boolean supports(String topic) {
                 return topic.startsWith("chat:");
@@ -126,5 +135,24 @@ class TopicAccessTest {
         Outcome outcome = resolve(List.of("user", "user", CHAT, CHAT), chatAuthorizer((user, topic) -> true));
 
         assertThat(outcome.topics()).containsExactlyInAnyOrder("user:" + USER, CHAT);
+    }
+
+    @Test
+    void aClaimedTopicOfARevocableAuthorizerIsListedForRecheck() {
+        TopicAuthorizer revocable = chatAuthorizer((user, topic) -> true, true);
+
+        Outcome outcome = resolve(List.of("user", CHAT), revocable);
+
+        assertThat(outcome.status()).isEqualTo(Status.OK);
+        assertThat(outcome.rechecks()).containsOnlyKeys(CHAT);
+        assertThat(outcome.rechecks().get(CHAT)).isSameAs(revocable);
+    }
+
+    @Test
+    void userAndNonRevocableTopicsAreNotListedForRecheck() {
+        assertThat(resolve(List.of("user")).rechecks()).isEmpty();
+        assertThat(resolve(List.of("user", CHAT), chatAuthorizer((user, topic) -> true)).rechecks()).isEmpty();
+        assertThat(resolve(List.of(CHAT), chatAuthorizer((user, topic) -> false, true)).rechecks()).isEmpty();
+        assertThat(resolve(List.of("not a topic")).rechecks()).isEmpty();
     }
 }
