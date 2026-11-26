@@ -36,6 +36,7 @@ import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowReview;
 import com.flowcortex.workflow.domain.WorkflowReviewImage;
+import com.flowcortex.workflow.infrastructure.WorkflowRatingTotals;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowReviewHelpfulRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowReviewImageRepository;
@@ -73,9 +74,10 @@ class WorkflowReviewServiceTest {
     private final WorkflowReviewReportRepository reports = mock(WorkflowReviewReportRepository.class);
     private final MediaJobs mediaJobs = mock(MediaJobs.class);
     private final UserDirectory users = mock(UserDirectory.class);
+    private final WorkflowRatingTotals ratingTotals = mock(WorkflowRatingTotals.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final WorkflowReviewService service = new WorkflowReviewService(workflows, runs, reviews, images,
-            helpful, reports, mediaJobs, users, transactions, Clock.fixed(NOW, ZoneOffset.UTC));
+            helpful, reports, mediaJobs, users, ratingTotals, transactions, Clock.fixed(NOW, ZoneOffset.UTC));
 
     private final Workflow workflow = Workflow.draft(UUID.randomUUID(), ANA, "Dubbing");
 

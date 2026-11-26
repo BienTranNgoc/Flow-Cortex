@@ -68,7 +68,7 @@ const textPairs: [string, string][] = [
   ),
   ...['paper', 'paper-3'].map((s): [string, string] => ['primary', s]),
   ['primary', 'chrome-active'],
-  ...['paper', 'paper-3', 'btn-bg'].map((s): [string, string] => ['red', s]),
+  ...['paper', 'paper-2', 'paper-3', 'btn-bg'].map((s): [string, string] => ['red', s]),
   ['accent', 'paper'],
   ['input-placeholder', 'input-bg'],
   ['input-text', 'input-bg'],

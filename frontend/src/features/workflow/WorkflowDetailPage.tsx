@@ -12,6 +12,7 @@ import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { formatCredits } from '../credits/formatCredits';
 import { invalidateBalance } from '../credits/useBalance';
+import { SimilarWorkflows } from '../marketplace/SimilarWorkflows';
 import { sampleInputFrom } from '../onboarding/sampleHandoff';
 import './WorkflowPages.css';
 import './ProductVideoStudio.css';
@@ -269,6 +270,7 @@ function WorkflowDetailView({ workflowId }: Readonly<{ workflowId: string }>) {
           })}
         </p>
       )}
+      {workflow && <SimilarWorkflows workflowId={workflowId} />}
     </div>
   );
 }

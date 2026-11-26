@@ -539,6 +539,12 @@ flowcortex:
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
     reaper-interval-ms: 30000
+    # The pass that refreshes the Explore trending and popular figures runs once per interval.
+    discovery:
+      stats-interval-ms: ${FLOWCORTEX_WORKFLOW_DISCOVERY_STATS_INTERVAL_MS:600000}
+      # A workflow joins another's similar list only when at least this many other members ran both, so no
+      # listed workflow can be traced back to fewer members. Below 1 is read as 1. Env var + restart.
+      similar-min-support: ${FLOWCORTEX_WORKFLOW_DISCOVERY_SIMILAR_MIN_SUPPORT:3}
     # A review nobody decided within expire-after ends as `expired` and stops its run (REVIEW_EXPIRED);
     # the sweep looks every sweep-interval-ms. Env var + restart.
     review:

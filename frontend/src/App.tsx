@@ -24,6 +24,7 @@ import { ChatPage } from './features/chat/ChatPage';
 import { HistoryPage } from './features/chat/history/HistoryPage';
 import { DriveFeatureGate } from './features/drive/DriveFeatureGate';
 import { DrivePage } from './features/drive/DrivePage';
+import { ExplorePage } from './features/marketplace/ExplorePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { OAuthConsentRoute } from './features/auth/OAuthConsentPage';
@@ -185,6 +186,7 @@ export function App() {
               <Route path="builder/dashboard" element={<BuilderDashboardPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="notifications/preferences" element={<NotificationPreferencesPage />} />
+              <Route path="explore" element={<ExplorePage />} />
               <Route path="workflows" element={<WorkflowsListPage />} />
               <Route path="workflows/:id" element={<WorkflowDetailPage />} />
               <Route path="workflows/:workflowId/runs/:runId" element={<RunProgressPage />} />

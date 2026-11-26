@@ -228,6 +228,13 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Forms and dialogs: native modal on `paper-3`; fields are `input-bg` with an `input-border` edge, `red` edge and message when refused; the text counter is `ink-3` and turns `red` over the limit; refusals with no field of their own show as one `red` on `red-soft` message above the buttons. An upload shows "Sending n%" with a determinate progress, then "Saving to Drive…" with an indeterminate one while Cancel holds.
 - Controls keep `control-h`, and `hit-min` on coarse pointers or below 1024px.
 
+### Explore
+
+- Page: as wide as `--content-max` and centred, like the Workflows list. Tabs are a row of buttons on a `card-edge` rule, the selected one with a `primary` underline and `ink` text; a count sits beside each label in a `paper-3` pill.
+- Toolbar: a `paper-2` bar with a `card-edge` edge and `md` radius holding the search field and the order select. The search field grows from a 240px basis (the Workflows list toolbar's value) and wraps above the select on a narrow screen.
+- Chips: `control-h` tall, fully rounded, `card-edge` edge; pressed is a `primary` fill with `primary-foreground` text.
+- Cards: `paper-2` fill, `card-edge` edge, `shadow-sm`, `lg` radius, in a grid of `repeat(auto-fill, minmax(min(100%, 280px), 1fr))`, so a narrow screen stacks them. A focused card takes `focus-ring`.
+
 ## Do's and Don'ts
 
 - Do take every colour from a token; no literal colour outside `tokens.css`.

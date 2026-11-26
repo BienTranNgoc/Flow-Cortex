@@ -1,6 +1,7 @@
 import {
   BookOpen,
   ChatsCircle,
+  Compass,
   FlowArrow,
   HardDrives,
   House,
@@ -32,6 +33,7 @@ export const DOCS_ICON: Icon = BookOpen;
 
 const CORE_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/', labelKey: 'common.nav.home', icon: House, end: true },
+  { to: '/explore', labelKey: 'common.nav.explore', icon: Compass },
   { to: '/workflows', labelKey: 'common.nav.workflows', icon: FlowArrow },
   { to: '/runs', labelKey: 'common.nav.runs', icon: Play },
 ];

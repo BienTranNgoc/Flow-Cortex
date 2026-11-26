@@ -25,6 +25,8 @@ erDiagram
   media_asset ||--o{ media_asset_binding : "asset_id"
   workflow ||--o{ workflow_bookmark : "workflow_id"
   workflow ||--o{ workflow_review : "workflow_id"
+  workflow ||--o| workflow_discovery_stats : "workflow_id, ON DELETE CASCADE"
+  workflow ||--o| workflow_rating_total : "workflow_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_image : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_helpful : "review_id, ON DELETE CASCADE"
   workflow_review ||--o{ workflow_review_report : "review_id, ON DELETE CASCADE"
@@ -268,6 +270,19 @@ erDiagram
     varchar details "up to 1000"
     timestamptz created_at
   }
+  workflow_discovery_stats {
+    uuid workflow_id PK,FK "ON DELETE CASCADE; one row per catalogue workflow, removed when it leaves the catalogue"
+    integer runners_7d "CHECK >= 0; distinct non-owner members who started a workflow run (child runs excluded) in the last 7 days"
+    integer saves_7d "CHECK >= 0; non-owner bookmarks created in the last 7 days"
+    integer members_30d "CHECK >= 0; distinct non-owner members with a completed run (child runs excluded) in the last 30 days"
+    integer trending_score "CHECK >= 0; 3 per runner + 5 per save, saturating at the integer maximum"
+    timestamptz computed_at "stamped by the discovery stats job"
+  }
+  workflow_rating_total {
+    uuid workflow_id PK,FK "ON DELETE CASCADE"
+    integer rating_count "CHECK >= 0; moved by the review write that changes it, never recomputed by a job"
+    integer rating_sum "CHECK >= 0; sum of the stars, so average = sum / count"
+  }
   event_publication {
     uuid id PK "Spring Modulith event publication registry (transactional outbox)"
     text listener_id
@@ -340,7 +355,17 @@ expiry sweep), `idx_script_revision_run`,
 `idx_event_publication_completion_date`,
 `idx_workflow_bookmark_page` (`user_id, created_at DESC, workflow_id DESC` — the saved list),
 `idx_workflow_review_newest` (`workflow_id, created_at DESC, id DESC`), `idx_workflow_review_helpful`
-(`workflow_id, helpful_count DESC, created_at DESC, id DESC`).
+(`workflow_id, helpful_count DESC, created_at DESC, id DESC`),
+`idx_workflow_bookmark_created` (`created_at DESC` — the 7-day saves window of the discovery stats),
+`idx_workflow_catalogue` (`created_at DESC, id DESC`, partial `WHERE deleted_at IS NULL AND status = 'published' AND visibility = 'public'` — the catalogue),
+`idx_workflow_name_fold_trgm` (GIN `gin_trgm_ops` over `workflow_search_fold(name)` — Explore search).
+
+`workflow_search_fold(text)` is an `IMMUTABLE` SQL function (NFC, `lower()`, Vietnamese letters mapped to ASCII
+with `translate()`) that reuses the rule and constants of `app_user_search_fold`; Explore search folds both
+the name and the typed terms with it, so case and accents do not matter. `workflow_rating_total` is
+backfilled from `workflow_review` when the migration runs and is then kept equal to the reviews by every
+review insert, replace and delete in the same transaction. `workflow_discovery_stats` is rewritten
+periodically by a cluster job. Neither table has a user column, so neither needs the no-FK rule below.
 
 `owner_id` columns carry no foreign key on purpose: the user module owns `app_user`, the workflow module
 owns the other tables, and the module boundary (ADR-0003) is kept at the schema level too — ownership is

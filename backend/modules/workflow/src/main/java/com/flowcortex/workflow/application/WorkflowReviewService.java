@@ -21,6 +21,7 @@ import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowReview;
 import com.flowcortex.workflow.domain.WorkflowReviewImage;
 import com.flowcortex.workflow.infrastructure.RatingCount;
+import com.flowcortex.workflow.infrastructure.WorkflowRatingTotals;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowReviewHelpfulRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowReviewImageRepository;
@@ -68,13 +69,15 @@ public class WorkflowReviewService {
     private final WorkflowReviewReportRepository reports;
     private final MediaJobs mediaJobs;
     private final UserDirectory users;
+    private final WorkflowRatingTotals ratingTotals;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     WorkflowReviewService(WorkflowRepository workflows, WorkflowRunRepository runs,
             WorkflowReviewRepository reviews, WorkflowReviewImageRepository images,
             WorkflowReviewHelpfulRepository helpful, WorkflowReviewReportRepository reports, MediaJobs mediaJobs,
-            UserDirectory users, PlatformTransactionManager transactionManager, Clock clock) {
+            UserDirectory users, WorkflowRatingTotals ratingTotals, PlatformTransactionManager transactionManager,
+            Clock clock) {
         this.workflows = workflows;
         this.runs = runs;
         this.reviews = reviews;
@@ -83,6 +86,7 @@ public class WorkflowReviewService {
         this.reports = reports;
         this.mediaJobs = mediaJobs;
         this.users = users;
+        this.ratingTotals = ratingTotals;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -141,6 +145,7 @@ public class WorkflowReviewService {
             List<StoredAttachment> stored = images.findByReviewIdOrderByPosition(review.getId()).stream()
                     .map(WorkflowReviewService::storedOf).toList();
             reviews.delete(review);
+            RatingDelta.of(review.getRating(), null).ifPresent(delta -> ratingTotals.add(workflowId, delta));
             deletedId[0] = review.getId();
             return stored;
         });
@@ -227,13 +232,17 @@ public class WorkflowReviewService {
             List<StoredAttachment> keptNow) {
         Instant now = clock.instant();
         WorkflowReview review = reviews.lockByWorkflowIdAndUserId(workflow.getId(), callerId).orElse(null);
+        Integer before = review == null ? null : review.getRating();
         if (review == null) {
             requireMayCreate(workflow, callerId);
-            reviews.insertIfAbsent(UUID.randomUUID(), workflow.getId(), callerId, stars, text, now);
+            int inserted = reviews.insertIfAbsent(UUID.randomUUID(), workflow.getId(), callerId, stars, text, now);
             review = reviews.lockByWorkflowIdAndUserId(workflow.getId(), callerId)
                     .orElseThrow(WorkflowReviewService::reviewNotFound);
+            // Nothing inserted: a concurrent first write by this member won and its rating is what this one replaces.
+            before = inserted == 1 ? null : review.getRating();
         }
         review.replace(stars, text, now);
+        RatingDelta.of(before, stars).ifPresent(delta -> ratingTotals.add(workflow.getId(), delta));
 
         List<WorkflowReviewImage> locked = images.findByReviewIdOrderByPosition(review.getId());
         if (plan == null) {

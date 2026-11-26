@@ -3453,6 +3453,11 @@ export interface AccessLogPageResponse {
   meta?: Meta;
 }
 
+export interface WorkflowCountsResponse {
+  mine: number;
+  saved: number;
+}
+
 export interface SharedWorkflowResponse {
   id?: string;
   name?: string;
@@ -4020,6 +4025,50 @@ export interface DeletionReasonView {
 export interface DeletionEligibilityView {
   eligible: boolean;
   reasons: DeletionReasonView[];
+}
+
+export interface MarketplaceRating {
+  /** @nullable */
+  average?: number | null;
+  count: number;
+}
+
+export interface MarketplaceItem {
+  workflow: WorkflowResponse;
+  /** @nullable */
+  authorName?: string | null;
+  rating: MarketplaceRating;
+  membersLast30Days: number;
+  bookmarked: boolean;
+}
+
+export interface MarketplacePageMeta {
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface MarketplacePageResponse {
+  data: MarketplaceItem[];
+  meta: MarketplacePageMeta;
+}
+
+export interface MarketplaceItemsResponse {
+  data: MarketplaceItem[];
+}
+
+export interface MarketplaceStatsResponse {
+  totalWorkflows: number;
+  totalBuilders: number;
+}
+
+export interface MarketplaceStepTypeFacet {
+  type: string;
+  count: number;
+}
+
+export interface MarketplaceFacetsResponse {
+  stepTypes: MarketplaceStepTypeFacet[];
 }
 
 export interface HealthResponse {
@@ -5721,6 +5770,38 @@ export const GetUnreadNotificationCountAudience = {
   member: 'member',
   admin: 'admin',
 } as const;
+
+export type ListMarketplaceWorkflowsParams = {
+  q?: string;
+  stepType?: string[];
+  sort?: string;
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListSimilarWorkflowsParams = {
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  limit?: number;
+};
+
+export type ListRecommendedWorkflowsParams = {
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  limit?: number;
+};
 
 export type ListEntityVersionsParams = {
   /**
@@ -19263,6 +19344,29 @@ export const getWorkflowAccessLog = async (
   });
 };
 
+export type getWorkflowCountsResponse200 = {
+  data: WorkflowCountsResponse;
+  status: 200;
+};
+
+export type getWorkflowCountsResponseSuccess = getWorkflowCountsResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowCountsResponse = getWorkflowCountsResponseSuccess;
+
+export const getGetWorkflowCountsUrl = () => {
+  return `/api/v1/workflows/counts`;
+};
+
+export const getWorkflowCounts = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowCountsResponse> => {
+  return customFetch<getWorkflowCountsResponse>(getGetWorkflowCountsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type getWorkflowByShareKeyResponse200 = {
   data: SharedWorkflowResponse;
   status: 200;
@@ -20530,6 +20634,170 @@ export const getAccountDeletionEligibility = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getAccountDeletionEligibilityResponse> => {
   return customFetch<getAccountDeletionEligibilityResponse>(getGetAccountDeletionEligibilityUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listMarketplaceWorkflowsResponse200 = {
+  data: MarketplacePageResponse;
+  status: 200;
+};
+
+export type listMarketplaceWorkflowsResponseSuccess = listMarketplaceWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listMarketplaceWorkflowsResponse = listMarketplaceWorkflowsResponseSuccess;
+
+export const getListMarketplaceWorkflowsUrl = (params?: ListMarketplaceWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ['stepType'];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/marketplace/workflows?${stringifiedParams}`
+    : `/api/v1/marketplace/workflows`;
+};
+
+export const listMarketplaceWorkflows = async (
+  params?: ListMarketplaceWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listMarketplaceWorkflowsResponse> => {
+  return customFetch<listMarketplaceWorkflowsResponse>(getListMarketplaceWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listSimilarWorkflowsResponse200 = {
+  data: MarketplaceItemsResponse;
+  status: 200;
+};
+
+export type listSimilarWorkflowsResponseSuccess = listSimilarWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listSimilarWorkflowsResponse = listSimilarWorkflowsResponseSuccess;
+
+export const getListSimilarWorkflowsUrl = (id: string, params?: ListSimilarWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/marketplace/workflows/${id}/similar?${stringifiedParams}`
+    : `/api/v1/marketplace/workflows/${id}/similar`;
+};
+
+export const listSimilarWorkflows = async (
+  id: string,
+  params?: ListSimilarWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listSimilarWorkflowsResponse> => {
+  return customFetch<listSimilarWorkflowsResponse>(getListSimilarWorkflowsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getMarketplaceStatsResponse200 = {
+  data: MarketplaceStatsResponse;
+  status: 200;
+};
+
+export type getMarketplaceStatsResponseSuccess = getMarketplaceStatsResponse200 & {
+  headers: Headers;
+};
+export type getMarketplaceStatsResponse = getMarketplaceStatsResponseSuccess;
+
+export const getGetMarketplaceStatsUrl = () => {
+  return `/api/v1/marketplace/stats`;
+};
+
+export const getMarketplaceStats = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getMarketplaceStatsResponse> => {
+  return customFetch<getMarketplaceStatsResponse>(getGetMarketplaceStatsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listRecommendedWorkflowsResponse200 = {
+  data: MarketplaceItemsResponse;
+  status: 200;
+};
+
+export type listRecommendedWorkflowsResponseSuccess = listRecommendedWorkflowsResponse200 & {
+  headers: Headers;
+};
+export type listRecommendedWorkflowsResponse = listRecommendedWorkflowsResponseSuccess;
+
+export const getListRecommendedWorkflowsUrl = (params?: ListRecommendedWorkflowsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/marketplace/recommended?${stringifiedParams}`
+    : `/api/v1/marketplace/recommended`;
+};
+
+export const listRecommendedWorkflows = async (
+  params?: ListRecommendedWorkflowsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listRecommendedWorkflowsResponse> => {
+  return customFetch<listRecommendedWorkflowsResponse>(getListRecommendedWorkflowsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getMarketplaceFacetsResponse200 = {
+  data: MarketplaceFacetsResponse;
+  status: 200;
+};
+
+export type getMarketplaceFacetsResponseSuccess = getMarketplaceFacetsResponse200 & {
+  headers: Headers;
+};
+export type getMarketplaceFacetsResponse = getMarketplaceFacetsResponseSuccess;
+
+export const getGetMarketplaceFacetsUrl = () => {
+  return `/api/v1/marketplace/facets`;
+};
+
+export const getMarketplaceFacets = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getMarketplaceFacetsResponse> => {
+  return customFetch<getMarketplaceFacetsResponse>(getGetMarketplaceFacetsUrl(), {
     ...options,
     method: 'GET',
   });

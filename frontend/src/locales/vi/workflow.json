@@ -464,5 +464,96 @@
       "runs": "Lượt chạy",
       "failed": "Thất bại"
     }
+  },
+  "marketplace": {
+    "heading": "Khám phá",
+    "lede": "Tìm quy trình do thành viên khác xây dựng, lưu lại và tự chạy.",
+    "totals": "{{workflows}} từ {{builders}}",
+    "workflowCount_one": "{{n}} quy trình",
+    "workflowCount_other": "{{n}} quy trình",
+    "builderCount_one": "{{n}} người xây dựng",
+    "builderCount_other": "{{n}} người xây dựng",
+    "tabs": {
+      "label": "Các mục khám phá",
+      "discover": "Khám phá",
+      "saved": "Đã lưu"
+    },
+    "search": {
+      "label": "Tìm quy trình",
+      "placeholder": "Tìm theo tên…"
+    },
+    "filters": {
+      "legend": "Lọc theo loại bước",
+      "chip": "{{label}} ({{count}})"
+    },
+    "sort": {
+      "label": "Sắp xếp",
+      "trending": "Thịnh hành",
+      "popular": "Phổ biến nhất",
+      "newest": "Mới nhất",
+      "topRated": "Đánh giá cao",
+      "name": "Tên (A–Z)"
+    },
+    "rows": {
+      "recommended": "Dành cho bạn",
+      "trending": "Thịnh hành",
+      "popular": "Phổ biến",
+      "seeAll": "Xem tất cả",
+      "seeAllNamed": "Xem tất cả mục {{row}}"
+    },
+    "results": {
+      "heading": "Tất cả quy trình",
+      "savedHeading": "Quy trình đã lưu",
+      "count_one": "{{n}} quy trình",
+      "count_other": "{{n}} quy trình",
+      "loadMore": "Tải thêm",
+      "loadingMore": "Đang tải…",
+      "loading": "Đang tải danh sách quy trình…",
+      "loadError": "Không tải được danh sách quy trình.",
+      "empty": "Chưa có quy trình nào được xuất bản.",
+      "savedEmpty": "Bạn chưa lưu quy trình nào.",
+      "savedEmptyAction": "Khám phá quy trình"
+    },
+    "card": {
+      "by": "Bởi {{name}}",
+      "product": "Nodi",
+      "untitled": "Quy trình chưa đặt tên",
+      "credits": "Khoảng {{amount}} Credit",
+      "noRating": "Chưa có đánh giá",
+      "rating": "{{average}} ({{count}})",
+      "ratingLabel_one": "Được {{count}} thành viên đánh giá {{average}} trên 5",
+      "ratingLabel_other": "Được {{count}} thành viên đánh giá {{average}} trên 5",
+      "members_one": "{{n}} thành viên trong tháng này",
+      "members_other": "{{n}} thành viên trong tháng này",
+      "save": "Lưu {{name}}",
+      "saveFailed": "Không cập nhật được danh sách đã lưu của bạn."
+    },
+    "similar": {
+      "heading": "Quy trình tương tự"
+    },
+    "stepTypes": {
+      "echo": "Phản hồi lại",
+      "fail": "Lỗi có chủ đích",
+      "generate_script": "Viết kịch bản",
+      "generate_storyboard": "Lập phân cảnh",
+      "generate_speech": "Tạo giọng đọc",
+      "generate_video": "Tạo cảnh",
+      "fetch_video": "Tải video",
+      "ingest_video": "Tải video lên",
+      "ingest_image": "Tải ảnh lên",
+      "probe": "Kiểm tra tệp",
+      "extract_audio": "Tách âm thanh",
+      "align_audio": "Căn chỉnh âm thanh",
+      "render_video": "Ghép video",
+      "separate_audio": "Tách âm thanh nền",
+      "translate": "Dịch",
+      "tts": "Chuyển văn bản thành giọng nói",
+      "load_template": "Tải mẫu",
+      "workflow_call": "Chạy quy trình khác",
+      "connector_call": "Gọi trình kết nối",
+      "iterate": "Lặp qua danh sách",
+      "APPROVAL_CHECKPOINT": "Bước duyệt",
+      "qa_review": "Duyệt bằng hỏi đáp"
+    }
   }
 }

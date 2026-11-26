@@ -7992,6 +7992,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessLogPageResponse"
+  /api/v1/workflows/counts:
+    get:
+      tags:
+      - marketplace-controller
+      operationId: getWorkflowCounts
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowCountsResponse"
   /api/v1/workflows/by-key/{key}:
     get:
       tags:
@@ -9057,6 +9069,128 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/marketplace/workflows:
+    get:
+      tags:
+      - marketplace-controller
+      operationId: listMarketplaceWorkflows
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: stepType
+        in: query
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplacePageResponse"
+  /api/v1/marketplace/workflows/{id}/similar:
+    get:
+      tags:
+      - marketplace-controller
+      operationId: listSimilarWorkflows
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 8
+          maximum: 20
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceItemsResponse"
+  /api/v1/marketplace/stats:
+    get:
+      tags:
+      - marketplace-controller
+      operationId: getMarketplaceStats
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceStatsResponse"
+  /api/v1/marketplace/recommended:
+    get:
+      tags:
+      - marketplace-controller
+      operationId: listRecommendedWorkflows
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+          maximum: 20
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceItemsResponse"
+  /api/v1/marketplace/facets:
+    get:
+      tags:
+      - marketplace-controller
+      operationId: getMarketplaceFacets
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceFacetsResponse"
   /api/v1/health:
     get:
       tags:
@@ -16831,6 +16965,18 @@ components:
             $ref: "#/components/schemas/Entry"
         meta:
           $ref: "#/components/schemas/Meta"
+    WorkflowCountsResponse:
+      type: object
+      properties:
+        mine:
+          type: integer
+          format: int64
+        saved:
+          type: integer
+          format: int64
+      required:
+      - mine
+      - saved
     SharedWorkflowResponse:
       type: object
       properties:
@@ -17807,6 +17953,108 @@ components:
       required:
       - key
       - message
+    MarketplaceItem:
+      type: object
+      properties:
+        workflow:
+          $ref: "#/components/schemas/WorkflowResponse"
+        authorName:
+          type:
+          - string
+          - "null"
+        rating:
+          $ref: "#/components/schemas/MarketplaceRating"
+        membersLast30Days:
+          type: integer
+          format: int32
+        bookmarked:
+          type: boolean
+      required:
+      - bookmarked
+      - membersLast30Days
+      - rating
+      - workflow
+    MarketplacePageMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - page
+      - size
+      - total
+    MarketplacePageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketplaceItem"
+        meta:
+          $ref: "#/components/schemas/MarketplacePageMeta"
+      required:
+      - data
+      - meta
+    MarketplaceRating:
+      type: object
+      properties:
+        average:
+          type:
+          - number
+          - "null"
+        count:
+          type: integer
+          format: int32
+      required:
+      - count
+    MarketplaceItemsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketplaceItem"
+      required:
+      - data
+    MarketplaceStatsResponse:
+      type: object
+      properties:
+        totalWorkflows:
+          type: integer
+          format: int64
+        totalBuilders:
+          type: integer
+          format: int64
+      required:
+      - totalBuilders
+      - totalWorkflows
+    MarketplaceFacetsResponse:
+      type: object
+      properties:
+        stepTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketplaceStepTypeFacet"
+      required:
+      - stepTypes
+    MarketplaceStepTypeFacet:
+      type: object
+      properties:
+        type:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - type
     HealthResponse:
       type: object
       properties:

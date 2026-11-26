@@ -1,0 +1,63 @@
+.mp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.mp-section--similar {
+  margin-top: 2rem;
+}
+
+.mp-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.mp-section__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.mp-section__count {
+  color: var(--ink-3);
+  font-size: 0.88rem;
+}
+
+.mp-section__link,
+.mp-section__more {
+  margin: 0;
+  align-self: flex-start;
+  border-color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.mp-section__more[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* Columns of at least 280px that wrap, so a narrow screen stacks them and none scrolls sideways. */
+.mp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mp-grid > li {
+  display: flex;
+  min-width: 0;
+}
+
+.mp-grid > li > * {
+  flex: 1;
+}
