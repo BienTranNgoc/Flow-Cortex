@@ -43,10 +43,11 @@ class NotificationServiceTest {
     void aPageIsRenderedInTheReadersLanguageWithTheUnreadCount() {
         NotificationRow row = new NotificationRow(UUID.randomUUID(), "welcome", "notification.welcome.title",
                 "notification.welcome.body", List.of(), "/workflows", null, NOW);
-        when(repository.page(member, true, 20, 20)).thenReturn(new RowPage(List.of(row), true));
-        when(repository.unreadCount(member)).thenReturn(7L);
+        when(repository.page(member, Audience.MEMBER, true, 20, 20)).thenReturn(new RowPage(List.of(row), true));
+        when(repository.unreadCount(member, Audience.MEMBER)).thenReturn(7L);
 
-        NotificationService.Listing listing = service.list(member, "unread", "1", null, Locale.forLanguageTag("vi"));
+        NotificationService.Listing listing = service.list(member, Audience.MEMBER, "unread", "1", null,
+                Locale.forLanguageTag("vi"));
 
         assertThat(listing.items()).singleElement().satisfies(item -> {
             assertThat(item.title()).isEqualTo("Chào mừng bạn đến với Nodi");
@@ -62,7 +63,7 @@ class NotificationServiceTest {
     void outOfRangeParametersAreRefusedByName() {
         for (String[] args : new String[][] {{"all", "-1", "20"}, {"all", "0", "51"}, {"all", "0", "0"},
                 {"archived", "0", "20"}, {"all", "x", "20"}, {"all", "0", "2.5"}}) {
-            assertThatThrownBy(() -> service.list(member, args[0], args[1], args[2], Locale.ENGLISH))
+            assertThatThrownBy(() -> service.list(member, Audience.MEMBER, args[0], args[1], args[2], Locale.ENGLISH))
                     .isInstanceOf(LocalizedStatusException.class);
         }
     }
@@ -91,10 +92,10 @@ class NotificationServiceTest {
 
     @Test
     void readAllSignalsOnlyWhenSomethingChanged() {
-        when(repository.markAllRead(member, NOW)).thenReturn(3, 0);
+        when(repository.markAllRead(member, Audience.MEMBER, NOW)).thenReturn(3, 0);
 
-        assertThat(service.markAllRead(member)).isEqualTo(3);
-        assertThat(service.markAllRead(member)).isZero();
+        assertThat(service.markAllRead(member, Audience.MEMBER)).isEqualTo(3);
+        assertThat(service.markAllRead(member, Audience.MEMBER)).isZero();
 
         verify(signals, org.mockito.Mockito.times(1)).changed(member);
     }

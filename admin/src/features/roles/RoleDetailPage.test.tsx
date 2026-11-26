@@ -31,6 +31,10 @@ function routes(role: () => FakeReply) {
     'GET /api/v1/auth/me': { status: 200, body: ADMIN_ME },
     'GET /api/v1/admin/permission-catalog': { status: 200, body: CATALOG },
     'GET /api/v1/admin/roles/KIEM_DUYET': role,
+    'GET /api/v1/admin/rbac/runtime': {
+      status: 200,
+      body: { mutationsEnabled: true, source: 'DEFAULT', configuredValue: null, updatedBy: null, updatedAt: null },
+    },
   };
 }
 

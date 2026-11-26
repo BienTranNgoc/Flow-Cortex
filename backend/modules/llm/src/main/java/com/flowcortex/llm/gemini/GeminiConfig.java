@@ -4,6 +4,7 @@ import com.flowcortex.llm.api.LlmChatClient;
 import com.flowcortex.llm.api.LlmClient;
 import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.llm.api.LlmTimeouts;
+import com.flowcortex.llm.registry.ModelActivity;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
 import java.net.http.HttpClient;
@@ -39,11 +40,12 @@ class GeminiConfig {
 
     @Bean
     LlmSlots llmSlots(GeminiProperties properties, GeminiSlotProperties slots, HttpClient geminiHttpClient,
-            MeterRegistry meters, ObjectProvider<ObservationRegistry> observations) {
+            MeterRegistry meters, ObjectProvider<ObservationRegistry> observations, ModelActivity modelActivity) {
         GeminiTelemetry telemetry = new GeminiTelemetry(meters,
                 observations.getIfAvailable(() -> ObservationRegistry.NOOP));
         return new GeminiChainClient(properties, slots,
-                callTimeout -> GeminiAttempts.restClient(geminiHttpClient, callTimeout), Thread::sleep, telemetry);
+                callTimeout -> GeminiAttempts.restClient(geminiHttpClient, callTimeout), Thread::sleep, telemetry,
+                modelActivity::activeByModelKey);
     }
 
     @Bean

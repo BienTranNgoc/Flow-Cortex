@@ -18,6 +18,8 @@ import java.util.regex.Pattern;
 final class InboxQuery {
 
     static final int MAX_SEARCH_LENGTH = 100;
+    /** The only value of the {@code sla} parameter. */
+    static final String AT_RISK = "at_risk";
 
     private static final Pattern NUMBER = Pattern.compile("#?(\\d{1,18})");
 
@@ -106,14 +108,15 @@ final class InboxQuery {
      * @param assignee null when not filtered
      * @param created null when not filtered
      * @param search null when there is no search text
-     * @param now the one instant the created buckets are cut from
+     * @param atRisk whether only due-soon and overdue requests are kept
+     * @param now the one instant the created buckets and the SLA cut-offs are cut from
      */
     record InboxFilter(String status, String type, AssigneeFilter assignee, CreatedBucket created, Search search,
-            Sort sort, int page, Instant now) {
+            boolean atRisk, Sort sort, int page, Instant now) {
     }
 
-    static Parsed parse(String status, String type, String assignee, String created, String q, String sort,
-            int page, UUID callerId, Instant now) {
+    static Parsed parse(String status, String type, String assignee, String created, String q, String sla,
+            String sort, int page, UUID callerId, Instant now) {
         Map<String, LocalizedMessage> errors = new LinkedHashMap<>();
         String statusFilter = blankToNull(status);
         if (statusFilter != null && RequestStatus.parse(statusFilter).isEmpty()) {
@@ -133,6 +136,14 @@ final class InboxQuery {
             }
         }
         Search search = search(q, errors);
+        boolean atRisk = false;
+        String slaText = blankToNull(sla);
+        if (slaText != null) {
+            atRisk = slaText.equals(AT_RISK);
+            if (!atRisk) {
+                errors.put("sla", new LocalizedMessage("support.request.error.sla"));
+            }
+        }
         Sort order = Sort.NEWEST;
         String sortText = blankToNull(sort);
         if (sortText != null) {
@@ -149,8 +160,8 @@ final class InboxQuery {
         if (!errors.isEmpty()) {
             return new Parsed(null, errors);
         }
-        return new Parsed(new InboxFilter(statusFilter, typeFilter, assigneeFilter, bucket, search, order, page, now),
-                Map.of());
+        return new Parsed(new InboxFilter(statusFilter, typeFilter, assigneeFilter, bucket, search, atRisk, order,
+                page, now), Map.of());
     }
 
     private static AssigneeFilter assignee(String value, UUID callerId, Map<String, LocalizedMessage> errors) {
