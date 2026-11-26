@@ -115,7 +115,74 @@ jobs:
             -v "$RUNNER_TEMP/pytest-libs:/pytest-libs:ro" \
             -e PYTHONPATH=/pytest-libs -w /work --entrypoint python \
             flowcortex-audio-worker:ci \
-            -m pytest -m engines -o "markers=engines: needs the audio image" -p no:cacheprovider -rs tests/engines
+            -m pytest -m engines -o "markers=engines: needs the audio image" -p no:cacheprovider -rs tests/engines/test_engines.py
+
+  trend-engines:
+    # Builds the trend image (hash-pinned packages, digest-checked detector files), runs its engine
+    # tests with no network, measures the cost of the largest job, and checks that a container
+    # started before its queue exists refuses to run.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: '0.12.21'
+          python-version: '3.12'
+
+      - name: Build the trend image
+        run: docker build --target trend-runtime -t flowcortex-trend-worker:ci .
+
+      - name: Collect the locked pytest packages
+        # Pure-Python wheels at the versions uv.lock pins; the image itself carries no test tools.
+        run: |
+          uv export --frozen --no-emit-project --only-group dev --no-hashes \
+            | grep -E '^(pytest|pluggy|iniconfig|packaging|pygments)==' > "$RUNNER_TEMP/pytest-pins.txt"
+          uv pip install --quiet --target "$RUNNER_TEMP/pytest-libs" --no-deps -r "$RUNNER_TEMP/pytest-pins.txt"
+
+      - name: Engine tests, offline
+        # A skipped test means the image lacks a library, so the junit report is checked for skips
+        # the way the preview scene tests are. The report directory is writable by user 10001.
+        run: |
+          mkdir -p "$RUNNER_TEMP/trend-junit"
+          chmod 0777 "$RUNNER_TEMP/trend-junit"
+          docker run --rm --network none \
+            -v "$PWD/tests/engines:/work/tests/engines:ro" \
+            -v "$RUNNER_TEMP/pytest-libs:/pytest-libs:ro" \
+            -v "$RUNNER_TEMP/trend-junit:/junit" \
+            -e PYTHONPATH=/pytest-libs -w /work --entrypoint python \
+            flowcortex-trend-worker:ci \
+            -m pytest -m engines -o "markers=engines: needs the trend image" -p no:cacheprovider -rs \
+            tests/engines/test_trend_engine.py --junitxml=/junit/trend.xml
+          if grep -q '<skipped' "$RUNNER_TEMP/trend-junit/trend.xml"; then
+            echo "::error::a trend engine test was skipped: the image lacks transformers or the model"
+            exit 1
+          fi
+
+      - name: Measure the role suggestion cost
+        # Four CPUs and no network, as a production pool runs; the figures in the job log go to
+        # worker/README.md. Exits non-zero when any run fails.
+        run: |
+          docker run --rm --cpus=4 --network none \
+            -v "$PWD/scripts:/bench:ro" \
+            --entrypoint python \
+            flowcortex-trend-worker:ci /bench/role_suggest_bench.py
+
+      - name: A container without a lane refuses to start
+        # The image presets media.trend.jobs, a queue the role check does not know yet, so it
+        # must exit 2 before it connects to anything.
+        run: |
+          status=0
+          timeout 30 docker run --rm flowcortex-trend-worker:ci || status=$?
+          if [ "$status" -ne 2 ]; then
+            echo "::error::the trend image exited $status instead of refusing the unknown queue (2)"
+            exit 1
+          fi
 
   # The white-block preview: the scene script against the pinned Blender, then the
   # preview-runtime image (whose build runs its own render gate) and the render-cost
