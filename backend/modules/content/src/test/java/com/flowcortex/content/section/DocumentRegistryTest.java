@@ -52,6 +52,29 @@ class DocumentRegistryTest {
                 .hasMessageContaining("carousel");
     }
 
+    private static ContentDocumentDefinition counted(String slug, int min, int max) {
+        return new ContentDocumentDefinition(
+                slug, new LocalizedText("Tiêu đề", "Title"), List.of("richText"), false, min, max);
+    }
+
+    @Test
+    void refusesASectionCountOutsideZeroTo100() {
+        assertThatThrownBy(() -> new DocumentRegistry(List.of(counted("neg-min", -1, 1)), TYPES))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("neg-min");
+        assertThatThrownBy(() -> new DocumentRegistry(List.of(counted("big-max", 0, 101)), TYPES))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("big-max");
+        assertThat(new DocumentRegistry(List.of(counted("edges", 0, 100)), TYPES).find("edges")).isPresent();
+    }
+
+    @Test
+    void refusesMinSectionsAboveMax() {
+        assertThatThrownBy(() -> new DocumentRegistry(List.of(counted("inverted", 2, 1)), TYPES))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("inverted");
+    }
+
     @Test
     void findsARegisteredSlugAndNothingElse() {
         DocumentRegistry registry = new DocumentRegistry(List.of(def("terms", "richText")), TYPES);

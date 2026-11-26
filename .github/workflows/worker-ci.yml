@@ -180,7 +180,7 @@ jobs:
         if: steps.blender-archive.outputs.cache-hit != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/blender-archive"
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/blender-archive/blender.tar.xz" \
+          curl -fsSL --proto '=https' --tlsv1.2 --retry 3 -o "$RUNNER_TEMP/blender-archive/blender.tar.xz" \
             "https://download.blender.org/release/Blender4.5/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
 
       - name: Install Blender

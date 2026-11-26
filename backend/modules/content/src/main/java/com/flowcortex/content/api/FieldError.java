@@ -14,4 +14,8 @@ public record FieldError(String path, String messageKey) {
     public static final String UNSUPPORTED_VERSION = "content.document.invalid.unsupportedVersion";
     public static final String MALFORMED = "content.document.invalid.malformed";
     public static final String MEDIA_NOT_FOUND = "content.document.invalid.mediaNotFound";
+    public static final String UNKNOWN_DOCUMENT = "content.document.invalid.unknownDocument";
+    public static final String DUPLICATE = "content.document.invalid.duplicate";
+    public static final String DATE = "content.document.invalid.date";
+    public static final String FORMAT = "content.document.invalid.format";
 }

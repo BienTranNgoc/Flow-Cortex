@@ -16,6 +16,7 @@ import { DocumentEditorPage } from './features/content/DocumentEditorPage';
 import { DocumentsPage } from './features/content/DocumentsPage';
 import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { FeatureSwitchesPage } from './features/featureSwitches/FeatureSwitchesPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
 import { OnboardingSamplePage } from './features/onboarding/OnboardingSamplePage';
 import { RoleDetailPage } from './features/roles/RoleDetailPage';
@@ -47,6 +48,7 @@ const PAGES: Record<string, ReactElement> = {
   '/sms-outbox': <SmsOutboxPage />,
   '/phone-verification': <PhoneVerificationStatusPage />,
   '/settings': <SettingsPage />,
+  '/features': <FeatureSwitchesPage />,
   '/media-jobs': <MediaJobsPage />,
   '/onboarding-sample': <OnboardingSamplePage />,
   '/admin-accounts': <AdminAccountsPage />,
