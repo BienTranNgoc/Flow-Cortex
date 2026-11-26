@@ -7,7 +7,6 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.support.assistant.ConversationStore.StoredConversation;
 import com.flowcortex.support.assistant.ConversationStore.StoredMessage;
 import com.flowcortex.support.config.AssistantSwitch;
-import com.flowcortex.support.config.SupportProperties;
 import com.flowcortex.support.kb.KnowledgeBaseService.ScoredArticle;
 import com.flowcortex.support.web.SupportProblemException;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -52,7 +51,6 @@ class AssistantService {
     private static final Logger LOG = LoggerFactory.getLogger(AssistantService.class);
 
     private final AssistantSwitch assistantSwitch;
-    private final String model;
     private final ConversationStore conversations;
     private final QuotaService quotas;
     private final MinuteLimiter minuteLimiter;
@@ -61,11 +59,10 @@ class AssistantService {
     private final AssistantTelemetry telemetry;
     private final Clock clock;
 
-    AssistantService(AssistantSwitch assistantSwitch, SupportProperties properties, ConversationStore conversations,
-            QuotaService quotas, MinuteLimiter minuteLimiter, Retriever retriever, LlmDeadline llm,
-            AssistantTelemetry telemetry, Clock clock) {
+    AssistantService(AssistantSwitch assistantSwitch, ConversationStore conversations, QuotaService quotas,
+            MinuteLimiter minuteLimiter, Retriever retriever, LlmDeadline llm, AssistantTelemetry telemetry,
+            Clock clock) {
         this.assistantSwitch = assistantSwitch;
-        this.model = properties.assistant().model();
         this.conversations = conversations;
         this.quotas = quotas;
         this.minuteLimiter = minuteLimiter;
@@ -249,9 +246,9 @@ class AssistantService {
 
     private AssistantReply answerCharged(Asker asker, UUID conversationId, String question, Instant askedAt,
             List<ScoredArticle> articles, Locale locale, QuotaService.Charge charge, long started) {
-        LlmJsonResult result = llm.call(PromptBuilder.request(model, question, articles, locale));
+        LlmJsonResult result = llm.call(PromptBuilder.request(question, articles, locale));
         Optional<Answer> answer = answer(result, articles);
-        telemetry.provider(model, result, answer.map(a -> a.sources().size()).orElse(0));
+        telemetry.provider(AssistantSlot.NAME, result, answer.map(a -> a.sources().size()).orElse(0));
         if (answer.isEmpty()) {
             telemetry.record("unavailable", 0, length(question), started);
             throw new SupportProblemException(HttpStatus.SERVICE_UNAVAILABLE, "assistant-unavailable",

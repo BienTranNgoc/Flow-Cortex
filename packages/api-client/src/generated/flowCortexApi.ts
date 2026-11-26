@@ -601,6 +601,36 @@ export interface RoleResponse {
   accountCount: number;
 }
 
+export interface RbacRuntimeUpdate {
+  mutationsEnabled: boolean;
+  /**
+   * @minLength 0
+   * @maxLength 2000
+   */
+  reason?: string;
+}
+
+export type RbacRuntimeSource = (typeof RbacRuntimeSource)[keyof typeof RbacRuntimeSource];
+
+export const RbacRuntimeSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface RbacRuntime {
+  mutationsEnabled: boolean;
+  source: RbacRuntimeSource;
+  /** @nullable */
+  configuredValue?: boolean | null;
+  /** @nullable */
+  updatedBy?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
 export interface PaymentSettingUpdate {
   value: string | boolean | number;
   /**
@@ -2208,8 +2238,16 @@ export interface WorkflowArtifactWorkflow {
   name: string;
 }
 
+/**
+ * @nullable
+ */
+export type WorkflowArtifactStepConfig = { [key: string]: unknown } | null;
+
 export interface WorkflowArtifactStep {
-  /** @minimum 1 */
+  /**
+   * @minimum 1
+   * @maximum 32767
+   */
   stepOrder: number;
   /**
    * @maxLength 255
@@ -2227,7 +2265,14 @@ export interface WorkflowArtifactStep {
    */
   inputRef: string | null;
   /** @nullable */
-  config: string | null;
+  config: WorkflowArtifactStepConfig;
+}
+
+export interface WorkflowArtifactDataEntry {
+  key: string;
+  dataType: string;
+  /** Any JSON value */
+  value: unknown;
 }
 
 export interface WorkflowArtifact {
@@ -2239,6 +2284,8 @@ export interface WorkflowArtifact {
   exportedAt: string;
   workflow: WorkflowArtifactWorkflow;
   steps: WorkflowArtifactStep[];
+  /** The workflow's data-store entries; absent when it has none */
+  dataStore?: WorkflowArtifactDataEntry[];
 }
 
 export type ImportIssueResponseSeverity =
@@ -3552,6 +3599,18 @@ export interface BalanceResponse {
   granted?: number;
 }
 
+export interface LegalIndexEntry {
+  /** The document slug, e.g. legal-privacy */
+  slug: string;
+  /** The member page path, e.g. /legal/privacy */
+  path: string;
+  label: LocalizedText;
+}
+
+export interface LegalIndex {
+  items: LegalIndexEntry[];
+}
+
 export interface ContentDocumentHistoryEntry {
   revisionId: string;
   publishedAt: string;
@@ -3953,6 +4012,19 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
+/**
+ * none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned
+ */
+export type AdminPhoneVerificationStatusCarrierCredential =
+  (typeof AdminPhoneVerificationStatusCarrierCredential)[keyof typeof AdminPhoneVerificationStatusCarrierCredential];
+
+export const AdminPhoneVerificationStatusCarrierCredential = {
+  none: 'none',
+  active: 'active',
+  reseed_required: 'reseed_required',
+  unseeded: 'unseeded',
+} as const;
+
 export interface AdminPhoneVerificationStatus {
   verificationEnabled: boolean;
   /** none when no SMS sender is wired; the configured sender when it is a known one; else custom */
@@ -3964,6 +4036,8 @@ export interface AdminPhoneVerificationStatus {
   globalSendsPerDay: number;
   /** Codes sent in the last 24 hours */
   sentLast24h: number;
+  /** none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned */
+  carrierCredential: AdminPhoneVerificationStatusCarrierCredential;
 }
 
 export type PermissionCatalogEntryKey =
@@ -4065,6 +4139,17 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export interface AdminFeature {
+  name: string;
+  /** @nullable */
+  settingKey?: string | null;
+  value: boolean;
+}
+
+export interface AdminFeatureList {
+  items: AdminFeature[];
+}
+
 export interface PageViewContentMediaItem {
   items: ContentMediaItem[];
   page: number;
@@ -4077,6 +4162,8 @@ export interface ContentDocumentSummary {
   title: LocalizedText;
   sectionTypes: string[];
   publicHistory: boolean;
+  minSections: number;
+  maxSections: number;
   draftVersion: number;
   /** @nullable */
   draftUpdatedAt?: string | null;
@@ -6774,6 +6861,74 @@ export const replaceAdminRolePermissions = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(replacePermissionsRequest),
+  });
+};
+
+export type getRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type getRbacRuntimeResponseSuccess = getRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type getRbacRuntimeResponse = getRbacRuntimeResponseSuccess;
+
+export const getGetRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const getRbacRuntime = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRbacRuntimeResponse> => {
+  return customFetch<getRbacRuntimeResponse>(getGetRbacRuntimeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type updateRbacRuntimeResponseSuccess = updateRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type updateRbacRuntimeResponse = updateRbacRuntimeResponseSuccess;
+
+export const getUpdateRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const updateRbacRuntime = async (
+  rbacRuntimeUpdate: RbacRuntimeUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateRbacRuntimeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateRbacRuntimeResponse>(getUpdateRbacRuntimeUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rbacRuntimeUpdate),
   });
 };
 
@@ -10945,10 +11100,19 @@ export type sendCodeResponse200 = {
   status: 200;
 };
 
+export type sendCodeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type sendCodeResponseSuccess = sendCodeResponse200 & {
   headers: Headers;
 };
-export type sendCodeResponse = sendCodeResponseSuccess;
+export type sendCodeResponseError = sendCodeResponse503 & {
+  headers: Headers;
+};
+
+export type sendCodeResponse = sendCodeResponseSuccess | sendCodeResponseError;
 
 export const getSendCodeUrl = () => {
   return `/api/v1/me/phone/send-code`;
@@ -11081,6 +11245,11 @@ export type changeStartResponse429 = {
   status: 429;
 };
 
+export type changeStartResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type changeStartResponseSuccess = changeStartResponse200 & {
   headers: Headers;
 };
@@ -11090,6 +11259,7 @@ export type changeStartResponseError = (
   | changeStartResponse409
   | changeStartResponse422
   | changeStartResponse429
+  | changeStartResponse503
 ) & {
   headers: Headers;
 };
@@ -17544,6 +17714,29 @@ export const getContentMedia = async (
   });
 };
 
+export type getLegalIndexResponse200 = {
+  data: LegalIndex;
+  status: 200;
+};
+
+export type getLegalIndexResponseSuccess = getLegalIndexResponse200 & {
+  headers: Headers;
+};
+export type getLegalIndexResponse = getLegalIndexResponseSuccess;
+
+export const getGetLegalIndexUrl = () => {
+  return `/api/v1/content/legal-index`;
+};
+
+export const getLegalIndex = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getLegalIndexResponse> => {
+  return customFetch<getLegalIndexResponse>(getGetLegalIndexUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type getPublishedContentDocumentResponse200 = {
   data: ContentDocumentPublication;
   status: 200;
@@ -18761,6 +18954,29 @@ export const listAdminMediaJobs = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listAdminMediaJobsResponse> => {
   return customFetch<listAdminMediaJobsResponse>(getListAdminMediaJobsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAdminFeaturesResponse200 = {
+  data: AdminFeatureList;
+  status: 200;
+};
+
+export type listAdminFeaturesResponseSuccess = listAdminFeaturesResponse200 & {
+  headers: Headers;
+};
+export type listAdminFeaturesResponse = listAdminFeaturesResponseSuccess;
+
+export const getListAdminFeaturesUrl = () => {
+  return `/api/v1/admin/features`;
+};
+
+export const listAdminFeatures = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminFeaturesResponse> => {
+  return customFetch<listAdminFeaturesResponse>(getListAdminFeaturesUrl(), {
     ...options,
     method: 'GET',
   });

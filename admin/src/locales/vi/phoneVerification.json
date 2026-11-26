@@ -13,12 +13,20 @@
     "hashSecret": "Khóa băm",
     "gate": "Cổng số điện thoại",
     "dailyBudget": "Hạn mức mã mỗi ngày",
-    "sentLast24h": "Mã đã gửi trong 24 giờ qua"
+    "sentLast24h": "Mã đã gửi trong 24 giờ qua",
+    "carrierCredential": "Thông tin xác thực nhà mạng"
   },
   "sender": {
     "none": "Không có",
     "outbox": "Hộp thư đi phát triển",
+    "vietguys": "VietGuys SMS",
     "custom": "Bên gửi tùy chỉnh"
+  },
+  "carrierCredential": {
+    "none": "Không dùng",
+    "active": "Đang hoạt động",
+    "reseed_required": "Cần token mới",
+    "unseeded": "Chưa nạp token"
   },
   "hashSecret": {
     "configured": "Đã cấu hình",

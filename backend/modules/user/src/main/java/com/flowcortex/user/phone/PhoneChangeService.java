@@ -30,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.MessageSource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -52,8 +51,6 @@ class PhoneChangeService {
 
     static final Duration UNDO_WINDOW = Duration.ofHours(24);
 
-    private static final LocalizedMessage CHANGED_NOTICE = new LocalizedMessage("sms.phoneChanged.body");
-    private static final LocalizedMessage REVERTED_NOTICE = new LocalizedMessage("sms.phoneChangeReverted.body");
     private static final Logger LOG = LoggerFactory.getLogger(PhoneChangeService.class);
     private static final String START = "start";
     private static final String VERIFY = "verify";
@@ -71,7 +68,6 @@ class PhoneChangeService {
     private final PhoneTelemetry telemetry;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
-    private final MessageSource messages;
     private final RequestLocale requestLocale;
 
     PhoneChangeService(StepUpProofs stepUpProofs, PhoneVerificationService verification,
@@ -79,7 +75,7 @@ class PhoneChangeService {
             Mailer mailer, MailRecipientDirectory recipients,
             @Qualifier("applicationTaskExecutor") TaskExecutor mailExecutor, AuditEventWriter audit,
             PhoneTelemetry telemetry, JdbcTemplate jdbc, PlatformTransactionManager transactionManager,
-            MessageSource messages, RequestLocale requestLocale) {
+            RequestLocale requestLocale) {
         this.stepUpProofs = stepUpProofs;
         this.verification = verification;
         this.challenges = challenges;
@@ -92,7 +88,6 @@ class PhoneChangeService {
         this.telemetry = telemetry;
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(transactionManager);
-        this.messages = messages;
         this.requestLocale = requestLocale;
     }
 
@@ -299,7 +294,7 @@ class PhoneChangeService {
         Locale locale = requestLocale.current();
         audit.write(AuthEventType.PHONE_CHANGED, userId, clientIp, userAgent,
                 AuthEventType.metadata("old", PhoneNumbers.mask(replaced), "new", PhoneNumbers.mask(added)));
-        textNotice(userId, replaced, CHANGED_NOTICE, locale);
+        textNotice(userId, replaced, SmsMessage.Kind.PHONE_CHANGED, locale);
         mailNotice(userId, PhoneNumbers.mask(added), locale);
     }
 
@@ -307,19 +302,33 @@ class PhoneChangeService {
         Locale locale = requestLocale.current();
         audit.write(AuthEventType.PHONE_CHANGE_REVERTED, userId, clientIp, userAgent,
                 AuthEventType.metadata("old", PhoneNumbers.mask(removed), "new", PhoneNumbers.mask(restored)));
-        textNotice(userId, removed, REVERTED_NOTICE, locale);
-        textNotice(userId, restored, REVERTED_NOTICE, locale);
+        textNotice(userId, removed, SmsMessage.Kind.PHONE_CHANGE_REVERTED, locale);
+        textNotice(userId, restored, SmsMessage.Kind.PHONE_CHANGE_REVERTED, locale);
     }
 
-    private void textNotice(UUID userId, String phone, LocalizedMessage notice, Locale locale) {
+    /** The message is built here, on the request's thread; the carrier call runs on the mail executor. */
+    private void textNotice(UUID userId, String phone, SmsMessage.Kind kind, Locale locale) {
         try {
             if (smsSender == null) {
                 throw new IllegalStateException("No SMS sender is configured (flowcortex.sms.sender)");
             }
-            smsSender.send(phone, messages.getMessage(notice, locale));
+            SmsMessage message = new SmsMessage(phone, kind, null, locale, UUID.randomUUID().toString());
+            mailExecutor.execute(() -> deliver(userId, message));
+        } catch (TaskRejectedException rejected) {
+            LOG.warn("Phone change notice not sent: userId={} phone={} channel=sms error=queue_full", userId,
+                    PhoneNumbers.forLog(phone));
         } catch (RuntimeException failure) {
             LOG.warn("Phone change notice not sent: userId={} phone={} channel=sms error={}", userId,
                     PhoneNumbers.forLog(phone), failure.getClass().getName());
+        }
+    }
+
+    private void deliver(UUID userId, SmsMessage message) {
+        try {
+            smsSender.send(message);
+        } catch (RuntimeException failure) {
+            LOG.warn("Phone change notice not sent: userId={} phone={} channel=sms error={}", userId,
+                    PhoneNumbers.forLog(message.phoneE164()), failure.getClass().getName());
         }
     }
 

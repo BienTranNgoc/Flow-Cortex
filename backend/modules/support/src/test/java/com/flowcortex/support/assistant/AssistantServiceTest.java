@@ -67,9 +67,7 @@ class AssistantServiceTest {
 
     @BeforeEach
     void setUp() {
-        SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
-        service = new AssistantService(assistantSwitch, properties, conversations, quotas, minuteLimiter, retriever,
+        service = new AssistantService(assistantSwitch, conversations, quotas, minuteLimiter, retriever,
                 llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         when(assistantSwitch.available()).thenReturn(true);
         when(retriever.retrieve(anyString())).thenReturn(List.of(NAP, GOI));
@@ -291,8 +289,8 @@ class AssistantServiceTest {
     void rotatingSessionIdsFromOneAddressIsRefusedAtTheEleventhQuestionInAMinute() {
         MinuteLimiter real = AskerLimitsTest.minuteLimiter(Clock.fixed(NOW, ZoneOffset.UTC));
         SupportProperties properties = new SupportProperties(true, "", new SupportProperties.Assistant(true,
-                "gemini-test", 2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
-        AssistantService limited = new AssistantService(assistantSwitch, properties, conversations, quotas, real,
+                2000, 50, 10, 100), new SupportProperties.Lifecycle(true, 7, true, 0, true, 24));
+        AssistantService limited = new AssistantService(assistantSwitch, conversations, quotas, real,
                 retriever, llm, new AssistantTelemetry(meters, ObservationRegistry.NOOP), Clock.fixed(NOW, ZoneOffset.UTC));
         GuestKeys keys = new GuestKeys(properties, "support-hash-secret-for-unit-tests-0123456789");
         when(retriever.retrieve(anyString())).thenReturn(List.of());

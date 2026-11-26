@@ -5,10 +5,12 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.infrastructure.RoleDetailRow;
 import com.flowcortex.user.infrastructure.RoleRepository;
+import com.flowcortex.user.roles.RbacMutationSwitch.RbacOperation;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -23,9 +25,11 @@ public class RoleService {
     private static final String FOREIGN_KEY_VIOLATION = "23503";
 
     private final RoleRepository roles;
+    private final RbacMutationSwitch mutationSwitch;
 
-    RoleService(RoleRepository roles) {
+    RoleService(RoleRepository roles, RbacMutationSwitch mutationSwitch) {
         this.roles = roles;
+        this.mutationSwitch = mutationSwitch;
     }
 
     /**
@@ -33,7 +37,8 @@ public class RoleService {
      * or reserved code gets the next numeric suffix, and a taken name is a conflict settled by the unique index.
      */
     @Transactional
-    public String create(String name, String description, Collection<String> keys) {
+    public String create(UUID actor, String name, String description, Collection<String> keys) {
+        mutationSwitch.requireEnabled(RbacOperation.ROLE_CREATE, actor);
         String cleanName = name.strip();
         String cleanDescription = cleanDescription(description);
         List<String> keySet = keys == null ? List.of() : keys.stream().distinct().toList();
@@ -62,7 +67,8 @@ public class RoleService {
 
     /** Changes the name and/or description of a custom role; a {@code null} argument leaves the field as it is. */
     @Transactional
-    public void update(String code, String name, String description) {
+    public void update(UUID actor, String code, String name, String description) {
+        mutationSwitch.requireEnabled(RbacOperation.ROLE_UPDATE, actor);
         RoleDetailRow role = require(code);
         if (role.system()) {
             throw systemImmutable(code);
@@ -82,7 +88,8 @@ public class RoleService {
      * race raises the foreign-key violation outside any transaction, so the count can still be read for the
      * message (inside one, PostgreSQL refuses every further statement).
      */
-    public void delete(String code) {
+    public void delete(UUID actor, String code) {
+        mutationSwitch.requireEnabled(RbacOperation.ROLE_DELETE, actor);
         RoleDetailRow role = require(code);
         if (role.system()) {
             throw systemImmutable(code);

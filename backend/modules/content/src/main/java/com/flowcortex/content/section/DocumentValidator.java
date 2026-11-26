@@ -70,7 +70,7 @@ public class DocumentValidator {
             errors.add(new FieldError("sections", FieldError.MALFORMED));
             return errors;
         }
-        if (sections.size() > MAX_SECTIONS) {
+        if (sections.size() > definition.maxSections()) {
             errors.add(new FieldError("sections", FieldError.TOO_MANY));
             return errors;
         }

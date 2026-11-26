@@ -19,7 +19,9 @@
   "vetoedNote": "Đang bị tắt bởi cấu hình máy chủ; giá trị đã lưu sẽ có hiệu lực khi cấu hình được gỡ.",
   "degradedNote": "Kho cài đặt không khả dụng nên đang áp dụng giá trị dự phòng an toàn.",
   "groups": {
-    "support": "Trung tâm trợ giúp"
+    "support": "Trung tâm trợ giúp",
+    "user": "Tài khoản",
+    "workflow": "Quy trình"
   },
   "source": {
     "STORED": "Do quản trị viên đặt",
@@ -45,7 +47,29 @@
     "older": "Cũ hơn"
   },
   "keys": {
+    "user": {
+      "pw_reset": {
+        "enabled": {
+          "label": "Đặt lại mật khẩu",
+          "help": "Khi tắt, liên kết đặt lại mật khẩu bị ẩn với thành viên và các yêu cầu đặt lại bị từ chối từ yêu cầu kế tiếp."
+        }
+      }
+    },
+    "workflow": {
+      "run_cancellation": {
+        "enabled": {
+          "label": "Hủy lượt chạy",
+          "help": "Khi tắt, nút Dừng bị ẩn với thành viên và các yêu cầu hủy bị từ chối từ yêu cầu kế tiếp."
+        }
+      }
+    },
     "support": {
+      "help_center": {
+        "enabled": {
+          "label": "Trung tâm trợ giúp",
+          "help": "Khi tắt, Trung tâm trợ giúp bị ẩn với thành viên và mọi yêu cầu tới Trung tâm trợ giúp bị từ chối từ yêu cầu kế tiếp."
+        }
+      },
       "assistant": {
         "enabled": {
           "label": "Trợ lý AI",
