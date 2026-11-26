@@ -161,6 +161,18 @@ erDiagram
     timestamptz created_at
     timestamptz updated_at "finished rows deleted after 30 days"
   }
+  trash_entry {
+    uuid id PK
+    varchar item_type "lowercase key, UNIQUE with item_id; the owning module's provider type"
+    varchar item_id "the trashed row's id in its own module, no FK"
+    uuid owner_id "the account that sees and acts on the entry, no FK"
+    uuid deleted_by "no FK"
+    text name "1-200 characters; NULL = untitled"
+    text name_key "folded search key written by Java; empty when untitled"
+    varchar location_code "message code of where the item lived"
+    timestamptz deleted_at "expiry = deleted_at + retention, never stored"
+    timestamptz reminded_at "NULL until the expiry reminder claims it; cleared when the item is deleted again"
+  }
   product_video_input {
     uuid run_id PK,FK
     varchar product_name

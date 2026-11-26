@@ -12,6 +12,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaDownload;
@@ -50,6 +51,8 @@ import java.util.UUID;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
@@ -67,8 +70,10 @@ class RequestServiceTest {
     private final UserDirectory users = mock(UserDirectory.class);
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final Settings settings = mock(Settings.class);
+    private final SupportSignals signals = mock(SupportSignals.class);
     private final RequestService service = new RequestService(requests, idempotency, publisher, attachments, users,
-            adminPermissions, settings, mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
+            adminPermissions, settings, signals, mock(PlatformTransactionManager.class),
+            Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID member = UUID.randomUUID();
     private final UUID admin = UUID.randomUUID();
 
@@ -639,6 +644,147 @@ class RequestServiceTest {
         assertThat(service.autoClose(resolved, cutoff)).isFalse();
         assertThat(service.autoClose(row(UUID.randomUUID(), 13, RequestStatus.IN_PROGRESS), cutoff)).isFalse();
         verify(requests, never()).move(any(), any(), any(), any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"create", "memberReply", "cancel", "confirm", "adminReply", "setStatus", "pickUpAssign",
+            "autoClose"})
+    void everyWinningWriteSignalsItsRequestOnce(String write) {
+        UUID id = UUID.randomUUID();
+        UUID linh = UUID.randomUUID();
+        RequestStatus from = switch (write) {
+            case "memberReply" -> RequestStatus.WAITING_MEMBER;
+            case "confirm", "autoClose" -> RequestStatus.RESOLVED;
+            case "adminReply", "pickUpAssign" -> RequestStatus.NEW;
+            default -> RequestStatus.IN_PROGRESS;
+        };
+        RequestRow before = row(id, 12, from);
+        when(requests.findByNumber(12)).thenReturn(Optional.of(before));
+        when(requests.findById(any())).thenReturn(Optional.of(before));
+        when(requests.insertRequest(any(), eq(member), any(), any(), any(), any(), any())).thenReturn(12L);
+        when(requests.move(any(), any(), any(), any(), any(), any())).thenReturn(true);
+        when(requests.assign(any(), any(), any(), any(), any())).thenReturn(true);
+        when(requests.closeSeenResolution(any(), any(), any(), any())).thenReturn(true);
+        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of(member, "m@example.com"));
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+
+        switch (write) {
+            case "create" -> service.create(member, new NewRequest("credit", "Không thấy credit",
+                    "Tôi đã nạp nhưng chưa thấy credit.", List.of(), null), Optional.empty(), Locale.ENGLISH);
+            case "memberReply" -> service.reply(member, 12, "Đã thử, vẫn lỗi", List.of(), Optional.empty());
+            case "cancel" -> service.cancel(member, 12);
+            case "confirm" -> service.confirm(member, 12);
+            case "adminReply" -> service.adminReply(admin, 12, "Đã xử lý", List.of(), "resolved", Optional.empty());
+            case "setStatus" -> service.setStatus(12, "resolved");
+            case "pickUpAssign" -> service.assign(admin, 12, linh);
+            default -> service.autoClose(before, NOW.minusSeconds(7 * 24 * 3600));
+        }
+
+        verify(signals, times(1)).changed(member, 12L);
+        verifyNoMoreInteractions(signals);
+    }
+
+    @Test
+    void aReplayedKeyALostRaceOrARefusalSignalsNothing() {
+        UUID first = UUID.randomUUID();
+        UUID winner = UUID.randomUUID();
+        UUID closed = UUID.randomUUID();
+        UUID busy = UUID.randomUUID();
+        when(idempotency.find(member, "replayed", "request", null, NOW)).thenReturn(Optional.of(first));
+        when(requests.findById(first)).thenReturn(Optional.of(row(first, 7, RequestStatus.NEW)));
+        when(idempotency.claim(eq(member), eq("raced"), eq("request"), isNull(), any(), eq(NOW)))
+                .thenReturn(Optional.of(winner));
+        when(requests.findById(winner)).thenReturn(Optional.of(row(winner, 8, RequestStatus.NEW)));
+        when(requests.findByNumber(9)).thenReturn(Optional.of(row(closed, 9, RequestStatus.CLOSED)));
+        when(requests.findByNumber(12)).thenReturn(Optional.of(row(busy, 12, RequestStatus.IN_PROGRESS)));
+        when(requests.move(any(), any(), any(), any(), any(), any())).thenReturn(false);
+        NewRequest input = new NewRequest("credit", "Không thấy credit", "Bấm gửi hai lần liền.", List.of(), null);
+
+        service.create(member, input, Optional.of("replayed"), Locale.ENGLISH);
+        service.create(member, input, Optional.of("raced"), Locale.ENGLISH);
+        assertProblem(() -> service.reply(member, 9, "Còn nữa", List.of(), Optional.empty()), HttpStatus.CONFLICT,
+                "request-closed");
+        assertProblem(() -> service.cancel(member, 12), HttpStatus.CONFLICT, "request-state-changed");
+        assertProblem(() -> service.setStatus(12, "resolved"), HttpStatus.CONFLICT, "request-state-changed");
+
+        verifyNoInteractions(signals);
+    }
+
+    @Test
+    void anAssignmentThatChangesNothingSignalsNothing() {
+        UUID linh = UUID.randomUUID();
+        UUID open = UUID.randomUUID();
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(31)).thenReturn(Optional.of(row(open, 31, RequestStatus.IN_PROGRESS, member, linh)));
+        when(requests.findById(open)).thenReturn(Optional.of(row(open, 31, RequestStatus.IN_PROGRESS, member, linh)));
+
+        service.assign(admin, 31, linh);
+
+        verifyNoInteractions(signals);
+        verify(requests, never()).assign(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anAssignmentThatLostTheRaceSignalsNothing() {
+        UUID linh = UUID.randomUUID();
+        UUID busy = UUID.randomUUID();
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(row(busy, 30, RequestStatus.NEW)));
+        when(requests.assign(any(), any(), any(), any(), any())).thenReturn(false);
+
+        assertProblem(() -> service.assign(admin, 30, linh), HttpStatus.CONFLICT, "request-state-changed");
+
+        verifyNoInteractions(signals);
+    }
+
+    @Test
+    void bulkAssignSignalsOnlyTheRequestsItChanged() {
+        UUID linh = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        RequestRow fresh = row(UUID.randomUUID(), 30, RequestStatus.NEW);
+        RequestRow already = row(UUID.randomUUID(), 31, RequestStatus.IN_PROGRESS, member, linh);
+        RequestRow closed = row(UUID.randomUUID(), 9, RequestStatus.CLOSED);
+        RequestRow racing = row(UUID.randomUUID(), 32, RequestStatus.IN_PROGRESS, member, other);
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(fresh));
+        when(requests.findByNumber(31)).thenReturn(Optional.of(already));
+        when(requests.findByNumber(9)).thenReturn(Optional.of(closed));
+        when(requests.findByNumber(32)).thenReturn(Optional.of(racing));
+        when(requests.findByNumber(999)).thenReturn(Optional.empty());
+        when(requests.assign(fresh.id(), RequestStatus.NEW, RequestStatus.IN_PROGRESS, linh, NOW)).thenReturn(true);
+        when(requests.assign(racing.id(), RequestStatus.IN_PROGRESS, RequestStatus.IN_PROGRESS, linh, NOW))
+                .thenReturn(false);
+
+        service.bulkAssign(admin, List.of(30L, 31L, 9L, 999L, 32L), linh);
+
+        verify(signals).changed(member, 30L);
+        verifyNoMoreInteractions(signals);
+    }
+
+    @Test
+    void openingSignalsOnlyWhenMarkSeenChangedTheRow() {
+        UUID id = UUID.randomUUID();
+        RequestRow resolved = row(id, 12, RequestStatus.RESOLVED);
+        when(requests.findByNumber(12)).thenReturn(Optional.of(resolved));
+        when(requests.findById(id)).thenReturn(Optional.of(resolved));
+        when(requests.markSeen(id, NOW)).thenReturn(true, false);
+
+        service.open(member, 12);
+        service.open(member, 12);
+
+        verify(signals, times(1)).changed(member, 12L);
+        verifyNoMoreInteractions(signals);
+    }
+
+    @Test
+    void anAutoCloseThatLostTheRaceSignalsNothing() {
+        RequestRow resolved = row(UUID.randomUUID(), 12, RequestStatus.RESOLVED);
+        Instant cutoff = NOW.minusSeconds(7 * 24 * 3600);
+        when(requests.closeSeenResolution(resolved.id(), "auto", cutoff, NOW)).thenReturn(false);
+
+        service.autoClose(resolved, cutoff);
+
+        verifyNoInteractions(signals);
     }
 
     private RequestRow row(UUID id, long number, RequestStatus status) {
