@@ -222,6 +222,22 @@ export interface ProfileUpdateRequest {
   lastName?: string;
 }
 
+export type AccountDeletionViewState =
+  (typeof AccountDeletionViewState)[keyof typeof AccountDeletionViewState];
+
+export const AccountDeletionViewState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionView {
+  state: AccountDeletionViewState;
+  requestedAt: string;
+  /** When the grace period ends; the deletion can be cancelled until then */
+  scheduledAt: string;
+}
+
 export type MeResponsePermissionsItem =
   (typeof MeResponsePermissionsItem)[keyof typeof MeResponsePermissionsItem];
 
@@ -281,6 +297,7 @@ export interface MeResponse {
   permissions: MeResponsePermissionsItem[];
   adminDisabled: boolean;
   phoneVerificationRequired: boolean;
+  accountDeletion?: AccountDeletionView;
 }
 
 export interface UsernameRequest {
@@ -947,6 +964,39 @@ export interface AiModel {
   active: boolean;
   displayOrder: number;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeletionBlockConditionUpdate {
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 999
+   */
+  sortOrder: number;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  messageVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  messageEn: string;
+}
+
+export interface DeletionBlockConditionView {
+  key: string;
+  enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 999
+   */
+  sortOrder: number;
+  messageVi: string;
+  messageEn: string;
+  updatedBy?: string;
   updatedAt: string;
 }
 
@@ -1932,6 +1982,7 @@ export type StepUpRequestPurpose = (typeof StepUpRequestPurpose)[keyof typeof St
 export const StepUpRequestPurpose = {
   PAT_CREATE: 'PAT_CREATE',
   PHONE_CHANGE: 'PHONE_CHANGE',
+  ACCOUNT_DELETION: 'ACCOUNT_DELETION',
 } as const;
 
 export interface StepUpRequest {
@@ -2014,6 +2065,42 @@ export interface CreatedApiToken {
   token: string;
   createdAt: string;
   expiresAt: string;
+}
+
+export interface AccountDeletionRequestBody {
+  /**
+   * @minLength 0
+   * @maxLength 200
+   */
+  stepUpProof: string;
+}
+
+export type AccountDeletionAcceptedState =
+  (typeof AccountDeletionAcceptedState)[keyof typeof AccountDeletionAcceptedState];
+
+export const AccountDeletionAcceptedState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionAccepted {
+  requestId: string;
+  state: AccountDeletionAcceptedState;
+  requestedAt: string;
+  scheduledAt: string;
+}
+
+export type AccountDeletionCancelledState =
+  (typeof AccountDeletionCancelledState)[keyof typeof AccountDeletionCancelledState];
+
+export const AccountDeletionCancelledState = {
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export interface AccountDeletionCancelled {
+  state: AccountDeletionCancelledState;
+  cancelledAt: string;
 }
 
 export type CreateEntityRequestKind =
@@ -2317,6 +2404,10 @@ export interface Saved {
   label?: string;
   authType?: string;
   baseUrl?: string;
+}
+
+export interface GoogleAuthorizeResponse {
+  authorizationUrl?: string;
 }
 
 export interface Attachment {
@@ -4005,6 +4096,36 @@ export interface ApiTokenView {
   expired: boolean;
 }
 
+export type AccountDeletionStatusState =
+  (typeof AccountDeletionStatusState)[keyof typeof AccountDeletionStatusState];
+
+export const AccountDeletionStatusState = {
+  NONE: 'NONE',
+  PENDING: 'PENDING',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+export interface AccountDeletionStatus {
+  enabled: boolean;
+  gracePeriodDays: number;
+  state: AccountDeletionStatusState;
+  /** Null while the state is NONE */
+  requestedAt?: string;
+  /** When the grace period ends; null while the state is NONE */
+  scheduledAt?: string;
+}
+
+export interface DeletionReasonView {
+  key: string;
+  /** Already in the caller's language */
+  message: string;
+}
+
+export interface DeletionEligibilityView {
+  eligible: boolean;
+  reasons: DeletionReasonView[];
+}
+
 export interface HealthResponse {
   /** Overall service health status. */
   status?: string;
@@ -4270,6 +4391,57 @@ export interface Summary {
   extraHeaderNames?: string[];
 }
 
+export interface GoogleConnection {
+  provider?: string;
+  email?: string;
+  scopes?: string[];
+  missingScopes?: string[];
+  expiresAt?: string;
+  usageEnabled?: boolean;
+}
+
+export interface Spreadsheet {
+  id?: string;
+  name?: string;
+  modifiedAt?: string;
+  ownerEmail?: string;
+  webViewUrl?: string;
+}
+
+export interface SpreadsheetPage {
+  items?: Spreadsheet[];
+  nextCursor?: string;
+}
+
+export interface Tab {
+  sheetId?: number;
+  title?: string;
+  rowCount?: number;
+  columnCount?: number;
+}
+
+export interface Tabs {
+  spreadsheetId?: string;
+  title?: string;
+  tabs?: Tab[];
+}
+
+export type PreviewRowsItem = { [key: string]: string };
+
+export interface Preview {
+  spreadsheetId?: string;
+  tab?: string;
+  range?: string;
+  header?: string[];
+  rows?: PreviewRowsItem[];
+}
+
+export interface GoogleHealth {
+  valid?: boolean;
+  email?: string;
+  reason?: string;
+}
+
 export interface ChatFolderList {
   items?: ChatFolder[];
 }
@@ -4470,6 +4642,134 @@ export interface PreferencesView {
   locale?: PreferencesViewLocale;
   ui: UiPreferences;
   privacy: PrivacySettings;
+}
+
+export interface AssetCountsResponse {
+  all: number;
+  video: number;
+  image: number;
+  audio: number;
+  favorite: number;
+}
+
+export type AssetItemResponseKind =
+  (typeof AssetItemResponseKind)[keyof typeof AssetItemResponseKind];
+
+export const AssetItemResponseKind = {
+  video: 'video',
+  image: 'image',
+  audio: 'audio',
+} as const;
+
+export type AssetItemResponseSource =
+  (typeof AssetItemResponseSource)[keyof typeof AssetItemResponseSource];
+
+export const AssetItemResponseSource = {
+  run: 'run',
+  upload: 'upload',
+} as const;
+
+export interface AssetItemResponse {
+  id: string;
+  kind: AssetItemResponseKind;
+  title: string;
+  source: AssetItemResponseSource;
+  mimeType: string;
+  bytes: number;
+  createdAt: string;
+  runId: string;
+  workflowId?: string;
+  workflowName?: string;
+  favorite: boolean;
+  tags: string[];
+  missing: boolean;
+  thumbnailUrl?: string;
+}
+
+export interface AssetPageMetaResponse {
+  total: number;
+  counts: AssetCountsResponse;
+  nextCursor?: string;
+  mark: string;
+}
+
+export interface AssetPageResponse {
+  items: AssetItemResponse[];
+  meta: AssetPageMetaResponse;
+}
+
+export interface AssetLinkResponse {
+  url: string;
+  expiresAt: string;
+}
+
+export interface AssetUsageEntryResponse {
+  count: number;
+  bytes: number;
+}
+
+export interface AssetUsageByKindResponse {
+  video: AssetUsageEntryResponse;
+  image: AssetUsageEntryResponse;
+  audio: AssetUsageEntryResponse;
+}
+
+export interface AssetUsageResponse {
+  total: AssetUsageEntryResponse;
+  byKind: AssetUsageByKindResponse;
+}
+
+export interface AssetTagResponse {
+  label: string;
+  count: number;
+}
+
+export interface AssetTagListResponse {
+  tags: AssetTagResponse[];
+}
+
+export interface RunResultThumbnailResponse {
+  url: string;
+}
+
+export type RunResultResponseRegistration =
+  (typeof RunResultResponseRegistration)[keyof typeof RunResultResponseRegistration];
+
+export const RunResultResponseRegistration = {
+  pending: 'pending',
+  done: 'done',
+  none: 'none',
+} as const;
+
+export interface RunResultResponse {
+  runId: string;
+  count: number;
+  kinds: string[];
+  thumbnails: RunResultThumbnailResponse[];
+  registration: RunResultResponseRegistration;
+}
+
+export interface RunResultListResponse {
+  results: RunResultResponse[];
+}
+
+export interface AssetGroupPageMetaResponse {
+  totalGroups: number;
+  mark: string;
+}
+
+export interface AssetGroupResponse {
+  key: string;
+  title?: string;
+  count: number;
+  runCount: number;
+  latestAt: string;
+  items: AssetItemResponse[];
+}
+
+export interface AssetGroupPageResponse {
+  groups: AssetGroupResponse[];
+  meta: AssetGroupPageMetaResponse;
 }
 
 export type AdminWorkflowResponseStatus =
@@ -5625,6 +5925,25 @@ export type ListContentDocumentHistoryParams = {
   size?: number;
 };
 
+export type ListGoogleSpreadsheetsParams = {
+  q?: string;
+  limit?: string;
+  cursor?: string;
+};
+
+export type PreviewGoogleSpreadsheetTabParams = {
+  tab?: string;
+  range?: string;
+  limit?: string;
+  hasHeader?: string;
+};
+
+export type GoogleCallbackParams = {
+  state?: string;
+  code?: string;
+  error?: string;
+};
+
 export type CountChatConversationsParams = {
   q?: string;
   /**
@@ -5680,6 +5999,145 @@ export type AuthorizeParams = {
   remember_me?: boolean;
   return_to?: string;
 };
+
+export type ListAssetsParams = {
+  /**
+   * Comma-separated kinds: video, image, audio
+   */
+  kind?: string;
+  /**
+   * Comma-separated sources: run, upload
+   */
+  source?: string;
+  /**
+   * A group key: workflow:<id>, upload or day:<YYYY-MM-DD>
+   */
+  group?: string;
+  runId?: string;
+  /**
+   * Search in titles and tags, at most 200 characters
+   */
+  q?: string;
+  tag?: string;
+  favorite?: boolean;
+  time?: ListAssetsTime;
+  /**
+   * First day, Asia/Ho_Chi_Minh; with time=custom
+   */
+  from?: string;
+  /**
+   * Last day, inclusive; with time=custom
+   */
+  to?: string;
+  sort?: ListAssetsSort;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  pageSize?: number;
+  /**
+   * meta.nextCursor of the previous page
+   */
+  cursor?: string;
+  /**
+   * Snapshot instant of a walk
+   */
+  mark?: string;
+};
+
+export type ListAssetsTime = (typeof ListAssetsTime)[keyof typeof ListAssetsTime];
+
+export const ListAssetsTime = {
+  all: 'all',
+  '7d': '7d',
+  '30d': '30d',
+  custom: 'custom',
+} as const;
+
+export type ListAssetsSort = (typeof ListAssetsSort)[keyof typeof ListAssetsSort];
+
+export const ListAssetsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  size_desc: 'size_desc',
+  size_asc: 'size_asc',
+} as const;
+
+export type ListRunResultsParams = {
+  /**
+   * 1-100 distinct run ids; a repeated id answers once
+   * @minItems 1
+   * @maxItems 100
+   */
+  runId: string[];
+};
+
+export type ListAssetGroupsParams = {
+  groupBy?: ListAssetGroupsGroupBy;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 30
+   */
+  pageSize?: number;
+  /**
+   * @minimum 1
+   * @maximum 12
+   */
+  itemsPerGroup?: number;
+  /**
+   * Comma-separated kinds: video, image, audio
+   */
+  kind?: string;
+  /**
+   * Comma-separated sources: run, upload
+   */
+  source?: string;
+  runId?: string;
+  q?: string;
+  tag?: string;
+  favorite?: boolean;
+  time?: ListAssetGroupsTime;
+  from?: string;
+  to?: string;
+  /**
+   * Order of the items inside each group
+   */
+  sort?: ListAssetGroupsSort;
+  /**
+   * meta.mark of page 1, sent with every later page
+   */
+  mark?: string;
+};
+
+export type ListAssetGroupsGroupBy =
+  (typeof ListAssetGroupsGroupBy)[keyof typeof ListAssetGroupsGroupBy];
+
+export const ListAssetGroupsGroupBy = {
+  workflow: 'workflow',
+  day: 'day',
+} as const;
+
+export type ListAssetGroupsTime = (typeof ListAssetGroupsTime)[keyof typeof ListAssetGroupsTime];
+
+export const ListAssetGroupsTime = {
+  all: 'all',
+  '7d': '7d',
+  '30d': '30d',
+  custom: 'custom',
+} as const;
+
+export type ListAssetGroupsSort = (typeof ListAssetGroupsSort)[keyof typeof ListAssetGroupsSort];
+
+export const ListAssetGroupsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+  size_desc: 'size_desc',
+  size_asc: 'size_asc',
+} as const;
 
 export type ExportAdminWorkflowsParams = {
   /**
@@ -8754,6 +9212,73 @@ export const deleteAdminAiModel = async (
     ...options,
     method: 'DELETE',
   });
+};
+
+export type updateAdminDeletionBlockConditionResponse200 = {
+  data: DeletionBlockConditionView;
+  status: 200;
+};
+
+export type updateAdminDeletionBlockConditionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminDeletionBlockConditionResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminDeletionBlockConditionResponseSuccess =
+  updateAdminDeletionBlockConditionResponse200 & {
+    headers: Headers;
+  };
+export type updateAdminDeletionBlockConditionResponseError = (
+  updateAdminDeletionBlockConditionResponse400 | updateAdminDeletionBlockConditionResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminDeletionBlockConditionResponse =
+  updateAdminDeletionBlockConditionResponseSuccess | updateAdminDeletionBlockConditionResponseError;
+
+export const getUpdateAdminDeletionBlockConditionUrl = (key: string) => {
+  return `/api/v1/admin/account-deletion/block-conditions/${key}`;
+};
+
+export const updateAdminDeletionBlockCondition = async (
+  key: string,
+  deletionBlockConditionUpdate: DeletionBlockConditionUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminDeletionBlockConditionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminDeletionBlockConditionResponse>(
+    getUpdateAdminDeletionBlockConditionUrl(key),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+      body: JSON.stringify(deletionBlockConditionUpdate),
+    },
+  );
 };
 
 export type listWorkflowsResponse200 = {
@@ -13028,6 +13553,144 @@ export const createApiToken = async (
   });
 };
 
+export type getAccountDeletionStatusResponse200 = {
+  data: AccountDeletionStatus;
+  status: 200;
+};
+
+export type getAccountDeletionStatusResponseSuccess = getAccountDeletionStatusResponse200 & {
+  headers: Headers;
+};
+export type getAccountDeletionStatusResponse = getAccountDeletionStatusResponseSuccess;
+
+export const getGetAccountDeletionStatusUrl = () => {
+  return `/api/v1/me/account-deletion`;
+};
+
+export const getAccountDeletionStatus = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountDeletionStatusResponse> => {
+  return customFetch<getAccountDeletionStatusResponse>(getGetAccountDeletionStatusUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type requestAccountDeletionResponse202 = {
+  data: AccountDeletionAccepted;
+  status: 202;
+};
+
+export type requestAccountDeletionResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type requestAccountDeletionResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type requestAccountDeletionResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type requestAccountDeletionResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type requestAccountDeletionResponseSuccess = requestAccountDeletionResponse202 & {
+  headers: Headers;
+};
+export type requestAccountDeletionResponseError = (
+  | requestAccountDeletionResponse400
+  | requestAccountDeletionResponse403
+  | requestAccountDeletionResponse409
+  | requestAccountDeletionResponse503
+) & {
+  headers: Headers;
+};
+
+export type requestAccountDeletionResponse =
+  requestAccountDeletionResponseSuccess | requestAccountDeletionResponseError;
+
+export const getRequestAccountDeletionUrl = () => {
+  return `/api/v1/me/account-deletion`;
+};
+
+export const requestAccountDeletion = async (
+  accountDeletionRequestBody: AccountDeletionRequestBody,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<requestAccountDeletionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<requestAccountDeletionResponse>(getRequestAccountDeletionUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(accountDeletionRequestBody),
+  });
+};
+
+export type cancelAccountDeletionResponse200 = {
+  data: AccountDeletionCancelled;
+  status: 200;
+};
+
+export type cancelAccountDeletionResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type cancelAccountDeletionResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type cancelAccountDeletionResponseSuccess = cancelAccountDeletionResponse200 & {
+  headers: Headers;
+};
+export type cancelAccountDeletionResponseError = (
+  cancelAccountDeletionResponse409 | cancelAccountDeletionResponse422
+) & {
+  headers: Headers;
+};
+
+export type cancelAccountDeletionResponse =
+  cancelAccountDeletionResponseSuccess | cancelAccountDeletionResponseError;
+
+export const getCancelAccountDeletionUrl = () => {
+  return `/api/v1/me/account-deletion/cancel`;
+};
+
+export const cancelAccountDeletion = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<cancelAccountDeletionResponse> => {
+  return customFetch<cancelAccountDeletionResponse>(getCancelAccountDeletionUrl(), {
+    ...options,
+    method: 'POST',
+  });
+};
+
 export type listEntitiesResponse200 = {
   data: EntityListResponse;
   status: 200;
@@ -13624,6 +14287,45 @@ export const save = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(saveRequest),
+  });
+};
+
+export type googleAuthorizeResponse200 = {
+  data: GoogleAuthorizeResponse;
+  status: 200;
+};
+
+export type googleAuthorizeResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleAuthorizeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleAuthorizeResponseSuccess = googleAuthorizeResponse200 & {
+  headers: Headers;
+};
+export type googleAuthorizeResponseError = (
+  googleAuthorizeResponse403 | googleAuthorizeResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleAuthorizeResponse = googleAuthorizeResponseSuccess | googleAuthorizeResponseError;
+
+export const getGoogleAuthorizeUrl = () => {
+  return `/api/v1/connectors/google/authorize`;
+};
+
+export const googleAuthorize = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleAuthorizeResponse> => {
+  return customFetch<googleAuthorizeResponse>(getGoogleAuthorizeUrl(), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -20320,6 +21022,41 @@ export const getDriveMigration = async (
   });
 };
 
+export type getAccountDeletionEligibilityResponse200 = {
+  data: DeletionEligibilityView;
+  status: 200;
+};
+
+export type getAccountDeletionEligibilityResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getAccountDeletionEligibilityResponseSuccess =
+  getAccountDeletionEligibilityResponse200 & {
+    headers: Headers;
+  };
+export type getAccountDeletionEligibilityResponseError =
+  getAccountDeletionEligibilityResponse503 & {
+    headers: Headers;
+  };
+
+export type getAccountDeletionEligibilityResponse =
+  getAccountDeletionEligibilityResponseSuccess | getAccountDeletionEligibilityResponseError;
+
+export const getGetAccountDeletionEligibilityUrl = () => {
+  return `/api/v1/me/account-deletion/eligibility`;
+};
+
+export const getAccountDeletionEligibility = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAccountDeletionEligibilityResponse> => {
+  return customFetch<getAccountDeletionEligibilityResponse>(getGetAccountDeletionEligibilityUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type healthResponse200 = {
   data: HealthResponse;
   status: 200;
@@ -20955,6 +21692,386 @@ export const getTelegramConnectorHealth = async (
   });
 };
 
+export type googleReadResponse200 = {
+  data: GoogleConnection;
+  status: 200;
+};
+
+export type googleReadResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleReadResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type googleReadResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleReadResponseSuccess = googleReadResponse200 & {
+  headers: Headers;
+};
+export type googleReadResponseError = (
+  googleReadResponse403 | googleReadResponse404 | googleReadResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleReadResponse = googleReadResponseSuccess | googleReadResponseError;
+
+export const getGoogleReadUrl = () => {
+  return `/api/v1/connectors/google`;
+};
+
+export const googleRead = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleReadResponse> => {
+  return customFetch<googleReadResponse>(getGoogleReadUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listGoogleSpreadsheetsResponse200 = {
+  data: SpreadsheetPage;
+  status: 200;
+};
+
+export type listGoogleSpreadsheetsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listGoogleSpreadsheetsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listGoogleSpreadsheetsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listGoogleSpreadsheetsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listGoogleSpreadsheetsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listGoogleSpreadsheetsResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type listGoogleSpreadsheetsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listGoogleSpreadsheetsResponseSuccess = listGoogleSpreadsheetsResponse200 & {
+  headers: Headers;
+};
+export type listGoogleSpreadsheetsResponseError = (
+  | listGoogleSpreadsheetsResponse400
+  | listGoogleSpreadsheetsResponse403
+  | listGoogleSpreadsheetsResponse404
+  | listGoogleSpreadsheetsResponse409
+  | listGoogleSpreadsheetsResponse422
+  | listGoogleSpreadsheetsResponse502
+  | listGoogleSpreadsheetsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listGoogleSpreadsheetsResponse =
+  listGoogleSpreadsheetsResponseSuccess | listGoogleSpreadsheetsResponseError;
+
+export const getListGoogleSpreadsheetsUrl = (params?: ListGoogleSpreadsheetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/sheets?${stringifiedParams}`
+    : `/api/v1/connectors/google/sheets`;
+};
+
+export const listGoogleSpreadsheets = async (
+  params?: ListGoogleSpreadsheetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listGoogleSpreadsheetsResponse> => {
+  return customFetch<listGoogleSpreadsheetsResponse>(getListGoogleSpreadsheetsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listGoogleSpreadsheetTabsResponse200 = {
+  data: Tabs;
+  status: 200;
+};
+
+export type listGoogleSpreadsheetTabsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listGoogleSpreadsheetTabsResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type listGoogleSpreadsheetTabsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listGoogleSpreadsheetTabsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listGoogleSpreadsheetTabsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listGoogleSpreadsheetTabsResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type listGoogleSpreadsheetTabsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listGoogleSpreadsheetTabsResponseSuccess = listGoogleSpreadsheetTabsResponse200 & {
+  headers: Headers;
+};
+export type listGoogleSpreadsheetTabsResponseError = (
+  | listGoogleSpreadsheetTabsResponse400
+  | listGoogleSpreadsheetTabsResponse403
+  | listGoogleSpreadsheetTabsResponse404
+  | listGoogleSpreadsheetTabsResponse409
+  | listGoogleSpreadsheetTabsResponse422
+  | listGoogleSpreadsheetTabsResponse502
+  | listGoogleSpreadsheetTabsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listGoogleSpreadsheetTabsResponse =
+  listGoogleSpreadsheetTabsResponseSuccess | listGoogleSpreadsheetTabsResponseError;
+
+export const getListGoogleSpreadsheetTabsUrl = (id: string) => {
+  return `/api/v1/connectors/google/sheets/${id}/tabs`;
+};
+
+export const listGoogleSpreadsheetTabs = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listGoogleSpreadsheetTabsResponse> => {
+  return customFetch<listGoogleSpreadsheetTabsResponse>(getListGoogleSpreadsheetTabsUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type previewGoogleSpreadsheetTabResponse200 = {
+  data: Preview;
+  status: 200;
+};
+
+export type previewGoogleSpreadsheetTabResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type previewGoogleSpreadsheetTabResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type previewGoogleSpreadsheetTabResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type previewGoogleSpreadsheetTabResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type previewGoogleSpreadsheetTabResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type previewGoogleSpreadsheetTabResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type previewGoogleSpreadsheetTabResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type previewGoogleSpreadsheetTabResponseSuccess = previewGoogleSpreadsheetTabResponse200 & {
+  headers: Headers;
+};
+export type previewGoogleSpreadsheetTabResponseError = (
+  | previewGoogleSpreadsheetTabResponse400
+  | previewGoogleSpreadsheetTabResponse403
+  | previewGoogleSpreadsheetTabResponse404
+  | previewGoogleSpreadsheetTabResponse409
+  | previewGoogleSpreadsheetTabResponse422
+  | previewGoogleSpreadsheetTabResponse502
+  | previewGoogleSpreadsheetTabResponse503
+) & {
+  headers: Headers;
+};
+
+export type previewGoogleSpreadsheetTabResponse =
+  previewGoogleSpreadsheetTabResponseSuccess | previewGoogleSpreadsheetTabResponseError;
+
+export const getPreviewGoogleSpreadsheetTabUrl = (
+  id: string,
+  params?: PreviewGoogleSpreadsheetTabParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/sheets/${id}/preview?${stringifiedParams}`
+    : `/api/v1/connectors/google/sheets/${id}/preview`;
+};
+
+export const previewGoogleSpreadsheetTab = async (
+  id: string,
+  params?: PreviewGoogleSpreadsheetTabParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<previewGoogleSpreadsheetTabResponse> => {
+  return customFetch<previewGoogleSpreadsheetTabResponse>(
+    getPreviewGoogleSpreadsheetTabUrl(id, params),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
+};
+
+export type googleHealthResponse200 = {
+  data: GoogleHealth;
+  status: 200;
+};
+
+export type googleHealthResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type googleHealthResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type googleHealthResponse502 = {
+  data: ProblemDetail;
+  status: 502;
+};
+
+export type googleHealthResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type googleHealthResponseSuccess = googleHealthResponse200 & {
+  headers: Headers;
+};
+export type googleHealthResponseError = (
+  | googleHealthResponse403
+  | googleHealthResponse404
+  | googleHealthResponse502
+  | googleHealthResponse503
+) & {
+  headers: Headers;
+};
+
+export type googleHealthResponse = googleHealthResponseSuccess | googleHealthResponseError;
+
+export const getGoogleHealthUrl = () => {
+  return `/api/v1/connectors/google/health`;
+};
+
+export const googleHealth = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleHealthResponse> => {
+  return customFetch<googleHealthResponse>(getGoogleHealthUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type googleCallbackResponse302 = {
+  data: void;
+  status: 302;
+};
+
+export type googleCallbackResponseError = googleCallbackResponse302 & {
+  headers: Headers;
+};
+
+export type googleCallbackResponse = googleCallbackResponseError;
+
+export const getGoogleCallbackUrl = (params?: GoogleCallbackParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/connectors/google/callback?${stringifiedParams}`
+    : `/api/v1/connectors/google/callback`;
+};
+
+export const googleCallback = async (
+  params?: GoogleCallbackParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<googleCallbackResponse> => {
+  return customFetch<googleCallbackResponse>(getGoogleCallbackUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listChatMessagesResponse200 = {
   data: ChatMessage[];
   status: 200;
@@ -21384,6 +22501,235 @@ export const getMeUrl = () => {
 
 export const me = async (options?: Parameters<typeof customFetch>[1]): Promise<meResponse> => {
   return customFetch<meResponse>(getMeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAssetsResponse200 = {
+  data: AssetPageResponse;
+  status: 200;
+};
+
+export type listAssetsResponseSuccess = listAssetsResponse200 & {
+  headers: Headers;
+};
+export type listAssetsResponse = listAssetsResponseSuccess;
+
+export const getListAssetsUrl = (params?: ListAssetsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/assets?${stringifiedParams}` : `/api/v1/assets`;
+};
+
+export const listAssets = async (
+  params?: ListAssetsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAssetsResponse> => {
+  return customFetch<listAssetsResponse>(getListAssetsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetResponse200 = {
+  data: AssetItemResponse;
+  status: 200;
+};
+
+export type getAssetResponseSuccess = getAssetResponse200 & {
+  headers: Headers;
+};
+export type getAssetResponse = getAssetResponseSuccess;
+
+export const getGetAssetUrl = (id: string) => {
+  return `/api/v1/assets/${id}`;
+};
+
+export const getAsset = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetResponse> => {
+  return customFetch<getAssetResponse>(getGetAssetUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetViewUrlResponse200 = {
+  data: AssetLinkResponse;
+  status: 200;
+};
+
+export type getAssetViewUrlResponseSuccess = getAssetViewUrlResponse200 & {
+  headers: Headers;
+};
+export type getAssetViewUrlResponse = getAssetViewUrlResponseSuccess;
+
+export const getGetAssetViewUrlUrl = (id: string) => {
+  return `/api/v1/assets/${id}/view-url`;
+};
+
+export const getAssetViewUrl = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetViewUrlResponse> => {
+  return customFetch<getAssetViewUrlResponse>(getGetAssetViewUrlUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetDownloadUrlResponse200 = {
+  data: AssetLinkResponse;
+  status: 200;
+};
+
+export type getAssetDownloadUrlResponseSuccess = getAssetDownloadUrlResponse200 & {
+  headers: Headers;
+};
+export type getAssetDownloadUrlResponse = getAssetDownloadUrlResponseSuccess;
+
+export const getGetAssetDownloadUrlUrl = (id: string) => {
+  return `/api/v1/assets/${id}/download-url`;
+};
+
+export const getAssetDownloadUrl = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetDownloadUrlResponse> => {
+  return customFetch<getAssetDownloadUrlResponse>(getGetAssetDownloadUrlUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAssetUsageResponse200 = {
+  data: AssetUsageResponse;
+  status: 200;
+};
+
+export type getAssetUsageResponseSuccess = getAssetUsageResponse200 & {
+  headers: Headers;
+};
+export type getAssetUsageResponse = getAssetUsageResponseSuccess;
+
+export const getGetAssetUsageUrl = () => {
+  return `/api/v1/assets/usage`;
+};
+
+export const getAssetUsage = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAssetUsageResponse> => {
+  return customFetch<getAssetUsageResponse>(getGetAssetUsageUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAssetTagsResponse200 = {
+  data: AssetTagListResponse;
+  status: 200;
+};
+
+export type listAssetTagsResponseSuccess = listAssetTagsResponse200 & {
+  headers: Headers;
+};
+export type listAssetTagsResponse = listAssetTagsResponseSuccess;
+
+export const getListAssetTagsUrl = () => {
+  return `/api/v1/assets/tags`;
+};
+
+export const listAssetTags = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAssetTagsResponse> => {
+  return customFetch<listAssetTagsResponse>(getListAssetTagsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listRunResultsResponse200 = {
+  data: RunResultListResponse;
+  status: 200;
+};
+
+export type listRunResultsResponseSuccess = listRunResultsResponse200 & {
+  headers: Headers;
+};
+export type listRunResultsResponse = listRunResultsResponseSuccess;
+
+export const getListRunResultsUrl = (params: ListRunResultsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ['runId'];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/assets/run-results?${stringifiedParams}`
+    : `/api/v1/assets/run-results`;
+};
+
+export const listRunResults = async (
+  params: ListRunResultsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listRunResultsResponse> => {
+  return customFetch<listRunResultsResponse>(getListRunResultsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listAssetGroupsResponse200 = {
+  data: AssetGroupPageResponse;
+  status: 200;
+};
+
+export type listAssetGroupsResponseSuccess = listAssetGroupsResponse200 & {
+  headers: Headers;
+};
+export type listAssetGroupsResponse = listAssetGroupsResponseSuccess;
+
+export const getListAssetGroupsUrl = (params?: ListAssetGroupsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/assets/groups?${stringifiedParams}`
+    : `/api/v1/assets/groups`;
+};
+
+export const listAssetGroups = async (
+  params?: ListAssetGroupsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAssetGroupsResponse> => {
+  return customFetch<listAssetGroupsResponse>(getListAssetGroupsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -22545,6 +23891,34 @@ export const listAdminAccounts = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type listAdminDeletionBlockConditionsResponse200 = {
+  data: DeletionBlockConditionView[];
+  status: 200;
+};
+
+export type listAdminDeletionBlockConditionsResponseSuccess =
+  listAdminDeletionBlockConditionsResponse200 & {
+    headers: Headers;
+  };
+export type listAdminDeletionBlockConditionsResponse =
+  listAdminDeletionBlockConditionsResponseSuccess;
+
+export const getListAdminDeletionBlockConditionsUrl = () => {
+  return `/api/v1/admin/account-deletion/block-conditions`;
+};
+
+export const listAdminDeletionBlockConditions = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminDeletionBlockConditionsResponse> => {
+  return customFetch<listAdminDeletionBlockConditionsResponse>(
+    getListAdminDeletionBlockConditionsUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type oauthMetadataResponse200 = {

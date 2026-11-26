@@ -461,7 +461,11 @@ class WorkflowServiceImplTest {
         ConnectorCallStepExecutor connectorCall = new ConnectorCallStepExecutor(
                 mock(com.flowcortex.connector.api.HttpConnector.class),
                 mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(), others);
-        StepExecutorRegistry connectorRegistry = new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall));
+        DriveReadStepExecutor driveRead = new DriveReadStepExecutor(mock(com.flowcortex.connector.api.GoogleDrive.class),
+                mock(com.flowcortex.workflow.infrastructure.WorkflowRunRepository.class), DubFixtures.dub(), others,
+                java.time.Clock.systemUTC());
+        StepExecutorRegistry connectorRegistry =
+                new StepExecutorRegistry(List.of(new EchoStepExecutor(), connectorCall, driveRead));
         return new WorkflowServiceImpl(workflowRepository, workflowStepRepository, connectorRegistry,
                 new WorkflowWriteAccess(workflowRepository, connectorRegistry,
                         Validation.buildDefaultValidatorFactory().getValidator()),
@@ -543,6 +547,69 @@ class WorkflowServiceImplTest {
         assertThatThrownBy(() -> connectorService.addStep(BEN, workflow.getId(),
                 new NewStep("Call", "connector.call", null, CONNECTOR_CONFIG)))
                 .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+    }
+
+    private static final String DRIVE_CONFIG = "{\"folderId\":\"1AbCdEfGhIjK\"}";
+
+    private List<WorkflowStep> withEchoThenDriveReadStep(Workflow workflow) {
+        List<WorkflowStep> steps = List.of(
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 1, "Say", "echo", null, null),
+                new WorkflowStep(UUID.randomUUID(), workflow.getId(), (short) 2, "Read", "drive.read", null,
+                        DRIVE_CONFIG));
+        when(workflowStepRepository.findByWorkflowIdOrderByStepOrderAsc(workflow.getId())).thenReturn(steps);
+        when(workflowStepRepository.findMaxStepOrder(workflow.getId())).thenReturn(2);
+        steps.forEach(step -> when(workflowStepRepository.findById(step.getId())).thenReturn(Optional.of(step)));
+        return steps;
+    }
+
+    @Test
+    void anAdminCannotAddOrEditADriveReadStepOnAnotherMembersWorkflow() {
+        WorkflowServiceImpl driveService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenDriveReadStep(workflow);
+
+        assertThatThrownBy(() -> driveService.addStep(admin, workflow.getId(),
+                new NewStep("Read", "drive.read", null, DRIVE_CONFIG)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN))
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getDetailMessageCode())
+                        .isEqualTo("workflow.notOwner"));
+        assertThatThrownBy(() -> driveService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit("renamed", null, null))).satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> driveService.updateStep(admin, workflow.getId(), steps.get(1).getId(),
+                new StepEdit(null, "{\"folderId\":\"9ZyXwVuTsRq\"}", null)))
+                .satisfies(e -> assertStatus(e, HttpStatus.FORBIDDEN));
+        verify(workflowStepRepository, never()).save(any());
+        assertThat(steps.get(1).getConfig()).isEqualTo(DRIVE_CONFIG);
+        assertThat(steps.get(1).getName()).isEqualTo("Read");
+    }
+
+    @Test
+    void anAdminStillDeletesAndReordersADriveReadStepOfAnotherMember() {
+        WorkflowServiceImpl driveService = serviceKnowingConnectorCalls();
+        Caller admin = Caller.admin(CLEO);
+        Workflow workflow = stored(published(ANA, true));
+        List<WorkflowStep> steps = withEchoThenDriveReadStep(workflow);
+
+        driveService.reorderSteps(admin, workflow.getId(), List.of(steps.get(1).getId(), steps.get(0).getId()));
+        driveService.deleteStep(admin, workflow.getId(), steps.get(1).getId());
+
+        verify(workflowStepRepository).deleteById(steps.get(1).getId());
+    }
+
+    @Test
+    void theOwnerAddsAndEditsADriveReadStepWhetherOrNotAnAdmin() {
+        WorkflowServiceImpl driveService = serviceKnowingConnectorCalls();
+        Workflow workflow = stored(draft(ANA, false));
+        List<WorkflowStep> steps = withEchoThenDriveReadStep(workflow);
+
+        for (Caller owner : List.of(Caller.member(ANA), Caller.admin(ANA))) {
+            WorkflowStepView added = driveService.addStep(owner, workflow.getId(),
+                    new NewStep("Read", "drive.read", null, DRIVE_CONFIG));
+            assertThat(added.type()).isEqualTo("drive.read");
+            driveService.updateStep(owner, workflow.getId(), steps.get(1).getId(), new StepEdit("renamed", null, null));
+        }
+        assertThat(steps.get(1).getName()).isEqualTo("renamed");
     }
 
     @Test

@@ -28,12 +28,15 @@ import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { OAuthConsentRoute } from './features/auth/OAuthConsentPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
+import { PendingDeletionGate } from './features/auth/PendingDeletionGate';
+import { PendingDeletionPage } from './features/auth/PendingDeletionPage';
 import { PhoneGate } from './features/auth/PhoneGate';
 import { RegisterPage } from './features/auth/RegisterPage';
 import { ProfilePage } from './features/auth/ProfilePage';
 import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
+import { useMeQuery } from './features/auth/useAuth';
 import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
 import { LegalDocumentPage } from './features/legal/LegalDocumentPage';
 import { LegalHistoryPage } from './features/legal/LegalHistoryPage';
@@ -70,9 +73,13 @@ const SupportWidget = lazy(() =>
   import('./features/support/SupportWidget').then((module) => ({ default: module.SupportWidget })),
 );
 
+// The widget is global and its unread poll is refused by the deletion gate, so a signed-in member
+// gets it only once `/me` says the account is free.
 function SupportWidgetWhenOn() {
   const { supportWidget } = useFeatures();
-  return supportWidget ? (
+  const me = useMeQuery();
+  const held = me.isLoading || Boolean(me.data?.accountDeletion);
+  return supportWidget && !held ? (
     <ErrorBoundary fallback={null}>
       <Suspense fallback={null}>
         <SupportWidget />
@@ -135,7 +142,15 @@ export function App() {
                 </RequireAuth>
               }
             >
-              <Route path="/verify-phone" element={<VerifyPhonePage />} />
+              <Route
+                path="/verify-phone"
+                element={
+                  <PendingDeletionGate>
+                    <VerifyPhonePage />
+                  </PendingDeletionGate>
+                }
+              />
+              <Route path="/account-deletion" element={<PendingDeletionPage />} />
             </Route>
           </Route>
           {/* Public: a signed-out visitor reads the legal documents too. */}
@@ -149,10 +164,12 @@ export function App() {
             element={
               <RequireAuth>
                 <PasswordSetupGate>
-                  <PhoneGate>
-                    <Layout />
-                    <OnboardingFlowWhenOn />
-                  </PhoneGate>
+                  <PendingDeletionGate>
+                    <PhoneGate>
+                      <Layout />
+                      <OnboardingFlowWhenOn />
+                    </PhoneGate>
+                  </PendingDeletionGate>
                 </PasswordSetupGate>
               </RequireAuth>
             }

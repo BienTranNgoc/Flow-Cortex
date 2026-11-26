@@ -32,6 +32,7 @@ erDiagram
   workflow ||--o{ workflow_moderation_action : "workflow_id, ON DELETE CASCADE"
   workflow_report ||--o{ workflow_moderation_action : "report_id, ON DELETE SET NULL"
   media_asset ||--o| space_asset : "media_asset_id, UNIQUE (no FK)"
+  space_asset ||--o{ space_asset_tag : "asset_id, ON DELETE CASCADE"
 
   app_user {
     uuid id PK
@@ -138,6 +139,16 @@ erDiagram
     uuid run_step_id "NOT NULL exactly when source = run"
     uuid workflow_id
     text workflow_name "copied at registration"
+    timestamptz created_at "index (space_id, created_at DESC, id DESC) serves the newest-first walk"
+    boolean favorite "default false"
+    timestamptz missing_at "set by a link route when the stored file is gone, NULL otherwise"
+    text title_search "generated: asset_search_fold(title), accents/case/d-stroke folded"
+  }
+  space_asset_tag {
+    uuid asset_id PK,FK "ON DELETE CASCADE"
+    uuid space_id "copied for the per-space tag list, no FK"
+    text label "1-40 characters, first label kept per tag_key"
+    text tag_key PK "generated: asset_search_fold(label)"
     timestamptz created_at
   }
   space_asset_registration {

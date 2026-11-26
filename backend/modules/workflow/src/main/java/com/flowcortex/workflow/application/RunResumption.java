@@ -15,6 +15,7 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.UnprocessableEntityException;
+import com.flowcortex.workflow.api.IterateStepConfig;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.api.RunStartGuard.StartContext;
 import com.flowcortex.workflow.api.RunStartGuard.StepDef;
@@ -370,8 +371,11 @@ public class RunResumption {
         if (remaining.stream().anyMatch(step -> registry.isRemote(step.getType())) && !mediaJobs.isEnabled()) {
             throw new LocalizedStatusException(HttpStatus.SERVICE_UNAVAILABLE, new LocalizedMessage("media.disabled"));
         }
-        if (remaining.stream().anyMatch(step -> !registry.isAvailable(step.getType(), step.getConfig()))) {
-            throw new DubDisabledException();
+        Optional<StepExecutor> unavailable = registry.firstUnavailable(remaining.stream()
+                .flatMap(step -> IterateStepConfig.effectiveTypes(step.getType(), step.getConfig()).stream())
+                .toList());
+        if (unavailable.isPresent()) {
+            throw unavailable.get().unavailableRefusal();
         }
     }
 

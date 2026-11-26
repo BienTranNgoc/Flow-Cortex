@@ -14,6 +14,8 @@ class PhoneGateExemptionsTest {
             "/api/v1/me/phone",
             "/api/v1/me/phone/change/start",
             "/api/v1/me/password",
+            "/api/v1/me/account-deletion",
+            "/api/v1/me/account-deletion/cancel",
             "/api/v1/features",
             "/api/v1/support/kb/articles",
             "/api/v1/client-errors"})

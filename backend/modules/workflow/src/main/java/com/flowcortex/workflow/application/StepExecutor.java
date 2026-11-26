@@ -1,5 +1,6 @@
 package com.flowcortex.workflow.application;
 
+import com.flowcortex.shared.web.LocalizedStatusException;
 import java.time.Duration;
 
 /**
@@ -65,6 +66,11 @@ interface StepExecutor {
     /** Whether this step type may run now; a workflow with a step that may not is refused at start. */
     default boolean available() {
         return true;
+    }
+
+    /** What a run start answers when {@link #available()} is false; the dubbing refusal unless the type says otherwise. */
+    default LocalizedStatusException unavailableRefusal() {
+        return new DubDisabledException();
     }
 
     String execute(StepContext context);
