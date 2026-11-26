@@ -59,14 +59,13 @@ describe('UsersPage', () => {
       'OPERATION_MANAGER',
     );
     const name = screen.getByLabelText('Name', { selector: '#edit-name-u4' });
-    await userEvent.clear(name);
+    expect(name).toHaveValue('');
+    expect(name).toHaveAttribute('placeholder', 'Ops');
     await userEvent.type(name, 'Ops Lead');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
-    const body = calls.find((call) => call.method === 'PUT')?.body;
-    expect(body).toMatchObject({ name: 'Ops Lead' });
-    expect(body).not.toHaveProperty('role');
+    expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ name: 'Ops Lead' });
   });
 
   it('keeps the Creator role selected and sends no role when it is untouched', async () => {
@@ -90,7 +89,72 @@ describe('UsersPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
-    expect(calls.find((call) => call.method === 'PUT')?.body).not.toHaveProperty('role');
+    expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({});
+  });
+
+  it('editOnlyTheRole', async () => {
+    const calls = stubApi({
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [STATS_PATH]: STATS,
+      [LIST_PATH]: pageOf([ALICE]),
+      'PUT /api/v1/users/u1': { status: 200, body: ALICE },
+    });
+    renderRoute('/users', '/users', <UsersPage />);
+    await screen.findByText(ALICE.email);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const email = screen.getByLabelText('Email', { selector: '#edit-email-u1' });
+    expect(email).toHaveValue('');
+    expect(email).toHaveAttribute('placeholder', ALICE.email);
+    await userEvent.selectOptions(
+      screen.getByLabelText('Role', { selector: '#edit-role-u1' }),
+      'CREATOR',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
+    expect(calls.find((call) => call.method === 'PUT')?.body).toEqual({ role: 'CREATOR' });
+  });
+
+  it('refuses an invalid email only when one is typed', async () => {
+    const calls = stubApi({
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [STATS_PATH]: STATS,
+      [LIST_PATH]: pageOf([ALICE]),
+      'PUT /api/v1/users/u1': { status: 200, body: ALICE },
+    });
+    renderRoute('/users', '/users', <UsersPage />);
+    await screen.findByText(ALICE.email);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.type(screen.getByLabelText('Email', { selector: '#edit-email-u1' }), 'nope');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Enter a valid email')).toBeInTheDocument();
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+  });
+
+  it('shows the message of a masked value the server refuses', async () => {
+    stubApi({
+      [ME_PATH]: { status: 200, body: ADMIN_ME },
+      [STATS_PATH]: STATS,
+      [LIST_PATH]: pageOf([ALICE]),
+      'PUT /api/v1/users/u1': {
+        status: 422,
+        body: {
+          status: 422,
+          code: 'user.maskedValue',
+          detail: 'That value is the masked form of the current one.',
+        },
+      },
+    });
+    renderRoute('/users', '/users', <UsersPage />);
+    await screen.findByText(ALICE.email);
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.type(screen.getByLabelText('Name', { selector: '#edit-name-u1' }), 'A*****');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(
+      await screen.findByText('That value is the masked form of the current one.'),
+    ).toBeInTheDocument();
   });
 
   it('sends one list request for a settled search and resets the page', async () => {

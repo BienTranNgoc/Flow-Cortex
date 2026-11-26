@@ -121,7 +121,8 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "view": "View",
-    "edit": "Edit"
+    "edit": "Edit",
+    "keepHint": "Leave empty to keep the current value."
   },
   "detail": {
     "title": "User details",
@@ -155,7 +156,87 @@
     "suspend": "Suspend account",
     "reactivate": "Reactivate account",
     "updated": "Account updated.",
-    "invalidRole": "Select a valid role."
+    "invalidRole": "Select a valid role.",
+    "reveal": "Show contact details",
+    "revealing": "Showing…",
+    "revealed": "Contact details are shown for this page view only.",
+    "revealError": "Could not show the contact details. Try again.",
+    "revealUnavailable": "The contact details were not shown because the audit trail could not record the request. Try again shortly."
+  },
+  "activity": {
+    "title": "Activity",
+    "hint": "What this member did and what admins did to the account, newest first.",
+    "loading": "Loading activity…",
+    "loadError": "Could not load the activity.",
+    "loadMoreError": "Could not load more activity.",
+    "retry": "Retry",
+    "empty": "No activity yet.",
+    "emptyHint": "Sign-ins, workflows, support requests and admin actions appear here.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "actorMember": "This member",
+    "columns": {
+      "time": "Time",
+      "source": "Source",
+      "action": "Action",
+      "actor": "By",
+      "object": "Object"
+    },
+    "sources": {
+      "admin_action": "Admin action",
+      "auth": "Sign-in",
+      "workflow": "Workflow",
+      "workflow_run": "Run",
+      "support_request": "Support"
+    },
+    "actions": {
+      "user": {
+        "create": "Account created",
+        "update": "Account updated",
+        "delete": "Account deleted",
+        "reveal_identity": "Contact details revealed",
+        "export": "Users exported"
+      },
+      "admin_account": {
+        "change_role": "Admin role changed",
+        "deactivate": "Admin access deactivated",
+        "activate": "Admin access activated"
+      },
+      "auth": {
+        "login_success": "Signed in",
+        "login_failed_bad_credentials": "Sign-in failed: wrong credentials",
+        "login_failed_account_locked": "Sign-in refused: account locked",
+        "login_failed_account_suspended": "Sign-in refused: account suspended",
+        "registration_accepted": "Registered",
+        "registration_rejected_rate_limited": "Registration refused: too many attempts",
+        "password_set": "Password set",
+        "password_reset_requested": "Password reset requested",
+        "password_reset_completed": "Password reset completed",
+        "oauth_login_success": "Signed in with Google",
+        "oauth_login_failed": "Google sign-in failed",
+        "oauth_unconfirmed_account_claimed": "Unconfirmed account claimed by Google",
+        "refresh_token_rotated": "Session renewed",
+        "refresh_token_reuse_detected": "Session token reuse detected",
+        "step_up_succeeded": "Identity re-confirmed",
+        "step_up_failed_invalid_password": "Re-confirmation failed: wrong password",
+        "step_up_failed_password_required": "Re-confirmation failed: password required",
+        "step_up_rate_limited": "Re-confirmation refused: too many attempts",
+        "pat_created": "Access token created",
+        "pat_revoked": "Access token revoked",
+        "phone_changed": "Phone number changed",
+        "phone_change_reverted": "Phone number change reverted",
+        "logout": "Signed out"
+      },
+      "workflow": {
+        "create": "Workflow created"
+      },
+      "workflow_run": {
+        "start": "Run started"
+      },
+      "support_request": {
+        "create": "Support request opened"
+      }
+    }
   },
   "validation": {
     "emailRequired": "Email is required",

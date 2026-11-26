@@ -1,0 +1,86 @@
+{
+  "title": "Nhật ký kiểm toán",
+  "eyebrow": "Quản trị",
+  "description": "Mọi thay đổi do quản trị viên thực hiện: ai làm, tác động đến đâu và có thành công hay không.",
+  "refresh": "Làm mới",
+  "refreshing": "Đang làm mới…",
+  "filters": {
+    "label": "Bộ lọc nhật ký kiểm toán",
+    "search": "Tìm kiếm",
+    "searchPlaceholder": "Người thực hiện, mã hoặc nhãn đối tượng",
+    "searchHint": "Nhập ít nhất {{count}} ký tự để tìm kiếm.",
+    "action": "Hành động",
+    "allActions": "Tất cả",
+    "resourceType": "Loại đối tượng",
+    "allResourceTypes": "Tất cả",
+    "status": "Trạng thái",
+    "allStatuses": "Tất cả",
+    "from": "Từ ngày",
+    "to": "Đến ngày",
+    "rangeReversed": "Ngày bắt đầu sau ngày kết thúc. Hãy chọn ngày bắt đầu không muộn hơn ngày kết thúc.",
+    "clear": "Xóa bộ lọc",
+    "actorChip": "Người thực hiện: {{name}}",
+    "removeActor": "Bỏ lọc người thực hiện ({{name}})",
+    "facetsError": "Không tải được danh sách hành động và loại đối tượng.",
+    "facetsRetry": "Tải lại danh sách"
+  },
+  "status": {
+    "success": "Thành công",
+    "failed": "Thất bại"
+  },
+  "columns": {
+    "time": "Thời gian",
+    "actor": "Người thực hiện",
+    "action": "Hành động",
+    "resource": "Đối tượng",
+    "status": "Trạng thái"
+  },
+  "table": {
+    "label": "Các dòng nhật ký kiểm toán",
+    "unknownActor": "Không rõ người thực hiện",
+    "openDetails": "Mở chi tiết của {{action}} lúc {{time}}",
+    "filterByActor": "Chỉ hiện các dòng của {{name}}"
+  },
+  "loading": "Đang tải nhật ký kiểm toán…",
+  "loadError": "Không tải được nhật ký kiểm toán.",
+  "retry": "Thử lại",
+  "stale": "Lần làm mới gần nhất thất bại; các dòng đang hiển thị có thể đã cũ.",
+  "empty": {
+    "title": "Chưa có dòng nhật ký nào",
+    "hint": "Các thay đổi của quản trị viên sẽ xuất hiện ở đây khi được thực hiện."
+  },
+  "noMatch": "Không có dòng nhật ký nào khớp bộ lọc.",
+  "loadMore": "Tải thêm 50 dòng",
+  "loadingMore": "Đang tải…",
+  "loadMoreError": "Không tải được các dòng tiếp theo.",
+  "export": {
+    "button": "Xuất CSV",
+    "busy": "Đang xuất…",
+    "done": "Đã tải xuống {{fileName}}.",
+    "forbidden": "Vai trò của bạn không được xuất nhật ký kiểm toán.",
+    "unavailable": "Chưa gửi tệp vì nhật ký kiểm toán không ghi nhận được lần xuất này. Hãy thử lại sau ít phút.",
+    "tooLarge": "Chưa gửi tệp: có quá nhiều dòng khớp. Hãy thu hẹp bộ lọc rồi thử lại.",
+    "failed": "Xuất thất bại. Hãy thử lại."
+  },
+  "detail": {
+    "label": "Chi tiết dòng nhật ký",
+    "title": "Dòng nhật ký",
+    "close": "Đóng chi tiết",
+    "time": "Thời gian",
+    "actor": "Người thực hiện",
+    "actorId": "Mã người thực hiện",
+    "action": "Hành động",
+    "resourceType": "Loại đối tượng",
+    "resourceId": "Mã đối tượng",
+    "resourceLabel": "Nhãn đối tượng",
+    "status": "Trạng thái",
+    "errorCode": "Mã lỗi",
+    "ip": "Địa chỉ IP",
+    "userAgent": "Trình duyệt (User agent)",
+    "origin": "Nguồn",
+    "changeSummary": "Tóm tắt thay đổi",
+    "id": "Mã dòng",
+    "none": "Không có",
+    "filterByActor": "Chỉ hiện người thực hiện này"
+  }
+}

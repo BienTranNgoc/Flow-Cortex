@@ -42,6 +42,9 @@ export const ACTION_LABEL_KEYS = {
   'payment.setting.view': 'roles.catalog.actions.payment.setting.view',
   'payment.setting.update': 'roles.catalog.actions.payment.setting.update',
   'user.account.export': 'roles.catalog.actions.user.account.export',
+  'user.account.view_pii': 'roles.catalog.actions.user.account.view_pii',
+  'system.audit_log.view': 'roles.catalog.actions.system.audit_log.view',
+  'system.audit_log.export': 'roles.catalog.actions.system.audit_log.export',
 } satisfies Record<PermissionKey, string>;
 
 const ACTION_KEYS: Readonly<Record<string, string>> = ACTION_LABEL_KEYS;

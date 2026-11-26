@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   ApiError,
   authHeaders,
@@ -8,6 +9,7 @@ import {
   getUser,
   getUserStats,
   listUsers,
+  revealUserIdentity,
   unwrap,
   update,
 } from '@flow-cortex/api-client';
@@ -19,6 +21,7 @@ import type {
   UserResponse,
 } from '@flow-cortex/api-client';
 import type { UsersParams } from './usersQueryParams';
+import { userActivityKey } from './useUserActivity';
 
 export const USERS_PAGE_SIZE = 20;
 const USERS_QUERY_KEY = ['users'] as const;
@@ -91,9 +94,25 @@ export function useUpdateUserMutation() {
       await Promise.all([
         invalidateDirectory(queryClient),
         queryClient.invalidateQueries({ queryKey: ['user', id] }),
+        queryClient.invalidateQueries({ queryKey: userActivityKey(id) }),
       ]);
     },
   });
+}
+
+/**
+ * Releases the member's unmasked email and name; each call is recorded by the server. The result
+ * lives only in this mutation, which is dropped as soon as the page leaves (`gcTime: 0`) and
+ * reset when `id` changes, so no query cache entry ever holds it.
+ */
+export function useRevealIdentity(id: string) {
+  const mutation = useMutation({
+    mutationFn: () => unwrap(revealUserIdentity(id, authHeaders())),
+    gcTime: 0,
+  });
+  const { reset } = mutation;
+  useEffect(() => reset(), [id, reset]);
+  return mutation;
 }
 
 function saveBlob(blob: Blob, fileName: string) {

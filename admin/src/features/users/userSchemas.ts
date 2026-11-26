@@ -20,14 +20,22 @@ export const createUserSchema = z.object({
 
 export type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
+const emailAddressSchema = z.string().email();
+
 /**
- * Mirrors `UsersController.UpdateUserRequest` — the backend accepts a
- * partial update; the form validates every field, and the row sends `role` and
- * `status` only when the user changed them.
+ * Mirrors `UsersController.UpdateUserRequest` — the backend accepts a partial update. The email
+ * and name inputs start empty (the server only returns masked values), and an empty one means
+ * unchanged; the row sends only the fields the admin changed.
  */
 export const editUserSchema = z.object({
-  email: z.string().min(1, 'users.validation.emailRequired').email('users.validation.emailInvalid'),
-  name: z.string().min(1, 'users.validation.nameRequired'),
+  email: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === '' || emailAddressSchema.safeParse(value).success,
+      'users.validation.emailInvalid',
+    ),
+  name: z.string().trim(),
   role: roleCodeSchema,
   status: z.enum(['ACTIVE', 'SUSPENDED']),
 });

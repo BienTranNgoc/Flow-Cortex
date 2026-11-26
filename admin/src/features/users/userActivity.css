@@ -1,0 +1,108 @@
+.cortex-admin-activity {
+  margin-top: 1rem;
+}
+
+.cortex-admin-activity__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.cortex-admin-activity__table th,
+.cortex-admin-activity__table td {
+  padding: 0.65rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--admin-card-edge);
+  color: var(--admin-ink);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.cortex-admin-activity__table th {
+  color: var(--admin-ink-3);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cortex-admin-activity__table th:nth-child(1) {
+  width: 20%;
+}
+
+.cortex-admin-activity__table th:nth-child(2) {
+  width: 14%;
+}
+
+.cortex-admin-activity__table th:nth-child(3) {
+  width: 24%;
+}
+
+.cortex-admin-activity__table th:nth-child(4) {
+  width: 18%;
+}
+
+.cortex-admin-activity__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cortex-admin-activity__table tbody tr:hover {
+  background: var(--admin-chrome-hover);
+}
+
+.cortex-admin-activity__more {
+  margin-top: 1rem;
+}
+
+@media (max-width: 1023px) {
+  .cortex-admin-activity__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .cortex-admin-activity__table,
+  .cortex-admin-activity__table tbody,
+  .cortex-admin-activity__table tr,
+  .cortex-admin-activity__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .cortex-admin-activity__table tr {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid var(--admin-card-edge);
+    border-radius: var(--radius-md);
+    background: var(--admin-card-surface);
+  }
+
+  .cortex-admin-activity__table td {
+    padding: 0.25rem 0.35rem;
+    border: 0;
+  }
+
+  .cortex-admin-activity__time {
+    color: var(--admin-ink-3);
+    font-size: 0.78rem;
+  }
+
+  .cortex-admin-activity__table td[data-label]::before {
+    content: attr(data-label);
+    margin-inline-end: 0.5rem;
+    color: var(--admin-ink-3);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .cortex-admin-activity__more {
+    width: 100%;
+  }
+}

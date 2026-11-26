@@ -10,7 +10,7 @@ import i18n from '../lib/i18n';
 import viCommon from '../locales/vi/common.json';
 import { ADMIN_ME, MEMBER_ME, stubApi, testQueryClient } from '../test/fakeApi';
 import { stubMatchMedia } from '../test/matchMedia';
-import type { NavGroup } from './nav';
+import { reachableItems, type NavGroup } from './nav';
 import type { Caller } from './permissions';
 import { queryClient } from './queryClient';
 import { Sidebar } from './Sidebar';
@@ -80,7 +80,6 @@ describe('Sidebar', () => {
     'Approval Queue',
     'Credits & Wallets',
     'Feature Switches',
-    'Audit Log',
     'Voice Quota',
     'Health',
   ])(
@@ -95,6 +94,21 @@ describe('Sidebar', () => {
       expect(screen.queryByRole('link', { name: new RegExp(label, 'i') })).not.toBeInTheDocument();
     },
   );
+
+  it('links Audit Log, routable and with no coming-soon tag, only with system.audit_log.view', () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { unmount } = renderSidebar(ADMIN_ME);
+    const link = screen.getByRole('link', { name: /Audit Log/ });
+    expect(link).toHaveAttribute('href', '/audit');
+    expect(link).not.toHaveTextContent('Coming soon');
+    unmount();
+
+    const editor: Caller = { permissions: ['content.document.view'], adminDisabled: false };
+    renderSidebar(editor);
+    expect(screen.queryByText('Audit Log')).not.toBeInTheDocument();
+    expect(reachableItems(editor).map((item) => item.path)).not.toContain('/audit');
+    expect(reachableItems(ADMIN_ME).map((item) => item.path)).toContain('/audit');
+  });
 
   it('links no entry for a caller holding no key and reads no open count', () => {
     const calls = stubApi({});
