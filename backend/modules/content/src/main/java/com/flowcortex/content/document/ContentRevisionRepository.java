@@ -1,5 +1,6 @@
 package com.flowcortex.content.document;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,8 @@ interface ContentRevisionRepository extends Repository<ContentRevision, UUID> {
     Optional<ContentRevision> findByIdAndSlug(UUID id, String slug);
 
     Page<ContentRevision> findBySlugAndKindOrderByCreatedAtDescIdDesc(String slug, String kind, Pageable pageable);
+
+    List<ContentRevision> findBySlugAndKindOrderByCreatedAtDescIdDesc(String slug, String kind);
 
     Optional<ContentRevision> findByIdAndSlugAndKind(UUID id, String slug, String kind);
 }

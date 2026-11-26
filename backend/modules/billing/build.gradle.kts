@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":modules:content"))
     implementation(project(":modules:settings"))
     implementation(project(":modules:user"))
     implementation(project(":shared:web"))
