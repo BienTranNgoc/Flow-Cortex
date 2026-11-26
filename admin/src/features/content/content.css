@@ -254,6 +254,84 @@
   margin-bottom: 0;
 }
 
+/* ===== LEGAL INDEX ROWS ================================================= */
+
+.content-index {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-inline-size: 0;
+}
+
+.content-index__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.content-index__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-md);
+  background: var(--admin-paper-3);
+}
+
+.content-index__row legend {
+  padding: 0 0.4rem;
+  font-weight: 600;
+  color: var(--admin-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.content-index__shown {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  min-height: var(--admin-control-h);
+  cursor: pointer;
+}
+
+.content-index__shown:has(input:disabled) {
+  cursor: default;
+}
+
+.content-index__shown input:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.content-index__add {
+  margin-bottom: 0;
+  max-width: 100%;
+}
+
+.content-index__add select {
+  max-width: 100%;
+}
+
+.content-preview__legal h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+}
+
+.content-preview__legal .content-hint {
+  margin-bottom: 0.75rem;
+}
+
+.content-preview__index {
+  margin: 0 0 1rem;
+  padding-inline-start: 1.5rem;
+}
+
 /* ===== MEDIA SLOT AND THUMBNAILS ======================================== */
 
 .content-media-slot {

@@ -1,5 +1,6 @@
 package com.flowcortex.llm.gemini;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
@@ -43,6 +44,21 @@ final class GeminiTelemetry {
         long latencyMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
         observation.lowCardinalityKeyValue("outcome", outcome).stop();
         record(slot, model, attempt, outcome, status, latencyMillis, detail);
+    }
+
+    /** One model the resolver left out of a slot's chain for this call. */
+    void skipped(String slot, String model) {
+        Counter.builder("llm.slot.skipped")
+                .description("Models left out of a slot's chain because the registry marks them inactive")
+                .tag("slot", slot)
+                .tag("model", model)
+                .register(meters)
+                .increment();
+    }
+
+    /** A call whose chain the registry could not narrow; carries no prompt, answer or key. */
+    void degraded(String slot, String reason) {
+        LOG.warn("llm.slot.degraded slot={} reason={}", slot, reason);
     }
 
     /** For a call that never reached the provider, such as a missing key. */

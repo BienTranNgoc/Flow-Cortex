@@ -60,10 +60,9 @@ RUN if [ "$TARGETARCH" != "amd64" ]; then \
     fi \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils \
-      libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6 \
-      libgl1 libegl1 libegl-mesa0 libgl1-mesa-dri \
- && curl -fsSL --retry 3 -o /tmp/blender.tar.xz "$BLENDER_URL" \
+      ca-certificates curl libegl-mesa0 libegl1 libgl1 libgl1-mesa-dri libice6 libsm6 libx11-6 \
+      libxfixes3 libxi6 libxkbcommon0 libxrender1 libxxf86vm1 xz-utils \
+ && curl -fsSL --proto '=https' --tlsv1.2 --retry 3 -o /tmp/blender.tar.xz "$BLENDER_URL" \
  && echo "$BLENDER_SHA256  /tmp/blender.tar.xz" | sha256sum -c - \
  && mkdir /opt/blender \
  && tar -xJf /tmp/blender.tar.xz --strip-components=1 -C /opt/blender \
@@ -138,7 +137,7 @@ WORKDIR /models
 # EasyOCR creates both directories on startup, so they exist and stay empty of anything else.
 RUN set -eux; \
     mkdir -p lama easyocr/model easyocr/user_network; \
-    fetch() { curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$2" "$1"; }; \
+    fetch() { local url="$1" dest="$2"; curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors -o "$dest" "$url"; }; \
     fetch https://github.com/enesmsahin/simple-lama-inpainting/releases/download/v0.1.0/big-lama.pt lama/big-lama.pt; \
     fetch https://github.com/JaidedAI/EasyOCR/releases/download/pre-v1.1.6/craft_mlt_25k.zip /tmp/craft.zip; \
     fetch https://github.com/JaidedAI/EasyOCR/releases/download/v1.3/latin_g2.zip /tmp/latin_g2.zip; \
@@ -158,7 +157,9 @@ COPY --from=build-overlay /app/.venv /app/.venv
 COPY --from=overlay-models /models/ /opt/flowcortex/models/
 COPY --from=overlay-models /SHA256SUMS /opt/flowcortex/SHA256SUMS
 COPY models/face_detection_yunet_2023mar.onnx /opt/flowcortex/models/
-RUN cd /opt/flowcortex/models && sha256sum -c ../SHA256SUMS
+WORKDIR /opt/flowcortex/models
+RUN sha256sum -c ../SHA256SUMS
+WORKDIR /tmp
 ENV FLOWCORTEX_OVERLAY_MODELS=/opt/flowcortex/models \
     EASYOCR_MODULE_PATH=/opt/flowcortex/models/easyocr \
     WORKER_CAPABILITIES=clean_overlay
@@ -169,10 +170,10 @@ USER 10001
 # before, without build isolation, so no build backend is fetched unpinned.
 FROM build AS audio-build
 COPY engines/ ./engines/
-RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps --only-binary :all: \
       --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple \
       --index-strategy unsafe-best-match -r engines/requirements-torch-cpu.txt \
- && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
+ && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps --only-binary :all: \
       --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple \
       --index-strategy unsafe-best-match -r engines/requirements-audio-build.txt \
  && uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
@@ -185,18 +186,18 @@ RUN uv pip install --python /app/.venv/bin/python --require-hashes --no-deps \
 # A moved or replaced file fails the build; the runtime never touches the network.
 FROM audio-build AS audio-models
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates curl \
  && rm -rf /var/lib/apt/lists/*
 ENV TORCH_HOME=/models/torch
-RUN /app/.venv/bin/python -c "from demucs.pretrained import get_model; get_model('htdemucs')" \
- && cd "$TORCH_HOME/hub/checkpoints" \
- && printf '%s  %s\n' 8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4 955717e8-8726e21a.th \
+RUN /app/.venv/bin/python -c "from demucs.pretrained import get_model; get_model('htdemucs')"
+WORKDIR $TORCH_HOME/hub/checkpoints
+RUN printf '%s  %s\n' 8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4 955717e8-8726e21a.th \
     | sha256sum -c - \
  && test "$(ls | wc -l)" = 1
-RUN mkdir -p /models/speakers && cd /models/speakers \
- && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o silero_vad.onnx \
+WORKDIR /models/speakers
+RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors -o silero_vad.onnx \
       https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx \
- && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+ && curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors \
       -o 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
       https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
  && printf '%s  %s\n' \
@@ -204,8 +205,8 @@ RUN mkdir -p /models/speakers && cd /models/speakers \
       aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2 \
       3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx \
     | sha256sum -c -
-RUN mkdir -p /models/beat_this && cd /models/beat_this \
- && curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o final0.ckpt \
+WORKDIR /models/beat_this
+RUN curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-delay 10 --retry-all-errors -o final0.ckpt \
       https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/final0.ckpt \
  && printf '%s  %s\n' 8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331 final0.ckpt \
     | sha256sum -c -
@@ -213,7 +214,7 @@ RUN mkdir -p /models/beat_this && cd /models/beat_this \
 # --- audio-runtime stage: ffmpeg, the venv with the engines, the models, the licences -----------
 FROM python:3.12-slim AS audio-runtime
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg libsndfile1 libgomp1 \
+ && apt-get install -y --no-install-recommends ffmpeg libgomp1 libsndfile1 \
  && rm -rf /var/lib/apt/lists/* \
  && useradd --system --uid 10001 --no-create-home worker \
  && install -d -m 0700 -o worker -g worker /run/flowcortex

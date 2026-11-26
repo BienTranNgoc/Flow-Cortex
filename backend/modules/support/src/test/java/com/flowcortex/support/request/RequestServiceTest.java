@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -20,6 +21,7 @@ import com.flowcortex.settings.api.SettingRead;
 import com.flowcortex.settings.api.SettingSource;
 import com.flowcortex.settings.api.Settings;
 import com.flowcortex.support.config.SupportLifecycleSettings;
+import com.flowcortex.support.config.SupportSlaSettings;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.ConversationMessageRow;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
@@ -29,12 +31,14 @@ import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.BulkAssignFailure;
 import com.flowcortex.support.request.RequestViews.BulkAssignResult;
+import com.flowcortex.support.request.RequestViews.ConversationMessage;
 import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.web.SupportProblemException;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserDirectory;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -72,6 +76,17 @@ class RequestServiceTest {
     void replyMailWindowIsFifteenMinutes() {
         when(settings.get(SupportLifecycleSettings.REPLY_MAIL_WINDOW_MINUTES))
                 .thenReturn(new SettingRead<>(15, 15, SettingSource.STORED));
+    }
+
+    @BeforeEach
+    void slaThresholdsAreTheDefaults() {
+        when(settings.get(SupportSlaSettings.NEW_HOURS)).thenReturn(new SettingRead<>(24, 24, SettingSource.STORED));
+        when(settings.get(SupportSlaSettings.NEW_WARN_HOURS))
+                .thenReturn(new SettingRead<>(20, 20, SettingSource.STORED));
+        when(settings.get(SupportSlaSettings.IN_PROGRESS_DAYS))
+                .thenReturn(new SettingRead<>(3, 3, SettingSource.STORED));
+        when(settings.get(SupportSlaSettings.IN_PROGRESS_WARN_DAYS))
+                .thenReturn(new SettingRead<>(2, 2, SettingSource.STORED));
     }
 
     @Test
@@ -425,6 +440,22 @@ class RequestServiceTest {
     }
 
     @Test
+    void anAdminSeesTheHandoffOutcomeOfAnAssistantTurnUnchanged() {
+        UUID id = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(id, 12, member, "credit",
+                "Bị trừ tiền", RequestStatus.NEW, conversation, true, false, NOW, null, null, null, NOW, null, "vi")));
+        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
+        when(requests.conversation(conversation)).thenReturn(List.of(
+                new ConversationMessageRow("user", "Tôi bị trừ tiền 2 lần", null, NOW),
+                new ConversationMessageRow("assistant", "Câu hỏi này cần đội ngũ hỗ trợ xử lý", "handoff", NOW)));
+
+        AdminDetail detail = service.adminDetail(12);
+
+        assertThat(detail.conversation()).extracting(ConversationMessage::outcome).containsExactly(null, "handoff");
+    }
+
+    @Test
     void aLinkedConversationTheRetentionDeletedShowsAsExpiredWhileNoLinkDoesNot() {
         UUID expiredId = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(expiredId, 12, member, "credit",
@@ -442,11 +473,11 @@ class RequestServiceTest {
 
     @Test
     void anInboxPageBeyondTenThousandIsRefusedInsteadOfOverflowing() {
-        assertProblem(() -> service.page(null, null, null, null, null, null, Integer.MAX_VALUE, admin),
+        assertProblem(() -> service.page(null, null, null, null, null, null, null, Integer.MAX_VALUE, admin),
                 HttpStatus.BAD_REQUEST, "validation-failed");
-        assertProblem(() -> service.page(null, null, null, null, null, null, 10_001, admin), HttpStatus.BAD_REQUEST,
-                "validation-failed");
-        verify(requests, never()).page(any(), anyInt(), anyInt());
+        assertProblem(() -> service.page(null, null, null, null, null, null, null, 10_001, admin),
+                HttpStatus.BAD_REQUEST, "validation-failed");
+        verify(requests, never()).page(any(), any(), anyInt(), anyInt());
     }
 
     @Test
@@ -462,13 +493,15 @@ class RequestServiceTest {
     void theInboxPagesByTwentyAndRefusesUnknownFilters() {
         UUID id = UUID.randomUUID();
         UUID linh = UUID.randomUUID();
-        InboxQuery.InboxFilter filter = InboxQuery.parse("new", "credit", "me", null, null, null, 1, admin, NOW)
+        InboxQuery.InboxFilter filter = InboxQuery.parse("new", "credit", "me", null, null, null, null, 1, admin, NOW)
                 .filter();
-        when(requests.page(filter, 20, 20)).thenReturn(List.of(row(id, 3, RequestStatus.NEW, member, linh)));
-        when(requests.count(filter)).thenReturn(21L);
+        SlaThresholds thresholds = new SlaThresholds(24, 20, 3, 2);
+        when(requests.page(filter, thresholds, 20, 20))
+                .thenReturn(List.of(row(id, 3, RequestStatus.NEW, member, linh)));
+        when(requests.count(filter, thresholds)).thenReturn(21L);
         when(users.findEmailsByIds(List.of(member, linh))).thenReturn(Map.of(member, "m@example.com"));
 
-        AdminPage page = service.page("new", "credit", "me", null, null, null, 1, admin);
+        AdminPage page = service.page("new", "credit", "me", null, null, null, null, 1, admin);
 
         assertThat(page.items()).singleElement().satisfies(item -> {
             assertThat(item.requester().email()).isEqualTo("m@example.com");
@@ -476,8 +509,62 @@ class RequestServiceTest {
             assertThat(item.assignee().deleted()).isTrue();
         });
         assertThat(page.total()).isEqualTo(21);
-        assertProblem(() -> service.page("open", "billing", null, null, null, null, -1, admin), HttpStatus.BAD_REQUEST,
+        assertProblem(() -> service.page("open", "billing", null, null, null, null, null, -1, admin),
+                HttpStatus.BAD_REQUEST, "validation-failed");
+    }
+
+    @Test
+    void everyRowIsLabelledWithItsSlaLevel() {
+        UUID overdue = UUID.randomUUID();
+        UUID dueSoon = UUID.randomUUID();
+        UUID fine = UUID.randomUUID();
+        UUID waiting = UUID.randomUUID();
+        when(requests.page(any(), any(), anyInt(), anyInt())).thenReturn(List.of(
+                rowActive(overdue, 70, RequestStatus.NEW, NOW.minus(Duration.ofHours(25))),
+                rowActive(dueSoon, 71, RequestStatus.NEW, NOW.minus(Duration.ofHours(21))),
+                rowActive(fine, 72, RequestStatus.IN_PROGRESS, NOW.minus(Duration.ofDays(1))),
+                rowActive(waiting, 73, RequestStatus.WAITING_MEMBER, NOW.minus(Duration.ofDays(10)))));
+        when(users.findEmailsByIds(any())).thenReturn(Map.of());
+
+        AdminPage page = service.page(null, null, null, null, null, "at_risk", "oldest", 0, admin);
+
+        assertThat(page.items()).extracting(item -> item.number(), item -> item.slaLevel())
+                .containsExactly(tuple(70L, "overdue"), tuple(71L, "due_soon"), tuple(72L, "ok"),
+                        tuple(73L, "paused"));
+        ArgumentCaptor<InboxQuery.InboxFilter> filter = ArgumentCaptor.forClass(InboxQuery.InboxFilter.class);
+        verify(requests).page(filter.capture(), eq(new SlaThresholds(24, 20, 3, 2)), eq(0), eq(20));
+        assertThat(filter.getValue().atRisk()).isTrue();
+    }
+
+    @Test
+    void theSummaryReadsTheThresholdsOnce() {
+        when(requests.slaSummary(any(), any())).thenReturn(new RequestRepository.SlaCounts(2, 1));
+
+        RequestViews.SlaSummary summary = service.slaSummary("new", null, "me", "7d", "credit", admin);
+
+        assertThat(summary).isEqualTo(new RequestViews.SlaSummary(2, 1));
+        for (var key : List.of(SupportSlaSettings.NEW_HOURS, SupportSlaSettings.NEW_WARN_HOURS,
+                SupportSlaSettings.IN_PROGRESS_DAYS, SupportSlaSettings.IN_PROGRESS_WARN_DAYS)) {
+            verify(settings, times(1)).get(key);
+        }
+        ArgumentCaptor<InboxQuery.InboxFilter> filter = ArgumentCaptor.forClass(InboxQuery.InboxFilter.class);
+        verify(requests).slaSummary(filter.capture(), eq(new SlaThresholds(24, 20, 3, 2)));
+        assertThat(filter.getValue().atRisk()).isFalse();
+        assertThat(filter.getValue().status()).isEqualTo("new");
+    }
+
+    @Test
+    void theSummaryRefusesAnInvalidFilterWithoutCountingAndFacetsReadNoThresholds() {
+        assertProblem(() -> service.slaSummary(null, null, null, "yesterday", null, admin), HttpStatus.BAD_REQUEST,
                 "validation-failed");
+        verify(requests, never()).slaSummary(any(), any());
+
+        when(requests.facets(any(), any())).thenReturn(
+                new RequestRepository.FacetRows(Map.of(), Map.of(), Map.of(), 0, 0, List.of()));
+
+        service.facets(null, null, null, null, null, admin);
+
+        verify(settings, never()).get(SupportSlaSettings.NEW_HOURS);
     }
 
     @Test
@@ -566,6 +653,11 @@ class RequestServiceTest {
         return new RequestRow(id, number, requester, "credit", "Không thấy credit", status, null, false, false, NOW,
                 status == RequestStatus.RESOLVED ? NOW : null, null,
                 status == RequestStatus.CLOSED ? "cancelled" : null, NOW, assignee, "en");
+    }
+
+    private static RequestRow rowActive(UUID id, long number, RequestStatus status, Instant lastActivityAt) {
+        return new RequestRow(id, number, UUID.randomUUID(), "credit", "Không thấy credit", status, null, false, false,
+                lastActivityAt, null, null, null, NOW, null, "en");
     }
 
     private static void assertProblem(Runnable call, HttpStatus status, String code) {

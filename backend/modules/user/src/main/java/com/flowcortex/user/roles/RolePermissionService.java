@@ -5,8 +5,10 @@ import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.infrastructure.RoleDetailRow;
 import com.flowcortex.user.infrastructure.RoleRepository;
+import com.flowcortex.user.roles.RbacMutationSwitch.RbacOperation;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,9 +19,11 @@ public class RolePermissionService {
     private static final String NOT_EDITABLE = "ROLE_NOT_EDITABLE";
 
     private final RoleRepository roles;
+    private final RbacMutationSwitch mutationSwitch;
 
-    RolePermissionService(RoleRepository roles) {
+    RolePermissionService(RoleRepository roles, RbacMutationSwitch mutationSwitch) {
         this.roles = roles;
+        this.mutationSwitch = mutationSwitch;
     }
 
     /**
@@ -27,7 +31,8 @@ public class RolePermissionService {
      * serializes two editors on the role row: the second waits, then matches nothing and answers 409.
      */
     @Transactional
-    public void replace(String code, Collection<String> keys, int expectedVersion) {
+    public void replace(UUID actor, String code, Collection<String> keys, int expectedVersion) {
+        mutationSwitch.requireEnabled(RbacOperation.ROLE_PERMISSIONS_REPLACE, actor);
         RoleDetailRow role = roles.findDetail(code).orElseThrow(() -> RoleService.notFound(code));
         if (role.superAdmin() || !role.staff()) {
             throw new UnprocessableEntityException(new LocalizedMessage("role.notEditable", code), NOT_EDITABLE);

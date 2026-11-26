@@ -1,0 +1,240 @@
+.admin-bell {
+  position: relative;
+}
+
+.admin-bell__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--admin-control-h);
+  height: var(--admin-control-h);
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--admin-ink-2);
+  cursor: pointer;
+}
+
+.admin-bell__trigger:hover {
+  background: var(--admin-chrome-hover);
+  color: var(--admin-ink);
+}
+
+.admin-bell__trigger[aria-expanded='true'] {
+  background: var(--admin-chrome-active);
+  color: var(--admin-primary);
+}
+
+.admin-bell__trigger:active {
+  transform: scale(0.98);
+}
+
+.admin-bell__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding-inline: 0.25rem;
+  border-radius: var(--radius-full);
+  background: var(--admin-primary);
+  color: var(--admin-primary-foreground);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-bell__panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: min(32rem, calc(100dvh - var(--admin-topbar-h) - 1rem));
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--admin-paper-2);
+  box-shadow: var(--admin-shadow-lg);
+  animation: admin-bell-enter var(--dur-quick) var(--ease-standard);
+}
+
+.admin-bell__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--admin-card-edge);
+}
+
+.admin-bell__title {
+  margin: 0;
+  color: var(--admin-ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.admin-bell__action {
+  min-height: var(--admin-control-h);
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--admin-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-bell__action:not(:disabled):hover {
+  background: var(--admin-chrome-hover);
+}
+
+.admin-bell__action:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.admin-bell__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Positioned so the rows' absolutely placed visually-hidden text stays clipped by this scroller. */
+.admin-bell__body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-bell__note {
+  display: block;
+  margin: 0;
+  padding: 1.25rem 0.75rem;
+  color: var(--admin-ink-3);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.admin-bell__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0.75rem;
+  color: var(--admin-red);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.admin-bell__error p {
+  margin: 0;
+}
+
+.admin-bell__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: var(--admin-control-h);
+  margin: 0;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--admin-ink-2);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-bell__item:hover {
+  background: var(--admin-chrome-hover);
+}
+
+.admin-bell__item:active {
+  transform: scale(0.99);
+}
+
+.admin-bell__mark {
+  flex-shrink: 0;
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.3rem;
+  border: 2px solid var(--line-2);
+  border-radius: var(--radius-full);
+}
+
+/* Unread is a filled dot and a heavier title, not colour alone. */
+.admin-bell__item[data-unread='true'] .admin-bell__mark {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary);
+}
+
+.admin-bell__item[data-unread='true'] .admin-bell__item-title {
+  color: var(--admin-ink);
+  font-weight: 700;
+}
+
+.admin-bell__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.admin-bell__item-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.admin-bell__item-body {
+  color: var(--admin-ink-3);
+  overflow-wrap: anywhere;
+}
+
+.admin-bell__item-time {
+  color: var(--admin-ink-4);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Beside the other topbar actions a right-anchored panel would run off the left edge, so it spans the viewport. */
+@media (max-width: 640px) {
+  .admin-bell__panel {
+    position: fixed;
+    top: calc(var(--admin-topbar-h) + 0.5rem);
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+    max-height: calc(100dvh - var(--admin-topbar-h) - 1rem);
+  }
+}
+
+@keyframes admin-bell-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-bell__trigger,
+  .admin-bell__action,
+  .admin-bell__item,
+  .admin-bell__panel {
+    animation: none;
+    transition: none;
+  }
+}

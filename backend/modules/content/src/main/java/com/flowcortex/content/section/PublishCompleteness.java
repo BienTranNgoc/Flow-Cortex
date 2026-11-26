@@ -22,6 +22,10 @@ public class PublishCompleteness {
     /** The paths of every blank required text, in document order; empty when the draft is complete. */
     public List<String> missing(ContentDocumentDefinition definition, JsonNode sections, JsonNode seoMeta) {
         List<String> missing = new ArrayList<>();
+        int count = sections != null && sections.isArray() ? sections.size() : 0;
+        if (count < definition.minSections()) {
+            missing.add("sections");
+        }
         if (sections != null && sections.isArray()) {
             for (int i = 0; i < sections.size(); i++) {
                 JsonNode section = sections.get(i);
