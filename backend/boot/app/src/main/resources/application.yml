@@ -450,6 +450,18 @@ flowcortex:
         enabled: ${FLOWCORTEX_BILLING_LEDGER_APPLY_ENABLED:true}
         interval: ${FLOWCORTEX_BILLING_LEDGER_APPLY_INTERVAL:PT5S}
         batch-size: ${FLOWCORTEX_BILLING_LEDGER_APPLY_BATCH_SIZE:100}
+    # Asks the provider about payments whose callback never came (ageing) or that may be recorded wrongly (daily);
+    # switched off, a pass asks nothing and only the ageing pass still measures what is unresolved.
+    reconcile:
+      floor: ${FLOWCORTEX_BILLING_RECONCILE_FLOOR:PT15M}
+      ageing:
+        enabled: ${FLOWCORTEX_BILLING_RECONCILE_AGEING_ENABLED:true}
+        interval: ${FLOWCORTEX_BILLING_RECONCILE_AGEING_INTERVAL:PT5M}
+        batch-size: ${FLOWCORTEX_BILLING_RECONCILE_AGEING_BATCH_SIZE:50}
+      daily:
+        enabled: ${FLOWCORTEX_BILLING_RECONCILE_DAILY_ENABLED:true}
+        interval: ${FLOWCORTEX_BILLING_RECONCILE_DAILY_INTERVAL:PT10M}
+        batch-size: ${FLOWCORTEX_BILLING_RECONCILE_DAILY_BATCH_SIZE:50}
   # SSE (/api/v1/realtime/stream). Replay ring and max-streams-per-user are per instance;
   # queue-max-length drops the oldest broker event; a full publish queue drops with a WARN.
   # hub-threads are the module's own, not Boot's pools.

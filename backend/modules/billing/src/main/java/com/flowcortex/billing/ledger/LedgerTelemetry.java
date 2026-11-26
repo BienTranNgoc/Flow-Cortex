@@ -34,15 +34,22 @@ class LedgerTelemetry {
         this.meters = meters;
     }
 
-    /** Counts a decision that was committed, and logs a refusal. */
+    /**
+     * Counts a decision that was committed, and logs a refusal. A refused success is unapplied money only
+     * while the payment is not settled: on a settled one the money is applied and the refusal is ordinary,
+     * as when a late callback meets a payment a provider answer already settled.
+     *
+     * @param statusBefore the payment's status when the decision was taken, empty when there was no payment
+     */
     void decided(UUID callbackId, String provider, Decision decision, Optional<PaymentProviderEvent> event,
-            UUID paymentId) {
+            UUID paymentId, Optional<MoneyStatus> statusBefore) {
         switch (decision) {
             case Applied applied -> counted(provider, "applied", NONE);
             case Skipped skipped -> counted(provider, "skipped", skipped.reason());
             case Refused refused -> {
                 counted(provider, "refused", refused.reason());
-                refusal(callbackId, provider, refused.reason(), refused.derivedSuccess(), event, paymentId);
+                boolean unapplied = refused.derivedSuccess() && statusBefore.filter(MoneyStatus::isSettled).isEmpty();
+                refusal(callbackId, provider, refused.reason(), unapplied, event, paymentId);
             }
         }
     }

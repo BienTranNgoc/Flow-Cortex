@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.jobs.api.PublicationRetryPolicy;
 import com.flowcortex.jobs.infrastructure.FailedPublicationResubmitter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,8 +49,42 @@ class PublicationResubmitterIT extends AbstractPostgresBootTest {
     public record SlowProbe(String marker) {
     }
 
+    /** Retried like a payment event: eight attempts, critical, and described by its marker. */
+    public record CriticalProbe(String marker) {
+    }
+
     @TestConfiguration
     static class Probes {
+
+        @Bean
+        PublicationRetryPolicy criticalProbePolicy() {
+            return new PublicationRetryPolicy() {
+                @Override
+                public Class<?> eventType() {
+                    return CriticalProbe.class;
+                }
+
+                @Override
+                public int maxAttempts() {
+                    return 8;
+                }
+
+                @Override
+                public Duration delayAfter(int attempts) {
+                    return Duration.ofMinutes(1);
+                }
+
+                @Override
+                public boolean critical() {
+                    return true;
+                }
+
+                @Override
+                public String describe(Object event) {
+                    return "probe=" + ((CriticalProbe) event).marker();
+                }
+            };
+        }
 
         @Bean
         PublicationRetryPolicy slowProbePolicy() {
@@ -88,10 +123,18 @@ class PublicationResubmitterIT extends AbstractPostgresBootTest {
         void on(SlowProbe event) {
             RECEIVED.add(event.marker());
         }
+
+        @ApplicationModuleListener(id = "probe.critical")
+        void on(CriticalProbe event) {
+            RECEIVED.add(event.marker());
+        }
     }
 
     @Autowired
     private FailedPublicationResubmitter resubmitter;
+
+    @Autowired
+    private MeterRegistry meters;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -132,6 +175,41 @@ class PublicationResubmitterIT extends AbstractPostgresBootTest {
         await().atMost(Duration.ofSeconds(20)).until(() -> stored() == 0);
         assertThat(RECEIVED).containsExactly("due");
         assertThat(giveUps(output)).isEqualTo(150);
+    }
+
+    private double gaveUp(String event) {
+        return meters.counter("outbox.publication.gave_up", "event", event).count();
+    }
+
+    private static List<String> giveUpLines(CapturedOutput output, String event) {
+        return output.getAll().lines()
+                .filter(line -> line.contains("outcome=gave_up") && line.contains("event=" + event)).toList();
+    }
+
+    @Test
+    void aCriticalGiveUpIsAnErrorThatNamesWhatItConcernedAndIsCounted(CapturedOutput output) {
+        double before = gaveUp("CriticalProbe");
+        failed("probe.critical", CriticalProbe.class, "crit-1", 8, Duration.ofMinutes(10));
+
+        resubmitter.run();
+
+        assertThat(stored()).isZero();
+        assertThat(gaveUp("CriticalProbe") - before).isEqualTo(1);
+        assertThat(giveUpLines(output, "CriticalProbe")).singleElement().satisfies(line -> assertThat(line)
+                .contains("ERROR").contains("attempts=8").contains("publication=").contains("probe=crit-1"));
+    }
+
+    @Test
+    void everyGiveUpIsCountedAndADefaultPolicyOneStaysAWarning(CapturedOutput output) {
+        double before = gaveUp("DefaultProbe");
+        IntStream.range(0, 3).forEach(i -> failed("probe.default", DefaultProbe.class, "gone-" + i, 10,
+                Duration.ofMinutes(10)));
+
+        resubmitter.run();
+
+        assertThat(gaveUp("DefaultProbe") - before).isEqualTo(3);
+        assertThat(giveUpLines(output, "DefaultProbe")).hasSize(3)
+                .allSatisfy(line -> assertThat(line).contains("WARN").doesNotContain("probe="));
     }
 
     @Test

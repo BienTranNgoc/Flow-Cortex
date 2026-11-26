@@ -18,6 +18,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -30,8 +31,10 @@ class LedgerApplierConnectionFailureTest {
     private final CallbackInbox inbox = mock(CallbackInbox.class);
     private final PaymentTransactionRepository payments = mock(PaymentTransactionRepository.class);
     private final PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
-    private final LedgerApplier applier = new LedgerApplier(inbox, payments, new LedgerTelemetry(meters),
-            new LedgerApplyProperties(true, null, 100), Clock.fixed(NOW, ZoneOffset.UTC), transactionManager);
+    private final LedgerApplier applier = new LedgerApplier(inbox,
+            new ProviderAnswerApplier(payments, mock(ApplicationEventPublisher.class)),
+            new LedgerTelemetry(meters), new LedgerApplyProperties(true, null, 100),
+            Clock.fixed(NOW, ZoneOffset.UTC), transactionManager);
 
     @Test
     void anUnreachableDatabaseEndsThePassCountsOneFailureAndRecordsNoAttempt() {

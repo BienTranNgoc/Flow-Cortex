@@ -16,4 +16,14 @@ public interface PublicationRetryPolicy {
 
     /** The wait after the attempt numbered {@code attempts} began, before the next attempt. */
     Duration delayAfter(int attempts);
+
+    /** Whether giving up on this event type loses an effect somebody must act on; such a give-up is logged at ERROR. */
+    default boolean critical() {
+        return false;
+    }
+
+    /** What to add to the give-up log line so the event can be traced; never personal data. Empty adds nothing. */
+    default String describe(Object event) {
+        return "";
+    }
 }

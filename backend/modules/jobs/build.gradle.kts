@@ -8,4 +8,6 @@ dependencies {
     // EventPublicationRepository, the only way to delete a publication the registry gave up on.
     implementation("org.springframework.modulith:spring-modulith-events-core")
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")
+    // The resubmitter counts every publication it gives up on.
+    implementation("io.micrometer:micrometer-core")
 }
