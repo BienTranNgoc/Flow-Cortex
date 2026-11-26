@@ -1,0 +1,112 @@
+{
+  "eyebrow": "Nội dung",
+  "title": "Phân loại mẫu trend",
+  "description": "Danh mục và thẻ dùng để sắp xếp các mẫu trend, theo thứ tự thành viên nhìn thấy.",
+  "readOnlyHint": "Bạn có thể xem phân loại nhưng không thể thay đổi.",
+  "common": {
+    "loading": "Đang tải…",
+    "loadFailed": "Không tải được phân loại mẫu trend.",
+    "retry": "Thử lại",
+    "refreshFailed": "Không làm mới được dữ liệu mới nhất — đang hiển thị bản đã tải trước đó.",
+    "saveFailed": "Không lưu được. Vui lòng thử lại."
+  },
+  "tabs": {
+    "label": "Loại bản ghi",
+    "categories": "Danh mục",
+    "tags": "Thẻ"
+  },
+  "categories": {
+    "tableLabel": "Bảng danh mục",
+    "add": "Thêm danh mục",
+    "emptyTitle": "Chưa có danh mục nào",
+    "emptyWritable": "Thêm danh mục đầu tiên để bắt đầu sắp xếp các mẫu.",
+    "emptyReadOnly": "Chưa có danh mục nào."
+  },
+  "tags": {
+    "tableLabel": "Bảng thẻ",
+    "add": "Thêm thẻ",
+    "emptyTitle": "Chưa có thẻ nào",
+    "emptyWritable": "Thêm thẻ đầu tiên để bắt đầu gắn nhãn cho các mẫu.",
+    "emptyReadOnly": "Chưa có thẻ nào."
+  },
+  "columns": {
+    "order": "Thứ tự",
+    "nameVi": "Tên tiếng Việt",
+    "nameEn": "Tên tiếng Anh",
+    "usage": "Mẫu đang dùng",
+    "visibility": "Hiển thị",
+    "actions": "Thao tác"
+  },
+  "visibility": {
+    "visible": "Đang hiện",
+    "hidden": "Đã ẩn",
+    "hide": "Ẩn",
+    "show": "Hiện",
+    "hideRow": "Ẩn {{name}}",
+    "showRow": "Hiện {{name}}"
+  },
+  "actions": {
+    "up": "Lên",
+    "down": "Xuống",
+    "edit": "Sửa",
+    "delete": "Xoá",
+    "moveUp": "Đưa {{name}} lên",
+    "moveDown": "Đưa {{name}} xuống",
+    "editRow": "Sửa {{name}}",
+    "deleteRow": "Xoá {{name}}"
+  },
+  "announce": {
+    "created": "Đã thêm {{name}}",
+    "updated": "Đã lưu {{name}}",
+    "movedUp": "Đã chuyển {{name}} lên vị trí {{position}}",
+    "movedDown": "Đã chuyển {{name}} xuống vị trí {{position}}",
+    "deleted": "Đã xoá {{name}}",
+    "hidden": "{{name}} đã được ẩn",
+    "shown": "{{name}} đang hiển thị"
+  },
+  "dialog": {
+    "addCategory": "Thêm danh mục",
+    "editCategory": "Sửa danh mục",
+    "addTag": "Thêm thẻ",
+    "editTag": "Sửa thẻ",
+    "nameVi": "Tên tiếng Việt",
+    "nameEn": "Tên tiếng Anh",
+    "hint": "Tối đa {{max}} ký tự",
+    "key": "Khoá",
+    "keyHint": "Cố định từ khi tạo danh mục, vì các mẫu lưu theo khoá này.",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Huỷ",
+    "errors": {
+      "name": "Nhập từ 1 đến {{max}} ký tự",
+      "letterOrDigit": "Tên tiếng Việt cần có ít nhất một chữ cái hoặc chữ số"
+    }
+  },
+  "delete": {
+    "categoryTitle": "Xoá danh mục {{name}}?",
+    "categoryBody": "Danh mục đang có mẫu sử dụng thì không xoá được; hãy ẩn danh mục đó.",
+    "tagTitle": "Xoá thẻ {{name}}?",
+    "tagBodyUnused": "Chưa có mẫu nào dùng thẻ này.",
+    "tagBody_one": "{{count}} mẫu sẽ mất thẻ này.",
+    "tagBody_other": "{{count}} mẫu sẽ mất thẻ này.",
+    "confirm": "Xoá",
+    "working": "Đang xoá…",
+    "cancel": "Huỷ"
+  },
+  "inUse": {
+    "message_one": "{{name}} đang được {{count}} mẫu sử dụng nên không xoá được.",
+    "message_other": "{{name}} đang được {{count}} mẫu sử dụng nên không xoá được.",
+    "hideInstead": "Ẩn thay vì xoá",
+    "dismiss": "Đóng"
+  },
+  "problems": {
+    "category-not-found": "Danh mục này không còn tồn tại. Danh sách đã được tải lại.",
+    "tag-not-found": "Thẻ này không còn tồn tại. Danh sách đã được tải lại.",
+    "category-in-use_one": "{{count}} mẫu đang dùng danh mục này nên không xoá được.",
+    "category-in-use_other": "{{count}} mẫu đang dùng danh mục này nên không xoá được.",
+    "taxonomy-order-stale": "Danh sách đã thay đổi kể từ lúc tải nên thao tác chuyển chưa được áp dụng. Danh sách đã được tải lại; hãy thử lại.",
+    "taxonomy-full": "Danh sách đã đầy (1000 bản ghi). Hãy xoá bớt một bản ghi trước khi thêm.",
+    "category-key-exhausted": "Mọi khoá tạo từ tên này đều đã được dùng. Hãy chọn tên tiếng Việt khác.",
+    "validation-failed": "Một số dữ liệu bị từ chối. Hãy kiểm tra các tên rồi thử lại."
+  }
+}

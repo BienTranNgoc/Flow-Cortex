@@ -98,12 +98,13 @@ class RequestService {
     private final UserDirectory users;
     private final AdminPermissions adminPermissions;
     private final Settings settings;
+    private final SupportSignals signals;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     RequestService(RequestRepository requests, IdempotencyGuard idempotency, ApplicationEventPublisher events,
             AttachmentService attachments, UserDirectory users, AdminPermissions adminPermissions, Settings settings,
-            PlatformTransactionManager transactionManager, Clock clock) {
+            SupportSignals signals, PlatformTransactionManager transactionManager, Clock clock) {
         this.requests = requests;
         this.idempotency = idempotency;
         this.events = events;
@@ -111,6 +112,7 @@ class RequestService {
         this.users = users;
         this.adminPermissions = adminPermissions;
         this.settings = settings;
+        this.signals = signals;
         this.transaction = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -156,6 +158,7 @@ class RequestService {
                     locale.getLanguage(), at);
             requests.insertMessage(messageId, requestId, "member", memberId, description, at);
             requests.insertAttachments(messageId, kept, at);
+            signals.changed(memberId, number);
             LOG.info("support.request outcome=created request={} type={} attachments={}", number, type, kept.size());
             return Optional.<UUID>empty();
         });
@@ -172,7 +175,9 @@ class RequestService {
     /** Opening a request clears its unread mark, and the first opening of a resolution starts its close clock. */
     Detail open(UUID memberId, long number) {
         RequestRow row = owned(memberId, number);
-        requests.markSeen(row.id(), Instant.now(clock));
+        if (requests.markSeen(row.id(), Instant.now(clock))) {
+            signals.changed(row.requesterId(), row.number());
+        }
         return memberDetail(requireById(row.id()));
     }
 
@@ -197,6 +202,7 @@ class RequestService {
             requireMoved(row, move, null, at);
             requests.insertMessage(messageId, row.id(), "member", memberId, text, at);
             requests.insertAttachments(messageId, kept, at);
+            signals.changed(row.requesterId(), row.number());
             LOG.info("support.request outcome=replied request={} actor=member attachments={}", row.number(),
                     kept.size());
             return Optional.<UUID>empty();
@@ -279,6 +285,7 @@ class RequestService {
                         new LocalizedMessage("support.request.changedMeanwhile", row.number()));
             }
             notifyMember(row, RequestEvent.ADMIN_ASSIGN, target, null, at);
+            signals.changed(row.requesterId(), row.number());
         });
         LOG.info("support.request outcome=assigned request={} actor={} cleared={} picked_up={}", row.number(),
                 adminId, assigneeId == null, target != row.status());
@@ -322,6 +329,7 @@ class RequestService {
         boolean won = requests.assign(row.id(), row.status(), move.target(), assigneeId, at);
         if (won) {
             notifyMember(row, RequestEvent.ADMIN_ASSIGN, move.target(), null, at);
+            signals.changed(row.requesterId(), row.number());
         }
         return BulkAssignOutcome.written(won);
     }
@@ -391,6 +399,7 @@ class RequestService {
             requests.insertAttachments(messageId, kept, at);
             requests.markReplyMailDue(row.id(), messageId, at.plus(mailWindow));
             notifyMember(row, event, move.target(), messageId, at);
+            signals.changed(row.requesterId(), row.number());
             LOG.info("support.request outcome=replied request={} actor=admin status={} attachments={}", row.number(),
                     move.target().value(), kept.size());
             return Optional.<UUID>empty();
@@ -425,6 +434,7 @@ class RequestService {
             boolean closed = requests.closeSeenResolution(row.id(), move.closedReason(), cutoff, at);
             if (closed) {
                 notifyMember(row, RequestEvent.AUTO_CLOSE, move.target(), null, at);
+                signals.changed(row.requesterId(), row.number());
             }
             return closed;
         }));
@@ -459,6 +469,7 @@ class RequestService {
             Instant at = Instant.now(clock);
             requireMoved(row, move, null, at);
             notifyMember(row, event, move.target(), null, at);
+            signals.changed(row.requesterId(), row.number());
         });
         LOG.info("support.request outcome={} request={} from={} to={}", outcome, row.number(), row.status().value(),
                 move.target().value());
