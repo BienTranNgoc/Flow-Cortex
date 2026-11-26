@@ -9489,6 +9489,307 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/assets:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssets
+      parameters:
+      - name: kind
+        in: query
+        description: "Comma-separated kinds: video, image, audio"
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Comma-separated sources: run, upload"
+        schema:
+          type: string
+      - name: group
+        in: query
+        description: "A group key: workflow:<id>, upload or day:<YYYY-MM-DD>"
+        schema:
+          type: string
+      - name: runId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        description: "Search in titles and tags, at most 200 characters"
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: time
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - 7d
+          - 30d
+          - custom
+      - name: from
+        in: query
+        description: "First day, Asia/Ho_Chi_Minh; with time=custom"
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        description: "Last day, inclusive; with time=custom"
+        schema:
+          type: string
+          format: date
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - size_desc
+          - size_asc
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 48
+          maximum: 100
+          minimum: 1
+      - name: cursor
+        in: query
+        description: meta.nextCursor of the previous page
+        schema:
+          type: string
+      - name: mark
+        in: query
+        description: Snapshot instant of a walk
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetPageResponse"
+  /api/v1/assets/{id}:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAsset
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetItemResponse"
+  /api/v1/assets/{id}/view-url:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetViewUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLinkResponse"
+  /api/v1/assets/{id}/download-url:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetDownloadUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLinkResponse"
+  /api/v1/assets/usage:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetUsage
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetUsageResponse"
+  /api/v1/assets/tags:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssetTags
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetTagListResponse"
+  /api/v1/assets/run-results:
+    get:
+      tags:
+      - assets-controller
+      operationId: listRunResults
+      parameters:
+      - name: runId
+        in: query
+        description: 1-100 distinct run ids; a repeated id answers once
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResultListResponse"
+  /api/v1/assets/groups:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssetGroups
+      parameters:
+      - name: groupBy
+        in: query
+        schema:
+          type: string
+          enum:
+          - workflow
+          - day
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 10
+          maximum: 30
+          minimum: 1
+      - name: itemsPerGroup
+        in: query
+        schema:
+          type: integer
+          default: 4
+          maximum: 12
+          minimum: 1
+      - name: kind
+        in: query
+        description: "Comma-separated kinds: video, image, audio"
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Comma-separated sources: run, upload"
+        schema:
+          type: string
+      - name: runId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: time
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - 7d
+          - 30d
+          - custom
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: sort
+        in: query
+        description: Order of the items inside each group
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - size_desc
+          - size_asc
+      - name: mark
+        in: query
+        description: "meta.mark of page 1, sent with every later page"
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetGroupPageResponse"
   /api/v1/admin/workflows/{id}/report:
     get:
       tags:
@@ -17303,6 +17604,277 @@ components:
       required:
       - privacy
       - ui
+    AssetCountsResponse:
+      type: object
+      properties:
+        all:
+          type: integer
+          format: int64
+        video:
+          type: integer
+          format: int64
+        image:
+          type: integer
+          format: int64
+        audio:
+          type: integer
+          format: int64
+        favorite:
+          type: integer
+          format: int64
+      required:
+      - all
+      - audio
+      - favorite
+      - image
+      - video
+    AssetItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - video
+          - image
+          - audio
+        title:
+          type: string
+        source:
+          type: string
+          enum:
+          - run
+          - upload
+        mimeType:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        favorite:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        missing:
+          type: boolean
+        thumbnailUrl:
+          type: string
+      required:
+      - bytes
+      - createdAt
+      - favorite
+      - id
+      - kind
+      - mimeType
+      - missing
+      - runId
+      - source
+      - tags
+      - title
+    AssetPageMetaResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        counts:
+          $ref: "#/components/schemas/AssetCountsResponse"
+        nextCursor:
+          type: string
+        mark:
+          type: string
+          format: date-time
+      required:
+      - counts
+      - mark
+      - total
+    AssetPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetItemResponse"
+        meta:
+          $ref: "#/components/schemas/AssetPageMetaResponse"
+      required:
+      - items
+      - meta
+    AssetLinkResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - url
+    AssetUsageByKindResponse:
+      type: object
+      properties:
+        video:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        image:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        audio:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+      required:
+      - audio
+      - image
+      - video
+    AssetUsageEntryResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+        bytes:
+          type: integer
+          format: int64
+      required:
+      - bytes
+      - count
+    AssetUsageResponse:
+      type: object
+      properties:
+        total:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        byKind:
+          $ref: "#/components/schemas/AssetUsageByKindResponse"
+      required:
+      - byKind
+      - total
+    AssetTagListResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetTagResponse"
+      required:
+      - tags
+    AssetTagResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - label
+    RunResultListResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunResultResponse"
+      required:
+      - results
+    RunResultResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        count:
+          type: integer
+          format: int64
+        kinds:
+          type: array
+          items:
+            type: string
+        thumbnails:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunResultThumbnailResponse"
+        registration:
+          type: string
+          enum:
+          - pending
+          - done
+          - none
+      required:
+      - count
+      - kinds
+      - registration
+      - runId
+      - thumbnails
+    RunResultThumbnailResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+      - url
+    AssetGroupPageMetaResponse:
+      type: object
+      properties:
+        totalGroups:
+          type: integer
+          format: int64
+        mark:
+          type: string
+          format: date-time
+      required:
+      - mark
+      - totalGroups
+    AssetGroupPageResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetGroupResponse"
+        meta:
+          $ref: "#/components/schemas/AssetGroupPageMetaResponse"
+      required:
+      - groups
+      - meta
+    AssetGroupResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        count:
+          type: integer
+          format: int64
+        runCount:
+          type: integer
+          format: int64
+        latestAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetItemResponse"
+      required:
+      - count
+      - items
+      - key
+      - latestAt
+      - runCount
     AdminWorkflowResponse:
       type: object
       properties:
