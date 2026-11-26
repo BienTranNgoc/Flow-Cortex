@@ -85,7 +85,8 @@ class RealtimeFanoutIT extends AbstractPostgresBootTest {
                 "--spring.rabbitmq.username=" + BROKER.getAdminUsername(),
                 "--spring.rabbitmq.password=" + BROKER.getAdminPassword(),
                 "--spring.rabbitmq.virtual-host=" + vhost,
-                "--spring.rabbitmq.connection-timeout=2s");
+                "--spring.rabbitmq.connection-timeout=2s",
+                "--flowcortex.auth.totp.keys.k1=" + TOTP_TEST_KEY);
         instances.add(context);
         return context;
     }

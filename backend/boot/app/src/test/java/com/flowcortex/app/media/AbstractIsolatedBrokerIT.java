@@ -77,7 +77,8 @@ abstract class AbstractIsolatedBrokerIT extends AbstractPostgresBootTest {
                 "--spring.rabbitmq.port=" + ISOLATED_BROKER.getAmqpPort(),
                 "--spring.rabbitmq.username=" + ISOLATED_BROKER.getAdminUsername(),
                 "--spring.rabbitmq.password=" + ISOLATED_BROKER.getAdminPassword(),
-                "--spring.rabbitmq.virtual-host=" + vhost));
+                "--spring.rabbitmq.virtual-host=" + vhost,
+                "--flowcortex.auth.totp.keys.k1=" + TOTP_TEST_KEY));
         args.addAll(List.of(extraArgs));
         SpringApplicationBuilder builder = new SpringApplicationBuilder(FlowCortexApplication.class);
         customizer.accept(builder);
