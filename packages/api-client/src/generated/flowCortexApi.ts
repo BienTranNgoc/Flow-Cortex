@@ -4104,6 +4104,70 @@ export interface TransactionDetailResponse {
   timeline: TransactionTimelineEvent[];
 }
 
+export interface BillingReceiptLine {
+  description: string;
+  quantity: number;
+  unitPriceVnd: number;
+  amountVnd: number;
+}
+
+export type BillingReceiptResponseKind =
+  (typeof BillingReceiptResponseKind)[keyof typeof BillingReceiptResponseKind];
+
+export const BillingReceiptResponseKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+/**
+ * @nullable
+ */
+export type BillingReceiptResponseInstrument =
+  (typeof BillingReceiptResponseInstrument)[keyof typeof BillingReceiptResponseInstrument] | null;
+
+export const BillingReceiptResponseInstrument = {
+  wallet: 'wallet',
+  domestic_card: 'domestic_card',
+} as const;
+
+export type BillingReceiptResponseCurrency =
+  (typeof BillingReceiptResponseCurrency)[keyof typeof BillingReceiptResponseCurrency];
+
+export const BillingReceiptResponseCurrency = {
+  VND: 'VND',
+} as const;
+
+export interface BillingReceiptSeller {
+  /** @nullable */
+  legalName: string | null;
+  /** @nullable */
+  taxCode: string | null;
+  /** @nullable */
+  address: string | null;
+  /** @nullable */
+  email: string | null;
+}
+
+export interface BillingReceiptResponse {
+  transactionId: string;
+  orderRef: string;
+  kind: BillingReceiptResponseKind;
+  paidAt: string;
+  provider: string;
+  /** @nullable */
+  instrument: BillingReceiptResponseInstrument;
+  /** @nullable */
+  providerTransactionId: string | null;
+  seller: BillingReceiptSeller;
+  lines: BillingReceiptLine[];
+  subtotalVnd: number;
+  vatRateBps: number;
+  vatAmountVnd: number;
+  totalVnd: number;
+  currency: BillingReceiptResponseCurrency;
+  totalInWords: string;
+}
+
 export interface DefaultBillingProfileResponse {
   /** @nullable */
   profile: BillingProfileResponse;
@@ -19719,6 +19783,111 @@ export const getBillingTransaction = async (
     ...options,
     method: 'GET',
   });
+};
+
+export type getBillingReceiptResponse200 = {
+  data: BillingReceiptResponse;
+  status: 200;
+};
+
+export type getBillingReceiptResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getBillingReceiptResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBillingReceiptResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type getBillingReceiptResponseSuccess = getBillingReceiptResponse200 & {
+  headers: Headers;
+};
+export type getBillingReceiptResponseError = (
+  getBillingReceiptResponse401 | getBillingReceiptResponse404 | getBillingReceiptResponse409
+) & {
+  headers: Headers;
+};
+
+export type getBillingReceiptResponse =
+  getBillingReceiptResponseSuccess | getBillingReceiptResponseError;
+
+export const getGetBillingReceiptUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}/receipt`;
+};
+
+/**
+ * Amounts come from the tax split stored when the money was collected.
+ * @summary Read the receipt of one of the member's payments
+ */
+export const getBillingReceipt = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBillingReceiptResponse> => {
+  return customFetch<getBillingReceiptResponse>(getGetBillingReceiptUrl(transactionId), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type downloadBillingReceiptPdfResponse200 = {
+  data: Blob;
+  status: 200;
+};
+
+export type downloadBillingReceiptPdfResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type downloadBillingReceiptPdfResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type downloadBillingReceiptPdfResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type downloadBillingReceiptPdfResponseSuccess = downloadBillingReceiptPdfResponse200 & {
+  headers: Headers;
+};
+export type downloadBillingReceiptPdfResponseError = (
+  | downloadBillingReceiptPdfResponse401
+  | downloadBillingReceiptPdfResponse404
+  | downloadBillingReceiptPdfResponse409
+) & {
+  headers: Headers;
+};
+
+export type downloadBillingReceiptPdfResponse =
+  downloadBillingReceiptPdfResponseSuccess | downloadBillingReceiptPdfResponseError;
+
+export const getDownloadBillingReceiptPdfUrl = (transactionId: string) => {
+  return `/api/v1/billing/transactions/${transactionId}/receipt/pdf`;
+};
+
+/**
+ * A4 document in the request's language (Accept-Language vi or en).
+ * @summary Download the receipt as a PDF
+ */
+export const downloadBillingReceiptPdf = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<downloadBillingReceiptPdfResponse> => {
+  return customFetch<downloadBillingReceiptPdfResponse>(
+    getDownloadBillingReceiptPdfUrl(transactionId),
+    {
+      ...options,
+      method: 'GET',
+    },
+  );
 };
 
 export type getBillingTransactionByOrderResponse200 = {

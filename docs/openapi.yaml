@@ -9036,6 +9036,75 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/{transactionId}/receipt:
+    get:
+      tags:
+      - receipts-controller
+      summary: Read the receipt of one of the member's payments
+      description: Amounts come from the tax split stored when the money was collected.
+      operationId: getBillingReceipt
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingReceiptResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code billing_receipt_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: The payment is not collected yet (code billing_receipt_not_collected)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/transactions/{transactionId}/receipt/pdf:
+    get:
+      tags:
+      - receipts-controller
+      summary: Download the receipt as a PDF
+      description: A4 document in the request's language (Accept-Language vi or en).
+      operationId: downloadBillingReceiptPdf
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "The receipt PDF, saved as bien-nhan-<orderRef>.pdf"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code billing_receipt_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: The payment is not collected yet (code billing_receipt_not_collected)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/billing/transactions/by-order/{orderRef}:
     get:
       tags:
@@ -16612,6 +16681,118 @@ components:
       - at
       - code
       - kind
+    BillingReceiptLine:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+        unitPriceVnd:
+          type: integer
+          format: int64
+        amountVnd:
+          type: integer
+          format: int64
+      required:
+      - amountVnd
+      - description
+      - quantity
+      - unitPriceVnd
+    BillingReceiptResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        orderRef:
+          type: string
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        paidAt:
+          type: string
+          format: date-time
+        provider:
+          type: string
+        instrument:
+          type:
+          - string
+          - "null"
+          enum:
+          - wallet
+          - domestic_card
+        providerTransactionId:
+          type:
+          - string
+          - "null"
+        seller:
+          $ref: "#/components/schemas/BillingReceiptSeller"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillingReceiptLine"
+        subtotalVnd:
+          type: integer
+          format: int64
+        vatRateBps:
+          type: integer
+          format: int32
+        vatAmountVnd:
+          type: integer
+          format: int64
+        totalVnd:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          enum:
+          - VND
+        totalInWords:
+          type: string
+      required:
+      - currency
+      - instrument
+      - kind
+      - lines
+      - orderRef
+      - paidAt
+      - provider
+      - providerTransactionId
+      - seller
+      - subtotalVnd
+      - totalInWords
+      - totalVnd
+      - transactionId
+      - vatAmountVnd
+      - vatRateBps
+    BillingReceiptSeller:
+      type: object
+      properties:
+        legalName:
+          type:
+          - string
+          - "null"
+        taxCode:
+          type:
+          - string
+          - "null"
+        address:
+          type:
+          - string
+          - "null"
+        email:
+          type:
+          - string
+          - "null"
+      required:
+      - address
+      - email
+      - legalName
+      - taxCode
     DefaultBillingProfileResponse:
       type: object
       properties:
