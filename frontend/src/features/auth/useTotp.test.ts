@@ -2,8 +2,12 @@ import { act, renderHook } from '@testing-library/react';
 import { useLockActive } from './useTotp';
 
 describe('useLockActive', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('is active while the lock end is ahead and ends by itself at that moment', () => {
     const lockedUntil = new Date(Date.now() + 60_000);
