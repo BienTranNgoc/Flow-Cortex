@@ -2,7 +2,7 @@
 -- member holds (one row per member, none means Free) and the history of every decision about it.
 --
 -- The three CHECKs on payment_transaction are added NOT VALID: ADD COLUMN holds ACCESS EXCLUSIVE until this
--- file commits, so the scan that validates them runs in V2026.11.24.202, under a lock that does not block the
+-- file commits, so the scan that validates them runs in V2026.11.26.612, under a lock that does not block the
 -- ledger's writes. Until then they bind every new write.
 --
 -- Rollback (revert the code too). Run in one transaction, and include the history delete: without it
@@ -15,7 +15,7 @@
 --       DROP CONSTRAINT payment_transaction_period_kind_check,
 --       DROP COLUMN period_starts_at,
 --       DROP COLUMN period_renews_at;
---   DELETE FROM flyway_schema_history WHERE version IN ('2026.11.24.201', '2026.11.24.202');
+--   DELETE FROM flyway_schema_history WHERE version IN ('2026.11.26.611', '2026.11.26.612');
 --   COMMIT;
 -- This holds only until a later migration references these objects; after that, roll back with a forward
 -- migration.
