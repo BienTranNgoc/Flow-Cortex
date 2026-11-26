@@ -185,6 +185,12 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - API tokens section (profile, admins only): a title and `ink-3` hint, a create form (name field, lifetime select 30/90/180/365 days), then rows separated by `line-soft` rules. A row wraps a long name, shows `ink-3` dates beneath it and a `red` on `red-soft` expired badge when expired. Revoke opens an inline confirmation naming the token, with focus on "Keep token".
 - Reveal: a `paper-3` panel with a read-only token field, a copy button announced by a polite `green` status line, and the one-time warning in `ink-2`; closing it drops the token from the page.
 
+### App consent (`/oauth/authorize`)
+
+- Sits in the auth card with the auth palette: title, an `auth-ink-3` intro, a facts block on `auth-field` with an `auth-line` edge (App, Sends you back to, Signed in as; `auth-ink-3` labels, `auth-ink` values that wrap anywhere), then two `auth-ink-3` notes: the app chose its own name, and what Allow grants. The app name and host come from the server's check, never from the link.
+- Buttons are 44px (`target-min`): Deny is the secondary button, Allow the call-to-action. Below 768px they stack full width with Allow on top; from 768px they sit side by side at equal width. A secondary button's hover colours its edge and text `auth-accent`.
+- States: checking is an `auth-status` line; an invalid link, an unavailable service and a failed check are `auth-alert` messages (a failed check adds "Try again"), with no button that leaves; an account that may not consent sees the message and Deny only; a refused grant shows its `auth-alert` above the buttons with Allow enabled again; a faulty request shows an `auth-alert` and a secondary "Go back to <host>" button, never an automatic redirect (anyone can register a redirect URI); Deny sends the browser back to the client with an `auth-status` line. Allow opens the step-up dialog and stays disabled while the grant runs.
+
 ### Help Center
 
 - Launcher: a 56px button fixed bottom-right (20px from the edges, safe-area aware), `paper-3` fill, `line-2` outline, fully rounded, `shadow`. It holds the headset mascot, painted only from the `nodi-*` tokens (`nodi-headset` and `nodi-earcup` belong to the launcher alone); from 640px up the label "Trợ giúp" shows beside it in `ink`. Its accessible name is "Trợ giúp" at every width, and it reports `aria-expanded`.
@@ -197,6 +203,29 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Small screens: below 640px the open panel is modal (`aria-modal="true"`) and everything outside it is `inert`; the desktop panel stays non-modal. Escape closes the panel only when pressed inside it.
 - Trợ lý: an `ink-3` intro, then a `role="log"` (`aria-live="polite"`, focusable) of messages. A member's question is a `btn-bg` bubble with a `line-2` edge and `md` radius; an answer is Markdown with its sources as fully rounded `btn-bg` chips, and under every member answer a `primary` link-style "Vẫn chưa giải quyết? Gửi yêu cầu hỗ trợ" that opens the request form prefilled with the question and linked to the conversation. "Trợ lý đang trả lời…" is a `role="status"` line; errors are `role="alert"` with "Thử lại". The question box is a field with an `ink-3` counter ("n/1000") that turns `red` over the limit.
 - Yêu cầu: the member's requests as list rows, newest activity first, each with a status chip (foreground on its `-soft` partner: Mới `accent`, Đang xử lý `primary`, Chờ bạn phản hồi `warning`, Đã giải quyết `green`, Đã đóng `ink-3` on `line`). A thread shows member messages on `input-bg` and team messages on `paper`. An unread admin reply puts an 8px `red` dot on the launcher, the Yêu cầu tab and the request row, with "Có phản hồi mới" in their accessible names.
+
+### Legal pages
+
+- Frame: `/legal` and its subpages are public and sit outside the signed-in shell, in the member's chosen theme. A `paper-2` header holds the brand link, the VI | EN toggle and the theme toggle; below it a page of at most 72rem. From 1024px the legal index is a sticky 17rem side rail (`paper-2`, `card-edge`, `lg` radius) beside a text column of at most 48rem; below 1024px it stacks above the text. Index links are `hit-min` tall, `ink-3` on `paper-2`, `ink` on `chrome-hover`, and the current document is `primary` on `chrome-active` with `aria-current`.
+- Document: an `h1` in `ink`, a definition list of version, effective date and publication date (`ink-3` terms, `ink` values) over a `line-soft` rule, a visually hidden `h2`, then the Markdown body in `ink-2` at 1rem/1.7 with its headings from `h3`. Long words and URLs wrap; a code block or table scrolls inside its own box, never the page. Raw HTML shows as text and an image as its alt text.
+- Earlier versions: publication times as 44px rows (`primary` text, `card-edge` edge, `paper-3` on hover), newest first, 20 per page with Previous and Next buttons. An earlier version opens under a `paper-3` notice with a `line` edge naming its publication date and linking to the current text; the notice never uses `warning`.
+- States: loading is placeholder rows inside a `role="status"` region; a failed read is the shared error block with "Try again"; an unknown, unpublished or malformed address says the document (or version) is not available in a `paper-2` status box, with the navigation still shown.
+- Footer menu: the member footer shows one "Legal" disclosure button in its row, `control-h` tall like the GitHub link, so the footer keeps its height. Its panel opens upward, out of flow, `paper-2` with a `chrome-border` edge, `lg` radius and `shadow-lg`, at most 22rem wide and 60% of the viewport tall, and closes on Escape (focus back on the button), an outside press or a followed link. The button is absent while the index loads, when it is empty and when its request fails.
+
+### Drive (shared parts)
+
+- Button: the `btn-bg` button on `md` radius; primary is `primary` fill, danger is `red` on `red-soft`. Disabled is flat `paper-3` with `ink-4`; pressed shrinks to 0.98 except when disabled or under reduced motion.
+- Dialogs (confirm, preview): native modal `dialog`, `paper-3` fill, `line` edge, `md` radius, `shadow`, up to `min(40rem, 100vw − 2rem)` wide (confirm `min(28rem, …)`) and `min(80svh, 45rem)` tall, scrolling inside. Focus starts on the safe choice (Cancel, Close), Escape cancels and focus returns to the opener; both buttons hold while the action runs. Below 480px the buttons stack.
+- Media: an image, video or audio player from a signed link; a link that cannot load shows a dashed `line-2` "not available" panel on `paper-3` in `ink-3`.
+- Pagination: previous, numbered and next buttons (current page `primary-soft` with a `primary` edge, `aria-current="page"`), the first, last and current pages with its neighbours, `…` for longer gaps, and an optional page-size select as a field.
+- Migration notice: a `primary-soft` bar with `card-edge`, `lg` radius, a title, one sentence and a "Got it" button; announced as a status.
+
+### Drive (items and suggestions)
+
+- Sub-tabs: Text, Image, Video, Audio as wrapping buttons (selected `primary-soft` with a `primary` edge, roving focus, arrow keys, Home and End), with the add button as a `primary` button at the end of the row.
+- Cards: `paper-2` fill, `card-edge` edge, `shadow-sm`, `lg` radius, in a grid of `repeat(auto-fill, minmax(min(100%, 15rem), 1fr))`; name in `ink`, text start in `ink-2` clamped to four lines, role, source, date and size in `ink-3`; Open, Edit and Delete (danger) buttons at the foot. A kept suggestion's button reads "Kept" and holds.
+- Forms and dialogs: native modal on `paper-3`; fields are `input-bg` with an `input-border` edge, `red` edge and message when refused; the text counter is `ink-3` and turns `red` over the limit; refusals with no field of their own show as one `red` on `red-soft` message above the buttons. An upload shows "Sending n%" with a determinate progress, then "Saving to Drive…" with an indeterminate one while Cancel holds.
+- Controls keep `control-h`, and `hit-min` on coarse pointers or below 1024px.
 
 ## Do's and Don'ts
 

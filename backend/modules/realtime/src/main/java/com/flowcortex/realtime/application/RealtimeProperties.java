@@ -15,6 +15,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("flowcortex.realtime")
 public record RealtimeProperties(
         @NotNull Duration heartbeat,
+        @NotNull Duration recheckInterval,
         @NotNull @Valid Replay replay,
         @Positive int maxStreamsPerUser,
         @Positive int maxTopicsPerStream,

@@ -65,6 +65,25 @@ function reply(
   };
 }
 
+const HANDOFF_COPY = 'This question needs our support team to look into it';
+
+function handoffReply(handoff: Record<string, unknown>): FakeReply {
+  return {
+    status: 200,
+    body: {
+      conversationId: 'c-1',
+      message: {
+        role: 'assistant',
+        text: 'stored fixed line',
+        outcome: 'handoff',
+        sources: [],
+        handoff,
+      },
+      quota: { remaining: 9, resetsAt: '2026-10-23T17:00:00Z' },
+    },
+  };
+}
+
 function problem(status: number, code: string, extra: Record<string, unknown> = {}): FakeReply {
   return { status, body: { status, code, detail: code, ...extra } };
 }
@@ -281,6 +300,49 @@ describe('AssistantTab', () => {
 
     expect(await fileLinkedRequest(user, calls)).toEqual({
       description: 'workflow bị lỗi mất credit',
+      aiConversationId: 'c-1',
+    });
+  });
+
+  it('aHandoffShowsSendToTeamNotStillNotSolved', async () => {
+    setToken('member', true);
+    const calls = api({
+      [MEMBER_ASK]: handoffReply({
+        topic: 'money',
+        subject: 'Tôi bị trừ tiền hai lần',
+        description: 'Tại sao tôi bị trừ tiền hai lần?',
+      }),
+      ...CREATE,
+    });
+    const { user } = renderTab();
+
+    await ask(user, 'Tại sao tôi bị trừ tiền hai lần?');
+
+    const log = screen.getByRole('log');
+    expect(await within(log).findByText(HANDOFF_COPY)).toBeInTheDocument();
+    expect(within(log).queryByText('stored fixed line')).toBeNull();
+    expect(within(log).queryByText('Sources')).toBeNull();
+    expect(within(log).queryByRole('button', { name: /Still not solved/ })).toBeNull();
+    expect(within(log).queryByRole('link', { name: 'Sign in' })).toBeNull();
+
+    await user.click(within(log).getByRole('button', { name: 'Send to the support team' }));
+
+    expect(await screen.findByLabelText('Subject')).toHaveValue('Tôi bị trừ tiền hai lần');
+    expect(screen.getByLabelText('Description')).toHaveValue('Tại sao tôi bị trừ tiền hai lần?');
+    expect(screen.getByLabelText('Request type')).toHaveValue('');
+    await user.selectOptions(screen.getByLabelText('Request type'), 'Credit');
+    await user.click(screen.getByRole('button', { name: 'Send request' }));
+    await waitFor(() =>
+      expect(
+        calls.some((call) => call.method === 'POST' && call.path === '/api/v1/support/requests'),
+      ).toBe(true),
+    );
+    const created = calls.find(
+      (call) => call.method === 'POST' && call.path === '/api/v1/support/requests',
+    )?.body;
+    expect(created).toMatchObject({
+      subject: 'Tôi bị trừ tiền hai lần',
+      description: 'Tại sao tôi bị trừ tiền hai lần?',
       aiConversationId: 'c-1',
     });
   });

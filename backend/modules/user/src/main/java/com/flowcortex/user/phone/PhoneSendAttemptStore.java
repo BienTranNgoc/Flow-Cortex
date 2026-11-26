@@ -15,6 +15,8 @@ class PhoneSendAttemptStore {
 
     static final String SENT = "sent";
     static final String NUMBER_TAKEN = "number_taken";
+    static final String SMS_UNAVAILABLE = "sms_unavailable";
+    static final String PHONE_UNDELIVERABLE = "phone_undeliverable";
 
     private final JdbcTemplate jdbc;
 
@@ -22,10 +24,17 @@ class PhoneSendAttemptStore {
         this.jdbc = jdbc;
     }
 
-    void record(UUID userId, String phoneHash, String clientIp, String outcome, Instant at) {
+    /** Inserts the attempt and returns its id. */
+    UUID record(UUID userId, String phoneHash, String clientIp, String outcome, Instant at) {
+        UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO phone_send_attempt (id, user_id, phone_hash, ip, outcome, created_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?)", UUID.randomUUID(), userId, phoneHash, clientIp, outcome,
-                Timestamp.from(at));
+                + "VALUES (?, ?, ?, ?, ?, ?)", id, userId, phoneHash, clientIp, outcome, Timestamp.from(at));
+        return id;
+    }
+
+    /** Re-labels a recorded attempt, so quotas that count only {@code sent} attempts stop counting it. */
+    void markOutcome(UUID id, String outcome) {
+        jdbc.update("UPDATE phone_send_attempt SET outcome = ? WHERE id = ?", outcome, id);
     }
 
     /** The member's sends and number-taken answers after {@code since}, oldest first. */

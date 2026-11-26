@@ -110,6 +110,175 @@ class WorkflowTransferEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(replay.getBody()).containsEntry("id", created.getBody().get("id"));
     }
 
+    private void putEntry(UUID workflowId, String key, String dataType, String json) {
+        jdbc.update("INSERT INTO workflow_data_store (id, workflow_id, key, data_type, value, size_bytes,"
+                + " created_at, updated_at) VALUES (?, ?, ?, ?, ?::jsonb, ?, now(), now())",
+                UUID.randomUUID(), workflowId, key, dataType, json, json.length());
+    }
+
+    private List<Map<String, Object>> entriesOf(UUID workflowId) {
+        return jdbc.queryForList("SELECT key, data_type, value::text AS value FROM workflow_data_store "
+                + "WHERE workflow_id = ? ORDER BY key", workflowId);
+    }
+
+    private void openForForking(UUID workflowId) {
+        jdbc.update("UPDATE workflow SET allow_fork = true WHERE id = ?", workflowId);
+    }
+
+    private UUID insertCallStep(UUID workflowId, int order, UUID callee) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO workflow_step (id, workflow_id, step_order, name, type, config) "
+                + "VALUES (?, ?, ?, 'Call', 'workflow.call', ?::jsonb)", id, workflowId, order,
+                "{\"workflowId\":\"" + callee + "\"}");
+        return id;
+    }
+
+    @Test
+    void aForkCarriesTheOwnersTemplateRowsOnlyAndNeverTheirPrivateOnes() {
+        UserView ana = newUser("fork-rows-ana");
+        UserView binh = userService.createUser(ana.id(), uniqueEmail("fork-rows-binh"), "password123", "Binh",
+                "MEMBER");
+        UUID workflowId = insertWorkflow(ana.id(), true, true, "With a store");
+        openForForking(workflowId);
+        putEntry(workflowId, "promo", "template", "{\"data\":{\"brief\":\"Spring sale\",\"price\":2.50}}");
+        putEntry(workflowId, "apiNotes", "json", "{\"secret\":\"token-123\"}");
+
+        ResponseEntity<Map> forked = exchange(HttpMethod.POST, "/api/v1/workflows/" + workflowId + "/fork",
+                loginAs(binh), null);
+
+        assertThat(forked.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID forkId = UUID.fromString((String) forked.getBody().get("id"));
+        assertThat(entriesOf(forkId)).hasSize(1);
+        assertThat(entriesOf(forkId).get(0)).containsEntry("key", "promo").containsEntry("data_type", "template")
+                .isEqualTo(entriesOf(workflowId).stream().filter(row -> "promo".equals(row.get("key"))).findFirst()
+                        .orElseThrow());
+        assertThat(entriesOf(workflowId)).hasSize(2);
+    }
+
+    @Test
+    void aForkOfAWorkflowThatCallsOneTheForkerCannotSeeIsRefusedAndCreatesNothing() {
+        UserView ana = newUser("fork-call-ana");
+        UserView binh = userService.createUser(ana.id(), uniqueEmail("fork-call-binh"), "password123", "Binh",
+                "MEMBER");
+        UUID hidden = insertWorkflow(ana.id(), false, false, "Ana private child");
+        UUID parent = insertWorkflow(ana.id(), true, true, "Parent");
+        openForForking(parent);
+        insertCallStep(parent, 2, hidden);
+        String binhToken = loginAs(binh);
+
+        ResponseEntity<Map> refused = exchange(HttpMethod.POST, "/api/v1/workflows/" + parent + "/fork", binhToken,
+                null, "vi");
+
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(refused.getBody()).containsEntry("code", "FORK_REFERENCE_UNRESOLVED");
+        assertThat((Map<String, Object>) refused.getBody().get("errors")).containsOnlyKeys("step2.config");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow WHERE forked_from_id = ?", Integer.class,
+                parent)).isZero();
+        assertThat(jdbc.queryForObject("SELECT fork_count FROM workflow WHERE id = ?", Integer.class, parent))
+                .isZero();
+
+        jdbc.update("UPDATE workflow SET status = 'published', visibility = 'public' WHERE id = ?", hidden);
+        assertThat(exchange(HttpMethod.POST, "/api/v1/workflows/" + parent + "/fork", binhToken, null)
+                .getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void anExportedWorkflowCarriesItsRowsThroughReviewAndImport() {
+        UserView admin = newUser("transfer-rows");
+        UUID workflowId = insertWorkflow(admin.id(), false, false, "Dub with store");
+        putEntry(workflowId, "promo", "template", "{\"data\":{\"brief\":\"Spring sale\",\"price\":2.50}}");
+        putEntry(workflowId, "notes", "json", "[1,\"two\",null]");
+        String token = loginAs(admin);
+
+        String file = exchange(HttpMethod.GET, ADMIN + "/" + workflowId + "/export", token, null, String.class)
+                .getBody();
+        assertThat(file).contains("\"dataStore\"");
+        ResponseEntity<Map> review = review(token, file, null);
+        assertThat(review.getBody()).containsEntry("blocked", false);
+        ResponseEntity<Map> created = exchange(HttpMethod.POST, ADMIN + "/import", token,
+                Map.of("token", review.getBody().get("token")));
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID importedId = UUID.fromString((String) created.getBody().get("id"));
+        assertThat(entriesOf(importedId)).isEqualTo(entriesOf(workflowId));
+        assertThat(entriesOf(importedId)).hasSize(2);
+    }
+
+    @Test
+    void aFileWithoutADataStoreSectionStillImportsWithAnEmptyStore() {
+        UserView admin = newUser("transfer-no-rows");
+        String token = loginAs(admin);
+        String file = "{\"formatVersion\":1,\"exportedAt\":\"2026-11-09T10:00:00Z\",\"workflow\":{\"name\":\"Plain\"},"
+                + "\"steps\":[{\"stepOrder\":1,\"name\":null,\"type\":\"echo\",\"inputRef\":null,\"config\":null}]}";
+
+        ResponseEntity<Map> review = review(token, file, null);
+        ResponseEntity<Map> created = exchange(HttpMethod.POST, ADMIN + "/import", token,
+                Map.of("token", review.getBody().get("token")));
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(entriesOf(UUID.fromString((String) created.getBody().get("id")))).isEmpty();
+    }
+
+    @Test
+    void aRowTheStoreRefusesBlocksTheReviewAndTheImportCreatesNothing() {
+        UserView admin = newUser("transfer-refused-row");
+        String token = loginAs(admin);
+        String name = "Refused row " + UUID.randomUUID();
+        String file = "{\"formatVersion\":1,\"exportedAt\":\"2026-11-09T10:00:00Z\",\"workflow\":{\"name\":\"" + name
+                + "\"},\"steps\":[{\"stepOrder\":1,\"name\":null,\"type\":\"echo\",\"inputRef\":null,"
+                + "\"config\":null}],\"dataStore\":[{\"key\":\"bad key!\",\"dataType\":\"template\",\"value\":{}}]}";
+
+        ResponseEntity<Map> review = review(token, file, "vi");
+
+        assertThat(review.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(review.getBody()).containsEntry("blocked", true);
+        List<Map<String, Object>> issues = (List<Map<String, Object>>) review.getBody().get("issues");
+        assertThat(issues).singleElement().satisfies(issue -> {
+            assertThat(issue).containsEntry("code", "data_store_entry_invalid").containsEntry("severity", "blocking")
+                    .containsEntry("field", "dataStore[0].key");
+            assertThat(String.valueOf(issue.get("message"))).contains("Khóa");
+        });
+        ResponseEntity<Map> blocked = exchange(HttpMethod.POST, ADMIN + "/import", token,
+                Map.of("token", review.getBody().get("token")));
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(blocked.getBody()).containsEntry("code", "IMPORT_BLOCKED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM workflow WHERE name = ?", Integer.class, name)).isZero();
+    }
+
+    @Test
+    void aCallStepNamingAWorkflowTheAdminCannotSeeBlocksTheReviewAndTheImport() {
+        UserView admin = newUser("transfer-call");
+        UserView other = userService.createUser(admin.id(), uniqueEmail("transfer-call-other"), "password123",
+                "Other", "MEMBER");
+        UUID hidden = insertWorkflow(other.id(), false, false, "Someone else's");
+        UUID visible = insertWorkflow(admin.id(), false, false, "Mine");
+        String token = loginAs(admin);
+
+        for (UUID callee : List.of(UUID.randomUUID(), hidden)) {
+            ResponseEntity<Map> review = review(token, callFile(callee), null);
+            assertThat(review.getBody()).containsEntry("blocked", true);
+            assertThat((List<Map<String, Object>>) review.getBody().get("issues")).singleElement().satisfies(issue ->
+                    assertThat(issue).containsEntry("code", "reference_unresolved")
+                            .containsEntry("severity", "blocking").containsEntry("stepOrder", 1)
+                            .containsEntry("field", "config"));
+            ResponseEntity<Map> blocked = exchange(HttpMethod.POST, ADMIN + "/import", token,
+                    Map.of("token", review.getBody().get("token")));
+            assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+            assertThat(blocked.getBody()).containsEntry("code", "IMPORT_BLOCKED");
+        }
+
+        ResponseEntity<Map> clean = review(token, callFile(visible), null);
+        assertThat(clean.getBody()).containsEntry("blocked", false);
+        assertThat(exchange(HttpMethod.POST, ADMIN + "/import", token, Map.of("token", clean.getBody().get("token")))
+                .getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    private static String callFile(UUID callee) {
+        return "{\"formatVersion\":1,\"exportedAt\":\"2026-11-09T10:00:00Z\",\"workflow\":{\"name\":\"Caller\"},"
+                + "\"steps\":[{\"stepOrder\":1,\"name\":null,\"type\":\"workflow.call\",\"inputRef\":null,"
+                + "\"config\":{\"workflowId\":\"" + callee + "\"}}]}";
+    }
+
     @Test
     void aFileOverTwoMebibytesIsRefusedAsProblemJsonAndAnUnknownKeyAsInvalid() {
         UserView admin = newUser("transfer-limits");

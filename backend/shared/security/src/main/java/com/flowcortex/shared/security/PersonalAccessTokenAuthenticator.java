@@ -18,6 +18,9 @@ public interface PersonalAccessTokenAuthenticator {
 
     String AUTH_PAT = "pat";
 
+    /** Claim carrying the id of the token a principal was built from. */
+    String PAT_ID_CLAIM = "pat_id";
+
     /** The owner's principal (no role claim), or empty when the token is unknown, dead or its owner ineligible. */
     Optional<Jwt> authenticate(String rawToken);
 

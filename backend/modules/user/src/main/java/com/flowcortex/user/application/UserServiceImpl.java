@@ -22,6 +22,9 @@ import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
 import com.flowcortex.user.infrastructure.UserDirectoryRepository;
 import com.flowcortex.user.pii.PiiMask;
+import com.flowcortex.user.roles.RbacMutationRules;
+import com.flowcortex.user.roles.RbacMutationSwitch;
+import com.flowcortex.user.roles.RbacMutationSwitch.RbacOperation;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -52,6 +55,7 @@ class UserServiceImpl implements UserService {
     private final SuperAdminInvariant superAdminInvariant;
     private final RegistrationOwnerGuard registrationOwnerGuard;
     private final RoleCatalog roleCatalog;
+    private final RbacMutationSwitch mutationSwitch;
     private final UserDirectoryRepository directory;
     private final Clock clock;
 
@@ -59,8 +63,10 @@ class UserServiceImpl implements UserService {
             AccountCredentials accountCredentials, ApplicationEventPublisher events,
             EmailConfirmationService emailLinks, AdminPermissions adminPermissions,
             SuperAdminInvariant superAdminInvariant, RegistrationOwnerGuard registrationOwnerGuard,
-            RoleCatalog roleCatalog, UserDirectoryRepository directory, Clock clock) {
+            RoleCatalog roleCatalog, RbacMutationSwitch mutationSwitch, UserDirectoryRepository directory,
+            Clock clock) {
         this.roleCatalog = roleCatalog;
+        this.mutationSwitch = mutationSwitch;
         this.directory = directory;
         this.clock = clock;
         this.userRepository = userRepository;
@@ -86,6 +92,9 @@ class UserServiceImpl implements UserService {
         AppUser caller = requireActiveCaller(callerId);
         RoleRow newRole = roleCatalog.require(role);
         requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.create(newRole)));
+        if (RbacMutationRules.gatesCreate(newRole)) {
+            mutationSwitch.requireEnabled(RbacOperation.STAFF_ACCOUNT_CREATE, callerId);
+        }
         return createRow(UUID.randomUUID(), scopeOf(caller), email, rawPassword, name, Role.of(newRole.code()));
     }
 
@@ -143,6 +152,9 @@ class UserServiceImpl implements UserService {
         requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.update(
                 roleCatalog.require(user.getRole().code()), newRoleRow, user.getStatus(), newStatus)));
         requireRealValues(user, email, name);
+        if (RbacMutationRules.gatesUpdate(user.getRole().code(), newRoleRow)) {
+            mutationSwitch.requireEnabled(RbacOperation.USER_ROLE_CHANGE, callerId);
+        }
         boolean leavesAdminRole = user.getRole().isSuperAdmin() && newRole != null && !newRole.isSuperAdmin();
         boolean suspends = newStatus == UserStatus.SUSPENDED;
         if (leavesAdminRole || suspends) {

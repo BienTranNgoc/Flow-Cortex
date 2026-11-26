@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -265,5 +266,156 @@ class PersonalAccessTokenServiceTest {
                 .isInstanceOf(NotFoundException.class);
 
         verifyNoInteractions(audit);
+    }
+
+    private AppUser rbacDeactivatedAdmin() {
+        AppUser admin = owner(Role.ADMIN, UserStatus.ACTIVE);
+        admin.deactivateAdmin(UUID.randomUUID(), NOW.minusSeconds(60));
+        return admin;
+    }
+
+    @Test
+    void issueLocksTheOwnerNeverTouchesTheProofAndStoresOnlyTheHash() {
+        ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
+        when(tokens.countLive(userId, NOW)).thenReturn(9L);
+
+        OAuthTokenIssuer.Issued issued = service(true).issue(userId, "MCP: Claude", "mcp_ab12");
+
+        verify(users).findByIdForUpdate(userId);
+        verifyNoInteractions(stepUp);
+        assertThat(issued.rawToken()).matches("^fc_pat_[A-Za-z0-9_-]{43}$");
+        assertThat(issued.expiresAt()).isEqualTo(NOW.plus(Duration.ofDays(90)));
+        ArgumentCaptor<PersonalAccessToken> saved = ArgumentCaptor.forClass(PersonalAccessToken.class);
+        verify(tokens).save(saved.capture());
+        assertThat(saved.getValue().getId()).isEqualTo(issued.tokenId());
+        assertThat(saved.getValue().getUserId()).isEqualTo(userId);
+        assertThat(saved.getValue().getName()).isEqualTo("MCP: Claude");
+        assertThat(saved.getValue().getTokenHash()).isEqualTo(OpaqueTokens.hash(issued.rawToken()));
+        assertThat(saved.getValue().getExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(90)));
+        ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.captor();
+        verify(audit).write(eq(AuthEventType.PAT_CREATED), eq(userId), isNull(), isNull(), metadata.capture());
+        assertThat(metadata.getValue()).containsEntry("userId", userId.toString())
+                .containsEntry("tokenId", issued.tokenId().toString()).containsEntry("name", "MCP: Claude")
+                .containsEntry("clientId", "mcp_ab12");
+        assertThat(metadata.getValue().toString()).doesNotContain("fc_pat_").doesNotContain(issued.rawToken());
+    }
+
+    @Test
+    void issueRefusesAnOwnerThatIsNotAnActiveUnlockedEnabledAdmin() {
+        AppUser locked = owner(Role.ADMIN, UserStatus.ACTIVE);
+        locked.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+        List<AppUser> refused = List.of(owner(Role.MEMBER, UserStatus.ACTIVE), owner(Role.ADMIN, UserStatus.SUSPENDED),
+                locked, rbacDeactivatedAdmin());
+
+        for (AppUser candidate : refused) {
+            ownerIs(candidate);
+            assertThatThrownBy(() -> service(true).issue(userId, "MCP: Claude", "mcp_ab12"))
+                    .isInstanceOf(PatNotEligibleException.class);
+        }
+
+        verify(tokens, never()).save(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void issueRefusesAMissingOwnerAndTheTokenOverTheCap() {
+        when(users.findByIdForUpdate(userId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service(true).issue(userId, "MCP: Claude", "mcp_ab12"))
+                .isInstanceOf(PatNotEligibleException.class);
+
+        ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
+        when(tokens.countLive(userId, NOW)).thenReturn(10L);
+        assertThatThrownBy(() -> service(true).issue(userId, "MCP: Claude", "mcp_ab12"))
+                .isInstanceOf(PatLimitReachedException.class);
+
+        verify(tokens, never()).save(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void findLiveAnswersOnlyForALiveTokenOfTheOwnPrefix() {
+        String raw = "fc_pat_" + OpaqueTokens.generateRawToken();
+        PersonalAccessToken liveToken = live(raw);
+        when(tokens.findByTokenHash(OpaqueTokens.hash(raw))).thenReturn(Optional.of(liveToken));
+
+        assertThat(service(true).findLive(raw)).contains(new OAuthTokenIssuer.Live(liveToken.getId(), userId));
+        assertThat(service(true).findLive(null)).as("null").isEmpty();
+        assertThat(service(true).findLive("not-a-pat")).as("no prefix").isEmpty();
+        assertThat(service(true).findLive("fc_pat_unknown")).as("unknown hash").isEmpty();
+
+        PersonalAccessToken revoked = live(raw);
+        ReflectionTestUtils.setField(revoked, "revokedAt", NOW.minusSeconds(5));
+        when(tokens.findByTokenHash(OpaqueTokens.hash(raw))).thenReturn(Optional.of(revoked));
+        assertThat(service(true).findLive(raw)).as("revoked").isEmpty();
+
+        PersonalAccessToken expired = new PersonalAccessToken(UUID.randomUUID(), userId, "CI",
+                OpaqueTokens.hash(raw), NOW.minusSeconds(60), NOW);
+        when(tokens.findByTokenHash(OpaqueTokens.hash(raw))).thenReturn(Optional.of(expired));
+        assertThat(service(true).findLive(raw)).as("expiresAt == now").isEmpty();
+    }
+
+    @Test
+    void aClientScopedRevokeAuditsTheClientOnlyWhenTheConditionalUpdateHitsARow() {
+        UUID tokenId = UUID.randomUUID();
+        when(tokens.revoke(tokenId, userId, NOW)).thenReturn(1);
+
+        assertThat(service(true).revoke(userId, tokenId, "mcp_ab12")).isTrue();
+
+        ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.captor();
+        verify(audit).write(eq(AuthEventType.PAT_REVOKED), eq(userId), isNull(), isNull(), metadata.capture());
+        assertThat(metadata.getValue()).containsEntry("userId", userId.toString())
+                .containsEntry("tokenId", tokenId.toString()).containsEntry("clientId", "mcp_ab12");
+    }
+
+    @Test
+    void aClientScopedRevokeThatChangesNothingWritesNoAudit() {
+        UUID tokenId = UUID.randomUUID();
+        when(tokens.revoke(tokenId, userId, NOW)).thenReturn(0);
+
+        assertThat(service(true).revoke(userId, tokenId, "mcp_ab12")).isFalse();
+
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void eligibleToManageMirrorsTheManageRule() {
+        ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
+        assertThat(service(true).eligibleToManage(userId)).isTrue();
+
+        ownerIs(owner(Role.MEMBER, UserStatus.ACTIVE));
+        assertThat(service(true).eligibleToManage(userId)).as("member").isFalse();
+
+        ownerIs(rbacDeactivatedAdmin());
+        assertThat(service(true).eligibleToManage(userId)).as("rbac deactivated").isFalse();
+
+        AppUser locked = owner(Role.ADMIN, UserStatus.ACTIVE);
+        locked.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
+        ownerIs(locked);
+        assertThat(service(true).eligibleToManage(userId)).as("locked").isFalse();
+
+        when(users.findById(userId)).thenReturn(Optional.empty());
+        assertThat(service(true).eligibleToManage(userId)).as("gone").isFalse();
+    }
+
+    @Test
+    void atCapIsTrueFromTheConfiguredMaximumOfLiveTokens() {
+        when(tokens.countLive(userId, NOW)).thenReturn(9L);
+        assertThat(service(true).atCap(userId)).isFalse();
+
+        when(tokens.countLive(userId, NOW)).thenReturn(10L);
+        assertThat(service(true).atCap(userId)).isTrue();
+    }
+
+    @Test
+    void createAndAuthenticateRefuseAnRbacDeactivatedAdmin() {
+        ownerIs(rbacDeactivatedAdmin());
+        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT))
+                .isInstanceOf(PatNotEligibleException.class);
+        verifyNoInteractions(stepUp);
+
+        String raw = "fc_pat_" + OpaqueTokens.generateRawToken();
+        when(tokens.findByTokenHash(OpaqueTokens.hash(raw))).thenReturn(Optional.of(live(raw)));
+        assertThat(service(true).authenticate(raw)).isEmpty();
+        verify(tokens, never()).touchLastUsed(any(), any());
     }
 }

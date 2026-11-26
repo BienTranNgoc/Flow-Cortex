@@ -76,10 +76,25 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Workflows & Templates')).not.toBeInTheDocument();
   });
 
+  it('links Feature Switches to /features with no coming-soon tag for a holder of platform.setting.view, and hides it otherwise', () => {
+    stubApi({ [`GET ${OPEN_COUNT_PATH}`]: { status: 200, body: { count: 0 } } });
+    const { unmount } = renderSidebar(ADMIN_ME);
+
+    const link = screen.getByRole('link', { name: /Feature Switches/ });
+    expect(link).toHaveAttribute('href', '/features');
+    expect(link).not.toHaveTextContent('Coming soon');
+    unmount();
+
+    renderSidebar({
+      permissions: ADMIN_ME.permissions.filter((key) => key !== 'platform.setting.view'),
+      adminDisabled: false,
+    });
+    expect(screen.queryByText('Feature Switches')).not.toBeInTheDocument();
+  });
+
   it.each([
     'Approval Queue',
     'Credits & Wallets',
-    'Feature Switches',
     'Voice Quota',
     'Health',
   ])(

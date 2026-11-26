@@ -1,8 +1,8 @@
 package com.flowcortex.support.assistant;
 
-import com.flowcortex.llm.api.LlmClient;
-import com.flowcortex.llm.api.LlmJsonRequest;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.llm.api.LlmSlotRequest;
+import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.llm.api.LlmTimeouts;
 import io.micrometer.context.ContextExecutorService;
 import io.micrometer.context.ContextSnapshotFactory;
@@ -29,23 +29,23 @@ class LlmDeadline implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LlmDeadline.class);
 
-    private final LlmClient client;
+    private final LlmSlots slots;
     private final Duration deadline;
     private final ExecutorService executor = ContextExecutorService.wrap(
             Executors.newVirtualThreadPerTaskExecutor(), ContextSnapshotFactory.builder().build());
 
     @Autowired
-    LlmDeadline(LlmClient client, LlmTimeouts timeouts) {
-        this(client, timeouts.answer());
+    LlmDeadline(LlmSlots slots, LlmTimeouts timeouts) {
+        this(slots, timeouts.answer());
     }
 
-    LlmDeadline(LlmClient client, Duration deadline) {
-        this.client = client;
+    LlmDeadline(LlmSlots slots, Duration deadline) {
+        this.slots = slots;
         this.deadline = deadline;
     }
 
-    LlmJsonResult call(LlmJsonRequest request) {
-        Future<LlmJsonResult> call = executor.submit(() -> client.generateJson(request));
+    LlmJsonResult call(LlmSlotRequest request) {
+        Future<LlmJsonResult> call = executor.submit(() -> slots.generateJson(request));
         try {
             return call.get(deadline.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {

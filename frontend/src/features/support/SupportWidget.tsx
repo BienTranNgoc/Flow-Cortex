@@ -11,6 +11,7 @@ import {
   supportPanelReducer,
   tabsFor,
 } from './supportPanelState';
+import { useSupportStream } from './useSupportStream';
 import { useUnreadCount } from './useUnread';
 import './support.css';
 
@@ -44,6 +45,7 @@ function takePendingHelp(): string | null {
 export function SupportWidget() {
   const member = useAuthToken() !== null;
   const unread = useUnreadCount() > 0;
+  useSupportStream();
   const [state, dispatch] = useReducer(supportPanelReducer, CLOSED_PANEL);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);

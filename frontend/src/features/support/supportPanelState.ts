@@ -52,6 +52,7 @@ export interface SupportPanelState {
 }
 
 export interface RequestPrefill {
+  subject?: string;
   description: string;
   aiConversationId?: string;
 }
