@@ -31,16 +31,17 @@ class MailKeyCatalogTest {
     private static final Pattern UNREPLACED = Pattern.compile("\\{\\d");
 
     /** Values typed as the senders pass them: a number wherever the text formats one. */
-    private static final Map<MailKey, List<Object>> SAMPLES = new EnumMap<>(Map.of(
-            MailKey.ACTIVATION, List.of(LINK, 24),
-            MailKey.ACTIVATION_AFTER_RESET_REQUEST, List.of(LINK, 24),
-            MailKey.PASSWORD_SETUP_LINK, List.of(LINK, 30),
-            MailKey.PASSWORD_SET, List.of(),
-            MailKey.RESET_PASSWORD, List.of(LINK, new LocalizedMessage("email.duration.hours", 1)),
-            MailKey.PASSWORD_CHANGED, List.of("https://app.example/login"),
-            MailKey.GOOGLE_SIGN_IN_NOTICE, List.of("https://app.example/login"),
-            MailKey.SUPPORT_REQUEST_REPLIED, List.of(42, "https://app.example/?help=request-42"),
-            MailKey.PHONE_CHANGED, List.of("+84 9•• ••• 321")));
+    private static final Map<MailKey, List<Object>> SAMPLES = new EnumMap<>(Map.ofEntries(
+            Map.entry(MailKey.ACTIVATION, List.of(LINK, 24)),
+            Map.entry(MailKey.ACTIVATION_AFTER_RESET_REQUEST, List.of(LINK, 24)),
+            Map.entry(MailKey.PASSWORD_SETUP_LINK, List.of(LINK, 30)),
+            Map.entry(MailKey.PASSWORD_SET, List.of()),
+            Map.entry(MailKey.RESET_PASSWORD, List.of(LINK, new LocalizedMessage("email.duration.hours", 1))),
+            Map.entry(MailKey.PASSWORD_CHANGED, List.of("https://app.example/login")),
+            Map.entry(MailKey.GOOGLE_SIGN_IN_NOTICE, List.of("https://app.example/login")),
+            Map.entry(MailKey.SUPPORT_REQUEST_REPLIED, List.of(42, "https://app.example/?help=request-42")),
+            Map.entry(MailKey.PHONE_CHANGED, List.of("+84 9•• ••• 321")),
+            Map.entry(MailKey.TRASH_EXPIRING, List.of(2, "18/11/2026", "https://app.example/trash"))));
 
     private final ResourceBundleMessageSource messages = messageSource();
 

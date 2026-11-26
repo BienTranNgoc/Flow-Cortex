@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":modules:jobs"))
     implementation(project(":modules:llm"))
     implementation(project(":modules:connector"))
+    implementation(project(":modules:settings"))
     implementation(project(":shared:web"))
     implementation(project(":shared:security"))
     implementation(project(":shared:ratelimit"))

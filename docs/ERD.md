@@ -150,6 +150,18 @@ erDiagram
     timestamptz created_at
     timestamptz updated_at "finished rows deleted after 30 days"
   }
+  trash_entry {
+    uuid id PK
+    varchar item_type "lowercase key, UNIQUE with item_id; the owning module's provider type"
+    varchar item_id "the trashed row's id in its own module, no FK"
+    uuid owner_id "the account that sees and acts on the entry, no FK"
+    uuid deleted_by "no FK"
+    text name "1-200 characters; NULL = untitled"
+    text name_key "folded search key written by Java; empty when untitled"
+    varchar location_code "message code of where the item lived"
+    timestamptz deleted_at "expiry = deleted_at + retention, never stored"
+    timestamptz reminded_at "NULL until the expiry reminder claims it; cleared when the item is deleted again"
+  }
   product_video_input {
     uuid run_id PK,FK
     varchar product_name
@@ -467,6 +479,34 @@ erDiagram
 
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
+
+## Trend taxonomy (`V2026.11.15.260`)
+
+```mermaid
+erDiagram
+  trend_category {
+    varchar key PK "derived from name_vi, 1-64 chars of a-z0-9 joined by single hyphens (CHECK); never changes after create"
+    varchar name_vi "varchar(60)"
+    varchar name_en "varchar(60)"
+    int display_order "ties are read in key order"
+    boolean visible "hidden categories stay stored"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  trend_tag {
+    uuid id PK "generated in the application"
+    varchar name_vi "varchar(30)"
+    varchar name_en "varchar(30)"
+    int display_order "ties are read in creation order"
+    boolean visible
+    timestamptz created_at
+    timestamptz updated_at
+  }
+```
+
+No relations yet: the template table and its category foreign key arrive with the template change. The
+migration seeds four categories (`nguoi`, `san-pham`, `thu-cung`, `nhay-chuyen-canh`) and the two
+`content.trend_template.*` permission keys.
 
 ## Roadmap tables (each arrives with its own change)
 
