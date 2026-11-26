@@ -1,0 +1,176 @@
+.trend-page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trend-hint {
+  margin: 0;
+  color: var(--admin-ink-3);
+  font-size: 0.875rem;
+}
+
+.trend-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--admin-card-edge);
+  overflow-x: auto;
+}
+
+.trend-tab-button {
+  min-height: var(--admin-hit-min);
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--admin-ink-3);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.trend-tab-button[aria-selected='true'] {
+  border-bottom-color: var(--admin-primary);
+  color: var(--admin-primary);
+}
+
+.trend-tab-button:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) {
+  .trend-tab-button:not([aria-selected='true']):hover {
+    background: var(--admin-chrome-hover);
+    color: var(--admin-ink);
+  }
+}
+
+.trend-tab-button:active {
+  transform: scale(0.98);
+}
+
+.trend-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.trend-panel .cortex-admin-table-wrapper,
+.trend-panel .cortex-admin-empty,
+.trend-panel .cortex-admin-error {
+  margin-top: 0;
+}
+
+.trend-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.trend-announcement {
+  margin: 0;
+  color: var(--admin-ink-3);
+  font-size: 0.875rem;
+}
+
+.trend-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-left: 4px solid var(--admin-warning);
+  border-radius: var(--radius-md);
+  background: var(--admin-warning-soft);
+  color: var(--admin-ink);
+}
+
+.trend-notice p {
+  margin: 0;
+}
+
+.trend-notice__actions,
+.trend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.trend-table td:first-child {
+  width: 4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 1px solid var(--admin-card-edge-strong);
+  border-radius: var(--radius-lg);
+  background: var(--admin-card-surface);
+  color: var(--admin-ink);
+  box-shadow: var(--admin-shadow-lg);
+  overflow: hidden;
+}
+
+.trend-dialog::backdrop {
+  background: color-mix(in srgb, var(--admin-ink) 45%, transparent);
+}
+
+.trend-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100dvh - 2rem);
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.trend-dialog__body h2,
+.trend-dialog__body p {
+  margin: 0;
+}
+
+.trend-dialog__body h2 {
+  font-size: 1.15rem;
+}
+
+.trend-dialog .cortex-admin-field {
+  max-width: none;
+  margin-bottom: 0;
+}
+
+.trend-dialog .cortex-admin-field input[aria-invalid='true'] {
+  border-color: var(--admin-red);
+}
+
+.trend-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.trend-key {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.trend-key__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trend-tab-button:active {
+    transform: none;
+  }
+}
