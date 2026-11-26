@@ -7,7 +7,8 @@ import java.util.Objects;
 /**
  * The one failure a connector call or send surfaces. Runtime callers branch on {@link #reason()} and
  * {@link #retryable()}, never on an HTTP status; the web layer maps the reason to a status and the
- * {@link #detail()} key. {@code toString} and the message carry no token, URL or upstream text.
+ * {@link #detail()} key; a {@link #providerReason()} tells apart the causes of one reason. {@code toString} and
+ * the message carry no token, URL or upstream text.
  */
 public class ConnectorException extends RuntimeException {
 
@@ -20,20 +21,20 @@ public class ConnectorException extends RuntimeException {
     private final Reason reason;
     private final boolean retryable;
     private final LocalizedMessage detail;
-    private final String telegramReason;
+    private final String providerReason;
     private final Duration retryAfter;
 
-    public ConnectorException(Reason reason, boolean retryable, LocalizedMessage detail, String telegramReason,
+    public ConnectorException(Reason reason, boolean retryable, LocalizedMessage detail, String providerReason,
             Duration retryAfter) {
         super(reason + " " + Objects.requireNonNull(detail, "detail").code());
         this.reason = Objects.requireNonNull(reason, "reason");
         this.retryable = retryable;
         this.detail = detail;
-        this.telegramReason = telegramReason;
+        this.providerReason = providerReason;
         this.retryAfter = retryAfter;
     }
 
-    /** A failure that no retry can cure and that has no Telegram reason or wait. */
+    /** A failure that no retry can cure and that has no provider reason or wait. */
     public ConnectorException(Reason reason, LocalizedMessage detail) {
         this(reason, false, detail, null, null);
     }
@@ -68,9 +69,12 @@ public class ConnectorException extends RuntimeException {
         return detail;
     }
 
-    /** The Telegram refusal reason of a {@link Reason#REFUSED} send, else {@code null}. */
-    public String telegramReason() {
-        return telegramReason;
+    /**
+     * The provider's own machine-readable sub-reason (a Telegram refusal reason, a Google {@code folder_no_access}),
+     * else {@code null}. Callers may branch on it; the web layer exposes it as the problem property {@code reason}.
+     */
+    public String providerReason() {
+        return providerReason;
     }
 
     /** How long the upstream asked to wait, else {@code null}. */
