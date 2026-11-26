@@ -162,6 +162,21 @@ export interface AccessTokenResponse {
   expiresIn?: number;
 }
 
+export interface ChatFolderName {
+  /**
+   * @minLength 1
+   * @maxLength 60
+   */
+  name?: string;
+}
+
+export interface ChatFolder {
+  id?: string;
+  name?: string;
+  conversationCount?: number;
+  createdAt?: string;
+}
+
 export interface ChatConversationTitle {
   /** @maxLength 80 */
   title?: string;
@@ -172,6 +187,21 @@ export interface ChatConversation {
   title?: string;
   lastActivityAt?: string;
   createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
+}
+
+export interface ChatConversationPin {
+  pinned: boolean;
+}
+
+export interface ChatConversationFolder {
+  /**
+   * The folder to file into; null returns the conversation to Recent
+   * @nullable
+   */
+  folderId?: string | null;
 }
 
 export interface ProfileUpdateRequest {
@@ -2356,6 +2386,9 @@ export interface ChatConversationCreated {
   title?: string;
   lastActivityAt?: string;
   createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
   userMessage?: ChatMessage;
   assistantMessageId?: string;
 }
@@ -4030,9 +4063,43 @@ export interface Summary {
   extraHeaderNames?: string[];
 }
 
+export interface ChatFolderList {
+  items?: ChatFolder[];
+}
+
+export interface ChatConversationListItem {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  preview?: string | null;
+  /** True when the latest text was longer than the preview cap */
+  previewTruncated?: boolean;
+}
+
 export interface ChatConversationList {
-  items?: ChatConversation[];
+  items?: ChatConversationListItem[];
+  /**
+   * Opaque cursor of the next page; null on the last page
+   * @nullable
+   */
+  nextCursor?: string | null;
   chatEnabled?: boolean;
+}
+
+export interface ChatConversationCounts {
+  total?: number;
+  pinned?: number;
+  today?: number;
+  last7Days?: number;
+  earlier?: number;
 }
 
 export interface CapabilitiesResponse {
@@ -4842,6 +4909,41 @@ export type ListDriveItemsParams = {
   contentType?: string;
 };
 
+export type ListChatConversationsParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  cursor?: string;
+  sort?: ListChatConversationsSort;
+  pinned?: ListChatConversationsPinned;
+  /**
+   * A folder id, or none for conversations outside every folder
+   */
+  folder?: string;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type ListChatConversationsSort =
+  (typeof ListChatConversationsSort)[keyof typeof ListChatConversationsSort];
+
+export const ListChatConversationsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+} as const;
+
+export type ListChatConversationsPinned =
+  (typeof ListChatConversationsPinned)[keyof typeof ListChatConversationsPinned];
+
+export const ListChatConversationsPinned = {
+  only: 'only',
+  exclude: 'exclude',
+} as const;
+
 export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
 
 export type ListAdminWorkflowsParams = {
@@ -5235,6 +5337,16 @@ export type ListContentDocumentHistoryParams = {
    * @maximum 100
    */
   size?: number;
+};
+
+export type CountChatConversationsParams = {
+  q?: string;
+  /**
+   * A folder id, or none for conversations outside every folder
+   */
+  folder?: string;
+  todayStart: string;
+  weekStart: string;
 };
 
 export type GetBuilderRunsChartParams = {
@@ -6374,6 +6486,106 @@ export const setPassword = async (
   });
 };
 
+export type renameChatFolderResponse200 = {
+  data: ChatFolder;
+  status: 200;
+};
+
+export type renameChatFolderResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameChatFolderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameChatFolderResponseSuccess = renameChatFolderResponse200 & {
+  headers: Headers;
+};
+export type renameChatFolderResponseError = (
+  renameChatFolderResponse400 | renameChatFolderResponse404
+) & {
+  headers: Headers;
+};
+
+export type renameChatFolderResponse =
+  renameChatFolderResponseSuccess | renameChatFolderResponseError;
+
+export const getRenameChatFolderUrl = (id: string) => {
+  return `/api/v1/chat/folders/${id}`;
+};
+
+export const renameChatFolder = async (
+  id: string,
+  chatFolderName: ChatFolderName,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameChatFolderResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameChatFolderResponse>(getRenameChatFolderUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatFolderName),
+  });
+};
+
+export type deleteChatFolderResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteChatFolderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteChatFolderResponseSuccess = deleteChatFolderResponse204 & {
+  headers: Headers;
+};
+export type deleteChatFolderResponseError = deleteChatFolderResponse404 & {
+  headers: Headers;
+};
+
+export type deleteChatFolderResponse =
+  deleteChatFolderResponseSuccess | deleteChatFolderResponseError;
+
+export const getDeleteChatFolderUrl = (id: string) => {
+  return `/api/v1/chat/folders/${id}`;
+};
+
+/**
+ * The folder's conversations are kept and return to Recent with their pinned state.
+ */
+export const deleteChatFolder = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteChatFolderResponse> => {
+  return customFetch<deleteChatFolderResponse>(getDeleteChatFolderUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type renameChatConversationResponse200 = {
   data: ChatConversation;
   status: 200;
@@ -6468,6 +6680,125 @@ export const deleteChatConversation = async (
   return customFetch<deleteChatConversationResponse>(getDeleteChatConversationUrl(id), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type pinChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type pinChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type pinChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pinChatConversationResponseSuccess = pinChatConversationResponse200 & {
+  headers: Headers;
+};
+export type pinChatConversationResponseError = (
+  pinChatConversationResponse400 | pinChatConversationResponse404
+) & {
+  headers: Headers;
+};
+
+export type pinChatConversationResponse =
+  pinChatConversationResponseSuccess | pinChatConversationResponseError;
+
+export const getPinChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/pin`;
+};
+
+export const pinChatConversation = async (
+  id: string,
+  chatConversationPin: ChatConversationPin,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pinChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<pinChatConversationResponse>(getPinChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationPin),
+  });
+};
+
+export type moveChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type moveChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type moveChatConversationResponseSuccess = moveChatConversationResponse200 & {
+  headers: Headers;
+};
+export type moveChatConversationResponseError = moveChatConversationResponse404 & {
+  headers: Headers;
+};
+
+export type moveChatConversationResponse =
+  moveChatConversationResponseSuccess | moveChatConversationResponseError;
+
+export const getMoveChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/folder`;
+};
+
+export const moveChatConversation = async (
+  id: string,
+  chatConversationFolder: ChatConversationFolder,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<moveChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<moveChatConversationResponse>(getMoveChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationFolder),
   });
 };
 
@@ -13173,24 +13504,132 @@ export const reportClientError = async (
   });
 };
 
+export type listChatFoldersResponse200 = {
+  data: ChatFolderList;
+  status: 200;
+};
+
+export type listChatFoldersResponseSuccess = listChatFoldersResponse200 & {
+  headers: Headers;
+};
+export type listChatFoldersResponse = listChatFoldersResponseSuccess;
+
+export const getListChatFoldersUrl = () => {
+  return `/api/v1/chat/folders`;
+};
+
+export const listChatFolders = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatFoldersResponse> => {
+  return customFetch<listChatFoldersResponse>(getListChatFoldersUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createChatFolderResponse201 = {
+  data: ChatFolder;
+  status: 201;
+};
+
+export type createChatFolderResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createChatFolderResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createChatFolderResponseSuccess = createChatFolderResponse201 & {
+  headers: Headers;
+};
+export type createChatFolderResponseError = (
+  createChatFolderResponse400 | createChatFolderResponse409
+) & {
+  headers: Headers;
+};
+
+export type createChatFolderResponse =
+  createChatFolderResponseSuccess | createChatFolderResponseError;
+
+export const getCreateChatFolderUrl = () => {
+  return `/api/v1/chat/folders`;
+};
+
+export const createChatFolder = async (
+  chatFolderName: ChatFolderName,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createChatFolderResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createChatFolderResponse>(getCreateChatFolderUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatFolderName),
+  });
+};
+
 export type listChatConversationsResponse200 = {
   data: ChatConversationList;
   status: 200;
 };
 
+export type listChatConversationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type listChatConversationsResponseSuccess = listChatConversationsResponse200 & {
   headers: Headers;
 };
-export type listChatConversationsResponse = listChatConversationsResponseSuccess;
+export type listChatConversationsResponseError = listChatConversationsResponse400 & {
+  headers: Headers;
+};
 
-export const getListChatConversationsUrl = () => {
-  return `/api/v1/chat/conversations`;
+export type listChatConversationsResponse =
+  listChatConversationsResponseSuccess | listChatConversationsResponseError;
+
+export const getListChatConversationsUrl = (params?: ListChatConversationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/chat/conversations?${stringifiedParams}`
+    : `/api/v1/chat/conversations`;
 };
 
 export const listChatConversations = async (
+  params?: ListChatConversationsParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listChatConversationsResponse> => {
-  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(), {
+  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -19660,6 +20099,52 @@ export const listChatMessages = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listChatMessagesResponse> => {
   return customFetch<listChatMessagesResponse>(getListChatMessagesUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type countChatConversationsResponse200 = {
+  data: ChatConversationCounts;
+  status: 200;
+};
+
+export type countChatConversationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type countChatConversationsResponseSuccess = countChatConversationsResponse200 & {
+  headers: Headers;
+};
+export type countChatConversationsResponseError = countChatConversationsResponse400 & {
+  headers: Headers;
+};
+
+export type countChatConversationsResponse =
+  countChatConversationsResponseSuccess | countChatConversationsResponseError;
+
+export const getCountChatConversationsUrl = (params: CountChatConversationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/chat/conversations/counts?${stringifiedParams}`
+    : `/api/v1/chat/conversations/counts`;
+};
+
+export const countChatConversations = async (
+  params: CountChatConversationsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<countChatConversationsResponse> => {
+  return customFetch<countChatConversationsResponse>(getCountChatConversationsUrl(params), {
     ...options,
     method: 'GET',
   });
