@@ -34,6 +34,7 @@ import { TopicGroupsPage } from './features/support/kb/TopicGroupsPage';
 import { RequestDetailPage } from './features/support/requests/RequestDetailPage';
 import { RequestsInboxPage } from './features/support/requests/RequestsInboxPage';
 import { SupportSettingsPage } from './features/support/settings/SupportSettingsPage';
+import { TrendTaxonomyPage } from './features/trend/TrendTaxonomyPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
 import { WorkflowReportPage } from './features/workflows/WorkflowReportPage';
@@ -61,6 +62,7 @@ const PAGES: Record<string, ReactElement> = {
   '/chat/settings': <ChatSettingsPage />,
   '/content/documents': <DocumentsPage />,
   '/content/media': <MediaLibraryPage />,
+  '/content/trend-taxonomy': <TrendTaxonomyPage />,
 };
 
 /** Pages under a sidebar entry, routable only where that entry is. */

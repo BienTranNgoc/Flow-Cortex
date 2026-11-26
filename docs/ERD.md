@@ -534,6 +534,34 @@ candidates), `uq_batch_run_parent` (unique, partial `WHERE parent_batch_id IS NO
 
 Row counts are not stored on `batch_run`; they are one grouped read over `idx_batch_run_row_status`.
 
+## Trend taxonomy (`V2026.11.15.260`)
+
+```mermaid
+erDiagram
+  trend_category {
+    varchar key PK "derived from name_vi, 1-64 chars of a-z0-9 joined by single hyphens (CHECK); never changes after create"
+    varchar name_vi "varchar(60)"
+    varchar name_en "varchar(60)"
+    int display_order "ties are read in key order"
+    boolean visible "hidden categories stay stored"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  trend_tag {
+    uuid id PK "generated in the application"
+    varchar name_vi "varchar(30)"
+    varchar name_en "varchar(30)"
+    int display_order "ties are read in creation order"
+    boolean visible
+    timestamptz created_at
+    timestamptz updated_at
+  }
+```
+
+No relations yet: the template table and its category foreign key arrive with the template change. The
+migration seeds four categories (`nguoi`, `san-pham`, `thu-cung`, `nhay-chuyen-canh`) and the two
+`content.trend_template.*` permission keys.
+
 ## Roadmap tables (each arrives with its own change)
 
 | Table | Purpose | Arrives with |
