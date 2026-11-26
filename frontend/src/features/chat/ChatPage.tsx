@@ -1,22 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import './chat.css';
-import { ConversationRow } from './ConversationRow';
-import { DeleteDialog } from './DeleteDialog';
+import { ChatSidebar } from './ChatSidebar';
 import { NewThreadPane } from './NewThreadPane';
 import { ThreadPane } from './ThreadPane';
-import { useConversationList, useDeleteConversation } from './useConversations';
+import { useConversationList } from './useConversations';
 
 export function ChatPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { conversationId } = useParams();
-  const list = useConversationList();
-  const remove = useDeleteConversation();
+  // The same cache entry as the sidebar's Recent list, so reading the switch costs no request.
+  const recent = useConversationList();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
-  const conversations = list.data?.items ?? [];
+  const chatEnabled = recent.data?.pages[0]?.chatEnabled !== false;
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -26,22 +23,6 @@ export function ChatPage() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [drawerOpen]);
-
-  const startNew = () => {
-    setDrawerOpen(false);
-    void navigate('/chat');
-  };
-
-  const confirmDelete = () => {
-    if (!pendingDelete) return;
-    const { id } = pendingDelete;
-    remove.mutate(id, {
-      onSuccess: () => {
-        setPendingDelete(null);
-        if (id === conversationId) void navigate('/chat');
-      },
-    });
-  };
 
   return (
     <div className="chat-page">
@@ -64,69 +45,14 @@ export function ChatPage() {
           onClick={() => setDrawerOpen(false)}
         />
       )}
-      <nav
-        id="chat-sidebar"
-        className={drawerOpen ? 'chat-sidebar is-open' : 'chat-sidebar'}
-        aria-label={t('chat.list.label')}
-      >
-        <div className="chat-sidebar__head">
-          <h2>{t('chat.list.heading')}</h2>
-          <button
-            type="button"
-            className="chat-button chat-drawer-close"
-            onClick={() => setDrawerOpen(false)}
-          >
-            {t('chat.list.close')}
-          </button>
-        </div>
-        <button type="button" className="chat-button chat-button--primary" onClick={startNew}>
-          {t('chat.list.new')}
-        </button>
-        {list.isPending && <p role="status">{t('chat.list.loading')}</p>}
-        {list.isError && (
-          <div role="alert" className="chat-state">
-            <p>{t('chat.list.loadFailed')}</p>
-            <button type="button" className="chat-button" onClick={() => void list.refetch()}>
-              {t('chat.list.retry')}
-            </button>
-          </div>
-        )}
-        {list.isSuccess && conversations.length === 0 && (
-          <p className="chat-sidebar__empty">{t('chat.list.empty')}</p>
-        )}
-        <ul className="chat-list">
-          {conversations.map((conversation) => (
-            <ConversationRow
-              key={conversation.id}
-              conversation={conversation}
-              active={conversation.id === conversationId}
-              onOpen={() => setDrawerOpen(false)}
-              onDelete={() => {
-                remove.reset();
-                setPendingDelete({ id: conversation.id ?? '', title: conversation.title ?? '' });
-              }}
-            />
-          ))}
-        </ul>
-      </nav>
+      <ChatSidebar activeId={conversationId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <section className="chat-pane">
         {conversationId ? (
-          <ThreadPane
-            key={conversationId}
-            conversationId={conversationId}
-            chatEnabled={list.data?.chatEnabled !== false}
-          />
+          <ThreadPane key={conversationId} conversationId={conversationId} chatEnabled={chatEnabled} />
         ) : (
-          <NewThreadPane chatEnabled={list.data?.chatEnabled !== false} />
+          <NewThreadPane chatEnabled={chatEnabled} />
         )}
       </section>
-      <DeleteDialog
-        title={pendingDelete?.title ?? null}
-        deleting={remove.isPending}
-        failed={remove.isError}
-        onKeep={() => setPendingDelete(null)}
-        onDelete={confirmDelete}
-      />
     </div>
   );
 }

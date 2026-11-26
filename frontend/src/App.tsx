@@ -21,6 +21,7 @@ import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
+import { HistoryPage } from './features/chat/history/HistoryPage';
 import { DriveFeatureGate } from './features/drive/DriveFeatureGate';
 import { DrivePage } from './features/drive/DrivePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
@@ -102,6 +103,12 @@ const chatPage = (
   </ChatFeatureGate>
 );
 
+const historyPage = (
+  <ChatFeatureGate>
+    <HistoryPage />
+  </ChatFeatureGate>
+);
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -168,6 +175,7 @@ export function App() {
               <Route path="runs/:runId" element={<RunProgressPage />} />
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
               <Route path="chat" element={chatPage} />
+              <Route path="chat/history" element={historyPage} />
               <Route path="chat/:conversationId" element={chatPage} />
               <Route
                 path="drive"
