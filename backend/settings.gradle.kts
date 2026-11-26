@@ -26,6 +26,7 @@ include(
     ":modules:billing",
     ":modules:chat",
     ":modules:notification",
+    ":modules:trash",
     ":shared:web",
     ":shared:security",
     ":shared:ratelimit",

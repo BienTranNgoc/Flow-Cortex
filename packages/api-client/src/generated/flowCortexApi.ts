@@ -1210,6 +1210,64 @@ export interface CreateUserRequest {
   role: string;
 }
 
+export interface TrashItemKey {
+  /** @pattern ^[a-z][a-z0-9_]{1,31}$ */
+  type: string;
+  /** @pattern ^[A-Za-z0-9_-]{1,64}$ */
+  id: string;
+}
+
+export interface TrashItemsRequest {
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  items: TrashItemKey[];
+}
+
+export type TrashSkippedItemReason =
+  (typeof TrashSkippedItemReason)[keyof typeof TrashSkippedItemReason];
+
+export const TrashSkippedItemReason = {
+  notFound: 'notFound',
+  conflict: 'conflict',
+  blocked: 'blocked',
+  failed: 'failed',
+} as const;
+
+export interface TrashSkippedItem {
+  type: string;
+  id: string;
+  reason: TrashSkippedItemReason;
+  message?: string;
+}
+
+export interface TrashBulkResult {
+  succeeded: TrashItemKey[];
+  skipped: TrashSkippedItem[];
+}
+
+export interface TrashEmptyRequest {
+  /**
+   * The next of the previous answer; absent starts from the first entry
+   * @nullable
+   */
+  next?: string | null;
+}
+
+export interface TrashEmptyResult {
+  purged: number;
+  blocked: number;
+  failed: number;
+  /** Entries still in the Trash after this call */
+  remaining: number;
+  /**
+   * Send back as next to continue; null when every entry has been examined
+   * @nullable
+   */
+  next: string | null;
+}
+
 export interface SupportUploadRequest {
   /**
    * @minLength 0
@@ -3142,6 +3200,39 @@ export interface UserStats {
   newLast7Days?: number;
 }
 
+export interface TrashItem {
+  /** The owning module's item type key */
+  type: string;
+  /** The item's id within its type */
+  id: string;
+  name: string;
+  /** Where the item lived before it was deleted */
+  location: string;
+  deletedAt: string;
+  /** When the sweep deletes the item for good */
+  expiresAt: string;
+  /**
+   * Whole days to expiresAt, rounded up, never below 0
+   * @minimum 0
+   */
+  remainingDays: number;
+}
+
+/**
+ * Entries per provided type and under 'all', whatever type, q and paging say
+ */
+export type TrashListCounts = { [key: string]: number };
+
+export interface TrashList {
+  items: TrashItem[];
+  page: number;
+  size: number;
+  /** Entries matching type and q */
+  total: number;
+  /** Entries per provided type and under 'all', whatever type, q and paging say */
+  counts: TrashListCounts;
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -4820,6 +4911,34 @@ export const ExportUsersSort = {
   oldest: 'oldest',
   email: 'email',
   name: 'name',
+} as const;
+
+export type ListTrashParams = {
+  /**
+   * Only entries of this type
+   */
+  type?: string;
+  /**
+   * Search text, at most 100 characters; matches names without case or diacritics
+   */
+  q?: string;
+  sort?: ListTrashSort;
+  /**
+   * @minimum 0
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListTrashSort = (typeof ListTrashSort)[keyof typeof ListTrashSort];
+
+export const ListTrashSort = {
+  recent: 'recent',
+  expiring: 'expiring',
 } as const;
 
 export type SearchSupportKbParams = {
@@ -9080,6 +9199,223 @@ export const requestUpload = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(uploadRequest),
+  });
+};
+
+export type restoreTrashItemsResponse200 = {
+  data: TrashBulkResult;
+  status: 200;
+};
+
+export type restoreTrashItemsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type restoreTrashItemsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type restoreTrashItemsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type restoreTrashItemsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type restoreTrashItemsResponseSuccess = restoreTrashItemsResponse200 & {
+  headers: Headers;
+};
+export type restoreTrashItemsResponseError = (
+  | restoreTrashItemsResponse400
+  | restoreTrashItemsResponse404
+  | restoreTrashItemsResponse409
+  | restoreTrashItemsResponse503
+) & {
+  headers: Headers;
+};
+
+export type restoreTrashItemsResponse =
+  restoreTrashItemsResponseSuccess | restoreTrashItemsResponseError;
+
+export const getRestoreTrashItemsUrl = () => {
+  return `/api/v1/trash/restore`;
+};
+
+/**
+ * @summary Restore items from the Trash
+ */
+export const restoreTrashItems = async (
+  trashItemsRequest: TrashItemsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreTrashItemsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreTrashItemsResponse>(getRestoreTrashItemsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashItemsRequest),
+  });
+};
+
+export type purgeTrashItemsResponse200 = {
+  data: TrashBulkResult;
+  status: 200;
+};
+
+export type purgeTrashItemsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type purgeTrashItemsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type purgeTrashItemsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type purgeTrashItemsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type purgeTrashItemsResponseSuccess = purgeTrashItemsResponse200 & {
+  headers: Headers;
+};
+export type purgeTrashItemsResponseError = (
+  | purgeTrashItemsResponse400
+  | purgeTrashItemsResponse404
+  | purgeTrashItemsResponse409
+  | purgeTrashItemsResponse503
+) & {
+  headers: Headers;
+};
+
+export type purgeTrashItemsResponse = purgeTrashItemsResponseSuccess | purgeTrashItemsResponseError;
+
+export const getPurgeTrashItemsUrl = () => {
+  return `/api/v1/trash/purge`;
+};
+
+/**
+ * @summary Delete items from the Trash for good
+ */
+export const purgeTrashItems = async (
+  trashItemsRequest: TrashItemsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<purgeTrashItemsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<purgeTrashItemsResponse>(getPurgeTrashItemsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashItemsRequest),
+  });
+};
+
+export type emptyTrashResponse200 = {
+  data: TrashEmptyResult;
+  status: 200;
+};
+
+export type emptyTrashResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type emptyTrashResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type emptyTrashResponseSuccess = emptyTrashResponse200 & {
+  headers: Headers;
+};
+export type emptyTrashResponseError = (emptyTrashResponse400 | emptyTrashResponse503) & {
+  headers: Headers;
+};
+
+export type emptyTrashResponse = emptyTrashResponseSuccess | emptyTrashResponseError;
+
+export const getEmptyTrashUrl = () => {
+  return `/api/v1/trash/empty`;
+};
+
+/**
+ * @summary Delete the caller's Trash for good, at most 500 entries a call
+ */
+export const emptyTrash = async (
+  trashEmptyRequest?: TrashEmptyRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<emptyTrashResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<emptyTrashResponse>(getEmptyTrashUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashEmptyRequest),
   });
 };
 
@@ -16975,6 +17311,57 @@ export const exportUsers = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<exportUsersResponse> => {
   return customFetch<exportUsersResponse>(getExportUsersUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listTrashResponse200 = {
+  data: TrashList;
+  status: 200;
+};
+
+export type listTrashResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listTrashResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listTrashResponseSuccess = listTrashResponse200 & {
+  headers: Headers;
+};
+export type listTrashResponseError = (listTrashResponse400 | listTrashResponse503) & {
+  headers: Headers;
+};
+
+export type listTrashResponse = listTrashResponseSuccess | listTrashResponseError;
+
+export const getListTrashUrl = (params?: ListTrashParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/trash?${stringifiedParams}` : `/api/v1/trash`;
+};
+
+/**
+ * @summary List the caller's Trash with the badge counts
+ */
+export const listTrash = async (
+  params?: ListTrashParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listTrashResponse> => {
+  return customFetch<listTrashResponse>(getListTrashUrl(params), {
     ...options,
     method: 'GET',
   });

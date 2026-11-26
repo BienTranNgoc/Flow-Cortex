@@ -76,7 +76,7 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# Engine libraries exist only in the audio image; the worker process never imports them.
+# Engine libraries exist only in the audio and trend images; the worker process never imports them.
 module = [
     "numpy.*",
     "torch.*",
@@ -88,10 +88,14 @@ module = [
     "scipy.*",
     "librosa.*",
     "beat_this.*",
+    "transformers.*",
+    "tokenizers.*",
+    "safetensors.*",
+    "huggingface_hub.*",
 ]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-m 'not engines'"
-markers = ["engines: needs the engine libraries and models of the audio image"]
+markers = ["engines: needs the engine libraries and models of the audio or trend image"]
