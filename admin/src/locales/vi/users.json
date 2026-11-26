@@ -155,7 +155,16 @@
     "suspend": "Tạm ngưng tài khoản",
     "reactivate": "Kích hoạt lại tài khoản",
     "updated": "Đã cập nhật tài khoản.",
-    "invalidRole": "Hãy chọn một vai trò hợp lệ."
+    "invalidRole": "Hãy chọn một vai trò hợp lệ.",
+    "totp": "Xác thực hai lớp",
+    "totpOn": "Bật",
+    "totpOff": "Tắt",
+    "totpResetHint": "Nếu người này mất thiết bị, đặt lại sẽ đăng xuất họ khỏi mọi nơi và cho họ thiết lập lại xác thực hai lớp.",
+    "totpReset": "Đặt lại xác thực hai lớp",
+    "totpResetTitle": "Đặt lại xác thực hai lớp?",
+    "totpResetMessage": "{{name}} sẽ bị đăng xuất khỏi mọi nơi và các token truy cập cá nhân sẽ ngừng hoạt động. Xác thực hai lớp sẽ tắt cho đến khi họ thiết lập lại.",
+    "totpResetConfirm": "Đặt lại",
+    "totpResetDone": "Đã đặt lại xác thực hai lớp."
   },
   "validation": {
     "emailRequired": "Hãy nhập email",

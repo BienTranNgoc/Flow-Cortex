@@ -1,0 +1,57 @@
+.two-factor-setup__qr {
+  align-self: center;
+  width: 12.5rem;
+  height: 12.5rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-md);
+}
+
+.two-factor-setup__key {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  color: var(--admin-ink-2);
+  font-size: 0.88rem;
+}
+
+.two-factor-setup__key code {
+  user-select: all;
+  overflow-wrap: anywhere;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-md);
+  background: var(--admin-card-surface-2);
+  color: var(--admin-ink);
+  letter-spacing: 0.08em;
+}
+
+.two-factor-setup__codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  list-style: none;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-md);
+  background: var(--admin-card-surface-2);
+  color: var(--admin-ink);
+}
+
+.two-factor-setup__codes code {
+  user-select: all;
+  letter-spacing: 0.06em;
+}
+
+.two-factor-setup__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.two-factor-setup__note {
+  margin: 0;
+  color: var(--admin-ink-2);
+  font-size: 0.88rem;
+}

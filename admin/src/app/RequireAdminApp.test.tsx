@@ -1,4 +1,4 @@
-import { setToken } from '@flow-cortex/api-client';
+import { getToken, setToken } from '@flow-cortex/api-client';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -252,6 +252,116 @@ describe('RequireAdminApp', () => {
     );
 
     expect(await screen.findByText('admin content')).toBeInTheDocument();
+  });
+
+  describe('second factor', () => {
+    const SETUP = {
+      secret: 'JBSWY3DPEHPK3PXP',
+      otpauthUri: 'otpauth://totp/Nodi:admin@flowcortex.dev?secret=JBSWY3DPEHPK3PXP&issuer=Nodi',
+      qrDataUrl: 'data:image/svg+xml;base64,PHN2Zy8+',
+    };
+    const RECOVERY_CODES = Array.from({ length: 10 }, (_, i) => `ABCDE-2345${i}`);
+    const totp = (enabled: boolean, verified: boolean) => ({ enabled, required: true, verified });
+
+    it('shows a console account that must enroll only the setup screen, then the console on the session that passed TOTP', async () => {
+      let enrolled = false;
+      const calls = stubApi({
+        'GET /api/v1/auth/me': () => ({
+          status: 200,
+          body: { ...ADMIN_ME, totp: enrolled ? totp(true, true) : totp(false, false) },
+        }),
+        'POST /api/v1/auth/totp/setup': { status: 200, body: SETUP },
+        'POST /api/v1/auth/totp/enable': () => {
+          enrolled = true;
+          return {
+            status: 200,
+            body: { recoveryCodes: RECOVERY_CODES, accessToken: 'enrolled-token', expiresIn: 900 },
+          };
+        },
+        'GET /api/v1/admin/runs': { status: 200, body: EMPTY_PAGE },
+        'GET /api/v1/admin/support/requests/open-count': { status: 200, body: { count: 0 } },
+      });
+      setToken('admin-token-setup', true);
+      window.history.pushState({}, '', '/runs');
+      render(<App />);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Set up two-factor authentication' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: /QR code/ })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('navigation', { name: 'Admin navigation' }),
+      ).not.toBeInTheDocument();
+
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText('6-digit code'), '123456');
+      await user.click(screen.getByRole('button', { name: 'Turn on' }));
+      expect(
+        await screen.findByRole('heading', { name: 'Save your recovery codes' }),
+      ).toBeInTheDocument();
+      expect(getToken()).toBe('admin-token-setup');
+
+      await user.click(screen.getByRole('button', { name: 'Continue to the console' }));
+
+      expect(await screen.findByRole('heading', { name: 'Runs' })).toBeInTheDocument();
+      expect(getToken()).toBe('enrolled-token');
+      const firstAdminCall = calls.findIndex((call) => call.path.startsWith('/api/v1/admin/'));
+      const enableCall = calls.findIndex((call) => call.path === '/api/v1/auth/totp/enable');
+      expect(enableCall).toBeGreaterThan(-1);
+      expect(firstAdminCall).toBeGreaterThan(enableCall);
+    });
+
+    it('signs an enrolled account whose session never passed a code out to the login page', async () => {
+      const calls = stubApi({
+        'GET /api/v1/auth/me': { status: 200, body: { ...ADMIN_ME, totp: totp(true, false) } },
+        'POST /api/v1/auth/logout': { status: 204 },
+      });
+      setToken('admin-token-unverified', true);
+      window.history.pushState({}, '', '/runs');
+      render(<App />);
+
+      expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/login');
+      expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
+        'GET /api/v1/auth/me',
+        'POST /api/v1/auth/logout',
+      ]);
+    });
+
+    it('opens the console for an enrolled account whose session passed a code', async () => {
+      stubApi({
+        'GET /api/v1/auth/me': { status: 200, body: { ...ADMIN_ME, totp: totp(true, true) } },
+      });
+      setToken('admin-token-verified', true);
+      render(
+        <QueryClientProvider client={testQueryClient()}>
+          <MemoryRouter initialEntries={['/runs']}>
+            <RequireAdminApp>
+              <p>admin content</p>
+            </RequireAdminApp>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByText('admin content')).toBeInTheDocument();
+    });
+
+    it('tells a deactivated admin first, before any second-factor step', async () => {
+      const calls = stubApi({
+        'GET /api/v1/auth/me': {
+          status: 200,
+          body: { ...ADMIN_ME, adminDisabled: true, totp: totp(false, false) },
+        },
+      });
+      setToken('admin-token-disabled-totp', true);
+      window.history.pushState({}, '', '/runs');
+      render(<App />);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Your admin account is deactivated' }),
+      ).toBeInTheDocument();
+      expect(calls.map((call) => call.path)).toEqual(['/api/v1/auth/me']);
+    });
   });
 
   it('shows a retryable error when the signed-in user cannot be loaded', async () => {

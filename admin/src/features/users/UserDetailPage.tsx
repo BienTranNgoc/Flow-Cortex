@@ -17,10 +17,11 @@ import {
   statusLabel,
 } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
-import { canManageAccount } from './userAccess';
+import { ConfirmDialog } from '../content/EditorDialogs';
+import { canManageAccount, canResetTotp } from './userAccess';
 import { roleCodeSchema } from './userSchemas';
 import { useAssignableRoles } from './useAssignableRoles';
-import { useUpdateUserMutation, useUserQuery } from './useUsers';
+import { useResetTotpMutation, useUpdateUserMutation, useUserQuery } from './useUsers';
 
 const userIdSchema = z.string().uuid();
 
@@ -33,6 +34,8 @@ export function UserDetailPage() {
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
   const updateMutation = useUpdateUserMutation();
+  const resetTotpMutation = useResetTotpMutation();
+  const [confirmingTotpReset, setConfirmingTotpReset] = useState(false);
   const [role, setRole] = useState('');
   const [roleErrorKey, setRoleErrorKey] = useState('');
 
@@ -80,6 +83,14 @@ export function UserDetailPage() {
   const manageable = canManageAccount(me, user);
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
+  const totpResettable = canResetTotp(me, user);
+  const totpResetError = resetTotpMutation.error
+    ? ((resetTotpMutation.error instanceof ApiError
+        ? resetTotpMutation.error.problem?.detail
+        : undefined) ?? t('common.errors.requestFailed'))
+    : undefined;
+  const resetTotp = () =>
+    resetTotpMutation.mutate(parsedId.data, { onSuccess: () => setConfirmingTotpReset(false) });
   const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
   const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
   const saveRole = () => {
@@ -172,6 +183,10 @@ export function UserDetailPage() {
                   ? user.signInMethods.map((method) => signInMethodLabel(t, method)).join(', ')
                   : '—'}
               </dd>
+            </div>
+            <div>
+              <dt>{t('users.detail.totp')}</dt>
+              <dd>{user.totpEnabled ? t('users.detail.totpOn') : t('users.detail.totpOff')}</dd>
             </div>
             {user.lockedUntil && (
               <div>
@@ -267,12 +282,42 @@ export function UserDetailPage() {
               {updateMutation.isSuccess && (
                 <p className="cortex-admin-form-success">{t('users.detail.updated')}</p>
               )}
+              {totpResettable && (
+                <>
+                  <hr className="cortex-admin-divider" />
+                  <p className="cortex-admin-page-description">{t('users.detail.totpResetHint')}</p>
+                  <button
+                    type="button"
+                    className="cortex-admin-btn cortex-admin-btn--danger"
+                    onClick={() => {
+                      resetTotpMutation.reset();
+                      setConfirmingTotpReset(true);
+                    }}
+                  >
+                    {t('users.detail.totpReset')}
+                  </button>
+                </>
+              )}
+              {resetTotpMutation.isSuccess && (
+                <p className="cortex-admin-form-success">{t('users.detail.totpResetDone')}</p>
+              )}
             </>
           ) : (
             <p className="cortex-admin-stale">{t('users.readOnlyAdminAccount')}</p>
           )}
         </section>
       </div>
+      {confirmingTotpReset && (
+        <ConfirmDialog
+          title={t('users.detail.totpResetTitle')}
+          message={t('users.detail.totpResetMessage', { name: user.name || user.email })}
+          confirmLabel={t('users.detail.totpResetConfirm')}
+          pending={resetTotpMutation.isPending}
+          error={totpResetError}
+          onConfirm={resetTotp}
+          onClose={() => setConfirmingTotpReset(false)}
+        />
+      )}
     </div>
   );
 }

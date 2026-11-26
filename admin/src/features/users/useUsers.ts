@@ -8,6 +8,7 @@ import {
   getUser,
   getUserStats,
   listUsers,
+  resetUserTotp,
   unwrap,
   update,
 } from '@flow-cortex/api-client';
@@ -88,6 +89,20 @@ export function useUpdateUserMutation() {
     mutationFn: ({ id, changes }: { id: string; changes: UpdateUserRequest }) =>
       unwrap(update(id, changes, authHeaders())),
     onSuccess: async (_user: UserResponse, { id }) => {
+      await Promise.all([
+        invalidateDirectory(queryClient),
+        queryClient.invalidateQueries({ queryKey: ['user', id] }),
+      ]);
+    },
+  });
+}
+
+/** Deletes the account's second factor so its next sign-in starts over; the user record is refetched. */
+export function useResetTotpMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(resetUserTotp(id, authHeaders())),
+    onSuccess: async (_data, id) => {
       await Promise.all([
         invalidateDirectory(queryClient),
         queryClient.invalidateQueries({ queryKey: ['user', id] }),

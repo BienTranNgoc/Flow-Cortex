@@ -155,7 +155,16 @@
     "suspend": "Suspend account",
     "reactivate": "Reactivate account",
     "updated": "Account updated.",
-    "invalidRole": "Select a valid role."
+    "invalidRole": "Select a valid role.",
+    "totp": "Two-factor authentication",
+    "totpOn": "On",
+    "totpOff": "Off",
+    "totpResetHint": "If this person lost their device, a reset signs them out everywhere and lets them set up two-factor authentication again.",
+    "totpReset": "Reset two-factor authentication",
+    "totpResetTitle": "Reset two-factor authentication?",
+    "totpResetMessage": "{{name}} will be signed out everywhere and their personal access tokens will stop working. Two-factor authentication turns off until they set it up again.",
+    "totpResetConfirm": "Reset",
+    "totpResetDone": "Two-factor authentication was reset."
   },
   "validation": {
     "emailRequired": "Email is required",
