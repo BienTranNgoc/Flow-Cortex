@@ -4,6 +4,7 @@ import { can } from '../../app/permissions';
 import { PageHeading } from '../../app/PageHeading';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useMeQuery } from '../auth/useAuth';
+import { DeletionConditionsSection } from './DeletionConditionsSection';
 import { SettingRow } from './SettingRow';
 import { useSettingsList } from './useSettings';
 import './settings.css';
@@ -59,6 +60,7 @@ export function SettingsPage() {
             </ul>
           </section>
         ))}
+      <DeletionConditionsSection canUpdate={canUpdate} />
     </main>
   );
 }

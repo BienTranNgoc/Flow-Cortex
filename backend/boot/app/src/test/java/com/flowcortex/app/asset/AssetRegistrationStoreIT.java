@@ -68,6 +68,21 @@ class AssetRegistrationStoreIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void theLookupOfAStepAttemptsMediaAssetsHasAUsableIndex() {
+        Boolean valid = jdbc.queryForObject("""
+                SELECT i.indisvalid
+                FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                WHERE c.relname = 'idx_media_asset_source_step'
+                """, Boolean.class);
+
+        assertThat(valid).isTrue();
+        assertThat(jdbc.queryForObject("SELECT indexdef FROM pg_indexes WHERE indexname ="
+                + " 'idx_media_asset_source_step'", String.class))
+                .contains("(source_run_step_id, source_attempt)")
+                .contains("WHERE (source_run_step_id IS NOT NULL)");
+    }
+
+    @Test
     void upsertTwiceKeepsOneRow() {
         UUID run = UUID.randomUUID();
         UUID owner = UUID.randomUUID();
