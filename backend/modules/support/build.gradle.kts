@@ -28,6 +28,8 @@ dependencies {
     // runtime, so compile-only here.
     compileOnly("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
 
+    // OutcomeContractTest reads @Schema off the view records.
+    testImplementation("org.springdoc:springdoc-openapi-starter-common:${providers.gradleProperty("springdocVersion").get()}")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("io.micrometer:micrometer-observation-test")
     testImplementation(testFixtures(project(":shared:ratelimit")))

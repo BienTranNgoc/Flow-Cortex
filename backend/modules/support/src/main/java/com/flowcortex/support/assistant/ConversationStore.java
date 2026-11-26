@@ -5,6 +5,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -78,6 +80,19 @@ class ConversationStore {
                         slugs(rs), rs.getTimestamp("created_at").toInstant()),
                 ids.getFirst());
         return Optional.of(new StoredConversation(ids.getFirst(), messages));
+    }
+
+    /** The latest {@code limit} texts the user wrote in the conversation, oldest first; empty for no conversation. */
+    @Transactional(readOnly = true)
+    List<String> userMessages(UUID conversationId, int limit) {
+        if (conversationId == null) {
+            return List.of();
+        }
+        List<String> newestFirst = new ArrayList<>(jdbcTemplate.queryForList("SELECT text FROM support_ai_message "
+                + "WHERE conversation_id = ? AND role = 'user' ORDER BY created_at DESC LIMIT ?", String.class,
+                conversationId, limit));
+        Collections.reverse(newestFirst);
+        return newestFirst;
     }
 
     /** Titles of the given slugs that are still published; an unpublished slug is absent. */

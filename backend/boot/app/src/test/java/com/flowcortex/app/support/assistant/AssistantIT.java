@@ -4,9 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import com.flowcortex.AbstractPostgresBootTest;
-import com.flowcortex.llm.api.LlmClient;
-import com.flowcortex.llm.api.LlmJsonRequest;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.llm.api.LlmSlotRequest;
+import com.flowcortex.llm.api.LlmSlots;
+import com.flowcortex.llm.api.LlmSpeechResult;
 import com.flowcortex.settings.api.SettingKey;
 import com.flowcortex.settings.api.Settings;
 import com.flowcortex.user.api.UserService;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -131,7 +133,10 @@ class AssistantIT extends AbstractPostgresBootTest {
     record Source(String slug, String title) {
     }
 
-    record Message(String role, String text, String outcome, List<Source> sources) {
+    record Handoff(String topic, String subject, String description) {
+    }
+
+    record Message(String role, String text, String outcome, List<Source> sources, Handoff handoff) {
     }
 
     record Quota(int remaining, Instant resetsAt) {
@@ -140,7 +145,8 @@ class AssistantIT extends AbstractPostgresBootTest {
     record Reply(UUID conversationId, Message message, Quota quota) {
     }
 
-    record HistoryMessage(String role, String text, String outcome, List<Source> sources, Instant createdAt) {
+    record HistoryMessage(String role, String text, String outcome, List<Source> sources, Handoff handoff,
+            Instant createdAt) {
     }
 
     record Conversation(UUID conversationId, List<HistoryMessage> messages) {
@@ -213,7 +219,7 @@ class AssistantIT extends AbstractPostgresBootTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().message().sources()).containsExactly(new Source("nap-credit", "Nạp credit"));
-        LlmJsonRequest sent = fakeLlm.requests.getFirst();
+        LlmSlotRequest sent = fakeLlm.requests.getFirst();
         assertThat(sent.userText()).contains("[nap-credit]");
         assertThat(sent.systemInstruction()).contains("tiếng Anh (English)").doesNotContain("Trả lời bằng tiếng Việt");
     }
@@ -554,6 +560,42 @@ class AssistantIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void aMemberDoubleChargeIsHandedOffAndStored() {
+        String question = "Tại sao tôi bị trừ tiền hai lần?";
+        String member = memberToken("as-handoff");
+
+        Reply reply = ask(member, null, question).getBody();
+
+        assertThat(reply.message().outcome()).isEqualTo("handoff");
+        assertThat(reply.message().handoff()).isEqualTo(new Handoff("money", question, question));
+        assertThat(reply.quota().remaining()).isEqualTo(50);
+        assertThat(fakeLlm.requests).isEmpty();
+        assertThat(jdbcTemplate.queryForList("SELECT outcome FROM support_ai_message WHERE conversation_id = ? "
+                + "AND role = 'assistant'", String.class, reply.conversationId())).containsExactly("handoff");
+        Conversation latest = memberLatest(restTemplate, member).getBody();
+        assertThat(latest.messages()).extracting(HistoryMessage::outcome).containsExactly(null, "handoff");
+        assertThat(latest.messages().get(1).handoff()).isEqualTo(reply.message().handoff());
+    }
+
+    @Test
+    void aGuestSpendRequestIsASignIn() {
+        String session = UUID.randomUUID().toString();
+
+        Reply reply = guestAsk(session, null, "tạo video quảng cáo cho shop").getBody();
+
+        assertThat(reply.message().outcome()).isEqualTo("sign_in");
+        assertThat(reply.message().handoff()).isNull();
+        assertThat(reply.quota().remaining()).isEqualTo(9);
+        assertThat(fakeLlm.requests).isEmpty();
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT count FROM support_quota_usage WHERE subject_key LIKE 'guest-%'", Integer.class))
+                .containsExactly(1, 1);
+        assertThat(jdbcTemplate.queryForList("SELECT outcome FROM support_ai_message WHERE conversation_id = ? "
+                + "AND role = 'assistant'", String.class, reply.conversationId())).containsExactly("sign_in");
+        assertThat(guestLatest(restTemplate, session).getBody().messages().get(1).outcome()).isEqualTo("sign_in");
+    }
+
+    @Test
     void anotherMembersConversationIsNotFound() {
         UUID conversation = ask(memberToken("as-owner"), null, CREDIT_QUESTION).getBody().conversationId();
         String other = memberToken("as-other");
@@ -620,8 +662,9 @@ class AssistantIT extends AbstractPostgresBootTest {
         assertThat(hashes).hasSize(2).allMatch(hash -> hash.matches("[0-9a-f]{64}"))
                 .doesNotContain(sha256(session), sha256("127.0.0.1"), sha256("0:0:0:0:0:0:0:1"));
         assertThat(fakeLlm.requests).hasSize(2);
-        for (LlmJsonRequest request : fakeLlm.requests) {
-            String sent = request.systemInstruction() + request.userText();
+        for (LlmSlotRequest request : fakeLlm.requests) {
+            String sent = request.slot() + request.systemInstruction() + request.userText();
+            assertThat(request.slot()).isEqualTo("support-assistant");
             assertThat(request.userText()).contains(question).contains("Vào Hồ sơ > Credit để nạp credit.");
             assertThat(sent).doesNotContain(member.email(), member.name(), member.id().toString(), session,
                     "127.0.0.1", "0:0:0:0:0:0:0:1", hashes.get(0), hashes.get(1));
@@ -745,11 +788,16 @@ class AssistantIT extends AbstractPostgresBootTest {
                 new HttpEntity<>(session(session)), Conversation.class);
     }
 
-    /** Stands in for the provider: records every request and answers with {@link #answer}. */
-    static final class FakeLlm implements LlmClient {
+    /**
+     * Stands in for the slot port: records every request and answers with {@link #answer}. A hand-written
+     * fake, not a mock: both the assistant's and the dub's startup checks read the worst cases.
+     */
+    static final class FakeLlm implements LlmSlots {
 
-        final List<LlmJsonRequest> requests = new CopyOnWriteArrayList<>();
-        volatile Function<LlmJsonRequest, LlmJsonResult> answer;
+        private static final Duration WORST_CASE = Duration.ofSeconds(18);
+
+        final List<LlmSlotRequest> requests = new CopyOnWriteArrayList<>();
+        volatile Function<LlmSlotRequest, LlmJsonResult> answer;
 
         FakeLlm() {
             reset();
@@ -761,9 +809,29 @@ class AssistantIT extends AbstractPostgresBootTest {
         }
 
         @Override
-        public LlmJsonResult generateJson(LlmJsonRequest request) {
+        public LlmJsonResult generateJson(LlmSlotRequest request) {
             requests.add(request);
             return answer.apply(request);
+        }
+
+        @Override
+        public LlmSpeechResult speak(String slot, String text, String voice) {
+            throw new UnsupportedOperationException("the assistant never voices text");
+        }
+
+        @Override
+        public Duration jsonWorstCase(String slot) {
+            return WORST_CASE;
+        }
+
+        @Override
+        public Duration speechWorstCase(String slot) {
+            return WORST_CASE;
+        }
+
+        @Override
+        public boolean configured() {
+            return true;
         }
     }
 

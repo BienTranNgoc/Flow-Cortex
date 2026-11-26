@@ -26,7 +26,9 @@
   },
   "groups": {
     "support": "Help Center",
-    "media": "Media and video editor"
+    "media": "Media and video editor",
+    "user": "Accounts",
+    "workflow": "Workflows"
   },
   "source": {
     "STORED": "Set by an admin",
@@ -92,7 +94,29 @@
         }
       }
     },
+    "user": {
+      "pw_reset": {
+        "enabled": {
+          "label": "Password reset",
+          "help": "Turning it off hides the reset link for members and refuses reset requests from the next request."
+        }
+      }
+    },
+    "workflow": {
+      "run_cancellation": {
+        "enabled": {
+          "label": "Run cancellation",
+          "help": "Turning it off hides the Stop button for members and refuses cancel requests from the next request."
+        }
+      }
+    },
     "support": {
+      "help_center": {
+        "enabled": {
+          "label": "Help Center",
+          "help": "Turning it off hides the Help Center for members and refuses every Help Center request from the next request."
+        }
+      },
       "assistant": {
         "enabled": {
           "label": "AI assistant",
@@ -143,6 +167,30 @@
         "closed_request_months": {
           "label": "Months to keep a closed request",
           "help": "Counted from the request's last activity. 6 to 120 months."
+        }
+      },
+      "sla": {
+        "alerts": {
+          "enabled": {
+            "label": "Alert admins about late requests",
+            "help": "Rings the admin bell when a request becomes due soon or overdue. The inbox keeps showing each request's level while it is off."
+          }
+        },
+        "new_hours": {
+          "label": "Hours before a new request is overdue",
+          "help": "Counted from the request's last activity. 1 to 720 hours. A warning at or above this limit means no \"due soon\" level."
+        },
+        "new_warn_hours": {
+          "label": "Hours before a new request is due soon",
+          "help": "Counted from the request's last activity. 1 to 720 hours. At or above the limit, \"due soon\" never shows."
+        },
+        "in_progress_days": {
+          "label": "Days before an in-progress request is overdue",
+          "help": "Counted from the request's last activity. 1 to 90 days. A warning at or above this limit means no \"due soon\" level."
+        },
+        "in_progress_warn_days": {
+          "label": "Days before an in-progress request is due soon",
+          "help": "Counted from the request's last activity. 1 to 90 days. At or above the limit, \"due soon\" never shows."
         }
       }
     }

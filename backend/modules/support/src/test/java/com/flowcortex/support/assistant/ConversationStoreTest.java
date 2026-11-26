@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.support.assistant.ConversationStore.StoredMessage;
@@ -41,6 +43,29 @@ class ConversationStoreTest {
         verify(jdbcTemplate).update(sql.capture(), args.capture());
         assertThat(sql.getValue()).contains("WHERE id = ? AND owner_user_id = ?");
         assertThat(args.getValue()).endsWith(conversation, member.userId());
+    }
+
+    @Test
+    void userMessagesReturnsTheLatestInOrder() {
+        UUID conversation = UUID.randomUUID();
+        List<String> newestFirst = List.of("q12", "q11", "q10", "q9", "q8", "q7", "q6", "q5", "q4", "q3");
+        when(jdbcTemplate.queryForList(anyString(), eq(String.class), any(Object[].class))).thenReturn(newestFirst);
+
+        List<String> messages = store.userMessages(conversation, 10);
+
+        assertThat(messages).containsExactly("q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10", "q11", "q12");
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbcTemplate).queryForList(sql.capture(), eq(String.class), args.capture());
+        assertThat(sql.getValue()).contains("role = 'user'").contains("ORDER BY created_at DESC LIMIT ?");
+        assertThat(args.getValue()).containsExactly(conversation, 10);
+    }
+
+    @Test
+    void userMessagesOfNoConversationIsEmptyWithoutAQuery() {
+        assertThat(store.userMessages(null, 10)).isEmpty();
+
+        verifyNoInteractions(jdbcTemplate);
     }
 
     @Test

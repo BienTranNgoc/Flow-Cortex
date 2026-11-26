@@ -7,7 +7,10 @@ import { StatusPill } from '../../app/StatusPill';
 import { TableRegion } from '../../app/TableRegion';
 import { usePageTitle } from '../../app/usePageTitle';
 import { useMeQuery } from '../auth/useAuth';
+import { RbacRuntimeNotice } from './RbacRuntimeNotice';
+import { RbacRuntimeSwitch } from './RbacRuntimeSwitch';
 import { accountsOfRoleHref, isAdminRole, roleDisplayName } from './roleDisplay';
+import { useRolesEditable } from './useRbacRuntime';
 import { useRolesQuery } from './useRoles';
 import './roles.css';
 
@@ -15,7 +18,7 @@ export function RolesPage() {
   const { t } = useTranslation();
   usePageTitle(t('roles.title'));
   const me = useMeQuery().data;
-  const canManage = can(me, 'system.role.manage');
+  const { canManage, runtime, editable } = useRolesEditable();
   const canSeeAccounts = can(me, 'system.admin_account.view');
   const query = useRolesQuery();
   const roles = query.data?.filter(isAdminRole);
@@ -28,11 +31,16 @@ export function RolesPage() {
     accounts: t('roles.list.columns.accounts'),
   };
 
-  const create = canManage ? (
-    <Link className="cortex-admin-btn cortex-admin-btn--primary" to="/roles/new">
+  const createClass = 'cortex-admin-btn cortex-admin-btn--primary';
+  const create = !canManage ? undefined : editable ? (
+    <Link className={createClass} to="/roles/new">
       {t('roles.list.create')}
     </Link>
-  ) : undefined;
+  ) : (
+    <button type="button" className={createClass} disabled>
+      {t('roles.list.create')}
+    </button>
+  );
 
   return (
     <div className="roles-page">
@@ -42,6 +50,12 @@ export function RolesPage() {
         description={t('roles.description')}
         actions={create}
       />
+      {canManage && (
+        <>
+          <RbacRuntimeSwitch runtime={runtime} />
+          <RbacRuntimeNotice runtime={runtime} />
+        </>
+      )}
       <div className="cortex-admin-panel">
         {query.isPending && (
           <output className="cortex-admin-loading">{t('roles.list.loading')}</output>
