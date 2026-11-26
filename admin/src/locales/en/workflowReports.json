@@ -1,0 +1,127 @@
+{
+  "title": "Reported workflows",
+  "eyebrow": "Workflow Ops",
+  "description": "Workflows that members reported. Review each report, then dismiss it, resolve it, or take the workflow down.",
+  "noun_one": "report",
+  "noun_other": "reports",
+  "tableLabel": "Workflow reports table",
+  "deletedUser": "(deleted user)",
+  "columns": {
+    "workflow": "Workflow",
+    "reason": "Reason",
+    "reporter": "Reporter",
+    "status": "Report status",
+    "workflowState": "Workflow state",
+    "reported": "Reported"
+  },
+  "status": {
+    "pending": "Pending",
+    "dismissed": "Dismissed",
+    "resolved": "Resolved",
+    "hidden": "Hidden",
+    "removed": "Removed"
+  },
+  "moderation": {
+    "visible": "Visible",
+    "hidden": "Hidden",
+    "removed": "Removed",
+    "deleted": "Deleted"
+  },
+  "reasons": {
+    "spam": "Spam",
+    "harmful": "Harmful content",
+    "scam": "Scam or fraud",
+    "inappropriate": "Inappropriate",
+    "copyright": "Copyright",
+    "pii_data_leak": "Personal data leak",
+    "misleading": "Misleading",
+    "other": "Other"
+  },
+  "visibility": {
+    "private": "Private",
+    "unlisted": "Unlisted",
+    "public": "Public"
+  },
+  "actions": {
+    "hide": "Hide",
+    "remove": "Remove",
+    "restore": "Restore",
+    "dismiss": "Dismiss",
+    "resolve": "Resolve"
+  },
+  "search": {
+    "label": "Workflow name",
+    "placeholder": "Search by workflow name",
+    "submit": "Search",
+    "clear": "Clear filters"
+  },
+  "detail": {
+    "title": "Report detail",
+    "allReports": "All reports",
+    "notFound": "Report not found",
+    "notFoundHint": "This report does not exist or the address is wrong.",
+    "loading": "Loading report…",
+    "loadError": "Could not load this report.",
+    "forbidden": "You do not have permission to view this report.",
+    "report": "Report",
+    "details": "Details from the reporter",
+    "reviewedBy": "Reviewed by",
+    "reviewedAt": "Reviewed",
+    "resolution": "Outcome",
+    "internalNote": "Internal note",
+    "workflow": "Workflow",
+    "owner": "Owner",
+    "visibility": "Sharing"
+  },
+  "history": {
+    "title": "Moderation history",
+    "empty": "No moderation action has been taken on this workflow.",
+    "tableLabel": "Moderation history table",
+    "when": "When",
+    "action": "Action",
+    "source": "Source",
+    "moderator": "Moderator",
+    "result": "Workflow state after",
+    "reason": "Reason",
+    "note": "Internal note",
+    "sources": {
+      "report": "From a report",
+      "direct": "Direct"
+    }
+  },
+  "dialog": {
+    "reasonRequired": "Reason (required)",
+    "reasonOptional": "Reason (optional)",
+    "reasonMissing": "Enter a reason.",
+    "note": "Internal note (optional)",
+    "noteHint": "Visible to staff only.",
+    "cancel": "Cancel",
+    "working": "Working…",
+    "failed": "Could not apply this action. Try again.",
+    "hide": {
+      "title": "Hide workflow",
+      "description": "Members other than the owner can no longer find or open this workflow. The owner keeps full access. You can restore it later.",
+      "confirm": "Hide workflow"
+    },
+    "remove": {
+      "title": "Remove workflow",
+      "description": "Members other than the owner can no longer find or open this workflow. The owner keeps full access. You can restore it later.",
+      "confirm": "Remove workflow"
+    },
+    "restore": {
+      "title": "Restore workflow",
+      "description": "The workflow becomes visible to members again and its share links work again.",
+      "confirm": "Restore workflow"
+    },
+    "dismiss": {
+      "title": "Dismiss report",
+      "description": "Close this report without any change to the workflow.",
+      "confirm": "Dismiss report"
+    },
+    "resolve": {
+      "title": "Resolve report",
+      "description": "Close this report as handled. The workflow keeps its current state.",
+      "confirm": "Resolve report"
+    }
+  }
+}

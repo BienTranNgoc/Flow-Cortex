@@ -7,6 +7,7 @@ import com.flowcortex.workflow.api.WorkflowAudience;
 import com.flowcortex.workflow.api.WorkflowView;
 import com.flowcortex.workflow.api.WorkflowVisibility;
 import com.flowcortex.workflow.domain.Workflow;
+import com.flowcortex.workflow.domain.WorkflowModerationStatus;
 import com.flowcortex.workflow.domain.WorkflowStatus;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowStepRepository;
@@ -47,6 +48,9 @@ class WorkflowAudienceImpl implements WorkflowAudience {
         }
         if (workflow.getStatus() == WorkflowStatus.DRAFT) {
             return Audience.DRAFT;
+        }
+        if (workflow.getModerationStatus() != WorkflowModerationStatus.VISIBLE) {
+            return Audience.OWNER_ONLY;
         }
         return workflow.getVisibility() == WorkflowVisibility.PUBLIC ? Audience.ALL_MEMBERS : Audience.OWNER_ONLY;
     }

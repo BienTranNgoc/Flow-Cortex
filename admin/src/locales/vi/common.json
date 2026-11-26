@@ -78,6 +78,7 @@
         "dashboard": "Tổng quan",
         "workflows": "Quy trình & mẫu",
         "runs": "Lượt chạy",
+        "workflowReports": "Workflow bị báo cáo",
         "approvals": "Hàng chờ duyệt",
         "credits": "Credit & ví",
         "providers": "Nhà cung cấp mô hình",

@@ -20,7 +20,8 @@ public interface WorkflowBookmarkRepository extends JpaRepository<WorkflowBookma
 
     String VISIBLE_TO_CALLER = "w.deletedAt IS NULL "
             + "AND (w.ownerId = :caller OR (w.status = "
-            + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND "
+            + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND w.moderationStatus = "
+            + "com.flowcortex.workflow.domain.WorkflowModerationStatus.VISIBLE AND "
             + "(w.visibility = com.flowcortex.workflow.api.WorkflowVisibility.PUBLIC "
             + "OR (w.visibility = com.flowcortex.workflow.api.WorkflowVisibility.UNLISTED "
             + "AND EXISTS (SELECT 1 FROM WorkflowLinkGrant g "

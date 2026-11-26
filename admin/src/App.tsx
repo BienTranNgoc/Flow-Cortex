@@ -37,6 +37,8 @@ import { SupportSettingsPage } from './features/support/settings/SupportSettings
 import { TrendTaxonomyPage } from './features/trend/TrendTaxonomyPage';
 import { UserDetailPage } from './features/users/UserDetailPage';
 import { UsersPage } from './features/users/UsersPage';
+import { WorkflowReportDetailPage } from './features/workflowReports/WorkflowReportDetailPage';
+import { WorkflowReportsPage } from './features/workflowReports/WorkflowReportsPage';
 import { WorkflowReportPage } from './features/workflows/WorkflowReportPage';
 import { WorkflowsPage } from './features/workflows/WorkflowsPage';
 
@@ -44,6 +46,7 @@ const PAGES: Record<string, ReactElement> = {
   '/dashboard': <DashboardPage />,
   '/workflows': <WorkflowsPage />,
   '/runs': <RunsPage />,
+  '/workflow-reports': <WorkflowReportsPage />,
   '/users': <UsersPage />,
   '/providers': <ProvidersPage />,
   '/sms-outbox': <SmsOutboxPage />,
@@ -69,6 +72,11 @@ const PAGES: Record<string, ReactElement> = {
 const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
   { parent: '/workflows', path: '/workflows/:workflowId', element: <WorkflowReportPage /> },
   { parent: '/runs', path: '/runs/:runId', element: <RunDetailPage /> },
+  {
+    parent: '/workflow-reports',
+    path: '/workflow-reports/:reportId',
+    element: <WorkflowReportDetailPage />,
+  },
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
   { parent: '/roles', path: '/roles/new', element: <RoleDetailPage /> },
   { parent: '/roles', path: '/roles/:code', element: <RoleDetailPage /> },

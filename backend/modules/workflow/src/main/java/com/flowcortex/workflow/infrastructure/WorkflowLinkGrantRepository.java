@@ -14,7 +14,7 @@ public interface WorkflowLinkGrantRepository extends JpaRepository<WorkflowLinkG
 
     /**
      * Writes the grant only while {@code key} is the workflow's current, unexpired key of a
-     * published unlisted workflow. The share lock waits on a concurrent visibility change or
+     * published, unmoderated unlisted workflow. The share lock waits on a concurrent visibility change or
      * rotation and re-checks the predicate on the committed row, so a change that commits first
      * leaves no grant. Returns 1 when a row was written, 0 when none matched or the grant exists.
      */
@@ -23,7 +23,7 @@ public interface WorkflowLinkGrantRepository extends JpaRepository<WorkflowLinkG
             INSERT INTO workflow_link_grant (workflow_id, user_id, created_at)
             SELECT w.id, CAST(:userId AS uuid), CAST(:now AS timestamptz) FROM workflow w
              WHERE w.id = :workflowId AND w.unlisted_key = :key AND w.visibility = 'unlisted'
-               AND w.status = 'published' AND w.deleted_at IS NULL
+               AND w.status = 'published' AND w.deleted_at IS NULL AND w.moderation_status = 'visible'
                AND (w.unlisted_key_expires_at IS NULL OR w.unlisted_key_expires_at > CAST(:now AS timestamptz))
                FOR SHARE OF w
             ON CONFLICT (workflow_id, user_id) DO NOTHING

@@ -1,0 +1,127 @@
+{
+  "title": "Workflow bị báo cáo",
+  "eyebrow": "Vận hành quy trình",
+  "description": "Các quy trình bị thành viên báo cáo. Xem từng báo cáo rồi bỏ qua, đánh dấu đã xử lý hoặc gỡ quy trình xuống.",
+  "noun_one": "báo cáo",
+  "noun_other": "báo cáo",
+  "tableLabel": "Bảng báo cáo quy trình",
+  "deletedUser": "(người dùng đã bị xóa)",
+  "columns": {
+    "workflow": "Quy trình",
+    "reason": "Lý do",
+    "reporter": "Người báo cáo",
+    "status": "Trạng thái báo cáo",
+    "workflowState": "Trạng thái quy trình",
+    "reported": "Báo cáo lúc"
+  },
+  "status": {
+    "pending": "Chờ xử lý",
+    "dismissed": "Đã bỏ qua",
+    "resolved": "Đã xử lý",
+    "hidden": "Đã ẩn",
+    "removed": "Đã gỡ"
+  },
+  "moderation": {
+    "visible": "Đang hiển thị",
+    "hidden": "Đã ẩn",
+    "removed": "Đã gỡ",
+    "deleted": "Đã xóa"
+  },
+  "reasons": {
+    "spam": "Spam",
+    "harmful": "Nội dung có hại",
+    "scam": "Lừa đảo",
+    "inappropriate": "Không phù hợp",
+    "copyright": "Bản quyền",
+    "pii_data_leak": "Lộ dữ liệu cá nhân",
+    "misleading": "Gây hiểu lầm",
+    "other": "Khác"
+  },
+  "visibility": {
+    "private": "Riêng tư",
+    "unlisted": "Không công khai trong danh sách",
+    "public": "Công khai"
+  },
+  "actions": {
+    "hide": "Ẩn",
+    "remove": "Gỡ",
+    "restore": "Khôi phục",
+    "dismiss": "Bỏ qua",
+    "resolve": "Đánh dấu đã xử lý"
+  },
+  "search": {
+    "label": "Tên quy trình",
+    "placeholder": "Tìm theo tên quy trình",
+    "submit": "Tìm",
+    "clear": "Xóa các bộ lọc"
+  },
+  "detail": {
+    "title": "Chi tiết báo cáo",
+    "allReports": "Tất cả báo cáo",
+    "notFound": "Không tìm thấy báo cáo",
+    "notFoundHint": "Báo cáo này không tồn tại hoặc địa chỉ không đúng.",
+    "loading": "Đang tải báo cáo…",
+    "loadError": "Không tải được báo cáo này.",
+    "forbidden": "Bạn không có quyền xem báo cáo này.",
+    "report": "Báo cáo",
+    "details": "Chi tiết từ người báo cáo",
+    "reviewedBy": "Người xử lý",
+    "reviewedAt": "Xử lý lúc",
+    "resolution": "Kết quả",
+    "internalNote": "Ghi chú nội bộ",
+    "workflow": "Quy trình",
+    "owner": "Chủ sở hữu",
+    "visibility": "Chia sẻ"
+  },
+  "history": {
+    "title": "Lịch sử kiểm duyệt",
+    "empty": "Chưa có thao tác kiểm duyệt nào với quy trình này.",
+    "tableLabel": "Bảng lịch sử kiểm duyệt",
+    "when": "Thời điểm",
+    "action": "Thao tác",
+    "source": "Nguồn",
+    "moderator": "Người kiểm duyệt",
+    "result": "Trạng thái quy trình sau đó",
+    "reason": "Lý do",
+    "note": "Ghi chú nội bộ",
+    "sources": {
+      "report": "Từ báo cáo",
+      "direct": "Trực tiếp"
+    }
+  },
+  "dialog": {
+    "reasonRequired": "Lý do (bắt buộc)",
+    "reasonOptional": "Lý do (không bắt buộc)",
+    "reasonMissing": "Hãy nhập lý do.",
+    "note": "Ghi chú nội bộ (không bắt buộc)",
+    "noteHint": "Chỉ nhân viên nhìn thấy.",
+    "cancel": "Hủy",
+    "working": "Đang xử lý…",
+    "failed": "Không thực hiện được thao tác này. Hãy thử lại.",
+    "hide": {
+      "title": "Ẩn quy trình",
+      "description": "Các thành viên khác ngoài chủ sở hữu sẽ không còn tìm thấy hay mở được quy trình này. Chủ sở hữu vẫn dùng bình thường. Bạn có thể khôi phục sau.",
+      "confirm": "Ẩn quy trình"
+    },
+    "remove": {
+      "title": "Gỡ quy trình",
+      "description": "Các thành viên khác ngoài chủ sở hữu sẽ không còn tìm thấy hay mở được quy trình này. Chủ sở hữu vẫn dùng bình thường. Bạn có thể khôi phục sau.",
+      "confirm": "Gỡ quy trình"
+    },
+    "restore": {
+      "title": "Khôi phục quy trình",
+      "description": "Quy trình hiển thị trở lại với thành viên và các liên kết chia sẻ dùng lại được.",
+      "confirm": "Khôi phục quy trình"
+    },
+    "dismiss": {
+      "title": "Bỏ qua báo cáo",
+      "description": "Đóng báo cáo này mà không thay đổi gì ở quy trình.",
+      "confirm": "Bỏ qua báo cáo"
+    },
+    "resolve": {
+      "title": "Đánh dấu đã xử lý",
+      "description": "Đóng báo cáo này như đã xử lý. Quy trình giữ nguyên trạng thái hiện tại.",
+      "confirm": "Đánh dấu đã xử lý"
+    }
+  }
+}

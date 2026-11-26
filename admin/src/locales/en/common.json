@@ -78,6 +78,7 @@
         "dashboard": "Dashboard",
         "workflows": "Workflows & Templates",
         "runs": "Runs",
+        "workflowReports": "Reported workflows",
         "approvals": "Approval Queue",
         "credits": "Credits & Wallets",
         "providers": "Model Providers",

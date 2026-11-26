@@ -18,6 +18,7 @@ import enSmsOutbox from '../locales/en/smsOutbox.json';
 import enSupport from '../locales/en/support.json';
 import enTrend from '../locales/en/trend.json';
 import enUsers from '../locales/en/users.json';
+import enWorkflowReports from '../locales/en/workflowReports.json';
 import enWorkflows from '../locales/en/workflows.json';
 import viAdminAccounts from '../locales/vi/adminAccounts.json';
 import viAuth from '../locales/vi/auth.json';
@@ -38,6 +39,7 @@ import viSmsOutbox from '../locales/vi/smsOutbox.json';
 import viSupport from '../locales/vi/support.json';
 import viTrend from '../locales/vi/trend.json';
 import viUsers from '../locales/vi/users.json';
+import viWorkflowReports from '../locales/vi/workflowReports.json';
 import viWorkflows from '../locales/vi/workflows.json';
 
 export type { Locale } from '@flow-cortex/i18n';
@@ -52,6 +54,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     providers: viProviders,
     runs: viRuns,
     workflows: viWorkflows,
+    workflowReports: viWorkflowReports,
     mediaJobs: viMediaJobs,
     dashboard: viDashboard,
     smsOutbox: viSmsOutbox,
@@ -74,6 +77,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     providers: enProviders,
     runs: enRuns,
     workflows: enWorkflows,
+    workflowReports: enWorkflowReports,
     mediaJobs: enMediaJobs,
     dashboard: enDashboard,
     smsOutbox: enSmsOutbox,

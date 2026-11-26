@@ -391,6 +391,9 @@ export const MeResponsePermissionsItem = {
   useraccountexport: 'user.account.export',
   contenttrend_templateview: 'content.trend_template.view',
   contenttrend_templatemanage: 'content.trend_template.manage',
+  moderationreportview: 'moderation.report.view',
+  moderationreportresolve: 'moderation.report.resolve',
+  moderationcontenthide: 'moderation.content.hide',
 } as const;
 
 export interface MeResponse {
@@ -783,6 +786,9 @@ export const RoleResponsePermissionsItem = {
   useraccountexport: 'user.account.export',
   contenttrend_templateview: 'content.trend_template.view',
   contenttrend_templatemanage: 'content.trend_template.manage',
+  moderationreportview: 'moderation.report.view',
+  moderationreportresolve: 'moderation.report.resolve',
+  moderationcontenthide: 'moderation.content.hide',
 } as const;
 
 export interface RoleResponse {
@@ -1375,6 +1381,33 @@ export interface UploadResponse {
   headers: UploadResponseHeaders;
   expiresAt: string;
   maxBytes: number;
+}
+
+export type ReportWorkflowRequestReason =
+  (typeof ReportWorkflowRequestReason)[keyof typeof ReportWorkflowRequestReason];
+
+export const ReportWorkflowRequestReason = {
+  spam: 'spam',
+  harmful: 'harmful',
+  scam: 'scam',
+  inappropriate: 'inappropriate',
+  copyright: 'copyright',
+  pii_data_leak: 'pii_data_leak',
+  misleading: 'misleading',
+  other: 'other',
+} as const;
+
+export interface ReportWorkflowRequest {
+  reason?: ReportWorkflowRequestReason;
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  details?: string | null;
+}
+
+export interface ReportWorkflowResponse {
+  reported: boolean;
 }
 
 export type ShareSettingsResponseVisibility =
@@ -2852,6 +2885,144 @@ export interface ImportReviewResponse {
   outboundTargets: OutboundTargetResponse[];
 }
 
+export interface ModerationRequest {
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  reason?: string | null;
+  /**
+   * @maxLength 1000
+   * @nullable
+   */
+  internalNote?: string | null;
+}
+
+export type ModerationHistoryEntryResponseAction =
+  (typeof ModerationHistoryEntryResponseAction)[keyof typeof ModerationHistoryEntryResponseAction];
+
+export const ModerationHistoryEntryResponseAction = {
+  dismiss: 'dismiss',
+  resolve: 'resolve',
+  hide: 'hide',
+  remove: 'remove',
+  restore: 'restore',
+} as const;
+
+export type ModerationHistoryEntryResponseSource =
+  (typeof ModerationHistoryEntryResponseSource)[keyof typeof ModerationHistoryEntryResponseSource];
+
+export const ModerationHistoryEntryResponseSource = {
+  report: 'report',
+  direct: 'direct',
+} as const;
+
+export type ModerationHistoryEntryResponseModerationStatus =
+  (typeof ModerationHistoryEntryResponseModerationStatus)[keyof typeof ModerationHistoryEntryResponseModerationStatus];
+
+export const ModerationHistoryEntryResponseModerationStatus = {
+  visible: 'visible',
+  hidden: 'hidden',
+  removed: 'removed',
+} as const;
+
+export interface ModerationHistoryEntryResponse {
+  id: string;
+  action: ModerationHistoryEntryResponseAction;
+  source: ModerationHistoryEntryResponseSource;
+  reportId?: string;
+  moderatorId: string;
+  moderatorName?: string;
+  reason?: string;
+  internalNote?: string;
+  moderationStatus: ModerationHistoryEntryResponseModerationStatus;
+  createdAt: string;
+}
+
+export interface ModerationPersonResponse {
+  id: string;
+  name?: string;
+  email?: string;
+}
+
+export interface ModerationReviewerResponse {
+  id: string;
+  name?: string;
+}
+
+export type ReportedWorkflowResponseStatus =
+  (typeof ReportedWorkflowResponseStatus)[keyof typeof ReportedWorkflowResponseStatus];
+
+export const ReportedWorkflowResponseStatus = {
+  draft: 'draft',
+  published: 'published',
+} as const;
+
+export type ReportedWorkflowResponseVisibility =
+  (typeof ReportedWorkflowResponseVisibility)[keyof typeof ReportedWorkflowResponseVisibility];
+
+export const ReportedWorkflowResponseVisibility = {
+  private: 'private',
+  unlisted: 'unlisted',
+  public: 'public',
+} as const;
+
+export type ReportedWorkflowResponseModerationStatus =
+  (typeof ReportedWorkflowResponseModerationStatus)[keyof typeof ReportedWorkflowResponseModerationStatus];
+
+export const ReportedWorkflowResponseModerationStatus = {
+  visible: 'visible',
+  hidden: 'hidden',
+  removed: 'removed',
+} as const;
+
+export interface ReportedWorkflowResponse {
+  id: string;
+  name: string;
+  status: ReportedWorkflowResponseStatus;
+  visibility: ReportedWorkflowResponseVisibility;
+  moderationStatus: ReportedWorkflowResponseModerationStatus;
+  deleted: boolean;
+  owner: ModerationPersonResponse;
+}
+
+export type WorkflowReportDetailResponseStatus =
+  (typeof WorkflowReportDetailResponseStatus)[keyof typeof WorkflowReportDetailResponseStatus];
+
+export const WorkflowReportDetailResponseStatus = {
+  pending: 'pending',
+  dismissed: 'dismissed',
+  resolved: 'resolved',
+  hidden: 'hidden',
+  removed: 'removed',
+} as const;
+
+export type WorkflowReportDetailResponseResolution =
+  (typeof WorkflowReportDetailResponseResolution)[keyof typeof WorkflowReportDetailResponseResolution];
+
+export const WorkflowReportDetailResponseResolution = {
+  dismiss: 'dismiss',
+  resolve: 'resolve',
+  hide: 'hide',
+  remove: 'remove',
+  restore: 'restore',
+} as const;
+
+export interface WorkflowReportDetailResponse {
+  id: string;
+  reason: string;
+  details?: string;
+  status: WorkflowReportDetailResponseStatus;
+  resolution?: WorkflowReportDetailResponseResolution;
+  reviewedAt?: string;
+  createdAt: string;
+  reporter: ModerationPersonResponse;
+  reviewer?: ModerationReviewerResponse;
+  workflow: ReportedWorkflowResponse;
+  internalNote?: string;
+  history: ModerationHistoryEntryResponse[];
+}
+
 export interface AdminTrendTagCreateRequest {
   /**
    * @minLength 0
@@ -2970,6 +3141,20 @@ export interface CreateRoleRequest {
    * @items.maxLength 100
    */
   permissionKeys?: string[];
+}
+
+export type ModerationOutcomeResponseModerationStatus =
+  (typeof ModerationOutcomeResponseModerationStatus)[keyof typeof ModerationOutcomeResponseModerationStatus];
+
+export const ModerationOutcomeResponseModerationStatus = {
+  visible: 'visible',
+  hidden: 'hidden',
+  removed: 'removed',
+} as const;
+
+export interface ModerationOutcomeResponse {
+  id: string;
+  moderationStatus: ModerationOutcomeResponseModerationStatus;
 }
 
 export interface RegisterContentMediaRequest {
@@ -4895,6 +5080,48 @@ export interface WorkflowReportResponse {
   series: DayCountResponse[];
 }
 
+export type WorkflowReportRowResponseStatus =
+  (typeof WorkflowReportRowResponseStatus)[keyof typeof WorkflowReportRowResponseStatus];
+
+export const WorkflowReportRowResponseStatus = {
+  pending: 'pending',
+  dismissed: 'dismissed',
+  resolved: 'resolved',
+  hidden: 'hidden',
+  removed: 'removed',
+} as const;
+
+export type WorkflowReportRowResponseResolution =
+  (typeof WorkflowReportRowResponseResolution)[keyof typeof WorkflowReportRowResponseResolution];
+
+export const WorkflowReportRowResponseResolution = {
+  dismiss: 'dismiss',
+  resolve: 'resolve',
+  hide: 'hide',
+  remove: 'remove',
+  restore: 'restore',
+} as const;
+
+export interface WorkflowReportRowResponse {
+  id: string;
+  reason: string;
+  details?: string;
+  status: WorkflowReportRowResponseStatus;
+  resolution?: WorkflowReportRowResponseResolution;
+  reviewedAt?: string;
+  createdAt: string;
+  reporter: ModerationPersonResponse;
+  reviewer?: ModerationReviewerResponse;
+  workflow: ReportedWorkflowResponse;
+}
+
+export interface PageViewWorkflowReportRowResponse {
+  items: WorkflowReportRowResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
 export interface AdminTrendTaxonomy {
   categories: AdminTrendCategory[];
   tags: AdminTrendTag[];
@@ -5127,6 +5354,9 @@ export const PermissionCatalogEntryKey = {
   useraccountexport: 'user.account.export',
   contenttrend_templateview: 'content.trend_template.view',
   contenttrend_templatemanage: 'content.trend_template.manage',
+  moderationreportview: 'moderation.report.view',
+  moderationreportresolve: 'moderation.report.resolve',
+  moderationcontenthide: 'moderation.content.hide',
 } as const;
 
 export interface PermissionCatalogEntry {
@@ -6246,6 +6476,39 @@ export type ExportAdminWorkflowsStatus =
 export const ExportAdminWorkflowsStatus = {
   draft: 'draft',
   published: 'published',
+} as const;
+
+export type ListWorkflowReportsParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  /**
+   * @pattern pending|dismissed|resolved|hidden|removed
+   */
+  status?: ListWorkflowReportsStatus;
+  /**
+   * @minLength 0
+   * @maxLength 255
+   */
+  q?: string;
+};
+
+export type ListWorkflowReportsStatus =
+  (typeof ListWorkflowReportsStatus)[keyof typeof ListWorkflowReportsStatus];
+
+export const ListWorkflowReportsStatus = {
+  pending: 'pending',
+  dismissed: 'dismissed',
+  resolved: 'resolved',
+  hidden: 'hidden',
+  removed: 'removed',
 } as const;
 
 export type ListAdminSupportRequestsParams = {
@@ -10415,6 +10678,93 @@ export const createReviewImageUpload = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(uploadRequest),
+  });
+};
+
+export type reportWorkflowResponse200 = {
+  data: ReportWorkflowResponse;
+  status: 200;
+};
+
+export type reportWorkflowResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type reportWorkflowResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type reportWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type reportWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type reportWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type reportWorkflowResponse429 = {
+  data: ProblemDetail;
+  status: 429;
+};
+
+export type reportWorkflowResponseSuccess = reportWorkflowResponse200 & {
+  headers: Headers;
+};
+export type reportWorkflowResponseError = (
+  | reportWorkflowResponse400
+  | reportWorkflowResponse403
+  | reportWorkflowResponse404
+  | reportWorkflowResponse409
+  | reportWorkflowResponse422
+  | reportWorkflowResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportWorkflowResponse = reportWorkflowResponseSuccess | reportWorkflowResponseError;
+
+export const getReportWorkflowUrl = (id: string) => {
+  return `/api/v1/workflows/${id}/report`;
+};
+
+export const reportWorkflow = async (
+  id: string,
+  reportWorkflowRequest: ReportWorkflowRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reportWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reportWorkflowResponse>(getReportWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reportWorkflowRequest),
   });
 };
 
@@ -16336,6 +16686,386 @@ export const reviewAdminWorkflowImport = async (
   });
 };
 
+export type restoreWorkflowReportResponse200 = {
+  data: WorkflowReportDetailResponse;
+  status: 200;
+};
+
+export type restoreWorkflowReportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type restoreWorkflowReportResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type restoreWorkflowReportResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type restoreWorkflowReportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type restoreWorkflowReportResponseSuccess = restoreWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type restoreWorkflowReportResponseError = (
+  | restoreWorkflowReportResponse400
+  | restoreWorkflowReportResponse404
+  | restoreWorkflowReportResponse409
+  | restoreWorkflowReportResponse422
+) & {
+  headers: Headers;
+};
+
+export type restoreWorkflowReportResponse =
+  restoreWorkflowReportResponseSuccess | restoreWorkflowReportResponseError;
+
+export const getRestoreWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflow-reports/${id}/restore`;
+};
+
+export const restoreWorkflowReport = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreWorkflowReportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreWorkflowReportResponse>(getRestoreWorkflowReportUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
+export type resolveWorkflowReportResponse200 = {
+  data: WorkflowReportDetailResponse;
+  status: 200;
+};
+
+export type resolveWorkflowReportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type resolveWorkflowReportResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type resolveWorkflowReportResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type resolveWorkflowReportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type resolveWorkflowReportResponseSuccess = resolveWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type resolveWorkflowReportResponseError = (
+  | resolveWorkflowReportResponse400
+  | resolveWorkflowReportResponse404
+  | resolveWorkflowReportResponse409
+  | resolveWorkflowReportResponse422
+) & {
+  headers: Headers;
+};
+
+export type resolveWorkflowReportResponse =
+  resolveWorkflowReportResponseSuccess | resolveWorkflowReportResponseError;
+
+export const getResolveWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflow-reports/${id}/resolve`;
+};
+
+export const resolveWorkflowReport = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<resolveWorkflowReportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<resolveWorkflowReportResponse>(getResolveWorkflowReportUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
+export type removeWorkflowReportResponse200 = {
+  data: WorkflowReportDetailResponse;
+  status: 200;
+};
+
+export type removeWorkflowReportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type removeWorkflowReportResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type removeWorkflowReportResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type removeWorkflowReportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type removeWorkflowReportResponseSuccess = removeWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type removeWorkflowReportResponseError = (
+  | removeWorkflowReportResponse400
+  | removeWorkflowReportResponse404
+  | removeWorkflowReportResponse409
+  | removeWorkflowReportResponse422
+) & {
+  headers: Headers;
+};
+
+export type removeWorkflowReportResponse =
+  removeWorkflowReportResponseSuccess | removeWorkflowReportResponseError;
+
+export const getRemoveWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflow-reports/${id}/remove`;
+};
+
+export const removeWorkflowReport = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<removeWorkflowReportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<removeWorkflowReportResponse>(getRemoveWorkflowReportUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
+export type hideWorkflowReportResponse200 = {
+  data: WorkflowReportDetailResponse;
+  status: 200;
+};
+
+export type hideWorkflowReportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type hideWorkflowReportResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type hideWorkflowReportResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type hideWorkflowReportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type hideWorkflowReportResponseSuccess = hideWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type hideWorkflowReportResponseError = (
+  | hideWorkflowReportResponse400
+  | hideWorkflowReportResponse404
+  | hideWorkflowReportResponse409
+  | hideWorkflowReportResponse422
+) & {
+  headers: Headers;
+};
+
+export type hideWorkflowReportResponse =
+  hideWorkflowReportResponseSuccess | hideWorkflowReportResponseError;
+
+export const getHideWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflow-reports/${id}/hide`;
+};
+
+export const hideWorkflowReport = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<hideWorkflowReportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<hideWorkflowReportResponse>(getHideWorkflowReportUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
+export type dismissWorkflowReportResponse200 = {
+  data: WorkflowReportDetailResponse;
+  status: 200;
+};
+
+export type dismissWorkflowReportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type dismissWorkflowReportResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type dismissWorkflowReportResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type dismissWorkflowReportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type dismissWorkflowReportResponseSuccess = dismissWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type dismissWorkflowReportResponseError = (
+  | dismissWorkflowReportResponse400
+  | dismissWorkflowReportResponse404
+  | dismissWorkflowReportResponse409
+  | dismissWorkflowReportResponse422
+) & {
+  headers: Headers;
+};
+
+export type dismissWorkflowReportResponse =
+  dismissWorkflowReportResponseSuccess | dismissWorkflowReportResponseError;
+
+export const getDismissWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflow-reports/${id}/dismiss`;
+};
+
+export const dismissWorkflowReport = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<dismissWorkflowReportResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<dismissWorkflowReportResponse>(getDismissWorkflowReportUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
 export type createAdminTrendTagResponse201 = {
   data: AdminTrendTag;
   status: 201;
@@ -16960,6 +17690,231 @@ export const createAdminRole = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createRoleRequest),
+  });
+};
+
+export type restoreWorkflowResponse200 = {
+  data: ModerationOutcomeResponse;
+  status: 200;
+};
+
+export type restoreWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type restoreWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type restoreWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type restoreWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type restoreWorkflowResponseSuccess = restoreWorkflowResponse200 & {
+  headers: Headers;
+};
+export type restoreWorkflowResponseError = (
+  | restoreWorkflowResponse400
+  | restoreWorkflowResponse404
+  | restoreWorkflowResponse409
+  | restoreWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type restoreWorkflowResponse = restoreWorkflowResponseSuccess | restoreWorkflowResponseError;
+
+export const getRestoreWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/moderation/workflows/${id}/restore`;
+};
+
+export const restoreWorkflow = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreWorkflowResponse>(getRestoreWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
+export type removeWorkflowResponse200 = {
+  data: ModerationOutcomeResponse;
+  status: 200;
+};
+
+export type removeWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type removeWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type removeWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type removeWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type removeWorkflowResponseSuccess = removeWorkflowResponse200 & {
+  headers: Headers;
+};
+export type removeWorkflowResponseError = (
+  | removeWorkflowResponse400
+  | removeWorkflowResponse404
+  | removeWorkflowResponse409
+  | removeWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type removeWorkflowResponse = removeWorkflowResponseSuccess | removeWorkflowResponseError;
+
+export const getRemoveWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/moderation/workflows/${id}/remove`;
+};
+
+export const removeWorkflow = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<removeWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<removeWorkflowResponse>(getRemoveWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
+  });
+};
+
+export type hideWorkflowResponse200 = {
+  data: ModerationOutcomeResponse;
+  status: 200;
+};
+
+export type hideWorkflowResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type hideWorkflowResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type hideWorkflowResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type hideWorkflowResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type hideWorkflowResponseSuccess = hideWorkflowResponse200 & {
+  headers: Headers;
+};
+export type hideWorkflowResponseError = (
+  | hideWorkflowResponse400
+  | hideWorkflowResponse404
+  | hideWorkflowResponse409
+  | hideWorkflowResponse422
+) & {
+  headers: Headers;
+};
+
+export type hideWorkflowResponse = hideWorkflowResponseSuccess | hideWorkflowResponseError;
+
+export const getHideWorkflowUrl = (id: string) => {
+  return `/api/v1/admin/moderation/workflows/${id}/hide`;
+};
+
+export const hideWorkflow = async (
+  id: string,
+  moderationRequest?: ModerationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<hideWorkflowResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<hideWorkflowResponse>(getHideWorkflowUrl(id), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moderationRequest),
   });
 };
 
@@ -23054,6 +24009,126 @@ export const exportAdminWorkflows = async (
   });
 };
 
+export type listWorkflowReportsResponse200 = {
+  data: PageViewWorkflowReportRowResponse;
+  status: 200;
+};
+
+export type listWorkflowReportsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listWorkflowReportsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type listWorkflowReportsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type listWorkflowReportsResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type listWorkflowReportsResponseSuccess = listWorkflowReportsResponse200 & {
+  headers: Headers;
+};
+export type listWorkflowReportsResponseError = (
+  | listWorkflowReportsResponse400
+  | listWorkflowReportsResponse404
+  | listWorkflowReportsResponse409
+  | listWorkflowReportsResponse422
+) & {
+  headers: Headers;
+};
+
+export type listWorkflowReportsResponse =
+  listWorkflowReportsResponseSuccess | listWorkflowReportsResponseError;
+
+export const getListWorkflowReportsUrl = (params?: ListWorkflowReportsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/workflow-reports?${stringifiedParams}`
+    : `/api/v1/admin/workflow-reports`;
+};
+
+export const listWorkflowReports = async (
+  params?: ListWorkflowReportsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listWorkflowReportsResponse> => {
+  return customFetch<listWorkflowReportsResponse>(getListWorkflowReportsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getWorkflowReportResponse200 = {
+  data: WorkflowReportDetailResponse;
+  status: 200;
+};
+
+export type getWorkflowReportResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getWorkflowReportResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowReportResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type getWorkflowReportResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type getWorkflowReportResponseSuccess = getWorkflowReportResponse200 & {
+  headers: Headers;
+};
+export type getWorkflowReportResponseError = (
+  | getWorkflowReportResponse400
+  | getWorkflowReportResponse404
+  | getWorkflowReportResponse409
+  | getWorkflowReportResponse422
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowReportResponse =
+  getWorkflowReportResponseSuccess | getWorkflowReportResponseError;
+
+export const getGetWorkflowReportUrl = (id: string) => {
+  return `/api/v1/admin/workflow-reports/${id}`;
+};
+
+export const getWorkflowReport = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowReportResponse> => {
+  return customFetch<getWorkflowReportResponse>(getGetWorkflowReportUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listAdminTrendTaxonomyResponse200 = {
   data: AdminTrendTaxonomy;
   status: 200;
@@ -23603,6 +24678,61 @@ export const listPaymentSettingHistory = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listPaymentSettingHistoryResponse> => {
   return customFetch<listPaymentSettingHistoryResponse>(getListPaymentSettingHistoryUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getWorkflowModerationHistoryResponse200 = {
+  data: ModerationHistoryEntryResponse[];
+  status: 200;
+};
+
+export type getWorkflowModerationHistoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getWorkflowModerationHistoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getWorkflowModerationHistoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type getWorkflowModerationHistoryResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type getWorkflowModerationHistoryResponseSuccess =
+  getWorkflowModerationHistoryResponse200 & {
+    headers: Headers;
+  };
+export type getWorkflowModerationHistoryResponseError = (
+  | getWorkflowModerationHistoryResponse400
+  | getWorkflowModerationHistoryResponse404
+  | getWorkflowModerationHistoryResponse409
+  | getWorkflowModerationHistoryResponse422
+) & {
+  headers: Headers;
+};
+
+export type getWorkflowModerationHistoryResponse =
+  getWorkflowModerationHistoryResponseSuccess | getWorkflowModerationHistoryResponseError;
+
+export const getGetWorkflowModerationHistoryUrl = (id: string) => {
+  return `/api/v1/admin/moderation/workflows/${id}/history`;
+};
+
+export const getWorkflowModerationHistory = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getWorkflowModerationHistoryResponse> => {
+  return customFetch<getWorkflowModerationHistoryResponse>(getGetWorkflowModerationHistoryUrl(id), {
     ...options,
     method: 'GET',
   });

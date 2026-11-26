@@ -61,6 +61,9 @@ public class Workflow {
     @Column(name = "published_version_id")
     private UUID publishedVersionId;
 
+    @Column(name = "moderation_status", nullable = false)
+    private WorkflowModerationStatus moderationStatus;
+
     @Column(name = "allow_fork", nullable = false)
     private boolean allowFork;
 
@@ -100,6 +103,7 @@ public class Workflow {
         this.shared = shared;
         this.visibility = shared ? WorkflowVisibility.PUBLIC : WorkflowVisibility.PRIVATE;
         this.status = status;
+        this.moderationStatus = WorkflowModerationStatus.VISIBLE;
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
@@ -165,6 +169,14 @@ public class Workflow {
         touch();
     }
 
+    /**
+     * Sets the staff moderation state. The only writer of the field, and it leaves the owner's
+     * visibility alone so a restore returns the workflow to exactly what its owner chose.
+     */
+    public void moderate(WorkflowModerationStatus moderationStatus) {
+        this.moderationStatus = moderationStatus;
+    }
+
     public void markDeleted() {
         this.deletedAt = Instant.now();
         touch();
@@ -220,6 +232,10 @@ public class Workflow {
 
     public UUID getPublishedVersionId() {
         return publishedVersionId;
+    }
+
+    public WorkflowModerationStatus getModerationStatus() {
+        return moderationStatus;
     }
 
     public boolean isAllowFork() {

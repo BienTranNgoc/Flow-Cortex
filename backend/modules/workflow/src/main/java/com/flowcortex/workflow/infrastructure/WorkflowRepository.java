@@ -16,22 +16,24 @@ import org.springframework.data.repository.query.Param;
  * Spring Data JPA repository for {@link Workflow}.
  *
  * <p>Visibility: a workflow is readable when it is not deleted and its owner is the caller, or it
- * is published and either public or unlisted with a link grant for the caller. The list holds
- * only the caller's own and published public workflows: a grant never puts a workflow in a list.
- * Runs stay owner-scoped regardless.
+ * is published, not hidden or removed by staff, and either public or unlisted with a link grant for
+ * the caller. The list holds only the caller's own and published public workflows: a grant never puts
+ * a workflow in a list. Runs stay owner-scoped regardless.
  */
 public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
 
     @Query("SELECT w FROM Workflow w WHERE w.deletedAt IS NULL "
             + "AND (w.ownerId = :ownerId OR (w.status = "
-            + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND w.visibility = "
+            + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND w.moderationStatus = "
+            + "com.flowcortex.workflow.domain.WorkflowModerationStatus.VISIBLE AND w.visibility = "
             + "com.flowcortex.workflow.api.WorkflowVisibility.PUBLIC)) ORDER BY w.name ASC")
     List<Workflow> findAllVisibleTo(@Param("ownerId") UUID ownerId);
 
     /** The readable-by-{@code :ownerId} condition on {@code w}, shared by every single-workflow visibility query. */
     String VISIBLE_TO_OWNER = "w.deletedAt IS NULL "
             + "AND (w.ownerId = :ownerId OR (w.status = "
-            + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND "
+            + "com.flowcortex.workflow.domain.WorkflowStatus.PUBLISHED AND w.moderationStatus = "
+            + "com.flowcortex.workflow.domain.WorkflowModerationStatus.VISIBLE AND "
             + "(w.visibility = com.flowcortex.workflow.api.WorkflowVisibility.PUBLIC "
             + "OR (w.visibility = com.flowcortex.workflow.api.WorkflowVisibility.UNLISTED "
             + "AND EXISTS (SELECT 1 FROM WorkflowLinkGrant g "
@@ -45,6 +47,11 @@ public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
     List<UUID> findVisibleIds(@Param("ids") Collection<UUID> ids, @Param("ownerId") UUID ownerId);
 
     Optional<Workflow> findByUnlistedKey(String unlistedKey);
+
+    /** Row-locking load for staff moderation: deleted rows included, so a removed workflow can still be restored. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM Workflow w WHERE w.id = :id")
+    Optional<Workflow> findByIdForModeration(@Param("id") UUID id);
 
     /** Row-locking load for the write path, so concurrent edits of one workflow serialize. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

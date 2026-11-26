@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, type FormEvent } from 'react';
+import { useId, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useModalDialog } from '../../app/useModalDialog';
 
 interface StopRunDialogProps {
   readonly pending: boolean;
@@ -13,12 +14,7 @@ interface StopRunDialogProps {
 export function StopRunDialog({ pending, error, onConfirm, onClose }: StopRunDialogProps) {
   const { t } = useTranslation();
   const titleId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) dialog.showModal();
-  }, []);
+  const dialogRef = useModalDialog();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -31,9 +27,6 @@ export function StopRunDialog({ pending, error, onConfirm, onClose }: StopRunDia
       className="cortex-admin-account-dialog"
       aria-labelledby={titleId}
       onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <form className="cortex-admin-stop-dialog__body" onSubmit={submit} noValidate>
         <h2 id={titleId}>{t('runs.stop.title')}</h2>

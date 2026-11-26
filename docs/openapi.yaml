@@ -2298,6 +2298,63 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/report:
+    post:
+      tags:
+      - workflow-reports-controller
+      operationId: reportWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportWorkflowRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportWorkflowResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "429":
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
   /api/v1/workflows/{id}/regenerate-key:
     post:
       tags:
@@ -5992,6 +6049,246 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/workflow-reports/{id}/restore:
+    post:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: restoreWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportDetailResponse"
+  /api/v1/admin/workflow-reports/{id}/resolve:
+    post:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: resolveWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportDetailResponse"
+  /api/v1/admin/workflow-reports/{id}/remove:
+    post:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: removeWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportDetailResponse"
+  /api/v1/admin/workflow-reports/{id}/hide:
+    post:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: hideWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportDetailResponse"
+  /api/v1/admin/workflow-reports/{id}/dismiss:
+    post:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: dismissWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportDetailResponse"
   /api/v1/admin/trend/taxonomy/tags:
     post:
       tags:
@@ -6346,6 +6643,150 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/moderation/workflows/{id}/restore:
+    post:
+      tags:
+      - admin-workflow-moderation-controller
+      operationId: restoreWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationOutcomeResponse"
+  /api/v1/admin/moderation/workflows/{id}/remove:
+    post:
+      tags:
+      - admin-workflow-moderation-controller
+      operationId: removeWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationOutcomeResponse"
+  /api/v1/admin/moderation/workflows/{id}/hide:
+    post:
+      tags:
+      - admin-workflow-moderation-controller
+      operationId: hideWorkflow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationRequest"
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationOutcomeResponse"
   /api/v1/admin/content/media:
     get:
       tags:
@@ -10988,6 +11429,123 @@ paths:
             text/csv:
               schema:
                 type: string
+  /api/v1/admin/workflow-reports:
+    get:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: listWorkflowReports
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - dismissed
+          - resolved
+          - hidden
+          - removed
+          pattern: pending|dismissed|resolved|hidden|removed
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 255
+          minLength: 0
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewWorkflowReportRowResponse"
+  /api/v1/admin/workflow-reports/{id}:
+    get:
+      tags:
+      - admin-workflow-report-queue-controller
+      operationId: getWorkflowReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowReportDetailResponse"
   /api/v1/admin/trend/taxonomy:
     get:
       tags:
@@ -11548,6 +12106,51 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/moderation/workflows/{id}/history:
+    get:
+      tags:
+      - admin-workflow-moderation-controller
+      operationId: getWorkflowModerationHistory
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModerationHistoryEntryResponse"
   /api/v1/admin/media/jobs:
     get:
       tags:
@@ -12498,6 +13101,9 @@ components:
             - user.account.export
             - content.trend_template.view
             - content.trend_template.manage
+            - moderation.report.view
+            - moderation.report.resolve
+            - moderation.content.hide
         adminDisabled:
           type: boolean
         phoneVerificationRequired:
@@ -13123,6 +13729,9 @@ components:
             - user.account.export
             - content.trend_template.view
             - content.trend_template.manage
+            - moderation.report.view
+            - moderation.report.resolve
+            - moderation.content.hide
         permissionsVersion:
           type: integer
           format: int32
@@ -14020,6 +14629,32 @@ components:
       - method
       - uploadId
       - url
+    ReportWorkflowRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum:
+          - spam
+          - harmful
+          - scam
+          - inappropriate
+          - copyright
+          - pii_data_leak
+          - misleading
+          - other
+        details:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    ReportWorkflowResponse:
+      type: object
+      properties:
+        reported:
+          type: boolean
+      required:
+      - reported
     ShareSettingsResponse:
       type: object
       properties:
@@ -16192,6 +16827,177 @@ components:
       - stepOrder
       - type
       - value
+    ModerationRequest:
+      type: object
+      properties:
+        reason:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+        internalNote:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+    ModerationHistoryEntryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum:
+          - dismiss
+          - resolve
+          - hide
+          - remove
+          - restore
+        source:
+          type: string
+          enum:
+          - report
+          - direct
+        reportId:
+          type: string
+          format: uuid
+        moderatorId:
+          type: string
+          format: uuid
+        moderatorName:
+          type: string
+        reason:
+          type: string
+        internalNote:
+          type: string
+        moderationStatus:
+          type: string
+          enum:
+          - visible
+          - hidden
+          - removed
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - action
+      - createdAt
+      - id
+      - moderationStatus
+      - moderatorId
+      - source
+    ModerationPersonResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+      required:
+      - id
+    ModerationReviewerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+      required:
+      - id
+    ReportedWorkflowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - draft
+          - published
+        visibility:
+          type: string
+          enum:
+          - private
+          - unlisted
+          - public
+        moderationStatus:
+          type: string
+          enum:
+          - visible
+          - hidden
+          - removed
+        deleted:
+          type: boolean
+        owner:
+          $ref: "#/components/schemas/ModerationPersonResponse"
+      required:
+      - deleted
+      - id
+      - moderationStatus
+      - name
+      - owner
+      - status
+      - visibility
+    WorkflowReportDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        details:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - dismissed
+          - resolved
+          - hidden
+          - removed
+        resolution:
+          type: string
+          enum:
+          - dismiss
+          - resolve
+          - hide
+          - remove
+          - restore
+        reviewedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        reporter:
+          $ref: "#/components/schemas/ModerationPersonResponse"
+        reviewer:
+          $ref: "#/components/schemas/ModerationReviewerResponse"
+        workflow:
+          $ref: "#/components/schemas/ReportedWorkflowResponse"
+        internalNote:
+          type: string
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModerationHistoryEntryResponse"
+      required:
+      - createdAt
+      - history
+      - id
+      - reason
+      - reporter
+      - status
+      - workflow
     AdminTrendTagCreateRequest:
       type: object
       properties:
@@ -16396,6 +17202,21 @@ components:
           minItems: 0
       required:
       - name
+    ModerationOutcomeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        moderationStatus:
+          type: string
+          enum:
+          - visible
+          - hidden
+          - removed
+      required:
+      - id
+      - moderationStatus
     RegisterContentMediaRequest:
       type: object
       properties:
@@ -19744,6 +20565,72 @@ components:
       - countsByStatus
       - series
       - workflow
+    PageViewWorkflowReportRowResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowReportRowResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    WorkflowReportRowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        details:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - dismissed
+          - resolved
+          - hidden
+          - removed
+        resolution:
+          type: string
+          enum:
+          - dismiss
+          - resolve
+          - hide
+          - remove
+          - restore
+        reviewedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        reporter:
+          $ref: "#/components/schemas/ModerationPersonResponse"
+        reviewer:
+          $ref: "#/components/schemas/ModerationReviewerResponse"
+        workflow:
+          $ref: "#/components/schemas/ReportedWorkflowResponse"
+      required:
+      - createdAt
+      - id
+      - reason
+      - reporter
+      - status
+      - workflow
     AdminTrendTaxonomy:
       type: object
       properties:
@@ -20177,6 +21064,9 @@ components:
           - user.account.export
           - content.trend_template.view
           - content.trend_template.manage
+          - moderation.report.view
+          - moderation.report.resolve
+          - moderation.content.hide
         module:
           type: string
         feature:
