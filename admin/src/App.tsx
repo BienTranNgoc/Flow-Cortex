@@ -18,6 +18,8 @@ import { MediaLibraryPage } from './features/content/MediaLibraryPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { FeatureSwitchesPage } from './features/featureSwitches/FeatureSwitchesPage';
 import { MediaJobsPage } from './features/mediaJobs/MediaJobsPage';
+import { CapabilityPage } from './features/modelCatalog/CapabilityPage';
+import { ModelCatalogPage } from './features/modelCatalog/ModelCatalogPage';
 import { OnboardingSamplePage } from './features/onboarding/OnboardingSamplePage';
 import { RoleDetailPage } from './features/roles/RoleDetailPage';
 import { RolesPage } from './features/roles/RolesPage';
@@ -45,6 +47,7 @@ const PAGES: Record<string, ReactElement> = {
   '/runs': <RunsPage />,
   '/users': <UsersPage />,
   '/providers': <ProvidersPage />,
+  '/model-catalog': <ModelCatalogPage />,
   '/sms-outbox': <SmsOutboxPage />,
   '/phone-verification': <PhoneVerificationStatusPage />,
   '/settings': <SettingsPage />,
@@ -68,6 +71,7 @@ const CHILD_PAGES: { parent: string; path: string; element: ReactElement }[] = [
   { parent: '/workflows', path: '/workflows/:workflowId', element: <WorkflowReportPage /> },
   { parent: '/runs', path: '/runs/:runId', element: <RunDetailPage /> },
   { parent: '/users', path: '/users/:userId', element: <UserDetailPage /> },
+  { parent: '/model-catalog', path: '/model-catalog/:capability', element: <CapabilityPage /> },
   { parent: '/roles', path: '/roles/new', element: <RoleDetailPage /> },
   { parent: '/roles', path: '/roles/:code', element: <RoleDetailPage /> },
   { parent: '/support/articles', path: '/support/articles/:articleId', element: <ArticleEditorPage /> },

@@ -81,6 +81,7 @@
         "approvals": "Approval Queue",
         "credits": "Credits & Wallets",
         "providers": "Model Providers",
+        "modelCatalog": "Model catalog",
         "paymentSettings": "Payment settings",
         "users": "Users",
         "smsOutbox": "SMS Outbox",

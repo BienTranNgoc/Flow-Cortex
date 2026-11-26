@@ -1,0 +1,180 @@
+{
+  "title": "Danh mục mô hình",
+  "eyebrow": "Tín dụng & thanh toán",
+  "description": "Các năng lực mà công cụ quy trình chạy, các mô hình được liệt kê cho từng năng lực và thông tin mô hình mà nền tảng cung cấp sẵn.",
+  "tabs": {
+    "label": "Các mục của Danh mục mô hình",
+    "capabilities": "Năng lực",
+    "descriptors": "Mô tả mô hình"
+  },
+  "retry": "Thử lại",
+  "loading": "Đang tải…",
+  "loadError": "Không tải được mục này.",
+  "capabilities": {
+    "empty": "Chưa có năng lực nào trong danh mục.",
+    "emptyHint": "Năng lực được thêm theo từng bản phát hành, mỗi loại bước mà công cụ chạy có một dòng.",
+    "tableLabel": "Bảng năng lực",
+    "uncatalogued": {
+      "title_one": "{{count}} loại bước chưa có dòng trong danh mục:",
+      "title_other": "{{count}} loại bước chưa có dòng trong danh mục:",
+      "body": "Công cụ vẫn chạy các loại bước này nhưng danh mục chưa liệt kê. Dòng sẽ được thêm trong một bản phát hành."
+    },
+    "columns": {
+      "capability": "Năng lực",
+      "category": "Nhóm chức năng",
+      "group": "Nhóm hiển thị",
+      "models": "Mô hình",
+      "engine": "Công cụ"
+    },
+    "modelsValue": "{{total}} ({{enabled}} đang bật)",
+    "registered": "Đã đăng ký",
+    "notRegistered": "Không có bước tương ứng"
+  },
+  "descriptors": {
+    "intro": "Thông tin nền tảng cung cấp sẵn cho từng mô hình đã biết. Thông tin này đổi theo bản phát hành, không đổi tại đây.",
+    "empty": "Chưa có mô tả mô hình nào được cung cấp.",
+    "tableLabel": "Bảng mô tả mô hình",
+    "columns": {
+      "id": "Mã mô hình",
+      "provider": "Nhà cung cấp",
+      "status": "Trạng thái",
+      "modalities": "Đầu vào",
+      "limits": "Giới hạn",
+      "thinking": "Suy luận"
+    },
+    "limitsValue": "Ngữ cảnh {{window}} · đầu ra {{output}}"
+  },
+  "categories": {
+    "ingest": "Tiếp nhận",
+    "analyze": "Phân tích",
+    "generate": "Tạo nội dung",
+    "transform": "Biến đổi",
+    "present": "Trình bày",
+    "review": "Duyệt",
+    "deliver": "Giao hàng",
+    "control": "Điều khiển"
+  },
+  "groups": {
+    "input": "Đầu vào",
+    "generate": "Tạo nội dung",
+    "edit": "Chỉnh sửa",
+    "replace": "Thay thế",
+    "analyze": "Phân tích",
+    "deliver": "Giao hàng",
+    "control": "Điều khiển"
+  },
+  "modes": {
+    "text": "Văn bản",
+    "image": "Hình ảnh",
+    "video": "Video",
+    "audio": "Âm thanh",
+    "transform": "Biến đổi",
+    "deliver": "Giao hàng",
+    "ingest": "Tiếp nhận",
+    "control": "Điều khiển"
+  },
+  "statuses": {
+    "stable": "Ổn định",
+    "preview": "Bản xem trước",
+    "deprecated": "Đã ngừng hỗ trợ"
+  },
+  "knobs": {
+    "budget": "Ngân sách token",
+    "level": "Mức độ",
+    "none": "Không có điều khiển suy luận"
+  },
+  "modalities": {
+    "text": "Văn bản",
+    "image": "Hình ảnh",
+    "video": "Video",
+    "audio": "Âm thanh",
+    "pdf": "PDF"
+  },
+  "capability": {
+    "description": "Cách hiển thị năng lực này và các mô hình được liệt kê cho nó.",
+    "back": "Tất cả năng lực",
+    "notFound": "Năng lực này không có trong danh mục.",
+    "routingNote": "Hiện các dòng mô hình chỉ là danh mục: chúng chưa quyết định mô hình nào được dùng khi chạy.",
+    "notRegistered": "Công cụ không chạy loại bước nào có tên này.",
+    "displayFields": "Thông tin hiển thị",
+    "category": "Nhóm chức năng",
+    "group": "Nhóm hiển thị",
+    "icon": "Biểu tượng",
+    "iconNone": "Không có",
+    "iconHint": "Không bắt buộc. Chữ thường, chữ số và dấu gạch ngang, tối đa 64 ký tự.",
+    "save": "Lưu thông tin hiển thị",
+    "saving": "Đang lưu…",
+    "saved": "Đã lưu thông tin hiển thị.",
+    "saveError": "Không lưu được thông tin hiển thị.",
+    "errors": {
+      "icon": "Chỉ dùng chữ thường, chữ số và dấu gạch ngang, tối đa 64 ký tự."
+    }
+  },
+  "models": {
+    "title": "Mô hình",
+    "refresh": "Làm mới",
+    "add": "Thêm mô hình",
+    "empty": "Chưa có mô hình nào được liệt kê cho năng lực này.",
+    "emptyHint": "Hãy thêm một mô hình để liệt kê cho năng lực này.",
+    "tableLabel": "Bảng mô hình",
+    "noun_one": "mô hình",
+    "noun_other": "mô hình",
+    "columns": {
+      "modelKey": "Mã mô hình",
+      "provider": "Nhà cung cấp",
+      "mode": "Chế độ",
+      "descriptor": "Mô tả",
+      "enabled": "Đang bật",
+      "actions": "Thao tác"
+    },
+    "notImplemented": "Chưa hỗ trợ",
+    "noDescriptor": "Chưa có mô tả",
+    "enabledSwitch": "Đang bật: {{name}}",
+    "enabledState": "Đang bật",
+    "disabledState": "Đang tắt",
+    "edit": "Sửa",
+    "editFor": "Sửa {{name}}",
+    "delete": "Xóa",
+    "deleteFor": "Xóa {{name}}",
+    "toggleFailed": "Không đổi được {{name}}.",
+    "deleted": "Đã xóa {{name}}.",
+    "saved": "Đã lưu {{name}}.",
+    "created": "Đã thêm {{name}}."
+  },
+  "form": {
+    "addTitle": "Thêm mô hình vào {{capability}}",
+    "editTitle": "Sửa {{name}}",
+    "mode": "Chế độ",
+    "modelKey": "Mã mô hình",
+    "modelKeyChoose": "Chọn một mô hình",
+    "modelKeyHint": "Chữ cái, chữ số và . _ : -, dùng / giữa các phần. Tối đa 128 ký tự.",
+    "modelKeyPickerHint": "Ở chế độ văn bản, chỉ liệt kê được các mô hình đã có mô tả.",
+    "provider": "Nhà cung cấp",
+    "providerFromDescriptor": "Điền theo mô tả của mô hình.",
+    "vendorLabel": "Nhãn nhà cung cấp",
+    "makerLabel": "Nhãn nhà phát triển",
+    "enabled": "Đang bật",
+    "notImplemented": "Chưa hỗ trợ",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "descriptorsLoading": "Đang tải các mô hình đã có mô tả…",
+    "descriptorsFailed": "Không tải được các mô hình đã có mô tả. Hãy nhập mã mô hình, máy chủ sẽ kiểm tra.",
+    "descriptorsNone": "Không có mô hình đã mô tả nào để chọn.",
+    "errors": {
+      "required": "Bắt buộc nhập trường này.",
+      "tooLong": "Tối đa {{max}} ký tự.",
+      "modelKey": "Dùng chữ cái, chữ số và . _ : -, dùng / giữa các phần.",
+      "providerKey": "Dùng chữ thường, chữ số và . _ -, tối đa 64 ký tự.",
+      "generic": "Không lưu được mô hình."
+    }
+  },
+  "delete": {
+    "title": "Xóa {{name}}?",
+    "description": "Mô hình sẽ bị gỡ khỏi danh sách của {{capability}}. Không có gì khác thay đổi.",
+    "cancel": "Hủy",
+    "confirm": "Xóa",
+    "working": "Đang xóa…",
+    "error": "Không xóa được mô hình."
+  }
+}

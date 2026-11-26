@@ -1,0 +1,180 @@
+{
+  "title": "Model catalog",
+  "eyebrow": "Credits & billing",
+  "description": "The capabilities the workflow engine runs, the models listed for each, and the model facts the platform ships.",
+  "tabs": {
+    "label": "Model catalog sections",
+    "capabilities": "Capabilities",
+    "descriptors": "Descriptors"
+  },
+  "retry": "Retry",
+  "loading": "Loading…",
+  "loadError": "Could not load this section.",
+  "capabilities": {
+    "empty": "No capabilities are catalogued yet.",
+    "emptyHint": "Capabilities are added by a release, one for each step type the engine runs.",
+    "tableLabel": "Capabilities table",
+    "uncatalogued": {
+      "title_one": "{{count}} step type has no catalog row:",
+      "title_other": "{{count}} step types have no catalog row:",
+      "body": "The engine runs them, but this catalog does not list them yet. A release adds the row."
+    },
+    "columns": {
+      "capability": "Capability",
+      "category": "Category",
+      "group": "Group",
+      "models": "Models",
+      "engine": "Engine"
+    },
+    "modelsValue": "{{total}} ({{enabled}} enabled)",
+    "registered": "Registered",
+    "notRegistered": "No engine step"
+  },
+  "descriptors": {
+    "intro": "Facts the platform ships for each model it knows. They change with a release, not here.",
+    "empty": "No model descriptors are shipped.",
+    "tableLabel": "Model descriptors table",
+    "columns": {
+      "id": "Model id",
+      "provider": "Provider",
+      "status": "Status",
+      "modalities": "Input",
+      "limits": "Limits",
+      "thinking": "Thinking"
+    },
+    "limitsValue": "{{window}} context · {{output}} output"
+  },
+  "categories": {
+    "ingest": "Ingest",
+    "analyze": "Analyze",
+    "generate": "Generate",
+    "transform": "Transform",
+    "present": "Present",
+    "review": "Review",
+    "deliver": "Deliver",
+    "control": "Control"
+  },
+  "groups": {
+    "input": "Input",
+    "generate": "Generate",
+    "edit": "Edit",
+    "replace": "Replace",
+    "analyze": "Analyze",
+    "deliver": "Deliver",
+    "control": "Control"
+  },
+  "modes": {
+    "text": "Text",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "transform": "Transform",
+    "deliver": "Deliver",
+    "ingest": "Ingest",
+    "control": "Control"
+  },
+  "statuses": {
+    "stable": "Stable",
+    "preview": "Preview",
+    "deprecated": "Deprecated"
+  },
+  "knobs": {
+    "budget": "Token budget",
+    "level": "Level",
+    "none": "No thinking control"
+  },
+  "modalities": {
+    "text": "Text",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "pdf": "PDF"
+  },
+  "capability": {
+    "description": "How this capability is shown, and the models listed for it.",
+    "back": "All capabilities",
+    "notFound": "This capability is not in the catalog.",
+    "routingNote": "Model rows are a catalog only for now: they do not yet change which model a run uses.",
+    "notRegistered": "The engine does not run a step type with this name.",
+    "displayFields": "Display fields",
+    "category": "Category",
+    "group": "Group",
+    "icon": "Icon",
+    "iconNone": "None",
+    "iconHint": "Optional. Lowercase letters, digits and hyphens, up to 64 characters.",
+    "save": "Save display fields",
+    "saving": "Saving…",
+    "saved": "Display fields saved.",
+    "saveError": "Could not save the display fields.",
+    "errors": {
+      "icon": "Use lowercase letters, digits and hyphens only, up to 64 characters."
+    }
+  },
+  "models": {
+    "title": "Models",
+    "refresh": "Refresh",
+    "add": "Add model",
+    "empty": "No models are listed for this capability.",
+    "emptyHint": "Add a model to list it for this capability.",
+    "tableLabel": "Models table",
+    "noun_one": "model",
+    "noun_other": "models",
+    "columns": {
+      "modelKey": "Model id",
+      "provider": "Provider",
+      "mode": "Mode",
+      "descriptor": "Descriptor",
+      "enabled": "Enabled",
+      "actions": "Actions"
+    },
+    "notImplemented": "Not implemented",
+    "noDescriptor": "No descriptor",
+    "enabledSwitch": "Enabled: {{name}}",
+    "enabledState": "Enabled",
+    "disabledState": "Disabled",
+    "edit": "Edit",
+    "editFor": "Edit {{name}}",
+    "delete": "Delete",
+    "deleteFor": "Delete {{name}}",
+    "toggleFailed": "Could not change {{name}}.",
+    "deleted": "{{name}} was removed.",
+    "saved": "{{name}} was saved.",
+    "created": "{{name}} was added."
+  },
+  "form": {
+    "addTitle": "Add a model to {{capability}}",
+    "editTitle": "Edit {{name}}",
+    "mode": "Mode",
+    "modelKey": "Model id",
+    "modelKeyChoose": "Choose a model",
+    "modelKeyHint": "Letters, digits and . _ : -, with / between parts. Up to 128 characters.",
+    "modelKeyPickerHint": "Only models with a shipped descriptor can be listed in text mode.",
+    "provider": "Provider",
+    "providerFromDescriptor": "Filled from the model's descriptor.",
+    "vendorLabel": "Vendor label",
+    "makerLabel": "Maker label",
+    "enabled": "Enabled",
+    "notImplemented": "Not implemented",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "descriptorsLoading": "Loading described models…",
+    "descriptorsFailed": "Could not load the described models. Type the model id instead; the server checks it.",
+    "descriptorsNone": "No described models are available to pick.",
+    "errors": {
+      "required": "This field is required.",
+      "tooLong": "Use at most {{max}} characters.",
+      "modelKey": "Use letters, digits and . _ : -, with / between parts.",
+      "providerKey": "Use lowercase letters, digits and . _ -, up to 64 characters.",
+      "generic": "Could not save the model."
+    }
+  },
+  "delete": {
+    "title": "Remove {{name}}?",
+    "description": "The model is removed from the {{capability}} list. Nothing else changes.",
+    "cancel": "Cancel",
+    "confirm": "Remove",
+    "working": "Removing…",
+    "error": "Could not remove the model."
+  }
+}
