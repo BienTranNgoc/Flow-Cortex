@@ -52,18 +52,18 @@ public class NotificationService {
      * @throws LocalizedStatusException 400 naming the first parameter that is out of range
      */
     @Transactional(readOnly = true)
-    public Listing list(UUID userId, String filter, String page, String size, Locale locale) {
+    public Listing list(UUID userId, Audience audience, String filter, String page, String size, Locale locale) {
         boolean unreadOnly = parseFilter(filter);
         int pageNumber = parseInt(page, "page", 0, Integer.MAX_VALUE / MAX_SIZE, 0);
         int pageSize = parseInt(size, "size", 1, MAX_SIZE, DEFAULT_SIZE);
-        RowPage rows = repository.page(userId, unreadOnly, pageNumber * pageSize, pageSize);
+        RowPage rows = repository.page(userId, audience, unreadOnly, pageNumber * pageSize, pageSize);
         List<Item> items = rows.rows().stream().map(row -> item(row, locale)).toList();
-        return new Listing(items, pageNumber, pageSize, rows.hasMore(), repository.unreadCount(userId));
+        return new Listing(items, pageNumber, pageSize, rows.hasMore(), repository.unreadCount(userId, audience));
     }
 
     @Transactional(readOnly = true)
-    public long unreadCount(UUID userId) {
-        return repository.unreadCount(userId);
+    public long unreadCount(UUID userId, Audience audience) {
+        return repository.unreadCount(userId, audience);
     }
 
     /** @return false when the id is unknown or not the member's */
@@ -75,9 +75,9 @@ public class NotificationService {
         return repository.exists(id, userId);
     }
 
-    /** @return how many unread notifications were marked read */
-    public int markAllRead(UUID userId) {
-        int marked = repository.markAllRead(userId, Instant.now(clock));
+    /** @return how many unread notifications of the audience were marked read */
+    public int markAllRead(UUID userId, Audience audience) {
+        int marked = repository.markAllRead(userId, audience, Instant.now(clock));
         if (marked > 0) {
             signals.changed(userId);
         }

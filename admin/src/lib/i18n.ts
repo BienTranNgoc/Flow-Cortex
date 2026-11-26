@@ -5,6 +5,7 @@ import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
 import enContent from '../locales/en/content.json';
 import enDashboard from '../locales/en/dashboard.json';
+import enFeatureSwitches from '../locales/en/featureSwitches.json';
 import enMediaJobs from '../locales/en/mediaJobs.json';
 import enOnboarding from '../locales/en/onboarding.json';
 import enRoles from '../locales/en/roles.json';
@@ -15,6 +16,7 @@ import enRuns from '../locales/en/runs.json';
 import enSettings from '../locales/en/settings.json';
 import enSmsOutbox from '../locales/en/smsOutbox.json';
 import enSupport from '../locales/en/support.json';
+import enTrend from '../locales/en/trend.json';
 import enUsers from '../locales/en/users.json';
 import enWorkflowReports from '../locales/en/workflowReports.json';
 import enWorkflows from '../locales/en/workflows.json';
@@ -24,6 +26,7 @@ import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
 import viContent from '../locales/vi/content.json';
 import viDashboard from '../locales/vi/dashboard.json';
+import viFeatureSwitches from '../locales/vi/featureSwitches.json';
 import viMediaJobs from '../locales/vi/mediaJobs.json';
 import viOnboarding from '../locales/vi/onboarding.json';
 import viRoles from '../locales/vi/roles.json';
@@ -34,6 +37,7 @@ import viRuns from '../locales/vi/runs.json';
 import viSettings from '../locales/vi/settings.json';
 import viSmsOutbox from '../locales/vi/smsOutbox.json';
 import viSupport from '../locales/vi/support.json';
+import viTrend from '../locales/vi/trend.json';
 import viUsers from '../locales/vi/users.json';
 import viWorkflowReports from '../locales/vi/workflowReports.json';
 import viWorkflows from '../locales/vi/workflows.json';
@@ -56,11 +60,13 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     smsOutbox: viSmsOutbox,
     phoneVerification: viPhoneVerification,
     settings: viSettings,
+    featureSwitches: viFeatureSwitches,
     paymentSettings: viPaymentSettings,
     support: viSupport,
     onboarding: viOnboarding,
     chat: viChat,
     content: viContent,
+    trend: viTrend,
   },
   en: {
     common: enCommon,
@@ -77,11 +83,13 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     smsOutbox: enSmsOutbox,
     phoneVerification: enPhoneVerification,
     settings: enSettings,
+    featureSwitches: enFeatureSwitches,
     paymentSettings: enPaymentSettings,
     support: enSupport,
     onboarding: enOnboarding,
     chat: enChat,
     content: enContent,
+    trend: enTrend,
   },
 });
 

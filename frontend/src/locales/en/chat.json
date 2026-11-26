@@ -10,12 +10,28 @@
     "new": "New chat",
     "loading": "Loading conversations…",
     "empty": "No conversations yet. Start a new chat.",
+    "recentEmpty": "No conversations outside folders.",
     "loadFailed": "Could not load your conversations.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "history": "History",
+    "pinned": "Pinned",
+    "folders": "Folders",
+    "recent": "Recent",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "loadMoreFailed": "Could not load more conversations."
   },
   "row": {
     "rename": "Rename",
     "delete": "Delete",
+    "actions": "Actions",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "move": "Move to folder",
+    "time": {
+      "todayAt": "Today {{time}}",
+      "yesterday": "Yesterday"
+    },
     "renameLabel": "Conversation title",
     "save": "Save",
     "cancel": "Cancel",
@@ -23,6 +39,60 @@
     "titleEmpty": "Give the conversation a title.",
     "titleTooLong": "A title can have at most {{max}} characters.",
     "renameFailed": "Could not rename the conversation."
+  },
+  "folders": {
+    "new": "New folder",
+    "loading": "Loading folders…",
+    "loadFailed": "Could not load your folders.",
+    "retry": "Retry",
+    "empty": "No folders yet.",
+    "folderEmpty": "This folder is empty.",
+    "createTitle": "New folder",
+    "renameTitle": "Rename folder",
+    "nameLabel": "Folder name",
+    "counter": "{{length}}/{{max}}",
+    "nameEmpty": "Give the folder a name.",
+    "nameTooLong": "A folder name can have at most {{max}} characters.",
+    "create": "Create",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "limit": "You have reached the folder limit. Delete one to add another.",
+    "gone": "This folder no longer exists."
+  },
+  "move": {
+    "title": "Move to folder",
+    "text": "Choose where “{{title}}” goes.",
+    "none": "No folder",
+    "current": "Current",
+    "moving": "Moving…",
+    "cancel": "Cancel"
+  },
+  "history": {
+    "title": "Conversation history",
+    "toChat": "Back to chat",
+    "back": "All conversations",
+    "searchLabel": "Search conversations",
+    "search": "Search",
+    "clear": "Clear search",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest first",
+    "sortOldest": "Oldest first",
+    "noMatch": "No conversations match “{{q}}”.",
+    "group": {
+      "today": "Today",
+      "last7": "Last 7 days",
+      "earlier": "Earlier"
+    },
+    "folderCount_one": "{{count}} conversation",
+    "folderCount_other": "{{count}} conversations",
+    "renameFolder": "Rename folder {{name}}",
+    "deleteFolder": "Delete folder {{name}}",
+    "deleteFolderDialog": {
+      "title": "Delete this folder?",
+      "text": "“{{name}}” will be deleted. Its conversations are kept and return to Recent.",
+      "failed": "Could not delete the folder."
+    }
   },
   "delete": {
     "title": "Delete this conversation?",

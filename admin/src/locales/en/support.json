@@ -166,6 +166,17 @@
     "selectedCount_other": "{{count}} selected",
     "pickAssignee": "Choose a person",
     "assigneesFailed": "Could not load the list of staff.",
+    "sla": {
+      "bannerLabel": "Response time",
+      "summary": "{{overdue}} overdue · {{dueSoon}} due soon",
+      "showAtRisk": "Show at-risk only",
+      "showAll": "Show all",
+      "level": {
+        "due_soon": "Due soon",
+        "overdue": "Overdue"
+      },
+      "badgeLabel": "Response time: {{level}}"
+    },
     "bulk": {
       "label": "Assign selected requests",
       "assignTo": "Assign to",
@@ -225,7 +236,9 @@
     "assistant": "Assistant",
     "outcome": {
       "no_answer": "The assistant could not answer",
-      "blocked": "The question was refused"
+      "blocked": "The question was refused",
+      "handoff": "The question was sent to the support team",
+      "sign_in": "The guest was asked to sign in"
     },
     "attachmentAlt": "Attached image {{position}}",
     "saveStatus": "Save status",

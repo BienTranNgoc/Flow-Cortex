@@ -6,7 +6,7 @@ Hibernate `ddl-auto: validate`). This diagram mirrors those files and is updated
 in the same PR as any migration that changes it. Column notes list only what a
 reader cannot infer from the name.
 
-## Current schema (`V2026.09.22.001` – `V2026.11.24.030`)
+## Current schema (`V2026.09.22.001` – `V2026.11.26.730`)
 
 ```mermaid
 erDiagram
@@ -153,6 +153,18 @@ erDiagram
     uuid lease_token "fences finish and retry"
     timestamptz created_at
     timestamptz updated_at "finished rows deleted after 30 days"
+  }
+  trash_entry {
+    uuid id PK
+    varchar item_type "lowercase key, UNIQUE with item_id; the owning module's provider type"
+    varchar item_id "the trashed row's id in its own module, no FK"
+    uuid owner_id "the account that sees and acts on the entry, no FK"
+    uuid deleted_by "no FK"
+    text name "1-200 characters; NULL = untitled"
+    text name_key "folded search key written by Java; empty when untitled"
+    varchar location_code "message code of where the item lived"
+    timestamptz deleted_at "expiry = deleted_at + retention, never stored"
+    timestamptz reminded_at "NULL until the expiry reminder claims it; cleared when the item is deleted again"
   }
   product_video_input {
     uuid run_id PK,FK
@@ -410,6 +422,73 @@ and slot, which also makes concurrent saves exactly-once), `idx_profile_image_hi
 cross-module tables: the module boundary is kept at the schema level, and a deleted account leaves its
 rows behind.
 
+## MCP authorization server and token call guards (`V2026.11.15.225` – `V2026.11.15.226`)
+
+```mermaid
+erDiagram
+  oauth_client ||--o{ oauth_authorization_code : "client_id, ON DELETE CASCADE"
+  oauth_client ||--o{ oauth_issued_token : "client_id, ON DELETE CASCADE"
+  app_user ||--o{ oauth_authorization_code : "user_id, ON DELETE CASCADE"
+  personal_access_token ||--o| oauth_issued_token : "token_id, ON DELETE CASCADE"
+
+  oauth_client {
+    varchar client_id PK "mcp_ + 24 hex"
+    varchar client_secret_hash "SHA-256 hex; NULL for a public client (auth_method none)"
+    varchar client_name "1-128 characters, shown on the consent page"
+    jsonb redirect_uris "1-5 URIs validated in Java"
+    varchar auth_method "client_secret_post | client_secret_basic | none"
+    timestamptz created_at "index — unused-client purge"
+  }
+  oauth_authorization_code {
+    varchar code_hash PK "SHA-256 hex of the code; the code itself is never stored"
+    varchar client_id FK "ON DELETE CASCADE"
+    uuid user_id FK "ON DELETE CASCADE"
+    varchar redirect_uri "the exact URI the consent accepted"
+    varchar code_challenge "PKCE S256"
+    varchar scope
+    timestamptz created_at
+    timestamptz expires_at "5 minutes after consent; index — retention scan"
+    timestamptz redeemed_at "set once by a conditional UPDATE; NULL = unspent"
+    uuid issued_token_id "no FK: the token row may be purged before the code row"
+  }
+  oauth_issued_token {
+    uuid token_id PK, FK "personal_access_token, ON DELETE CASCADE"
+    varchar client_id FK "ON DELETE CASCADE; a client with a row here is never purged"
+    timestamptz issued_at
+  }
+  api_token_call {
+    uuid id PK
+    uuid user_id "no FK: rows outlive tokens and accounts until retention"
+    uuid token_id
+    varchar method
+    varchar route "normalized pattern, never the query or body"
+    varchar outcome "ok | error | blocked | replayed"
+    smallint http_status
+    varchar error_code
+    integer duration_ms
+    timestamptz occurred_at "index — daily cap count and 90-day purge"
+  }
+  api_token_idempotency {
+    uuid user_id PK "no FK"
+    varchar idem_key PK "1-80 characters from the Idempotency-Key header"
+    varchar fingerprint "SHA-256 hex of method, path, query and body"
+    varchar state "running | done"
+    timestamptz reserved_at "a running reservation older than 5 minutes is taken over"
+    smallint http_status
+    varchar content_type
+    bytea response_body "the stored answer, at most 256 KiB"
+    timestamptz expires_at "24 hours after the reservation; index — retention scan"
+  }
+```
+
+Indexes: `idx_oauth_client_created_at`, `idx_oauth_code_expires_at`, `idx_oauth_issued_token_client`,
+`idx_api_token_call_user_time` (`user_id, occurred_at`), `idx_api_token_call_occurred_at`,
+`idx_api_token_idempotency_expires_at`.
+
+`api_token_call` and `api_token_idempotency` carry no foreign key on purpose: the audit trail and the
+stored answers outlive the token and the account until the retention job deletes them.
+`user.mcp-oauth-retention` deletes spent codes, unused clients, old call rows and ended reservations.
+
 ## Runtime settings (`V2026.11.11.180`, `V2026.11.11.320`)
 
 ```mermaid
@@ -433,6 +512,102 @@ erDiagram
 
 `app_setting_change` is append-only history; one row is committed in the transaction that stores or resets
 the value, and a write of the value already stored records none.
+
+## Space entities (`V2026.11.26.501`)
+
+```mermaid
+erDiagram
+  space ||--o{ space_entity : "space_id (no FK)"
+  space_asset ||--o{ space_entity_part : "asset_id (no FK)"
+  workflow_run ||--o{ space_entity_run : "run_id (no FK)"
+  space_entity ||--o{ space_entity_part : "entity_id, ON DELETE CASCADE"
+  space_entity ||--o{ space_entity_tag : "entity_id, ON DELETE CASCADE"
+  space_entity ||--|{ space_entity_version : "entity_id, ON DELETE CASCADE"
+  space_entity ||--o{ space_entity_run : "entity_id, ON DELETE CASCADE"
+
+  space_entity {
+    uuid id PK
+    uuid space_id "owning space, no FK; UNIQUE (space_id, handle) WHERE deleted_at IS NULL"
+    varchar kind "brand | product | character | voice"
+    varchar handle "2-48 of a-z 0-9 hyphen"
+    text name "1-200 code points"
+    text search_key "normalised key of name, computed in Java"
+    jsonb fields "per-kind field values"
+    varchar category_label "NULL = no category; NULL exactly when category_key is"
+    text category_key
+    integer version "current version, 1 on create"
+    uuid created_by "no FK"
+    timestamptz created_at
+    timestamptz updated_at "INDEX (space_id, updated_at DESC, id) WHERE deleted_at IS NULL"
+    timestamptz deleted_at "trash; NULL exactly when deleted_by is, frees the handle"
+    uuid deleted_by "no FK"
+  }
+  space_entity_part {
+    uuid id PK
+    uuid entity_id FK "UNIQUE (entity_id, sort)"
+    uuid asset_id "library asset, no FK; INDEX"
+    varchar role "checked against the kind by the application"
+    varchar label "optional, up to 60 code points; NULL exactly when label_key is"
+    text label_key
+    integer sort "0-19"
+    timestamptz created_at
+  }
+  space_entity_tag {
+    uuid entity_id PK,FK
+    text tag_key PK "normalised key; INDEX"
+    varchar tag_label "40 code points, the space's first spelling"
+    timestamptz created_at
+  }
+  space_entity_version {
+    uuid entity_id PK,FK
+    integer version PK
+    jsonb snapshot "name, handle, fields, category, tags, parts; no URL"
+    jsonb changes "change codes of this version"
+    timestamptz created_at
+  }
+  space_entity_run {
+    uuid run_id PK "no FK"
+    uuid entity_id PK,FK
+    uuid space_id "no FK"
+    integer version "entity version at the time of the run"
+    uuid workflow_id "no FK"
+    text workflow_name "copied at recording"
+    timestamptz created_at
+    timestamptz completed_at "NULL while the run is open; partial INDEX (entity_id, completed_at DESC, run_id)"
+  }
+```
+
+An entity is trashed by stamping `deleted_at`/`deleted_by`, never deleted; the partial unique index on
+`handle` only covers live rows, so a trashed entity's handle is free again. `ON DELETE CASCADE` matters only
+for a future purge.
+
+## Trend taxonomy (`V2026.11.15.260`)
+
+```mermaid
+erDiagram
+  trend_category {
+    varchar key PK "derived from name_vi, 1-64 chars of a-z0-9 joined by single hyphens (CHECK); never changes after create"
+    varchar name_vi "varchar(60)"
+    varchar name_en "varchar(60)"
+    int display_order "ties are read in key order"
+    boolean visible "hidden categories stay stored"
+    timestamptz created_at
+    timestamptz updated_at
+  }
+  trend_tag {
+    uuid id PK "generated in the application"
+    varchar name_vi "varchar(30)"
+    varchar name_en "varchar(30)"
+    int display_order "ties are read in creation order"
+    boolean visible
+    timestamptz created_at
+    timestamptz updated_at
+  }
+```
+
+No relations yet: the template table and its category foreign key arrive with the template change. The
+migration seeds four categories (`nguoi`, `san-pham`, `thu-cung`, `nhay-chuyen-canh`) and the two
+`content.trend_template.*` permission keys.
 
 ## Roadmap tables (each arrives with its own change)
 

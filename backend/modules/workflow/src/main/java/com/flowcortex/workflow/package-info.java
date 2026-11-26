@@ -10,7 +10,8 @@
  * run topic), on the jobs module only through its {@code api} port (the lease reaper runs on the
  * cluster runner), on the llm module only through its {@code api} port (to ask the model by
  * purpose for the dub steps), on the connector module only through its {@code api} port (to call a
- * member's saved HTTP connector), plus the shared libraries.
+ * member's saved HTTP connector), on the settings module only through its {@code api} port (the run
+ * cancellation switch), plus the shared libraries.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Workflow",
@@ -22,6 +23,7 @@
                 "jobs :: api",
                 "llm :: api",
                 "connector :: api",
+                "settings :: api",
                 "shared :: web",
                 "shared :: security",
                 "shared :: ratelimit"

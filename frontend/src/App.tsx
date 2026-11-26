@@ -21,8 +21,12 @@ import { ConfirmEmailPage } from './features/auth/ConfirmEmailPage';
 import { EmailUnsubscribePage } from './features/auth/EmailUnsubscribePage';
 import { ChatFeatureGate } from './features/chat/ChatFeatureGate';
 import { ChatPage } from './features/chat/ChatPage';
+import { HistoryPage } from './features/chat/history/HistoryPage';
+import { DriveFeatureGate } from './features/drive/DriveFeatureGate';
+import { DrivePage } from './features/drive/DrivePage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { LoginPage } from './features/auth/LoginPage';
+import { OAuthConsentRoute } from './features/auth/OAuthConsentPage';
 import { PasswordSetupGate } from './features/auth/PasswordSetupGate';
 import { PhoneGate } from './features/auth/PhoneGate';
 import { RegisterPage } from './features/auth/RegisterPage';
@@ -31,6 +35,11 @@ import { RequireAuth } from './features/auth/RequireAuth';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { SetPasswordPage } from './features/auth/SetPasswordPage';
 import { VerifyPhonePage } from './features/auth/VerifyPhonePage';
+import { LegalDocumentPage } from './features/legal/LegalDocumentPage';
+import { LegalHistoryPage } from './features/legal/LegalHistoryPage';
+import { LegalIndexPage } from './features/legal/LegalIndexPage';
+import { LegalLayout } from './features/legal/LegalLayout';
+import { LegalVersionPage } from './features/legal/LegalVersionPage';
 import { RunHistoryPage } from './features/runHistory/RunHistoryPage';
 import { NotificationPreferencesPage } from './features/notifications/NotificationPreferencesPage';
 import { NotificationsPage } from './features/notifications/NotificationsPage';
@@ -94,6 +103,12 @@ const chatPage = (
   </ChatFeatureGate>
 );
 
+const historyPage = (
+  <ChatFeatureGate>
+    <HistoryPage />
+  </ChatFeatureGate>
+);
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -109,6 +124,8 @@ export function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/email/unsubscribe/:token" element={<EmailUnsubscribePage />} />
+            {/* Signs in through RequireAuth, yet stays outside PasswordSetupGate and the app Layout. */}
+            <Route path="/oauth/authorize" element={<OAuthConsentRoute />} />
             <Route
               element={
                 <RequireAuth>
@@ -120,6 +137,13 @@ export function App() {
             >
               <Route path="/verify-phone" element={<VerifyPhonePage />} />
             </Route>
+          </Route>
+          {/* Public: a signed-out visitor reads the legal documents too. */}
+          <Route path="legal" element={<LegalLayout />}>
+            <Route index element={<LegalIndexPage />} />
+            <Route path=":doc" element={<LegalDocumentPage />} />
+            <Route path=":doc/history" element={<LegalHistoryPage />} />
+            <Route path=":doc/history/:id" element={<LegalVersionPage />} />
           </Route>
           <Route
             element={
@@ -151,7 +175,16 @@ export function App() {
               <Route path="runs/:runId" element={<RunProgressPage />} />
               {demoPagesEnabled() && <Route path="integrations" element={<IntegrationsPage />} />}
               <Route path="chat" element={chatPage} />
+              <Route path="chat/history" element={historyPage} />
               <Route path="chat/:conversationId" element={chatPage} />
+              <Route
+                path="drive"
+                element={
+                  <DriveFeatureGate>
+                    <DrivePage />
+                  </DriveFeatureGate>
+                }
+              />
               <Route path="docs" element={<DocsPage />} />
               <Route path="docs/api" element={<DocsPage initialTab="api" />} />
               <Route path="docs/guides" element={<DocsPage initialTab="guides" />} />

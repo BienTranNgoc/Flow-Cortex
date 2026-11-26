@@ -1,5 +1,6 @@
 package com.flowcortex.support.web;
 
+import com.flowcortex.settings.api.Settings;
 import com.flowcortex.support.config.SupportProperties;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -11,8 +12,8 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 class SupportWebConfig {
 
     @Bean
-    SupportSwitchFilter supportSwitchFilter(SupportProperties properties,
+    SupportSwitchFilter supportSwitchFilter(SupportProperties properties, Settings settings,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
-        return new SupportSwitchFilter(properties, exceptionResolver);
+        return new SupportSwitchFilter(properties, settings, exceptionResolver);
     }
 }

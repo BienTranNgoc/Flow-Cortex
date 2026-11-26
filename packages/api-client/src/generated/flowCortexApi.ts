@@ -162,6 +162,21 @@ export interface AccessTokenResponse {
   expiresIn?: number;
 }
 
+export interface ChatFolderName {
+  /**
+   * @minLength 1
+   * @maxLength 60
+   */
+  name?: string;
+}
+
+export interface ChatFolder {
+  id?: string;
+  name?: string;
+  conversationCount?: number;
+  createdAt?: string;
+}
+
 export interface ChatConversationTitle {
   /** @maxLength 80 */
   title?: string;
@@ -172,6 +187,21 @@ export interface ChatConversation {
   title?: string;
   lastActivityAt?: string;
   createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
+}
+
+export interface ChatConversationPin {
+  pinned: boolean;
+}
+
+export interface ChatConversationFolder {
+  /**
+   * The folder to file into; null returns the conversation to Recent
+   * @nullable
+   */
+  folderId?: string | null;
 }
 
 export interface ProfileUpdateRequest {
@@ -232,6 +262,8 @@ export const MeResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
   moderationreportview: 'moderation.report.view',
   moderationreportresolve: 'moderation.report.resolve',
   moderationcontenthide: 'moderation.content.hide',
@@ -271,6 +303,41 @@ export interface LocaleRequest {
 
 export interface LocaleResponse {
   locale: string;
+}
+
+export interface AdminTrendTagOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   */
+  ids: string[];
+}
+
+export interface AdminTrendTag {
+  id: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
+}
+
+export interface AdminTrendCategoryOrderRequest {
+  /**
+   * @minItems 0
+   * @maxItems 1000
+   * @items.minLength 1
+   */
+  keys: string[];
+}
+
+export interface AdminTrendCategory {
+  key: string;
+  nameVi: string;
+  nameEn: string;
+  order: number;
+  visible: boolean;
+  usageCount: number;
 }
 
 export interface AdminSupportSettingsUpdate {
@@ -392,6 +459,8 @@ export const SupportConversationMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportConversationMessage {
@@ -587,6 +656,8 @@ export const RoleResponsePermissionsItem = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
   moderationreportview: 'moderation.report.view',
   moderationreportresolve: 'moderation.report.resolve',
   moderationcontenthide: 'moderation.content.hide',
@@ -603,6 +674,36 @@ export interface RoleResponse {
   permissions: RoleResponsePermissionsItem[];
   permissionsVersion: number;
   accountCount: number;
+}
+
+export interface RbacRuntimeUpdate {
+  mutationsEnabled: boolean;
+  /**
+   * @minLength 0
+   * @maxLength 2000
+   */
+  reason?: string;
+}
+
+export type RbacRuntimeSource = (typeof RbacRuntimeSource)[keyof typeof RbacRuntimeSource];
+
+export const RbacRuntimeSource = {
+  STORED: 'STORED',
+  CONFIGURED: 'CONFIGURED',
+  DEFAULT: 'DEFAULT',
+  VETOED: 'VETOED',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface RbacRuntime {
+  mutationsEnabled: boolean;
+  source: RbacRuntimeSource;
+  /** @nullable */
+  configuredValue?: boolean | null;
+  /** @nullable */
+  updatedBy?: string | null;
+  /** @nullable */
+  updatedAt?: string | null;
 }
 
 export interface PaymentSettingUpdate {
@@ -1211,6 +1312,64 @@ export interface CreateUserRequest {
   role: string;
 }
 
+export interface TrashItemKey {
+  /** @pattern ^[a-z][a-z0-9_]{1,31}$ */
+  type: string;
+  /** @pattern ^[A-Za-z0-9_-]{1,64}$ */
+  id: string;
+}
+
+export interface TrashItemsRequest {
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  items: TrashItemKey[];
+}
+
+export type TrashSkippedItemReason =
+  (typeof TrashSkippedItemReason)[keyof typeof TrashSkippedItemReason];
+
+export const TrashSkippedItemReason = {
+  notFound: 'notFound',
+  conflict: 'conflict',
+  blocked: 'blocked',
+  failed: 'failed',
+} as const;
+
+export interface TrashSkippedItem {
+  type: string;
+  id: string;
+  reason: TrashSkippedItemReason;
+  message?: string;
+}
+
+export interface TrashBulkResult {
+  succeeded: TrashItemKey[];
+  skipped: TrashSkippedItem[];
+}
+
+export interface TrashEmptyRequest {
+  /**
+   * The next of the previous answer; absent starts from the first entry
+   * @nullable
+   */
+  next?: string | null;
+}
+
+export interface TrashEmptyResult {
+  purged: number;
+  blocked: number;
+  failed: number;
+  /** Entries still in the Trash after this call */
+  remaining: number;
+  /**
+   * Send back as next to continue; null when every entry has been examined
+   * @nullable
+   */
+  next: string | null;
+}
+
 export interface SupportUploadRequest {
   /**
    * @minLength 0
@@ -1308,6 +1467,27 @@ export interface SupportAssistantQuestion {
   question: string;
 }
 
+/**
+ * @nullable
+ */
+export type SupportAssistantHandoffTopic =
+  (typeof SupportAssistantHandoffTopic)[keyof typeof SupportAssistantHandoffTopic] | null;
+
+export const SupportAssistantHandoffTopic = {
+  money: 'money',
+  security: 'security',
+  personal_data: 'personal_data',
+  legal: 'legal',
+  violation: 'violation',
+} as const;
+
+export interface SupportAssistantHandoff {
+  /** @nullable */
+  topic: SupportAssistantHandoffTopic;
+  subject?: string;
+  description?: string;
+}
+
 export interface SupportAssistantQuota {
   remaining: number;
   resetsAt: string;
@@ -1327,6 +1507,8 @@ export const SupportAssistantReplyMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportAssistantSource {
@@ -1339,6 +1521,7 @@ export interface SupportAssistantReplyMessage {
   text: string;
   outcome: SupportAssistantReplyMessageOutcome;
   sources: SupportAssistantSource[];
+  handoff?: SupportAssistantHandoff;
 }
 
 export interface SupportAssistantReply {
@@ -1634,6 +1817,112 @@ export interface BuilderCompleteBody {
   reason?: BuilderCompleteBodyReason;
 }
 
+export interface TokenForm {
+  grant_type: string;
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+/**
+ * The error object of RFC 6749 section 5.2, also used by RFC 7591
+ */
+export interface OAuthError {
+  /** The OAuth error code, for example invalid_grant */
+  error: string;
+  /** A human-readable explanation; never echoes a request value */
+  error_description?: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+export interface RevokeForm {
+  token: string;
+  token_type_hint?: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+export interface RegistrationRequest {
+  client_name?: string;
+  redirect_uris?: string[];
+  grant_types?: string[];
+  response_types?: string[];
+  token_endpoint_auth_method?: string;
+}
+
+export interface Registration {
+  client_id: string;
+  /** Absent for a client that authenticates with none */
+  client_secret?: string;
+  client_id_issued_at: number;
+  client_secret_expires_at: number;
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: string[];
+  response_types: string[];
+  token_endpoint_auth_method: string;
+}
+
+export interface GrantRequest {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  response_type?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  client_id?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  redirect_uri?: string;
+  /**
+   * @minLength 0
+   * @maxLength 256
+   */
+  code_challenge?: string;
+  /**
+   * @minLength 0
+   * @maxLength 16
+   */
+  code_challenge_method?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  scope?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  state?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  resource?: string;
+  /**
+   * @minLength 0
+   * @maxLength 128
+   */
+  stepUpProof?: string;
+}
+
+export interface GrantResponse {
+  redirectTo: string;
+}
+
 export interface ReadAllResult {
   marked?: number;
 }
@@ -1725,6 +2014,121 @@ export interface CreatedApiToken {
   token: string;
   createdAt: string;
   expiresAt: string;
+}
+
+export type CreateEntityRequestKind =
+  (typeof CreateEntityRequestKind)[keyof typeof CreateEntityRequestKind];
+
+export const CreateEntityRequestKind = {
+  brand: 'brand',
+  product: 'product',
+  character: 'character',
+  voice: 'voice',
+} as const;
+
+export type CreateEntityRequestFields = { [key: string]: unknown };
+
+export interface EntityPartRequest {
+  assetId: string;
+  role: string;
+  label?: string;
+}
+
+export interface CreateEntityRequest {
+  kind: CreateEntityRequestKind;
+  name: string;
+  handle?: string;
+  fields?: CreateEntityRequestFields;
+  parts?: EntityPartRequest[];
+  tags?: string[];
+  categoryLabel?: string;
+}
+
+export type EntityPartAssetKind = (typeof EntityPartAssetKind)[keyof typeof EntityPartAssetKind];
+
+export const EntityPartAssetKind = {
+  video: 'video',
+  image: 'image',
+  audio: 'audio',
+} as const;
+
+export interface EntityPartAsset {
+  id: string;
+  kind: EntityPartAssetKind;
+  title: string;
+  mimeType: string;
+}
+
+export interface EntityPartResponse {
+  id: string;
+  role: string;
+  label?: string;
+  sort: number;
+  asset: EntityPartAsset;
+}
+
+export type EntityResponseKind = (typeof EntityResponseKind)[keyof typeof EntityResponseKind];
+
+export const EntityResponseKind = {
+  brand: 'brand',
+  product: 'product',
+  character: 'character',
+  voice: 'voice',
+} as const;
+
+export type EntityResponseFields = { [key: string]: unknown };
+
+export interface EntityResponse {
+  id: string;
+  kind: EntityResponseKind;
+  handle: string;
+  name: string;
+  fields: EntityResponseFields;
+  /** @nullable */
+  categoryLabel?: string | null;
+  tags: string[];
+  parts: EntityPartResponse[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RestoreEntityRequest {
+  baseVersion: number;
+}
+
+export interface EntityDroppedPart {
+  assetId: string;
+  role: string;
+  label?: string;
+}
+
+export type EntityRestoreResponseKind =
+  (typeof EntityRestoreResponseKind)[keyof typeof EntityRestoreResponseKind];
+
+export const EntityRestoreResponseKind = {
+  brand: 'brand',
+  product: 'product',
+  character: 'character',
+  voice: 'voice',
+} as const;
+
+export type EntityRestoreResponseFields = { [key: string]: unknown };
+
+export interface EntityRestoreResponse {
+  id: string;
+  kind: EntityRestoreResponseKind;
+  handle: string;
+  name: string;
+  fields: EntityRestoreResponseFields;
+  /** @nullable */
+  categoryLabel?: string | null;
+  tags: string[];
+  parts: EntityPartResponse[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  droppedParts: EntityDroppedPart[];
 }
 
 export type EmailLinkUnsubscribedList =
@@ -1962,6 +2366,9 @@ export interface ChatConversationCreated {
   title?: string;
   lastActivityAt?: string;
   createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
   userMessage?: ChatMessage;
   assistantMessageId?: string;
 }
@@ -2109,8 +2516,16 @@ export interface WorkflowArtifactWorkflow {
   name: string;
 }
 
+/**
+ * @nullable
+ */
+export type WorkflowArtifactStepConfig = { [key: string]: unknown } | null;
+
 export interface WorkflowArtifactStep {
-  /** @minimum 1 */
+  /**
+   * @minimum 1
+   * @maximum 32767
+   */
   stepOrder: number;
   /**
    * @maxLength 255
@@ -2128,7 +2543,14 @@ export interface WorkflowArtifactStep {
    */
   inputRef: string | null;
   /** @nullable */
-  config: string | null;
+  config: WorkflowArtifactStepConfig;
+}
+
+export interface WorkflowArtifactDataEntry {
+  key: string;
+  dataType: string;
+  /** Any JSON value */
+  value: unknown;
 }
 
 export interface WorkflowArtifact {
@@ -2140,6 +2562,8 @@ export interface WorkflowArtifact {
   exportedAt: string;
   workflow: WorkflowArtifactWorkflow;
   steps: WorkflowArtifactStep[];
+  /** The workflow's data-store entries; absent when it has none */
+  dataStore?: WorkflowArtifactDataEntry[];
 }
 
 export type ImportIssueResponseSeverity =
@@ -2314,6 +2738,32 @@ export interface WorkflowReportDetailResponse {
   workflow: ReportedWorkflowResponse;
   internalNote?: string;
   history: ModerationHistoryEntryResponse[];
+}
+
+export interface AdminTrendTagCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn: string;
+}
+
+export interface AdminTrendCategoryCreateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn: string;
 }
 
 export type AdminSupportRequestReplyStatus =
@@ -2624,6 +3074,20 @@ export interface NotificationPreferencesView {
   marketingEmail?: boolean;
 }
 
+export type UpdateEntityRequestFields = { [key: string]: unknown };
+
+export interface UpdateEntityRequest {
+  baseVersion: number;
+  kind?: string;
+  name?: string;
+  handle?: string;
+  fields?: UpdateEntityRequestFields;
+  parts?: EntityPartRequest[];
+  tags?: string[];
+  /** @nullable */
+  categoryLabel?: string | null;
+}
+
 export interface UpdateDriveItemRequest {
   name?: string;
   semanticRole?: string;
@@ -2700,6 +3164,34 @@ export interface PrivacySettings {
   activity?: PrivacySettingsActivity;
   message?: PrivacySettingsMessage;
   stats?: PrivacySettingsStats;
+}
+
+export interface AdminTrendTagUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 30
+   */
+  nameEn?: string;
+  visible?: boolean;
+}
+
+export interface AdminTrendCategoryUpdateRequest {
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameVi?: string;
+  /**
+   * @minLength 0
+   * @maxLength 60
+   */
+  nameEn?: string;
+  visible?: boolean;
 }
 
 export interface UpdateRoleRequest {
@@ -3019,6 +3511,39 @@ export interface UserStats {
   newLast7Days?: number;
 }
 
+export interface TrashItem {
+  /** The owning module's item type key */
+  type: string;
+  /** The item's id within its type */
+  id: string;
+  name: string;
+  /** Where the item lived before it was deleted */
+  location: string;
+  deletedAt: string;
+  /** When the sweep deletes the item for good */
+  expiresAt: string;
+  /**
+   * Whole days to expiresAt, rounded up, never below 0
+   * @minimum 0
+   */
+  remainingDays: number;
+}
+
+/**
+ * Entries per provided type and under 'all', whatever type, q and paging say
+ */
+export type TrashListCounts = { [key: string]: number };
+
+export interface TrashList {
+  items: TrashItem[];
+  page: number;
+  size: number;
+  /** Entries matching type and q */
+  total: number;
+  /** Entries per provided type and under 'all', whatever type, q and paging say */
+  counts: TrashListCounts;
+}
+
 export interface SupportSettings {
   contactEmail?: string;
   assistantAvailable: boolean;
@@ -3109,6 +3634,8 @@ export const SupportAssistantHistoryMessageOutcome = {
   answered: 'answered',
   no_answer: 'no_answer',
   blocked: 'blocked',
+  handoff: 'handoff',
+  sign_in: 'sign_in',
 } as const;
 
 export interface SupportAssistantHistoryMessage {
@@ -3116,6 +3643,7 @@ export interface SupportAssistantHistoryMessage {
   text: string;
   outcome?: SupportAssistantHistoryMessageOutcome;
   sources: SupportAssistantSource[];
+  handoff?: SupportAssistantHandoff;
   createdAt: string;
 }
 
@@ -3420,6 +3948,19 @@ export interface OnboardingResultResponse {
   usageType: OnboardingResultResponseUsageType;
 }
 
+export interface CheckResponse {
+  clientId: string;
+  clientName: string;
+  redirectUri: string;
+  scope: string;
+  eligible: boolean;
+  /**
+   * The OAuth error the page sends to the redirect URI; null when the request is valid
+   * @nullable
+   */
+  error?: string | null;
+}
+
 export interface NotificationItem {
   id?: string;
   type?: string;
@@ -3483,6 +4024,98 @@ export interface FeaturesResponse {
   personalAccessTokens: boolean;
   onboarding: boolean;
   chat: boolean;
+  drive: boolean;
+}
+
+export interface EntityKindCounts {
+  brand: number;
+  product: number;
+  character: number;
+  voice: number;
+}
+
+export interface EntityListResponse {
+  items: EntityResponse[];
+  page: number;
+  size: number;
+  total: number;
+  counts: EntityKindCounts;
+}
+
+export type EntityChangeResponseCode =
+  (typeof EntityChangeResponseCode)[keyof typeof EntityChangeResponseCode];
+
+export const EntityChangeResponseCode = {
+  created: 'created',
+  renamed: 'renamed',
+  handleChanged: 'handleChanged',
+  fieldsChanged: 'fieldsChanged',
+  partsChanged: 'partsChanged',
+  tagsChanged: 'tagsChanged',
+  categoryChanged: 'categoryChanged',
+  restored: 'restored',
+} as const;
+
+export interface EntityChangeResponse {
+  code: EntityChangeResponseCode;
+  added?: string[];
+  removed?: string[];
+  from?: number;
+}
+
+export interface EntityVersionResponse {
+  version: number;
+  createdAt: string;
+  current: boolean;
+  changes: EntityChangeResponse[];
+  usedInRuns: number;
+}
+
+export interface PageViewEntityVersionResponse {
+  items: EntityVersionResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface EntityVersionDetailResponse {
+  version: number;
+  createdAt: string;
+  current: boolean;
+  entity: EntityResponse;
+}
+
+export interface EntityRunResponse {
+  runId: string;
+  workflowId?: string;
+  workflowName?: string;
+  version: number;
+  completedAt: string;
+}
+
+export interface PageViewEntityRunResponse {
+  items: EntityRunResponse[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface EntityTagSuggestionItem {
+  tag: string;
+  count: number;
+}
+
+export interface EntityTagSuggestionResponse {
+  items: EntityTagSuggestionItem[];
+}
+
+export interface EntitySuggestionItem {
+  label: string;
+  count: number;
+}
+
+export interface EntitySuggestionResponse {
+  items: EntitySuggestionItem[];
 }
 
 export type EmailLinkViewList = (typeof EmailLinkViewList)[keyof typeof EmailLinkViewList];
@@ -3588,6 +4221,18 @@ export interface BalanceResponse {
   granted?: number;
 }
 
+export interface LegalIndexEntry {
+  /** The document slug, e.g. legal-privacy */
+  slug: string;
+  /** The member page path, e.g. /legal/privacy */
+  path: string;
+  label: LocalizedText;
+}
+
+export interface LegalIndex {
+  items: LegalIndexEntry[];
+}
+
 export interface ContentDocumentHistoryEntry {
   revisionId: string;
   publishedAt: string;
@@ -3625,9 +4270,43 @@ export interface Summary {
   extraHeaderNames?: string[];
 }
 
+export interface ChatFolderList {
+  items?: ChatFolder[];
+}
+
+export interface ChatConversationListItem {
+  id?: string;
+  title?: string;
+  lastActivityAt?: string;
+  createdAt?: string;
+  pinned?: boolean;
+  /** @nullable */
+  folderId?: string | null;
+  /**
+   * @maxLength 200
+   * @nullable
+   */
+  preview?: string | null;
+  /** True when the latest text was longer than the preview cap */
+  previewTruncated?: boolean;
+}
+
 export interface ChatConversationList {
-  items?: ChatConversation[];
+  items?: ChatConversationListItem[];
+  /**
+   * Opaque cursor of the next page; null on the last page
+   * @nullable
+   */
+  nextCursor?: string | null;
   chatEnabled?: boolean;
+}
+
+export interface ChatConversationCounts {
+  total?: number;
+  pinned?: number;
+  today?: number;
+  last7Days?: number;
+  earlier?: number;
 }
 
 export interface CapabilitiesResponse {
@@ -3874,6 +4553,11 @@ export interface PageViewWorkflowReportRowResponse {
   total: number;
 }
 
+export interface AdminTrendTaxonomy {
+  categories: AdminTrendCategory[];
+  tags: AdminTrendTag[];
+}
+
 export type AdminSupportRequestSummaryType =
   (typeof AdminSupportRequestSummaryType)[keyof typeof AdminSupportRequestSummaryType];
 
@@ -3896,6 +4580,16 @@ export const AdminSupportRequestSummaryStatus = {
   closed: 'closed',
 } as const;
 
+export type AdminSupportRequestSummarySlaLevel =
+  (typeof AdminSupportRequestSummarySlaLevel)[keyof typeof AdminSupportRequestSummarySlaLevel];
+
+export const AdminSupportRequestSummarySlaLevel = {
+  ok: 'ok',
+  due_soon: 'due_soon',
+  overdue: 'overdue',
+  paused: 'paused',
+} as const;
+
 export interface AdminSupportRequestSummary {
   number: number;
   type: AdminSupportRequestSummaryType;
@@ -3905,6 +4599,7 @@ export interface AdminSupportRequestSummary {
   assignee?: SupportAssignee;
   createdAt: string;
   lastActivityAt: string;
+  slaLevel: AdminSupportRequestSummarySlaLevel;
 }
 
 export interface AdminSupportRequestPage {
@@ -3912,6 +4607,11 @@ export interface AdminSupportRequestPage {
   page: number;
   size: number;
   total: number;
+}
+
+export interface AdminSupportSlaSummary {
+  overdue: number;
+  dueSoon: number;
 }
 
 export interface SupportAssigneeCount {
@@ -4015,6 +4715,19 @@ export interface PageViewAdminRunResponse {
   total: number;
 }
 
+/**
+ * none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned
+ */
+export type AdminPhoneVerificationStatusCarrierCredential =
+  (typeof AdminPhoneVerificationStatusCarrierCredential)[keyof typeof AdminPhoneVerificationStatusCarrierCredential];
+
+export const AdminPhoneVerificationStatusCarrierCredential = {
+  none: 'none',
+  active: 'active',
+  reseed_required: 'reseed_required',
+  unseeded: 'unseeded',
+} as const;
+
 export interface AdminPhoneVerificationStatus {
   verificationEnabled: boolean;
   /** none when no SMS sender is wired; the configured sender when it is a known one; else custom */
@@ -4026,6 +4739,8 @@ export interface AdminPhoneVerificationStatus {
   globalSendsPerDay: number;
   /** Codes sent in the last 24 hours */
   sentLast24h: number;
+  /** none when the wired sender holds no carrier credential; reseed_required when its token chain was revoked and needs a new token; unseeded when no token was loaded yet. The token is never returned */
+  carrierCredential: AdminPhoneVerificationStatusCarrierCredential;
 }
 
 export type PermissionCatalogEntryKey =
@@ -4068,6 +4783,8 @@ export const PermissionCatalogEntryKey = {
   paymentsettingview: 'payment.setting.view',
   paymentsettingupdate: 'payment.setting.update',
   useraccountexport: 'user.account.export',
+  contenttrend_templateview: 'content.trend_template.view',
+  contenttrend_templatemanage: 'content.trend_template.manage',
   moderationreportview: 'moderation.report.view',
   moderationreportresolve: 'moderation.report.resolve',
   moderationcontenthide: 'moderation.content.hide',
@@ -4130,6 +4847,17 @@ export interface PageViewMediaJobResponse {
   total: number;
 }
 
+export interface AdminFeature {
+  name: string;
+  /** @nullable */
+  settingKey?: string | null;
+  value: boolean;
+}
+
+export interface AdminFeatureList {
+  items: AdminFeature[];
+}
+
 export interface PageViewContentMediaItem {
   items: ContentMediaItem[];
   page: number;
@@ -4142,6 +4870,8 @@ export interface ContentDocumentSummary {
   title: LocalizedText;
   sectionTypes: string[];
   publicHistory: boolean;
+  minSections: number;
+  maxSections: number;
   draftVersion: number;
   /** @nullable */
   draftUpdatedAt?: string | null;
@@ -4250,9 +4980,48 @@ export interface PageViewAdminAccountResponse {
   total: number;
 }
 
+export interface Metadata {
+  issuer: string;
+  authorization_endpoint: string;
+  token_endpoint: string;
+  registration_endpoint: string;
+  revocation_endpoint: string;
+  response_types_supported: string[];
+  grant_types_supported: string[];
+  code_challenge_methods_supported: string[];
+  scopes_supported: string[];
+  token_endpoint_auth_methods_supported: string[];
+  revocation_endpoint_auth_methods_supported: string[];
+}
+
 export interface RevokedResponse {
   revoked?: number;
 }
+
+/**
+ * The Idempotency-Key header is blank or longer than 80 characters, or the keyed request body cannot be fingerprinted (multipart or over 1 MiB).
+ */
+export type IdempotencyKeyInvalidResponse = ProblemDetail;
+
+/**
+ * A request with the same key is still running.
+ */
+export type IdempotencyInProgressResponse = ProblemDetail;
+
+/**
+ * The key was used with a different method, path, query or body.
+ */
+export type IdempotencyKeyReusedResponse = ProblemDetail;
+
+/**
+ * The token owner's daily write limit is reached (code API_TOKEN_DAILY_LIMIT); retry after the UTC day ends.
+ */
+export type ApiTokenDailyLimitResponse = ProblemDetail;
+
+/**
+ * Optional on POST and PATCH made with a personal access token. A repeat of the same request within 24 hours returns the stored answer with Idempotent-Replayed: true.
+ */
+export type IdempotencyKeyParameter = string;
 
 export type ListWorkflowVersionsParams = {
   /**
@@ -4318,6 +5087,37 @@ export const ListUsersSort = {
   name: 'name',
 } as const;
 
+export type RevokeOAuthToken200 = { [key: string]: unknown };
+
+export type MarkAllNotificationsReadParams = {
+  audience?: MarkAllNotificationsReadAudience;
+};
+
+export type MarkAllNotificationsReadAudience =
+  (typeof MarkAllNotificationsReadAudience)[keyof typeof MarkAllNotificationsReadAudience];
+
+export const MarkAllNotificationsReadAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export type ListEntitiesParams = {
+  /**
+   * @minimum 0
+   * @maximum 21474836
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+  kind?: string;
+  q?: string;
+  tag?: string;
+  category?: string;
+};
+
 export type UnsubscribeEmailLinkParams = {
   src?: string;
 };
@@ -4340,6 +5140,41 @@ export type ListDriveItemsParams = {
   role?: string;
   contentType?: string;
 };
+
+export type ListChatConversationsParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  cursor?: string;
+  sort?: ListChatConversationsSort;
+  pinned?: ListChatConversationsPinned;
+  /**
+   * A folder id, or none for conversations outside every folder
+   */
+  folder?: string;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type ListChatConversationsSort =
+  (typeof ListChatConversationsSort)[keyof typeof ListChatConversationsSort];
+
+export const ListChatConversationsSort = {
+  newest: 'newest',
+  oldest: 'oldest',
+} as const;
+
+export type ListChatConversationsPinned =
+  (typeof ListChatConversationsPinned)[keyof typeof ListChatConversationsPinned];
+
+export const ListChatConversationsPinned = {
+  only: 'only',
+  exclude: 'exclude',
+} as const;
 
 export type RecordPaymentJourneyEventBody = { [key: string]: unknown };
 
@@ -4510,6 +5345,34 @@ export const ExportUsersSort = {
   name: 'name',
 } as const;
 
+export type ListTrashParams = {
+  /**
+   * Only entries of this type
+   */
+  type?: string;
+  /**
+   * Search text, at most 100 characters; matches names without case or diacritics
+   */
+  q?: string;
+  sort?: ListTrashSort;
+  /**
+   * @minimum 0
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListTrashSort = (typeof ListTrashSort)[keyof typeof ListTrashSort];
+
+export const ListTrashSort = {
+  recent: 'recent',
+  expiring: 'expiring',
+} as const;
+
 export type SearchSupportKbParams = {
   /**
    * @minLength 2
@@ -4601,10 +5464,128 @@ export type OpenRealtimeStreamParams = {
   topic?: string[];
 };
 
+export type CheckOAuthAuthorizationParams = {
+  /**
+   * @minLength 0
+   * @maxLength 32
+   */
+  response_type?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  client_id?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  redirect_uri?: string;
+  /**
+   * @minLength 0
+   * @maxLength 256
+   */
+  code_challenge?: string;
+  /**
+   * @minLength 0
+   * @maxLength 16
+   */
+  code_challenge_method?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  scope?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1024
+   */
+  state?: string;
+  /**
+   * @minLength 0
+   * @maxLength 2048
+   */
+  resource?: string;
+};
+
 export type ListNotificationsParams = {
+  audience?: ListNotificationsAudience;
   filter?: string;
   page?: string;
   size?: string;
+};
+
+export type ListNotificationsAudience =
+  (typeof ListNotificationsAudience)[keyof typeof ListNotificationsAudience];
+
+export const ListNotificationsAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export type GetUnreadNotificationCountParams = {
+  audience?: GetUnreadNotificationCountAudience;
+};
+
+export type GetUnreadNotificationCountAudience =
+  (typeof GetUnreadNotificationCountAudience)[keyof typeof GetUnreadNotificationCountAudience];
+
+export const GetUnreadNotificationCountAudience = {
+  member: 'member',
+  admin: 'admin',
+} as const;
+
+export type ListEntityVersionsParams = {
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListEntityRunsParams = {
+  /**
+   * @minimum 0
+   * @maximum 42949672
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  size?: number;
+};
+
+export type ListEntityTagsParams = {
+  q?: string;
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  limit?: number;
+};
+
+export type ListEntityLabelsParams = {
+  role?: string;
+  q?: string;
+  /**
+   * @minimum 1
+   * @maximum 20
+   */
+  limit?: number;
+};
+
+export type ListEntityCategoriesParams = {
+  q?: string;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
 };
 
 export type ListDriveSuggestionsParams = {
@@ -4642,6 +5623,16 @@ export type ListContentDocumentHistoryParams = {
    * @maximum 100
    */
   size?: number;
+};
+
+export type CountChatConversationsParams = {
+  q?: string;
+  /**
+   * A folder id, or none for conversations outside every folder
+   */
+  folder?: string;
+  todayStart: string;
+  weekStart: string;
 };
 
 export type GetBuilderRunsChartParams = {
@@ -4756,6 +5747,10 @@ export type ListAdminSupportRequestsParams = {
    * @maxLength 100
    */
   q?: string;
+  /**
+   * Keeps only due-soon and overdue requests
+   */
+  sla?: ListAdminSupportRequestsSla;
   sort?: ListAdminSupportRequestsSort;
   /**
    * @minimum 0
@@ -4796,12 +5791,65 @@ export const ListAdminSupportRequestsCreated = {
   older: 'older',
 } as const;
 
+export type ListAdminSupportRequestsSla =
+  (typeof ListAdminSupportRequestsSla)[keyof typeof ListAdminSupportRequestsSla];
+
+export const ListAdminSupportRequestsSla = {
+  at_risk: 'at_risk',
+} as const;
+
 export type ListAdminSupportRequestsSort =
   (typeof ListAdminSupportRequestsSort)[keyof typeof ListAdminSupportRequestsSort];
 
 export const ListAdminSupportRequestsSort = {
   newest: 'newest',
   oldest: 'oldest',
+} as const;
+
+export type GetAdminSupportSlaSummaryParams = {
+  status?: GetAdminSupportSlaSummaryStatus;
+  type?: GetAdminSupportSlaSummaryType;
+  /**
+   * me, unassigned or an account id
+   */
+  assignee?: string;
+  created?: GetAdminSupportSlaSummaryCreated;
+  /**
+   * @maxLength 100
+   */
+  q?: string;
+};
+
+export type GetAdminSupportSlaSummaryStatus =
+  (typeof GetAdminSupportSlaSummaryStatus)[keyof typeof GetAdminSupportSlaSummaryStatus];
+
+export const GetAdminSupportSlaSummaryStatus = {
+  new: 'new',
+  in_progress: 'in_progress',
+  waiting_member: 'waiting_member',
+  resolved: 'resolved',
+  closed: 'closed',
+} as const;
+
+export type GetAdminSupportSlaSummaryType =
+  (typeof GetAdminSupportSlaSummaryType)[keyof typeof GetAdminSupportSlaSummaryType];
+
+export const GetAdminSupportSlaSummaryType = {
+  account: 'account',
+  credit: 'credit',
+  workflow: 'workflow',
+  technical: 'technical',
+  other: 'other',
+} as const;
+
+export type GetAdminSupportSlaSummaryCreated =
+  (typeof GetAdminSupportSlaSummaryCreated)[keyof typeof GetAdminSupportSlaSummaryCreated];
+
+export const GetAdminSupportSlaSummaryCreated = {
+  today: 'today',
+  '7d': '7d',
+  '30d': '30d',
+  older: 'older',
 } as const;
 
 export type GetAdminSupportRequestFacetsParams = {
@@ -5029,12 +6077,18 @@ export type reorderWorkflowStepsResponse422 = {
   status: 422;
 };
 
+export type reorderWorkflowStepsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type reorderWorkflowStepsResponseError = (
   | reorderWorkflowStepsResponse400
   | reorderWorkflowStepsResponse403
   | reorderWorkflowStepsResponse404
   | reorderWorkflowStepsResponse409
   | reorderWorkflowStepsResponse422
+  | reorderWorkflowStepsResponse429
 ) & {
   headers: Headers;
 };
@@ -5082,10 +6136,20 @@ export type setWorkflowReviewHelpfulResponse200 = {
   status: 200;
 };
 
+export type setWorkflowReviewHelpfulResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowReviewHelpfulResponseSuccess = setWorkflowReviewHelpfulResponse200 & {
   headers: Headers;
 };
-export type setWorkflowReviewHelpfulResponse = setWorkflowReviewHelpfulResponseSuccess;
+export type setWorkflowReviewHelpfulResponseError = setWorkflowReviewHelpfulResponse429 & {
+  headers: Headers;
+};
+
+export type setWorkflowReviewHelpfulResponse =
+  setWorkflowReviewHelpfulResponseSuccess | setWorkflowReviewHelpfulResponseError;
 
 export const getSetWorkflowReviewHelpfulUrl = (id: string, reviewId: string) => {
   return `/api/v1/workflows/${id}/reviews/${reviewId}/helpful`;
@@ -5156,10 +6220,20 @@ export type putMyWorkflowReviewResponse200 = {
   status: 200;
 };
 
+export type putMyWorkflowReviewResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type putMyWorkflowReviewResponseSuccess = putMyWorkflowReviewResponse200 & {
   headers: Headers;
 };
-export type putMyWorkflowReviewResponse = putMyWorkflowReviewResponseSuccess;
+export type putMyWorkflowReviewResponseError = putMyWorkflowReviewResponse429 & {
+  headers: Headers;
+};
+
+export type putMyWorkflowReviewResponse =
+  putMyWorkflowReviewResponseSuccess | putMyWorkflowReviewResponseError;
 
 export const getPutMyWorkflowReviewUrl = (id: string) => {
   return `/api/v1/workflows/${id}/reviews/mine`;
@@ -5202,10 +6276,20 @@ export type deleteMyWorkflowReviewResponse200 = {
   status: 200;
 };
 
+export type deleteMyWorkflowReviewResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteMyWorkflowReviewResponseSuccess = deleteMyWorkflowReviewResponse200 & {
   headers: Headers;
 };
-export type deleteMyWorkflowReviewResponse = deleteMyWorkflowReviewResponseSuccess;
+export type deleteMyWorkflowReviewResponseError = deleteMyWorkflowReviewResponse429 & {
+  headers: Headers;
+};
+
+export type deleteMyWorkflowReviewResponse =
+  deleteMyWorkflowReviewResponseSuccess | deleteMyWorkflowReviewResponseError;
 
 export const getDeleteMyWorkflowReviewUrl = (id: string) => {
   return `/api/v1/workflows/${id}/reviews/mine`;
@@ -5292,6 +6376,11 @@ export type putWorkflowDataResponse422 = {
   status: 422;
 };
 
+export type putWorkflowDataResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type putWorkflowDataResponseSuccess = putWorkflowDataResponse200 & {
   headers: Headers;
 };
@@ -5301,6 +6390,7 @@ export type putWorkflowDataResponseError = (
   | putWorkflowDataResponse404
   | putWorkflowDataResponse409
   | putWorkflowDataResponse422
+  | putWorkflowDataResponse429
 ) & {
   headers: Headers;
 };
@@ -5364,11 +6454,19 @@ export type deleteWorkflowDataResponse409 = {
   status: 409;
 };
 
+export type deleteWorkflowDataResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowDataResponseSuccess = deleteWorkflowDataResponse204 & {
   headers: Headers;
 };
 export type deleteWorkflowDataResponseError = (
-  deleteWorkflowDataResponse403 | deleteWorkflowDataResponse404 | deleteWorkflowDataResponse409
+  | deleteWorkflowDataResponse403
+  | deleteWorkflowDataResponse404
+  | deleteWorkflowDataResponse409
+  | deleteWorkflowDataResponse429
 ) & {
   headers: Headers;
 };
@@ -5420,10 +6518,20 @@ export type setWorkflowBookmarkResponse200 = {
   status: 200;
 };
 
+export type setWorkflowBookmarkResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowBookmarkResponseSuccess = setWorkflowBookmarkResponse200 & {
   headers: Headers;
 };
-export type setWorkflowBookmarkResponse = setWorkflowBookmarkResponseSuccess;
+export type setWorkflowBookmarkResponseError = setWorkflowBookmarkResponse429 & {
+  headers: Headers;
+};
+
+export type setWorkflowBookmarkResponse =
+  setWorkflowBookmarkResponseSuccess | setWorkflowBookmarkResponseError;
 
 export const getSetWorkflowBookmarkUrl = (id: string) => {
   return `/api/v1/workflows/${id}/bookmark`;
@@ -5660,6 +6768,106 @@ export const setPassword = async (
   });
 };
 
+export type renameChatFolderResponse200 = {
+  data: ChatFolder;
+  status: 200;
+};
+
+export type renameChatFolderResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type renameChatFolderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type renameChatFolderResponseSuccess = renameChatFolderResponse200 & {
+  headers: Headers;
+};
+export type renameChatFolderResponseError = (
+  renameChatFolderResponse400 | renameChatFolderResponse404
+) & {
+  headers: Headers;
+};
+
+export type renameChatFolderResponse =
+  renameChatFolderResponseSuccess | renameChatFolderResponseError;
+
+export const getRenameChatFolderUrl = (id: string) => {
+  return `/api/v1/chat/folders/${id}`;
+};
+
+export const renameChatFolder = async (
+  id: string,
+  chatFolderName: ChatFolderName,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<renameChatFolderResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<renameChatFolderResponse>(getRenameChatFolderUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatFolderName),
+  });
+};
+
+export type deleteChatFolderResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteChatFolderResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteChatFolderResponseSuccess = deleteChatFolderResponse204 & {
+  headers: Headers;
+};
+export type deleteChatFolderResponseError = deleteChatFolderResponse404 & {
+  headers: Headers;
+};
+
+export type deleteChatFolderResponse =
+  deleteChatFolderResponseSuccess | deleteChatFolderResponseError;
+
+export const getDeleteChatFolderUrl = (id: string) => {
+  return `/api/v1/chat/folders/${id}`;
+};
+
+/**
+ * The folder's conversations are kept and return to Recent with their pinned state.
+ */
+export const deleteChatFolder = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteChatFolderResponse> => {
+  return customFetch<deleteChatFolderResponse>(getDeleteChatFolderUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
 export type renameChatConversationResponse200 = {
   data: ChatConversation;
   status: 200;
@@ -5754,6 +6962,125 @@ export const deleteChatConversation = async (
   return customFetch<deleteChatConversationResponse>(getDeleteChatConversationUrl(id), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type pinChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type pinChatConversationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type pinChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type pinChatConversationResponseSuccess = pinChatConversationResponse200 & {
+  headers: Headers;
+};
+export type pinChatConversationResponseError = (
+  pinChatConversationResponse400 | pinChatConversationResponse404
+) & {
+  headers: Headers;
+};
+
+export type pinChatConversationResponse =
+  pinChatConversationResponseSuccess | pinChatConversationResponseError;
+
+export const getPinChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/pin`;
+};
+
+export const pinChatConversation = async (
+  id: string,
+  chatConversationPin: ChatConversationPin,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<pinChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<pinChatConversationResponse>(getPinChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationPin),
+  });
+};
+
+export type moveChatConversationResponse200 = {
+  data: ChatConversation;
+  status: 200;
+};
+
+export type moveChatConversationResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type moveChatConversationResponseSuccess = moveChatConversationResponse200 & {
+  headers: Headers;
+};
+export type moveChatConversationResponseError = moveChatConversationResponse404 & {
+  headers: Headers;
+};
+
+export type moveChatConversationResponse =
+  moveChatConversationResponseSuccess | moveChatConversationResponseError;
+
+export const getMoveChatConversationUrl = (id: string) => {
+  return `/api/v1/chat/conversations/${id}/folder`;
+};
+
+export const moveChatConversation = async (
+  id: string,
+  chatConversationFolder: ChatConversationFolder,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<moveChatConversationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<moveChatConversationResponse>(getMoveChatConversationUrl(id), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatConversationFolder),
   });
 };
 
@@ -5979,6 +7306,130 @@ export const reorderAdminWorkflowSteps = async (
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(reorderStepsRequest),
+  });
+};
+
+export type reorderAdminTrendTagsResponse200 = {
+  data: AdminTrendTag[];
+  status: 200;
+};
+
+export type reorderAdminTrendTagsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendTagsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendTagsResponseSuccess = reorderAdminTrendTagsResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendTagsResponseError = (
+  reorderAdminTrendTagsResponse400 | reorderAdminTrendTagsResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendTagsResponse =
+  reorderAdminTrendTagsResponseSuccess | reorderAdminTrendTagsResponseError;
+
+export const getReorderAdminTrendTagsUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags/order`;
+};
+
+export const reorderAdminTrendTags = async (
+  adminTrendTagOrderRequest: AdminTrendTagOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendTagsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendTagsResponse>(getReorderAdminTrendTagsUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagOrderRequest),
+  });
+};
+
+export type reorderAdminTrendCategoriesResponse200 = {
+  data: AdminTrendCategory[];
+  status: 200;
+};
+
+export type reorderAdminTrendCategoriesResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type reorderAdminTrendCategoriesResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type reorderAdminTrendCategoriesResponseSuccess = reorderAdminTrendCategoriesResponse200 & {
+  headers: Headers;
+};
+export type reorderAdminTrendCategoriesResponseError = (
+  reorderAdminTrendCategoriesResponse400 | reorderAdminTrendCategoriesResponse409
+) & {
+  headers: Headers;
+};
+
+export type reorderAdminTrendCategoriesResponse =
+  reorderAdminTrendCategoriesResponseSuccess | reorderAdminTrendCategoriesResponseError;
+
+export const getReorderAdminTrendCategoriesUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories/order`;
+};
+
+export const reorderAdminTrendCategories = async (
+  adminTrendCategoryOrderRequest: AdminTrendCategoryOrderRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reorderAdminTrendCategoriesResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<reorderAdminTrendCategoriesResponse>(getReorderAdminTrendCategoriesUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryOrderRequest),
   });
 };
 
@@ -6641,6 +8092,74 @@ export const replaceAdminRolePermissions = async (
   });
 };
 
+export type getRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type getRbacRuntimeResponseSuccess = getRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type getRbacRuntimeResponse = getRbacRuntimeResponseSuccess;
+
+export const getGetRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const getRbacRuntime = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getRbacRuntimeResponse> => {
+  return customFetch<getRbacRuntimeResponse>(getGetRbacRuntimeUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type updateRbacRuntimeResponse200 = {
+  data: RbacRuntime;
+  status: 200;
+};
+
+export type updateRbacRuntimeResponseSuccess = updateRbacRuntimeResponse200 & {
+  headers: Headers;
+};
+export type updateRbacRuntimeResponse = updateRbacRuntimeResponseSuccess;
+
+export const getUpdateRbacRuntimeUrl = () => {
+  return `/api/v1/admin/rbac/runtime`;
+};
+
+export const updateRbacRuntime = async (
+  rbacRuntimeUpdate: RbacRuntimeUpdate,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateRbacRuntimeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateRbacRuntimeResponse>(getUpdateRbacRuntimeUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rbacRuntimeUpdate),
+  });
+};
+
 export type updatePaymentSettingResponse200 = {
   data: PaymentSettingView;
   status: 200;
@@ -7280,9 +8799,19 @@ export type createWorkflowResponse404 = {
   status: 404;
 };
 
+export type createWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type createWorkflowResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type createWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type createWorkflowResponseSuccess = createWorkflowResponse201 & {
@@ -7292,7 +8821,9 @@ export type createWorkflowResponseError = (
   | createWorkflowResponse400
   | createWorkflowResponse403
   | createWorkflowResponse404
+  | createWorkflowResponse409
   | createWorkflowResponse422
+  | createWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -7413,13 +8944,33 @@ export type saveWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type saveWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type saveWorkflowVersionResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type saveWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type saveWorkflowVersionResponseSuccess = (
   saveWorkflowVersionResponse200 | saveWorkflowVersionResponse201
 ) & {
   headers: Headers;
 };
 export type saveWorkflowVersionResponseError = (
-  saveWorkflowVersionResponse400 | saveWorkflowVersionResponse403 | saveWorkflowVersionResponse404
+  | saveWorkflowVersionResponse400
+  | saveWorkflowVersionResponse403
+  | saveWorkflowVersionResponse404
+  | saveWorkflowVersionResponse409
+  | saveWorkflowVersionResponse422
+  | saveWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -7488,9 +9039,19 @@ export type rollbackWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type rollbackWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type rollbackWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type rollbackWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type rollbackWorkflowVersionResponseSuccess = (
@@ -7502,7 +9063,9 @@ export type rollbackWorkflowVersionResponseError = (
   | rollbackWorkflowVersionResponse400
   | rollbackWorkflowVersionResponse403
   | rollbackWorkflowVersionResponse404
+  | rollbackWorkflowVersionResponse409
   | rollbackWorkflowVersionResponse422
+  | rollbackWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -7577,6 +9140,11 @@ export type addStepResponse422 = {
   status: 422;
 };
 
+export type addStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type addStepResponseSuccess = addStepResponse201 & {
   headers: Headers;
 };
@@ -7586,6 +9154,7 @@ export type addStepResponseError = (
   | addStepResponse404
   | addStepResponse409
   | addStepResponse422
+  | addStepResponse429
 ) & {
   headers: Headers;
 };
@@ -7633,15 +9202,41 @@ export type startRunResponse200 = {
   status: 200;
 };
 
+export type startRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type startRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type startRunResponse410 = {
   data: ProblemDetail;
   status: 410;
 };
 
+export type startRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type startRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type startRunResponseSuccess = startRunResponse200 & {
   headers: Headers;
 };
-export type startRunResponseError = startRunResponse410 & {
+export type startRunResponseError = (
+  | startRunResponse400
+  | startRunResponse409
+  | startRunResponse410
+  | startRunResponse422
+  | startRunResponse429
+) & {
   headers: Headers;
 };
 
@@ -7701,10 +9296,40 @@ export type reportWorkflowReviewResponse200 = {
   status: 200;
 };
 
+export type reportWorkflowReviewResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type reportWorkflowReviewResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type reportWorkflowReviewResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type reportWorkflowReviewResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type reportWorkflowReviewResponseSuccess = reportWorkflowReviewResponse200 & {
   headers: Headers;
 };
-export type reportWorkflowReviewResponse = reportWorkflowReviewResponseSuccess;
+export type reportWorkflowReviewResponseError = (
+  | reportWorkflowReviewResponse400
+  | reportWorkflowReviewResponse409
+  | reportWorkflowReviewResponse422
+  | reportWorkflowReviewResponse429
+) & {
+  headers: Headers;
+};
+
+export type reportWorkflowReviewResponse =
+  reportWorkflowReviewResponseSuccess | reportWorkflowReviewResponseError;
 
 export const getReportWorkflowReviewUrl = (id: string, reviewId: string) => {
   return `/api/v1/workflows/${id}/reviews/${reviewId}/report`;
@@ -7748,10 +9373,40 @@ export type createReviewImageUploadResponse200 = {
   status: 200;
 };
 
+export type createReviewImageUploadResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type createReviewImageUploadResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type createReviewImageUploadResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type createReviewImageUploadResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type createReviewImageUploadResponseSuccess = createReviewImageUploadResponse200 & {
   headers: Headers;
 };
-export type createReviewImageUploadResponse = createReviewImageUploadResponseSuccess;
+export type createReviewImageUploadResponseError = (
+  | createReviewImageUploadResponse400
+  | createReviewImageUploadResponse409
+  | createReviewImageUploadResponse422
+  | createReviewImageUploadResponse429
+) & {
+  headers: Headers;
+};
+
+export type createReviewImageUploadResponse =
+  createReviewImageUploadResponseSuccess | createReviewImageUploadResponseError;
 
 export const getCreateReviewImageUploadUrl = (id: string) => {
   return `/api/v1/workflows/${id}/reviews/image-uploads`;
@@ -7794,6 +9449,11 @@ export type reportWorkflowResponse200 = {
   status: 200;
 };
 
+export type reportWorkflowResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type reportWorkflowResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -7802,6 +9462,11 @@ export type reportWorkflowResponse403 = {
 export type reportWorkflowResponse404 = {
   data: ProblemDetail;
   status: 404;
+};
+
+export type reportWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
 };
 
 export type reportWorkflowResponse422 = {
@@ -7818,8 +9483,10 @@ export type reportWorkflowResponseSuccess = reportWorkflowResponse200 & {
   headers: Headers;
 };
 export type reportWorkflowResponseError = (
+  | reportWorkflowResponse400
   | reportWorkflowResponse403
   | reportWorkflowResponse404
+  | reportWorkflowResponse409
   | reportWorkflowResponse422
   | reportWorkflowResponse429
 ) & {
@@ -7869,6 +9536,11 @@ export type regenerateWorkflowShareKeyResponse200 = {
   status: 200;
 };
 
+export type regenerateWorkflowShareKeyResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type regenerateWorkflowShareKeyResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -7884,13 +9556,26 @@ export type regenerateWorkflowShareKeyResponse409 = {
   status: 409;
 };
 
+export type regenerateWorkflowShareKeyResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateWorkflowShareKeyResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type regenerateWorkflowShareKeyResponseSuccess = regenerateWorkflowShareKeyResponse200 & {
   headers: Headers;
 };
 export type regenerateWorkflowShareKeyResponseError = (
+  | regenerateWorkflowShareKeyResponse400
   | regenerateWorkflowShareKeyResponse403
   | regenerateWorkflowShareKeyResponse404
   | regenerateWorkflowShareKeyResponse409
+  | regenerateWorkflowShareKeyResponse422
+  | regenerateWorkflowShareKeyResponse429
 ) & {
   headers: Headers;
 };
@@ -7961,16 +9646,30 @@ export type pinWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type pinWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type pinWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type pinWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type pinWorkflowVersionResponseSuccess = pinWorkflowVersionResponse200 & {
   headers: Headers;
 };
 export type pinWorkflowVersionResponseError = (
-  pinWorkflowVersionResponse400 | pinWorkflowVersionResponse404 | pinWorkflowVersionResponse422
+  | pinWorkflowVersionResponse400
+  | pinWorkflowVersionResponse404
+  | pinWorkflowVersionResponse409
+  | pinWorkflowVersionResponse422
+  | pinWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -8024,10 +9723,17 @@ export type unpinWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type unpinWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type unpinWorkflowVersionResponseSuccess = unpinWorkflowVersionResponse204 & {
   headers: Headers;
 };
-export type unpinWorkflowVersionResponseError = unpinWorkflowVersionResponse404 & {
+export type unpinWorkflowVersionResponseError = (
+  unpinWorkflowVersionResponse404 | unpinWorkflowVersionResponse429
+) & {
   headers: Headers;
 };
 
@@ -8073,13 +9779,33 @@ export type hotfixWorkflowResponse404 = {
   status: 404;
 };
 
+export type hotfixWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type hotfixWorkflowResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type hotfixWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type hotfixWorkflowResponseSuccess = (
   hotfixWorkflowResponse200 | hotfixWorkflowResponse201
 ) & {
   headers: Headers;
 };
 export type hotfixWorkflowResponseError = (
-  hotfixWorkflowResponse400 | hotfixWorkflowResponse403 | hotfixWorkflowResponse404
+  | hotfixWorkflowResponse400
+  | hotfixWorkflowResponse403
+  | hotfixWorkflowResponse404
+  | hotfixWorkflowResponse409
+  | hotfixWorkflowResponse422
+  | hotfixWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -8127,6 +9853,11 @@ export type forkWorkflowResponse201 = {
   status: 201;
 };
 
+export type forkWorkflowResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type forkWorkflowResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -8147,14 +9878,21 @@ export type forkWorkflowResponse422 = {
   status: 422;
 };
 
+export type forkWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type forkWorkflowResponseSuccess = forkWorkflowResponse201 & {
   headers: Headers;
 };
 export type forkWorkflowResponseError = (
+  | forkWorkflowResponse400
   | forkWorkflowResponse403
   | forkWorkflowResponse404
   | forkWorkflowResponse409
   | forkWorkflowResponse422
+  | forkWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -8300,10 +10038,39 @@ export type requestUploadResponse201 = {
   status: 201;
 };
 
+export type requestUploadResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type requestUploadResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type requestUploadResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type requestUploadResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type requestUploadResponseSuccess = requestUploadResponse201 & {
   headers: Headers;
 };
-export type requestUploadResponse = requestUploadResponseSuccess;
+export type requestUploadResponseError = (
+  | requestUploadResponse400
+  | requestUploadResponse409
+  | requestUploadResponse422
+  | requestUploadResponse429
+) & {
+  headers: Headers;
+};
+
+export type requestUploadResponse = requestUploadResponseSuccess | requestUploadResponseError;
 
 export const getRequestUploadUrl = () => {
   return `/api/v1/uploads`;
@@ -8337,6 +10104,223 @@ export const requestUpload = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(uploadRequest),
+  });
+};
+
+export type restoreTrashItemsResponse200 = {
+  data: TrashBulkResult;
+  status: 200;
+};
+
+export type restoreTrashItemsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type restoreTrashItemsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type restoreTrashItemsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type restoreTrashItemsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type restoreTrashItemsResponseSuccess = restoreTrashItemsResponse200 & {
+  headers: Headers;
+};
+export type restoreTrashItemsResponseError = (
+  | restoreTrashItemsResponse400
+  | restoreTrashItemsResponse404
+  | restoreTrashItemsResponse409
+  | restoreTrashItemsResponse503
+) & {
+  headers: Headers;
+};
+
+export type restoreTrashItemsResponse =
+  restoreTrashItemsResponseSuccess | restoreTrashItemsResponseError;
+
+export const getRestoreTrashItemsUrl = () => {
+  return `/api/v1/trash/restore`;
+};
+
+/**
+ * @summary Restore items from the Trash
+ */
+export const restoreTrashItems = async (
+  trashItemsRequest: TrashItemsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreTrashItemsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreTrashItemsResponse>(getRestoreTrashItemsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashItemsRequest),
+  });
+};
+
+export type purgeTrashItemsResponse200 = {
+  data: TrashBulkResult;
+  status: 200;
+};
+
+export type purgeTrashItemsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type purgeTrashItemsResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type purgeTrashItemsResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type purgeTrashItemsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type purgeTrashItemsResponseSuccess = purgeTrashItemsResponse200 & {
+  headers: Headers;
+};
+export type purgeTrashItemsResponseError = (
+  | purgeTrashItemsResponse400
+  | purgeTrashItemsResponse404
+  | purgeTrashItemsResponse409
+  | purgeTrashItemsResponse503
+) & {
+  headers: Headers;
+};
+
+export type purgeTrashItemsResponse = purgeTrashItemsResponseSuccess | purgeTrashItemsResponseError;
+
+export const getPurgeTrashItemsUrl = () => {
+  return `/api/v1/trash/purge`;
+};
+
+/**
+ * @summary Delete items from the Trash for good
+ */
+export const purgeTrashItems = async (
+  trashItemsRequest: TrashItemsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<purgeTrashItemsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<purgeTrashItemsResponse>(getPurgeTrashItemsUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashItemsRequest),
+  });
+};
+
+export type emptyTrashResponse200 = {
+  data: TrashEmptyResult;
+  status: 200;
+};
+
+export type emptyTrashResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type emptyTrashResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type emptyTrashResponseSuccess = emptyTrashResponse200 & {
+  headers: Headers;
+};
+export type emptyTrashResponseError = (emptyTrashResponse400 | emptyTrashResponse503) & {
+  headers: Headers;
+};
+
+export type emptyTrashResponse = emptyTrashResponseSuccess | emptyTrashResponseError;
+
+export const getEmptyTrashUrl = () => {
+  return `/api/v1/trash/empty`;
+};
+
+/**
+ * @summary Delete the caller's Trash for good, at most 500 entries a call
+ */
+export const emptyTrash = async (
+  trashEmptyRequest?: TrashEmptyRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<emptyTrashResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<emptyTrashResponse>(getEmptyTrashUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(trashEmptyRequest),
   });
 };
 
@@ -8831,6 +10815,11 @@ export type retryRunStepResponse200 = {
   status: 200;
 };
 
+export type retryRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type retryRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -8846,6 +10835,16 @@ export type retryRunStepResponse409 = {
   status: 409;
 };
 
+export type retryRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type retryRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type retryRunStepResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -8855,9 +10854,12 @@ export type retryRunStepResponseSuccess = retryRunStepResponse200 & {
   headers: Headers;
 };
 export type retryRunStepResponseError = (
+  | retryRunStepResponse400
   | retryRunStepResponse401
   | retryRunStepResponse404
   | retryRunStepResponse409
+  | retryRunStepResponse422
+  | retryRunStepResponse429
   | retryRunStepResponse503
 ) & {
   headers: Headers;
@@ -8885,6 +10887,11 @@ export type resetRunStepResponse200 = {
   status: 200;
 };
 
+export type resetRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type resetRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -8900,11 +10907,26 @@ export type resetRunStepResponse409 = {
   status: 409;
 };
 
+export type resetRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type resetRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type resetRunStepResponseSuccess = resetRunStepResponse200 & {
   headers: Headers;
 };
 export type resetRunStepResponseError = (
-  resetRunStepResponse401 | resetRunStepResponse404 | resetRunStepResponse409
+  | resetRunStepResponse400
+  | resetRunStepResponse401
+  | resetRunStepResponse404
+  | resetRunStepResponse409
+  | resetRunStepResponse422
+  | resetRunStepResponse429
 ) & {
   headers: Headers;
 };
@@ -8931,6 +10953,11 @@ export type executeRunStepResponse200 = {
   status: 200;
 };
 
+export type executeRunStepResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type executeRunStepResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -8946,6 +10973,16 @@ export type executeRunStepResponse409 = {
   status: 409;
 };
 
+export type executeRunStepResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type executeRunStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type executeRunStepResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -8955,9 +10992,12 @@ export type executeRunStepResponseSuccess = executeRunStepResponse200 & {
   headers: Headers;
 };
 export type executeRunStepResponseError = (
+  | executeRunStepResponse400
   | executeRunStepResponse401
   | executeRunStepResponse404
   | executeRunStepResponse409
+  | executeRunStepResponse422
+  | executeRunStepResponse429
   | executeRunStepResponse503
 ) & {
   headers: Headers;
@@ -8985,6 +11025,11 @@ export type regenerateChildResponse200 = {
   status: 200;
 };
 
+export type regenerateChildResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type regenerateChildResponse401 = {
   data: ProblemDetail;
   status: 401;
@@ -9005,6 +11050,16 @@ export type regenerateChildResponse409 = {
   status: 409;
 };
 
+export type regenerateChildResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateChildResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type regenerateChildResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -9014,10 +11069,13 @@ export type regenerateChildResponseSuccess = regenerateChildResponse200 & {
   headers: Headers;
 };
 export type regenerateChildResponseError = (
+  | regenerateChildResponse400
   | regenerateChildResponse401
   | regenerateChildResponse402
   | regenerateChildResponse404
   | regenerateChildResponse409
+  | regenerateChildResponse422
+  | regenerateChildResponse429
   | regenerateChildResponse503
 ) & {
   headers: Headers;
@@ -9076,6 +11134,11 @@ export type retryRunResponse422 = {
   status: 422;
 };
 
+export type retryRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type retryRunResponse503 = {
   data: ProblemDetail;
   status: 503;
@@ -9091,6 +11154,7 @@ export type retryRunResponseError = (
   | retryRunResponse404
   | retryRunResponse409
   | retryRunResponse422
+  | retryRunResponse429
   | retryRunResponse503
 ) & {
   headers: Headers;
@@ -9139,10 +11203,36 @@ export type cancelRunResponse200 = {
   status: 200;
 };
 
+export type cancelRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type cancelRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type cancelRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type cancelRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type cancelRunResponseSuccess = cancelRunResponse200 & {
   headers: Headers;
 };
-export type cancelRunResponse = cancelRunResponseSuccess;
+export type cancelRunResponseError = (
+  cancelRunResponse400 | cancelRunResponse409 | cancelRunResponse422 | cancelRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type cancelRunResponse = cancelRunResponseSuccess | cancelRunResponseError;
 
 export const getCancelRunUrl = (id: string) => {
   return `/api/v1/runs/${id}/cancel`;
@@ -9187,10 +11277,39 @@ export type saveRevisionResponse200 = {
   status: 200;
 };
 
+export type saveRevisionResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type saveRevisionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type saveRevisionResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type saveRevisionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type saveRevisionResponseSuccess = saveRevisionResponse200 & {
   headers: Headers;
 };
-export type saveRevisionResponse = saveRevisionResponseSuccess;
+export type saveRevisionResponseError = (
+  | saveRevisionResponse400
+  | saveRevisionResponse409
+  | saveRevisionResponse422
+  | saveRevisionResponse429
+) & {
+  headers: Headers;
+};
+
+export type saveRevisionResponse = saveRevisionResponseSuccess | saveRevisionResponseError;
 
 export const getSaveRevisionUrl = (taskId: string) => {
   return `/api/v1/review-tasks/${taskId}/revisions`;
@@ -9248,11 +11367,25 @@ export type rejectTaskResponse409 = {
   status: 409;
 };
 
+export type rejectTaskResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type rejectTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type rejectTaskResponseSuccess = rejectTaskResponse200 & {
   headers: Headers;
 };
 export type rejectTaskResponseError = (
-  rejectTaskResponse400 | rejectTaskResponse404 | rejectTaskResponse409
+  | rejectTaskResponse400
+  | rejectTaskResponse404
+  | rejectTaskResponse409
+  | rejectTaskResponse422
+  | rejectTaskResponse429
 ) & {
   headers: Headers;
 };
@@ -9298,11 +11431,20 @@ export type approveTaskResponse422 = {
   status: 422;
 };
 
+export type approveTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type approveTaskResponseSuccess = approveTaskResponse200 & {
   headers: Headers;
 };
 export type approveTaskResponseError = (
-  approveTaskResponse400 | approveTaskResponse404 | approveTaskResponse409 | approveTaskResponse422
+  | approveTaskResponse400
+  | approveTaskResponse404
+  | approveTaskResponse409
+  | approveTaskResponse422
+  | approveTaskResponse429
 ) & {
   headers: Headers;
 };
@@ -9370,11 +11512,20 @@ export type answerTaskResponse422 = {
   status: 422;
 };
 
+export type answerTaskResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type answerTaskResponseSuccess = answerTaskResponse200 & {
   headers: Headers;
 };
 export type answerTaskResponseError = (
-  answerTaskResponse400 | answerTaskResponse404 | answerTaskResponse409 | answerTaskResponse422
+  | answerTaskResponse400
+  | answerTaskResponse404
+  | answerTaskResponse409
+  | answerTaskResponse422
+  | answerTaskResponse429
 ) & {
   headers: Headers;
 };
@@ -9537,10 +11688,40 @@ export type startProductVideoRunResponse200 = {
   status: 200;
 };
 
+export type startProductVideoRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type startProductVideoRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type startProductVideoRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type startProductVideoRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type startProductVideoRunResponseSuccess = startProductVideoRunResponse200 & {
   headers: Headers;
 };
-export type startProductVideoRunResponse = startProductVideoRunResponseSuccess;
+export type startProductVideoRunResponseError = (
+  | startProductVideoRunResponse400
+  | startProductVideoRunResponse409
+  | startProductVideoRunResponse422
+  | startProductVideoRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type startProductVideoRunResponse =
+  startProductVideoRunResponseSuccess | startProductVideoRunResponseError;
 
 export const getStartProductVideoRunUrl = () => {
   return `/api/v1/product-videos/runs`;
@@ -9927,6 +12108,324 @@ export const completeBuilderOnboarding = async (
   });
 };
 
+export type oauthTokenResponse200 = {
+  data: TokenResponse;
+  status: 200;
+};
+
+export type oauthTokenResponse400 = {
+  data: OAuthError;
+  status: 400;
+};
+
+export type oauthTokenResponse401 = {
+  data: OAuthError;
+  status: 401;
+};
+
+export type oauthTokenResponse429 = {
+  data: OAuthError;
+  status: 429;
+};
+
+export type oauthTokenResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type oauthTokenResponseSuccess = oauthTokenResponse200 & {
+  headers: Headers;
+};
+export type oauthTokenResponseError = (
+  oauthTokenResponse400 | oauthTokenResponse401 | oauthTokenResponse429 | oauthTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export type oauthTokenResponse = oauthTokenResponseSuccess | oauthTokenResponseError;
+
+export const getOauthTokenUrl = () => {
+  return `/api/v1/oauth/token`;
+};
+
+export const oauthToken = async (
+  tokenForm: TokenForm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oauthTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`grant_type`, tokenForm.grant_type);
+  formUrlEncoded.append(`code`, tokenForm.code);
+  formUrlEncoded.append(`code_verifier`, tokenForm.code_verifier);
+  formUrlEncoded.append(`redirect_uri`, tokenForm.redirect_uri);
+  if (tokenForm.client_id !== undefined) {
+    formUrlEncoded.append(`client_id`, tokenForm.client_id);
+  }
+  if (tokenForm.client_secret !== undefined) {
+    formUrlEncoded.append(`client_secret`, tokenForm.client_secret);
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<oauthTokenResponse>(getOauthTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export type revokeOAuthTokenResponse200 = {
+  data: RevokeOAuthToken200;
+  status: 200;
+};
+
+export type revokeOAuthTokenResponse400 = {
+  data: OAuthError;
+  status: 400;
+};
+
+export type revokeOAuthTokenResponse401 = {
+  data: OAuthError;
+  status: 401;
+};
+
+export type revokeOAuthTokenResponse429 = {
+  data: OAuthError;
+  status: 429;
+};
+
+export type revokeOAuthTokenResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type revokeOAuthTokenResponseSuccess = revokeOAuthTokenResponse200 & {
+  headers: Headers;
+};
+export type revokeOAuthTokenResponseError = (
+  | revokeOAuthTokenResponse400
+  | revokeOAuthTokenResponse401
+  | revokeOAuthTokenResponse429
+  | revokeOAuthTokenResponse503
+) & {
+  headers: Headers;
+};
+
+export type revokeOAuthTokenResponse =
+  revokeOAuthTokenResponseSuccess | revokeOAuthTokenResponseError;
+
+export const getRevokeOAuthTokenUrl = () => {
+  return `/api/v1/oauth/revoke`;
+};
+
+export const revokeOAuthToken = async (
+  revokeForm: RevokeForm,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revokeOAuthTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`token`, revokeForm.token);
+  if (revokeForm.token_type_hint !== undefined) {
+    formUrlEncoded.append(`token_type_hint`, revokeForm.token_type_hint);
+  }
+  if (revokeForm.client_id !== undefined) {
+    formUrlEncoded.append(`client_id`, revokeForm.client_id);
+  }
+  if (revokeForm.client_secret !== undefined) {
+    formUrlEncoded.append(`client_secret`, revokeForm.client_secret);
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<revokeOAuthTokenResponse>(getRevokeOAuthTokenUrl(), {
+    ...options,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...getHeaders(options?.headers),
+    },
+    body: formUrlEncoded,
+  });
+};
+
+export type registerOAuthClientResponse201 = {
+  data: Registration;
+  status: 201;
+};
+
+export type registerOAuthClientResponse400 = {
+  data: OAuthError;
+  status: 400;
+};
+
+export type registerOAuthClientResponse429 = {
+  data: OAuthError;
+  status: 429;
+};
+
+export type registerOAuthClientResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type registerOAuthClientResponseSuccess = registerOAuthClientResponse201 & {
+  headers: Headers;
+};
+export type registerOAuthClientResponseError = (
+  registerOAuthClientResponse400 | registerOAuthClientResponse429 | registerOAuthClientResponse503
+) & {
+  headers: Headers;
+};
+
+export type registerOAuthClientResponse =
+  registerOAuthClientResponseSuccess | registerOAuthClientResponseError;
+
+export const getRegisterOAuthClientUrl = () => {
+  return `/api/v1/oauth/register`;
+};
+
+export const registerOAuthClient = async (
+  registrationRequest: RegistrationRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<registerOAuthClientResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<registerOAuthClientResponse>(getRegisterOAuthClientUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(registrationRequest),
+  });
+};
+
+export type grantOAuthAuthorizationResponse200 = {
+  data: GrantResponse;
+  status: 200;
+};
+
+export type grantOAuthAuthorizationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type grantOAuthAuthorizationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type grantOAuthAuthorizationResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type grantOAuthAuthorizationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type grantOAuthAuthorizationResponseSuccess = grantOAuthAuthorizationResponse200 & {
+  headers: Headers;
+};
+export type grantOAuthAuthorizationResponseError = (
+  | grantOAuthAuthorizationResponse400
+  | grantOAuthAuthorizationResponse403
+  | grantOAuthAuthorizationResponse409
+  | grantOAuthAuthorizationResponse503
+) & {
+  headers: Headers;
+};
+
+export type grantOAuthAuthorizationResponse =
+  grantOAuthAuthorizationResponseSuccess | grantOAuthAuthorizationResponseError;
+
+export const getGrantOAuthAuthorizationUrl = () => {
+  return `/api/v1/oauth/authorize`;
+};
+
+export const grantOAuthAuthorization = async (
+  grantRequest: GrantRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<grantOAuthAuthorizationResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<grantOAuthAuthorizationResponse>(getGrantOAuthAuthorizationUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(grantRequest),
+  });
+};
+
 export type markNotificationReadResponse204 = {
   data: void;
   status: 204;
@@ -9966,19 +12465,42 @@ export type markAllNotificationsReadResponse200 = {
   status: 200;
 };
 
+export type markAllNotificationsReadResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type markAllNotificationsReadResponseSuccess = markAllNotificationsReadResponse200 & {
   headers: Headers;
 };
-export type markAllNotificationsReadResponse = markAllNotificationsReadResponseSuccess;
+export type markAllNotificationsReadResponseError = markAllNotificationsReadResponse400 & {
+  headers: Headers;
+};
 
-export const getMarkAllNotificationsReadUrl = () => {
-  return `/api/v1/notifications/read-all`;
+export type markAllNotificationsReadResponse =
+  markAllNotificationsReadResponseSuccess | markAllNotificationsReadResponseError;
+
+export const getMarkAllNotificationsReadUrl = (params?: MarkAllNotificationsReadParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications/read-all?${stringifiedParams}`
+    : `/api/v1/notifications/read-all`;
 };
 
 export const markAllNotificationsRead = async (
+  params?: MarkAllNotificationsReadParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<markAllNotificationsReadResponse> => {
-  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(), {
+  return customFetch<markAllNotificationsReadResponse>(getMarkAllNotificationsReadUrl(params), {
     ...options,
     method: 'POST',
   });
@@ -10110,10 +12632,19 @@ export type sendCodeResponse200 = {
   status: 200;
 };
 
+export type sendCodeResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type sendCodeResponseSuccess = sendCodeResponse200 & {
   headers: Headers;
 };
-export type sendCodeResponse = sendCodeResponseSuccess;
+export type sendCodeResponseError = sendCodeResponse503 & {
+  headers: Headers;
+};
+
+export type sendCodeResponse = sendCodeResponseSuccess | sendCodeResponseError;
 
 export const getSendCodeUrl = () => {
   return `/api/v1/me/phone/send-code`;
@@ -10246,6 +12777,11 @@ export type changeStartResponse429 = {
   status: 429;
 };
 
+export type changeStartResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
 export type changeStartResponseSuccess = changeStartResponse200 & {
   headers: Headers;
 };
@@ -10255,6 +12791,7 @@ export type changeStartResponseError = (
   | changeStartResponse409
   | changeStartResponse422
   | changeStartResponse429
+  | changeStartResponse503
 ) & {
   headers: Headers;
 };
@@ -10488,6 +13025,134 @@ export const createApiToken = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createApiTokenRequest),
+  });
+};
+
+export type listEntitiesResponse200 = {
+  data: EntityListResponse;
+  status: 200;
+};
+
+export type listEntitiesResponseSuccess = listEntitiesResponse200 & {
+  headers: Headers;
+};
+export type listEntitiesResponse = listEntitiesResponseSuccess;
+
+export const getListEntitiesUrl = (params?: ListEntitiesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities?${stringifiedParams}`
+    : `/api/v1/entities`;
+};
+
+export const listEntities = async (
+  params?: ListEntitiesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntitiesResponse> => {
+  return customFetch<listEntitiesResponse>(getListEntitiesUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createEntityResponse201 = {
+  data: EntityResponse;
+  status: 201;
+};
+
+export type createEntityResponseSuccess = createEntityResponse201 & {
+  headers: Headers;
+};
+export type createEntityResponse = createEntityResponseSuccess;
+
+export const getCreateEntityUrl = () => {
+  return `/api/v1/entities`;
+};
+
+export const createEntity = async (
+  createEntityRequest: CreateEntityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createEntityResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createEntityResponse>(getCreateEntityUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createEntityRequest),
+  });
+};
+
+export type restoreEntityVersionResponse200 = {
+  data: EntityRestoreResponse;
+  status: 200;
+};
+
+export type restoreEntityVersionResponseSuccess = restoreEntityVersionResponse200 & {
+  headers: Headers;
+};
+export type restoreEntityVersionResponse = restoreEntityVersionResponseSuccess;
+
+export const getRestoreEntityVersionUrl = (id: string, n: number) => {
+  return `/api/v1/entities/${id}/versions/${n}/restore`;
+};
+
+export const restoreEntityVersion = async (
+  id: string,
+  n: number,
+  restoreEntityRequest: RestoreEntityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<restoreEntityVersionResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<restoreEntityVersionResponse>(getRestoreEntityVersionUrl(id, n), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(restoreEntityRequest),
   });
 };
 
@@ -11032,24 +13697,132 @@ export const reportClientError = async (
   });
 };
 
+export type listChatFoldersResponse200 = {
+  data: ChatFolderList;
+  status: 200;
+};
+
+export type listChatFoldersResponseSuccess = listChatFoldersResponse200 & {
+  headers: Headers;
+};
+export type listChatFoldersResponse = listChatFoldersResponseSuccess;
+
+export const getListChatFoldersUrl = () => {
+  return `/api/v1/chat/folders`;
+};
+
+export const listChatFolders = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listChatFoldersResponse> => {
+  return customFetch<listChatFoldersResponse>(getListChatFoldersUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createChatFolderResponse201 = {
+  data: ChatFolder;
+  status: 201;
+};
+
+export type createChatFolderResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createChatFolderResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createChatFolderResponseSuccess = createChatFolderResponse201 & {
+  headers: Headers;
+};
+export type createChatFolderResponseError = (
+  createChatFolderResponse400 | createChatFolderResponse409
+) & {
+  headers: Headers;
+};
+
+export type createChatFolderResponse =
+  createChatFolderResponseSuccess | createChatFolderResponseError;
+
+export const getCreateChatFolderUrl = () => {
+  return `/api/v1/chat/folders`;
+};
+
+export const createChatFolder = async (
+  chatFolderName: ChatFolderName,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createChatFolderResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createChatFolderResponse>(getCreateChatFolderUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(chatFolderName),
+  });
+};
+
 export type listChatConversationsResponse200 = {
   data: ChatConversationList;
   status: 200;
 };
 
+export type listChatConversationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type listChatConversationsResponseSuccess = listChatConversationsResponse200 & {
   headers: Headers;
 };
-export type listChatConversationsResponse = listChatConversationsResponseSuccess;
+export type listChatConversationsResponseError = listChatConversationsResponse400 & {
+  headers: Headers;
+};
 
-export const getListChatConversationsUrl = () => {
-  return `/api/v1/chat/conversations`;
+export type listChatConversationsResponse =
+  listChatConversationsResponseSuccess | listChatConversationsResponseError;
+
+export const getListChatConversationsUrl = (params?: ListChatConversationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/chat/conversations?${stringifiedParams}`
+    : `/api/v1/chat/conversations`;
 };
 
 export const listChatConversations = async (
+  params?: ListChatConversationsParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listChatConversationsResponse> => {
-  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(), {
+  return customFetch<listChatConversationsResponse>(getListChatConversationsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -12601,6 +15374,137 @@ export const dismissWorkflowReport = async (
   });
 };
 
+export type createAdminTrendTagResponse201 = {
+  data: AdminTrendTag;
+  status: 201;
+};
+
+export type createAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendTagResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendTagResponseSuccess = createAdminTrendTagResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendTagResponseError = (
+  createAdminTrendTagResponse400 | createAdminTrendTagResponse409
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendTagResponse =
+  createAdminTrendTagResponseSuccess | createAdminTrendTagResponseError;
+
+export const getCreateAdminTrendTagUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/tags`;
+};
+
+export const createAdminTrendTag = async (
+  adminTrendTagCreateRequest: AdminTrendTagCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendTagResponse>(getCreateAdminTrendTagUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagCreateRequest),
+  });
+};
+
+export type createAdminTrendCategoryResponse201 = {
+  data: AdminTrendCategory;
+  status: 201;
+};
+
+export type createAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type createAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type createAdminTrendCategoryResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createAdminTrendCategoryResponseSuccess = createAdminTrendCategoryResponse201 & {
+  headers: Headers;
+};
+export type createAdminTrendCategoryResponseError = (
+  | createAdminTrendCategoryResponse400
+  | createAdminTrendCategoryResponse409
+  | createAdminTrendCategoryResponse422
+) & {
+  headers: Headers;
+};
+
+export type createAdminTrendCategoryResponse =
+  createAdminTrendCategoryResponseSuccess | createAdminTrendCategoryResponseError;
+
+export const getCreateAdminTrendCategoryUrl = () => {
+  return `/api/v1/admin/trend/taxonomy/categories`;
+};
+
+export const createAdminTrendCategory = async (
+  adminTrendCategoryCreateRequest: AdminTrendCategoryCreateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createAdminTrendCategoryResponse>(getCreateAdminTrendCategoryUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryCreateRequest),
+  });
+};
+
 export type replyToAdminSupportRequestResponse201 = {
   data: AdminSupportRequestDetail;
   status: 201;
@@ -13852,6 +16756,11 @@ export type deleteWorkflowResponse422 = {
   status: 422;
 };
 
+export type deleteWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowResponseSuccess = deleteWorkflowResponse204 & {
   headers: Headers;
 };
@@ -13860,6 +16769,7 @@ export type deleteWorkflowResponseError = (
   | deleteWorkflowResponse403
   | deleteWorkflowResponse404
   | deleteWorkflowResponse422
+  | deleteWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -13900,9 +16810,19 @@ export type updateWorkflowResponse404 = {
   status: 404;
 };
 
+export type updateWorkflowResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type updateWorkflowResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type updateWorkflowResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type updateWorkflowResponseSuccess = updateWorkflowResponse200 & {
@@ -13912,7 +16832,9 @@ export type updateWorkflowResponseError = (
   | updateWorkflowResponse400
   | updateWorkflowResponse403
   | updateWorkflowResponse404
+  | updateWorkflowResponse409
   | updateWorkflowResponse422
+  | updateWorkflowResponse429
 ) & {
   headers: Headers;
 };
@@ -13985,6 +16907,11 @@ export type setWorkflowVisibilityResponse422 = {
   status: 422;
 };
 
+export type setWorkflowVisibilityResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type setWorkflowVisibilityResponseSuccess = setWorkflowVisibilityResponse200 & {
   headers: Headers;
 };
@@ -13994,6 +16921,7 @@ export type setWorkflowVisibilityResponseError = (
   | setWorkflowVisibilityResponse404
   | setWorkflowVisibilityResponse409
   | setWorkflowVisibilityResponse422
+  | setWorkflowVisibilityResponse429
 ) & {
   headers: Headers;
 };
@@ -14092,9 +17020,19 @@ export type renameWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type renameWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type renameWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type renameWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type renameWorkflowVersionResponseSuccess = renameWorkflowVersionResponse200 & {
@@ -14104,7 +17042,9 @@ export type renameWorkflowVersionResponseError = (
   | renameWorkflowVersionResponse400
   | renameWorkflowVersionResponse403
   | renameWorkflowVersionResponse404
+  | renameWorkflowVersionResponse409
   | renameWorkflowVersionResponse422
+  | renameWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -14179,6 +17119,11 @@ export type deleteWorkflowStepResponse422 = {
   status: 422;
 };
 
+export type deleteWorkflowStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteWorkflowStepResponseSuccess = deleteWorkflowStepResponse204 & {
   headers: Headers;
 };
@@ -14188,6 +17133,7 @@ export type deleteWorkflowStepResponseError = (
   | deleteWorkflowStepResponse404
   | deleteWorkflowStepResponse409
   | deleteWorkflowStepResponse422
+  | deleteWorkflowStepResponse429
 ) & {
   headers: Headers;
 };
@@ -14240,6 +17186,11 @@ export type updateStepResponse422 = {
   status: 422;
 };
 
+export type updateStepResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type updateStepResponseSuccess = updateStepResponse200 & {
   headers: Headers;
 };
@@ -14249,6 +17200,7 @@ export type updateStepResponseError = (
   | updateStepResponse404
   | updateStepResponse409
   | updateStepResponse422
+  | updateStepResponse429
 ) & {
   headers: Headers;
 };
@@ -14297,6 +17249,11 @@ export type setPublishedWorkflowVersionResponse200 = {
   status: 200;
 };
 
+export type setPublishedWorkflowVersionResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
 export type setPublishedWorkflowVersionResponse403 = {
   data: ProblemDetail;
   status: 403;
@@ -14307,18 +17264,31 @@ export type setPublishedWorkflowVersionResponse404 = {
   status: 404;
 };
 
+export type setPublishedWorkflowVersionResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
 export type setPublishedWorkflowVersionResponse422 = {
   data: ProblemDetail;
   status: 422;
+};
+
+export type setPublishedWorkflowVersionResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
 };
 
 export type setPublishedWorkflowVersionResponseSuccess = setPublishedWorkflowVersionResponse200 & {
   headers: Headers;
 };
 export type setPublishedWorkflowVersionResponseError = (
+  | setPublishedWorkflowVersionResponse400
   | setPublishedWorkflowVersionResponse403
   | setPublishedWorkflowVersionResponse404
+  | setPublishedWorkflowVersionResponse409
   | setPublishedWorkflowVersionResponse422
+  | setPublishedWorkflowVersionResponse429
 ) & {
   headers: Headers;
 };
@@ -14391,10 +17361,19 @@ export type deleteRunResponse200 = {
   status: 200;
 };
 
+export type deleteRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type deleteRunResponseSuccess = deleteRunResponse200 & {
   headers: Headers;
 };
-export type deleteRunResponse = deleteRunResponseSuccess;
+export type deleteRunResponseError = deleteRunResponse429 & {
+  headers: Headers;
+};
+
+export type deleteRunResponse = deleteRunResponseSuccess | deleteRunResponseError;
 
 export const getDeleteRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
@@ -14415,10 +17394,36 @@ export type updateRunResponse200 = {
   status: 200;
 };
 
+export type updateRunResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type updateRunResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type updateRunResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type updateRunResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type updateRunResponseSuccess = updateRunResponse200 & {
   headers: Headers;
 };
-export type updateRunResponse = updateRunResponseSuccess;
+export type updateRunResponseError = (
+  updateRunResponse400 | updateRunResponse409 | updateRunResponse422 | updateRunResponse429
+) & {
+  headers: Headers;
+};
+
+export type updateRunResponse = updateRunResponseSuccess | updateRunResponseError;
 
 export const getUpdateRunUrl = (id: string) => {
   return `/api/v1/runs/${id}`;
@@ -14533,6 +17538,100 @@ export const updateNotificationPreferences = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(patchBody),
+  });
+};
+
+export type getEntityResponse200 = {
+  data: EntityResponse;
+  status: 200;
+};
+
+export type getEntityResponseSuccess = getEntityResponse200 & {
+  headers: Headers;
+};
+export type getEntityResponse = getEntityResponseSuccess;
+
+export const getGetEntityUrl = (id: string) => {
+  return `/api/v1/entities/${id}`;
+};
+
+export const getEntity = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getEntityResponse> => {
+  return customFetch<getEntityResponse>(getGetEntityUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteEntityResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteEntityResponseSuccess = deleteEntityResponse204 & {
+  headers: Headers;
+};
+export type deleteEntityResponse = deleteEntityResponseSuccess;
+
+export const getDeleteEntityUrl = (id: string) => {
+  return `/api/v1/entities/${id}`;
+};
+
+export const deleteEntity = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteEntityResponse> => {
+  return customFetch<deleteEntityResponse>(getDeleteEntityUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateEntityResponse200 = {
+  data: EntityResponse;
+  status: 200;
+};
+
+export type updateEntityResponseSuccess = updateEntityResponse200 & {
+  headers: Headers;
+};
+export type updateEntityResponse = updateEntityResponseSuccess;
+
+export const getUpdateEntityUrl = (id: string) => {
+  return `/api/v1/entities/${id}`;
+};
+
+export const updateEntity = async (
+  id: string,
+  updateEntityRequest: UpdateEntityRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateEntityResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateEntityResponse>(getUpdateEntityUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(updateEntityRequest),
   });
 };
 
@@ -15109,6 +18208,207 @@ export const updateAdminWorkflowStep = async (
   });
 };
 
+export type deleteAdminTrendTagResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendTagResponseSuccess = deleteAdminTrendTagResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendTagResponseError = deleteAdminTrendTagResponse404 & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendTagResponse =
+  deleteAdminTrendTagResponseSuccess | deleteAdminTrendTagResponseError;
+
+export const getDeleteAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const deleteAdminTrendTag = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendTagResponse> => {
+  return customFetch<deleteAdminTrendTagResponse>(getDeleteAdminTrendTagUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendTagResponse200 = {
+  data: AdminTrendTag;
+  status: 200;
+};
+
+export type updateAdminTrendTagResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendTagResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendTagResponseSuccess = updateAdminTrendTagResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendTagResponseError = (
+  updateAdminTrendTagResponse400 | updateAdminTrendTagResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendTagResponse =
+  updateAdminTrendTagResponseSuccess | updateAdminTrendTagResponseError;
+
+export const getUpdateAdminTrendTagUrl = (id: string) => {
+  return `/api/v1/admin/trend/taxonomy/tags/${id}`;
+};
+
+export const updateAdminTrendTag = async (
+  id: string,
+  adminTrendTagUpdateRequest: AdminTrendTagUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendTagResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendTagResponse>(getUpdateAdminTrendTagUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendTagUpdateRequest),
+  });
+};
+
+export type deleteAdminTrendCategoryResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteAdminTrendCategoryResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type deleteAdminTrendCategoryResponseSuccess = deleteAdminTrendCategoryResponse204 & {
+  headers: Headers;
+};
+export type deleteAdminTrendCategoryResponseError = (
+  deleteAdminTrendCategoryResponse404 | deleteAdminTrendCategoryResponse409
+) & {
+  headers: Headers;
+};
+
+export type deleteAdminTrendCategoryResponse =
+  deleteAdminTrendCategoryResponseSuccess | deleteAdminTrendCategoryResponseError;
+
+export const getDeleteAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const deleteAdminTrendCategory = async (
+  key: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteAdminTrendCategoryResponse> => {
+  return customFetch<deleteAdminTrendCategoryResponse>(getDeleteAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateAdminTrendCategoryResponse200 = {
+  data: AdminTrendCategory;
+  status: 200;
+};
+
+export type updateAdminTrendCategoryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type updateAdminTrendCategoryResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateAdminTrendCategoryResponseSuccess = updateAdminTrendCategoryResponse200 & {
+  headers: Headers;
+};
+export type updateAdminTrendCategoryResponseError = (
+  updateAdminTrendCategoryResponse400 | updateAdminTrendCategoryResponse404
+) & {
+  headers: Headers;
+};
+
+export type updateAdminTrendCategoryResponse =
+  updateAdminTrendCategoryResponseSuccess | updateAdminTrendCategoryResponseError;
+
+export const getUpdateAdminTrendCategoryUrl = (key: string) => {
+  return `/api/v1/admin/trend/taxonomy/categories/${key}`;
+};
+
+export const updateAdminTrendCategory = async (
+  key: string,
+  adminTrendCategoryUpdateRequest: AdminTrendCategoryUpdateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateAdminTrendCategoryResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateAdminTrendCategoryResponse>(getUpdateAdminTrendCategoryUrl(key), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminTrendCategoryUpdateRequest),
+  });
+};
+
 export type getAdminRoleResponse200 = {
   data: RoleResponse;
   status: 200;
@@ -15545,6 +18845,11 @@ export type revokeAllWorkflowLinkGrantsResponse409 = {
   status: 409;
 };
 
+export type revokeAllWorkflowLinkGrantsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type revokeAllWorkflowLinkGrantsResponseSuccess = revokeAllWorkflowLinkGrantsResponse200 & {
   headers: Headers;
 };
@@ -15552,6 +18857,7 @@ export type revokeAllWorkflowLinkGrantsResponseError = (
   | revokeAllWorkflowLinkGrantsResponse403
   | revokeAllWorkflowLinkGrantsResponse404
   | revokeAllWorkflowLinkGrantsResponse409
+  | revokeAllWorkflowLinkGrantsResponse429
 ) & {
   headers: Headers;
 };
@@ -15955,6 +19261,57 @@ export const exportUsers = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<exportUsersResponse> => {
   return customFetch<exportUsersResponse>(getExportUsersUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listTrashResponse200 = {
+  data: TrashList;
+  status: 200;
+};
+
+export type listTrashResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listTrashResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listTrashResponseSuccess = listTrashResponse200 & {
+  headers: Headers;
+};
+export type listTrashResponseError = (listTrashResponse400 | listTrashResponse503) & {
+  headers: Headers;
+};
+
+export type listTrashResponse = listTrashResponseSuccess | listTrashResponseError;
+
+export const getListTrashUrl = (params?: ListTrashParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/trash?${stringifiedParams}` : `/api/v1/trash`;
+};
+
+/**
+ * @summary List the caller's Trash with the badge counts
+ */
+export const listTrash = async (
+  params?: ListTrashParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listTrashResponse> => {
+  return customFetch<listTrashResponse>(getListTrashUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -16765,6 +20122,66 @@ export const getOnboardingResult = async (
   });
 };
 
+export type checkOAuthAuthorizationResponse200 = {
+  data: CheckResponse;
+  status: 200;
+};
+
+export type checkOAuthAuthorizationResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type checkOAuthAuthorizationResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type checkOAuthAuthorizationResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type checkOAuthAuthorizationResponseSuccess = checkOAuthAuthorizationResponse200 & {
+  headers: Headers;
+};
+export type checkOAuthAuthorizationResponseError = (
+  | checkOAuthAuthorizationResponse400
+  | checkOAuthAuthorizationResponse403
+  | checkOAuthAuthorizationResponse503
+) & {
+  headers: Headers;
+};
+
+export type checkOAuthAuthorizationResponse =
+  checkOAuthAuthorizationResponseSuccess | checkOAuthAuthorizationResponseError;
+
+export const getCheckOAuthAuthorizationUrl = (params?: CheckOAuthAuthorizationParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/oauth/authorize/request?${stringifiedParams}`
+    : `/api/v1/oauth/authorize/request`;
+};
+
+export const checkOAuthAuthorization = async (
+  params?: CheckOAuthAuthorizationParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<checkOAuthAuthorizationResponse> => {
+  return customFetch<checkOAuthAuthorizationResponse>(getCheckOAuthAuthorizationUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listNotificationsResponse200 = {
   data: NotificationPage;
   status: 200;
@@ -16816,19 +20233,42 @@ export type getUnreadNotificationCountResponse200 = {
   status: 200;
 };
 
+export type getUnreadNotificationCountResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
 export type getUnreadNotificationCountResponseSuccess = getUnreadNotificationCountResponse200 & {
   headers: Headers;
 };
-export type getUnreadNotificationCountResponse = getUnreadNotificationCountResponseSuccess;
+export type getUnreadNotificationCountResponseError = getUnreadNotificationCountResponse400 & {
+  headers: Headers;
+};
 
-export const getGetUnreadNotificationCountUrl = () => {
-  return `/api/v1/notifications/unread-count`;
+export type getUnreadNotificationCountResponse =
+  getUnreadNotificationCountResponseSuccess | getUnreadNotificationCountResponseError;
+
+export const getGetUnreadNotificationCountUrl = (params?: GetUnreadNotificationCountParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/notifications/unread-count?${stringifiedParams}`
+    : `/api/v1/notifications/unread-count`;
 };
 
 export const getUnreadNotificationCount = async (
+  params?: GetUnreadNotificationCountParams,
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getUnreadNotificationCountResponse> => {
-  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(), {
+  return customFetch<getUnreadNotificationCountResponse>(getGetUnreadNotificationCountUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -16921,6 +20361,213 @@ export const features = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<featuresResponse> => {
   return customFetch<featuresResponse>(getFeaturesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityVersionsResponse200 = {
+  data: PageViewEntityVersionResponse;
+  status: 200;
+};
+
+export type listEntityVersionsResponseSuccess = listEntityVersionsResponse200 & {
+  headers: Headers;
+};
+export type listEntityVersionsResponse = listEntityVersionsResponseSuccess;
+
+export const getListEntityVersionsUrl = (id: string, params?: ListEntityVersionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/${id}/versions?${stringifiedParams}`
+    : `/api/v1/entities/${id}/versions`;
+};
+
+export const listEntityVersions = async (
+  id: string,
+  params?: ListEntityVersionsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityVersionsResponse> => {
+  return customFetch<listEntityVersionsResponse>(getListEntityVersionsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getEntityVersionResponse200 = {
+  data: EntityVersionDetailResponse;
+  status: 200;
+};
+
+export type getEntityVersionResponseSuccess = getEntityVersionResponse200 & {
+  headers: Headers;
+};
+export type getEntityVersionResponse = getEntityVersionResponseSuccess;
+
+export const getGetEntityVersionUrl = (id: string, n: number) => {
+  return `/api/v1/entities/${id}/versions/${n}`;
+};
+
+export const getEntityVersion = async (
+  id: string,
+  n: number,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getEntityVersionResponse> => {
+  return customFetch<getEntityVersionResponse>(getGetEntityVersionUrl(id, n), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityRunsResponse200 = {
+  data: PageViewEntityRunResponse;
+  status: 200;
+};
+
+export type listEntityRunsResponseSuccess = listEntityRunsResponse200 & {
+  headers: Headers;
+};
+export type listEntityRunsResponse = listEntityRunsResponseSuccess;
+
+export const getListEntityRunsUrl = (id: string, params?: ListEntityRunsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/${id}/runs?${stringifiedParams}`
+    : `/api/v1/entities/${id}/runs`;
+};
+
+export const listEntityRuns = async (
+  id: string,
+  params?: ListEntityRunsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityRunsResponse> => {
+  return customFetch<listEntityRunsResponse>(getListEntityRunsUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityTagsResponse200 = {
+  data: EntityTagSuggestionResponse;
+  status: 200;
+};
+
+export type listEntityTagsResponseSuccess = listEntityTagsResponse200 & {
+  headers: Headers;
+};
+export type listEntityTagsResponse = listEntityTagsResponseSuccess;
+
+export const getListEntityTagsUrl = (params?: ListEntityTagsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/tags?${stringifiedParams}`
+    : `/api/v1/entities/tags`;
+};
+
+export const listEntityTags = async (
+  params?: ListEntityTagsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityTagsResponse> => {
+  return customFetch<listEntityTagsResponse>(getListEntityTagsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityLabelsResponse200 = {
+  data: EntitySuggestionResponse;
+  status: 200;
+};
+
+export type listEntityLabelsResponseSuccess = listEntityLabelsResponse200 & {
+  headers: Headers;
+};
+export type listEntityLabelsResponse = listEntityLabelsResponseSuccess;
+
+export const getListEntityLabelsUrl = (params?: ListEntityLabelsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/labels?${stringifiedParams}`
+    : `/api/v1/entities/labels`;
+};
+
+export const listEntityLabels = async (
+  params?: ListEntityLabelsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityLabelsResponse> => {
+  return customFetch<listEntityLabelsResponse>(getListEntityLabelsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listEntityCategoriesResponse200 = {
+  data: EntitySuggestionResponse;
+  status: 200;
+};
+
+export type listEntityCategoriesResponseSuccess = listEntityCategoriesResponse200 & {
+  headers: Headers;
+};
+export type listEntityCategoriesResponse = listEntityCategoriesResponseSuccess;
+
+export const getListEntityCategoriesUrl = (params?: ListEntityCategoriesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/entities/categories?${stringifiedParams}`
+    : `/api/v1/entities/categories`;
+};
+
+export const listEntityCategories = async (
+  params?: ListEntityCategoriesParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listEntityCategoriesResponse> => {
+  return customFetch<listEntityCategoriesResponse>(getListEntityCategoriesUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -17124,6 +20771,29 @@ export const getContentMedia = async (
   });
 };
 
+export type getLegalIndexResponse200 = {
+  data: LegalIndex;
+  status: 200;
+};
+
+export type getLegalIndexResponseSuccess = getLegalIndexResponse200 & {
+  headers: Headers;
+};
+export type getLegalIndexResponse = getLegalIndexResponseSuccess;
+
+export const getGetLegalIndexUrl = () => {
+  return `/api/v1/content/legal-index`;
+};
+
+export const getLegalIndex = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getLegalIndexResponse> => {
+  return customFetch<getLegalIndexResponse>(getGetLegalIndexUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type getPublishedContentDocumentResponse200 = {
   data: ContentDocumentPublication;
   status: 200;
@@ -17314,6 +20984,52 @@ export const listChatMessages = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<listChatMessagesResponse> => {
   return customFetch<listChatMessagesResponse>(getListChatMessagesUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type countChatConversationsResponse200 = {
+  data: ChatConversationCounts;
+  status: 200;
+};
+
+export type countChatConversationsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type countChatConversationsResponseSuccess = countChatConversationsResponse200 & {
+  headers: Headers;
+};
+export type countChatConversationsResponseError = countChatConversationsResponse400 & {
+  headers: Headers;
+};
+
+export type countChatConversationsResponse =
+  countChatConversationsResponseSuccess | countChatConversationsResponseError;
+
+export const getCountChatConversationsUrl = (params: CountChatConversationsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/chat/conversations/counts?${stringifiedParams}`
+    : `/api/v1/chat/conversations/counts`;
+};
+
+export const countChatConversations = async (
+  params: CountChatConversationsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<countChatConversationsResponse> => {
+  return customFetch<countChatConversationsResponse>(getCountChatConversationsUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -17899,6 +21615,29 @@ export const getWorkflowReport = async (
   });
 };
 
+export type listAdminTrendTaxonomyResponse200 = {
+  data: AdminTrendTaxonomy;
+  status: 200;
+};
+
+export type listAdminTrendTaxonomyResponseSuccess = listAdminTrendTaxonomyResponse200 & {
+  headers: Headers;
+};
+export type listAdminTrendTaxonomyResponse = listAdminTrendTaxonomyResponseSuccess;
+
+export const getListAdminTrendTaxonomyUrl = () => {
+  return `/api/v1/admin/trend/taxonomy`;
+};
+
+export const listAdminTrendTaxonomy = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminTrendTaxonomyResponse> => {
+  return customFetch<listAdminTrendTaxonomyResponse>(getListAdminTrendTaxonomyUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listAdminSupportRequestsResponse200 = {
   data: AdminSupportRequestPage;
   status: 200;
@@ -17974,6 +21713,52 @@ export const getAdminSupportRequest = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getAdminSupportRequestResponse> => {
   return customFetch<getAdminSupportRequestResponse>(getGetAdminSupportRequestUrl(number), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAdminSupportSlaSummaryResponse200 = {
+  data: AdminSupportSlaSummary;
+  status: 200;
+};
+
+export type getAdminSupportSlaSummaryResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getAdminSupportSlaSummaryResponseSuccess = getAdminSupportSlaSummaryResponse200 & {
+  headers: Headers;
+};
+export type getAdminSupportSlaSummaryResponseError = getAdminSupportSlaSummaryResponse400 & {
+  headers: Headers;
+};
+
+export type getAdminSupportSlaSummaryResponse =
+  getAdminSupportSlaSummaryResponseSuccess | getAdminSupportSlaSummaryResponseError;
+
+export const getGetAdminSupportSlaSummaryUrl = (params?: GetAdminSupportSlaSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/support/requests/sla-summary?${stringifiedParams}`
+    : `/api/v1/admin/support/requests/sla-summary`;
+};
+
+export const getAdminSupportSlaSummary = async (
+  params?: GetAdminSupportSlaSummaryParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAdminSupportSlaSummaryResponse> => {
+  return customFetch<getAdminSupportSlaSummaryResponse>(getGetAdminSupportSlaSummaryUrl(params), {
     ...options,
     method: 'GET',
   });
@@ -18475,6 +22260,29 @@ export const listAdminMediaJobs = async (
   });
 };
 
+export type listAdminFeaturesResponse200 = {
+  data: AdminFeatureList;
+  status: 200;
+};
+
+export type listAdminFeaturesResponseSuccess = listAdminFeaturesResponse200 & {
+  headers: Headers;
+};
+export type listAdminFeaturesResponse = listAdminFeaturesResponseSuccess;
+
+export const getListAdminFeaturesUrl = () => {
+  return `/api/v1/admin/features`;
+};
+
+export const listAdminFeatures = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAdminFeaturesResponse> => {
+  return customFetch<listAdminFeaturesResponse>(getListAdminFeaturesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type listContentDocumentsResponse200 = {
   data: ContentDocumentSummary[];
   status: 200;
@@ -18739,6 +22547,38 @@ export const listAdminAccounts = async (
   });
 };
 
+export type oauthMetadataResponse200 = {
+  data: Metadata;
+  status: 200;
+};
+
+export type oauthMetadataResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type oauthMetadataResponseSuccess = oauthMetadataResponse200 & {
+  headers: Headers;
+};
+export type oauthMetadataResponseError = oauthMetadataResponse503 & {
+  headers: Headers;
+};
+
+export type oauthMetadataResponse = oauthMetadataResponseSuccess | oauthMetadataResponseError;
+
+export const getOauthMetadataUrl = () => {
+  return `/.well-known/oauth-authorization-server`;
+};
+
+export const oauthMetadata = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<oauthMetadataResponse> => {
+  return customFetch<oauthMetadataResponse>(getOauthMetadataUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type revokeWorkflowLinkGrantResponse200 = {
   data: RevokedResponse;
   status: 200;
@@ -18759,6 +22599,11 @@ export type revokeWorkflowLinkGrantResponse409 = {
   status: 409;
 };
 
+export type revokeWorkflowLinkGrantResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
 export type revokeWorkflowLinkGrantResponseSuccess = revokeWorkflowLinkGrantResponse200 & {
   headers: Headers;
 };
@@ -18766,6 +22611,7 @@ export type revokeWorkflowLinkGrantResponseError = (
   | revokeWorkflowLinkGrantResponse403
   | revokeWorkflowLinkGrantResponse404
   | revokeWorkflowLinkGrantResponse409
+  | revokeWorkflowLinkGrantResponse429
 ) & {
   headers: Headers;
 };

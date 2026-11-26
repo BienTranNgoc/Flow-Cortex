@@ -1,8 +1,10 @@
 package com.flowcortex.asset.infrastructure;
 
+import com.flowcortex.asset.api.SpaceAssetSummary;
 import com.flowcortex.asset.domain.NewSpaceAsset;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.util.Collection;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.UUID;
@@ -61,6 +63,17 @@ public class SpaceAssetStore {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM space_asset WHERE bucket = :bucket AND object_key = :key)",
                 new MapSqlParameterSource("bucket", bucket).addValue("key", objectKey), Boolean.class));
+    }
+
+    /** The space's assets among {@code ids}; ids of another space, or unknown, are absent. */
+    public List<SpaceAssetSummary> findInSpace(UUID spaceId, Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query("SELECT id, kind, title, mime_type FROM space_asset WHERE space_id = :space AND id IN (:ids)",
+                new MapSqlParameterSource("space", spaceId).addValue("ids", ids),
+                (rs, row) -> new SpaceAssetSummary(rs.getObject("id", UUID.class), rs.getString("kind"),
+                        rs.getString("title"), rs.getString("mime_type")));
     }
 
     /** The title version of an output asset this run already wrote, or empty when it wrote none. */

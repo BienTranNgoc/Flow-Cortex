@@ -9,8 +9,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.flowcortex.media.api.MediaDownload;
@@ -20,6 +22,7 @@ import com.flowcortex.settings.api.SettingRead;
 import com.flowcortex.settings.api.SettingSource;
 import com.flowcortex.settings.api.Settings;
 import com.flowcortex.support.config.SupportLifecycleSettings;
+import com.flowcortex.support.config.SupportSlaSettings;
 import com.flowcortex.support.request.RequestRepository.AttachmentRow;
 import com.flowcortex.support.request.RequestRepository.ConversationMessageRow;
 import com.flowcortex.support.request.RequestRepository.MessageRow;
@@ -29,12 +32,14 @@ import com.flowcortex.support.request.RequestViews.AdminDetail;
 import com.flowcortex.support.request.RequestViews.AdminPage;
 import com.flowcortex.support.request.RequestViews.BulkAssignFailure;
 import com.flowcortex.support.request.RequestViews.BulkAssignResult;
+import com.flowcortex.support.request.RequestViews.ConversationMessage;
 import com.flowcortex.support.request.RequestViews.Detail;
 import com.flowcortex.support.web.SupportProblemException;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UserDirectory;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -46,6 +51,8 @@ import java.util.UUID;
 import java.util.stream.LongStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.QueryTimeoutException;
@@ -63,8 +70,10 @@ class RequestServiceTest {
     private final UserDirectory users = mock(UserDirectory.class);
     private final AdminPermissions adminPermissions = mock(AdminPermissions.class);
     private final Settings settings = mock(Settings.class);
+    private final SupportSignals signals = mock(SupportSignals.class);
     private final RequestService service = new RequestService(requests, idempotency, publisher, attachments, users,
-            adminPermissions, settings, mock(PlatformTransactionManager.class), Clock.fixed(NOW, ZoneOffset.UTC));
+            adminPermissions, settings, signals, mock(PlatformTransactionManager.class),
+            Clock.fixed(NOW, ZoneOffset.UTC));
     private final UUID member = UUID.randomUUID();
     private final UUID admin = UUID.randomUUID();
 
@@ -72,6 +81,17 @@ class RequestServiceTest {
     void replyMailWindowIsFifteenMinutes() {
         when(settings.get(SupportLifecycleSettings.REPLY_MAIL_WINDOW_MINUTES))
                 .thenReturn(new SettingRead<>(15, 15, SettingSource.STORED));
+    }
+
+    @BeforeEach
+    void slaThresholdsAreTheDefaults() {
+        when(settings.get(SupportSlaSettings.NEW_HOURS)).thenReturn(new SettingRead<>(24, 24, SettingSource.STORED));
+        when(settings.get(SupportSlaSettings.NEW_WARN_HOURS))
+                .thenReturn(new SettingRead<>(20, 20, SettingSource.STORED));
+        when(settings.get(SupportSlaSettings.IN_PROGRESS_DAYS))
+                .thenReturn(new SettingRead<>(3, 3, SettingSource.STORED));
+        when(settings.get(SupportSlaSettings.IN_PROGRESS_WARN_DAYS))
+                .thenReturn(new SettingRead<>(2, 2, SettingSource.STORED));
     }
 
     @Test
@@ -425,6 +445,22 @@ class RequestServiceTest {
     }
 
     @Test
+    void anAdminSeesTheHandoffOutcomeOfAnAssistantTurnUnchanged() {
+        UUID id = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(id, 12, member, "credit",
+                "Bị trừ tiền", RequestStatus.NEW, conversation, true, false, NOW, null, null, null, NOW, null, "vi")));
+        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of());
+        when(requests.conversation(conversation)).thenReturn(List.of(
+                new ConversationMessageRow("user", "Tôi bị trừ tiền 2 lần", null, NOW),
+                new ConversationMessageRow("assistant", "Câu hỏi này cần đội ngũ hỗ trợ xử lý", "handoff", NOW)));
+
+        AdminDetail detail = service.adminDetail(12);
+
+        assertThat(detail.conversation()).extracting(ConversationMessage::outcome).containsExactly(null, "handoff");
+    }
+
+    @Test
     void aLinkedConversationTheRetentionDeletedShowsAsExpiredWhileNoLinkDoesNot() {
         UUID expiredId = UUID.randomUUID();
         when(requests.findByNumber(12)).thenReturn(Optional.of(new RequestRow(expiredId, 12, member, "credit",
@@ -442,11 +478,11 @@ class RequestServiceTest {
 
     @Test
     void anInboxPageBeyondTenThousandIsRefusedInsteadOfOverflowing() {
-        assertProblem(() -> service.page(null, null, null, null, null, null, Integer.MAX_VALUE, admin),
+        assertProblem(() -> service.page(null, null, null, null, null, null, null, Integer.MAX_VALUE, admin),
                 HttpStatus.BAD_REQUEST, "validation-failed");
-        assertProblem(() -> service.page(null, null, null, null, null, null, 10_001, admin), HttpStatus.BAD_REQUEST,
-                "validation-failed");
-        verify(requests, never()).page(any(), anyInt(), anyInt());
+        assertProblem(() -> service.page(null, null, null, null, null, null, null, 10_001, admin),
+                HttpStatus.BAD_REQUEST, "validation-failed");
+        verify(requests, never()).page(any(), any(), anyInt(), anyInt());
     }
 
     @Test
@@ -462,13 +498,15 @@ class RequestServiceTest {
     void theInboxPagesByTwentyAndRefusesUnknownFilters() {
         UUID id = UUID.randomUUID();
         UUID linh = UUID.randomUUID();
-        InboxQuery.InboxFilter filter = InboxQuery.parse("new", "credit", "me", null, null, null, 1, admin, NOW)
+        InboxQuery.InboxFilter filter = InboxQuery.parse("new", "credit", "me", null, null, null, null, 1, admin, NOW)
                 .filter();
-        when(requests.page(filter, 20, 20)).thenReturn(List.of(row(id, 3, RequestStatus.NEW, member, linh)));
-        when(requests.count(filter)).thenReturn(21L);
+        SlaThresholds thresholds = new SlaThresholds(24, 20, 3, 2);
+        when(requests.page(filter, thresholds, 20, 20))
+                .thenReturn(List.of(row(id, 3, RequestStatus.NEW, member, linh)));
+        when(requests.count(filter, thresholds)).thenReturn(21L);
         when(users.findEmailsByIds(List.of(member, linh))).thenReturn(Map.of(member, "m@example.com"));
 
-        AdminPage page = service.page("new", "credit", "me", null, null, null, 1, admin);
+        AdminPage page = service.page("new", "credit", "me", null, null, null, null, 1, admin);
 
         assertThat(page.items()).singleElement().satisfies(item -> {
             assertThat(item.requester().email()).isEqualTo("m@example.com");
@@ -476,8 +514,62 @@ class RequestServiceTest {
             assertThat(item.assignee().deleted()).isTrue();
         });
         assertThat(page.total()).isEqualTo(21);
-        assertProblem(() -> service.page("open", "billing", null, null, null, null, -1, admin), HttpStatus.BAD_REQUEST,
+        assertProblem(() -> service.page("open", "billing", null, null, null, null, null, -1, admin),
+                HttpStatus.BAD_REQUEST, "validation-failed");
+    }
+
+    @Test
+    void everyRowIsLabelledWithItsSlaLevel() {
+        UUID overdue = UUID.randomUUID();
+        UUID dueSoon = UUID.randomUUID();
+        UUID fine = UUID.randomUUID();
+        UUID waiting = UUID.randomUUID();
+        when(requests.page(any(), any(), anyInt(), anyInt())).thenReturn(List.of(
+                rowActive(overdue, 70, RequestStatus.NEW, NOW.minus(Duration.ofHours(25))),
+                rowActive(dueSoon, 71, RequestStatus.NEW, NOW.minus(Duration.ofHours(21))),
+                rowActive(fine, 72, RequestStatus.IN_PROGRESS, NOW.minus(Duration.ofDays(1))),
+                rowActive(waiting, 73, RequestStatus.WAITING_MEMBER, NOW.minus(Duration.ofDays(10)))));
+        when(users.findEmailsByIds(any())).thenReturn(Map.of());
+
+        AdminPage page = service.page(null, null, null, null, null, "at_risk", "oldest", 0, admin);
+
+        assertThat(page.items()).extracting(item -> item.number(), item -> item.slaLevel())
+                .containsExactly(tuple(70L, "overdue"), tuple(71L, "due_soon"), tuple(72L, "ok"),
+                        tuple(73L, "paused"));
+        ArgumentCaptor<InboxQuery.InboxFilter> filter = ArgumentCaptor.forClass(InboxQuery.InboxFilter.class);
+        verify(requests).page(filter.capture(), eq(new SlaThresholds(24, 20, 3, 2)), eq(0), eq(20));
+        assertThat(filter.getValue().atRisk()).isTrue();
+    }
+
+    @Test
+    void theSummaryReadsTheThresholdsOnce() {
+        when(requests.slaSummary(any(), any())).thenReturn(new RequestRepository.SlaCounts(2, 1));
+
+        RequestViews.SlaSummary summary = service.slaSummary("new", null, "me", "7d", "credit", admin);
+
+        assertThat(summary).isEqualTo(new RequestViews.SlaSummary(2, 1));
+        for (var key : List.of(SupportSlaSettings.NEW_HOURS, SupportSlaSettings.NEW_WARN_HOURS,
+                SupportSlaSettings.IN_PROGRESS_DAYS, SupportSlaSettings.IN_PROGRESS_WARN_DAYS)) {
+            verify(settings, times(1)).get(key);
+        }
+        ArgumentCaptor<InboxQuery.InboxFilter> filter = ArgumentCaptor.forClass(InboxQuery.InboxFilter.class);
+        verify(requests).slaSummary(filter.capture(), eq(new SlaThresholds(24, 20, 3, 2)));
+        assertThat(filter.getValue().atRisk()).isFalse();
+        assertThat(filter.getValue().status()).isEqualTo("new");
+    }
+
+    @Test
+    void theSummaryRefusesAnInvalidFilterWithoutCountingAndFacetsReadNoThresholds() {
+        assertProblem(() -> service.slaSummary(null, null, null, "yesterday", null, admin), HttpStatus.BAD_REQUEST,
                 "validation-failed");
+        verify(requests, never()).slaSummary(any(), any());
+
+        when(requests.facets(any(), any())).thenReturn(
+                new RequestRepository.FacetRows(Map.of(), Map.of(), Map.of(), 0, 0, List.of()));
+
+        service.facets(null, null, null, null, null, admin);
+
+        verify(settings, never()).get(SupportSlaSettings.NEW_HOURS);
     }
 
     @Test
@@ -554,6 +646,147 @@ class RequestServiceTest {
         verify(requests, never()).move(any(), any(), any(), any(), any(), any());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"create", "memberReply", "cancel", "confirm", "adminReply", "setStatus", "pickUpAssign",
+            "autoClose"})
+    void everyWinningWriteSignalsItsRequestOnce(String write) {
+        UUID id = UUID.randomUUID();
+        UUID linh = UUID.randomUUID();
+        RequestStatus from = switch (write) {
+            case "memberReply" -> RequestStatus.WAITING_MEMBER;
+            case "confirm", "autoClose" -> RequestStatus.RESOLVED;
+            case "adminReply", "pickUpAssign" -> RequestStatus.NEW;
+            default -> RequestStatus.IN_PROGRESS;
+        };
+        RequestRow before = row(id, 12, from);
+        when(requests.findByNumber(12)).thenReturn(Optional.of(before));
+        when(requests.findById(any())).thenReturn(Optional.of(before));
+        when(requests.insertRequest(any(), eq(member), any(), any(), any(), any(), any())).thenReturn(12L);
+        when(requests.move(any(), any(), any(), any(), any(), any())).thenReturn(true);
+        when(requests.assign(any(), any(), any(), any(), any())).thenReturn(true);
+        when(requests.closeSeenResolution(any(), any(), any(), any())).thenReturn(true);
+        when(users.findEmailsByIds(List.of(member))).thenReturn(Map.of(member, "m@example.com"));
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+
+        switch (write) {
+            case "create" -> service.create(member, new NewRequest("credit", "Không thấy credit",
+                    "Tôi đã nạp nhưng chưa thấy credit.", List.of(), null), Optional.empty(), Locale.ENGLISH);
+            case "memberReply" -> service.reply(member, 12, "Đã thử, vẫn lỗi", List.of(), Optional.empty());
+            case "cancel" -> service.cancel(member, 12);
+            case "confirm" -> service.confirm(member, 12);
+            case "adminReply" -> service.adminReply(admin, 12, "Đã xử lý", List.of(), "resolved", Optional.empty());
+            case "setStatus" -> service.setStatus(12, "resolved");
+            case "pickUpAssign" -> service.assign(admin, 12, linh);
+            default -> service.autoClose(before, NOW.minusSeconds(7 * 24 * 3600));
+        }
+
+        verify(signals, times(1)).changed(member, 12L);
+        verifyNoMoreInteractions(signals);
+    }
+
+    @Test
+    void aReplayedKeyALostRaceOrARefusalSignalsNothing() {
+        UUID first = UUID.randomUUID();
+        UUID winner = UUID.randomUUID();
+        UUID closed = UUID.randomUUID();
+        UUID busy = UUID.randomUUID();
+        when(idempotency.find(member, "replayed", "request", null, NOW)).thenReturn(Optional.of(first));
+        when(requests.findById(first)).thenReturn(Optional.of(row(first, 7, RequestStatus.NEW)));
+        when(idempotency.claim(eq(member), eq("raced"), eq("request"), isNull(), any(), eq(NOW)))
+                .thenReturn(Optional.of(winner));
+        when(requests.findById(winner)).thenReturn(Optional.of(row(winner, 8, RequestStatus.NEW)));
+        when(requests.findByNumber(9)).thenReturn(Optional.of(row(closed, 9, RequestStatus.CLOSED)));
+        when(requests.findByNumber(12)).thenReturn(Optional.of(row(busy, 12, RequestStatus.IN_PROGRESS)));
+        when(requests.move(any(), any(), any(), any(), any(), any())).thenReturn(false);
+        NewRequest input = new NewRequest("credit", "Không thấy credit", "Bấm gửi hai lần liền.", List.of(), null);
+
+        service.create(member, input, Optional.of("replayed"), Locale.ENGLISH);
+        service.create(member, input, Optional.of("raced"), Locale.ENGLISH);
+        assertProblem(() -> service.reply(member, 9, "Còn nữa", List.of(), Optional.empty()), HttpStatus.CONFLICT,
+                "request-closed");
+        assertProblem(() -> service.cancel(member, 12), HttpStatus.CONFLICT, "request-state-changed");
+        assertProblem(() -> service.setStatus(12, "resolved"), HttpStatus.CONFLICT, "request-state-changed");
+
+        verifyNoInteractions(signals);
+    }
+
+    @Test
+    void anAssignmentThatChangesNothingSignalsNothing() {
+        UUID linh = UUID.randomUUID();
+        UUID open = UUID.randomUUID();
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(31)).thenReturn(Optional.of(row(open, 31, RequestStatus.IN_PROGRESS, member, linh)));
+        when(requests.findById(open)).thenReturn(Optional.of(row(open, 31, RequestStatus.IN_PROGRESS, member, linh)));
+
+        service.assign(admin, 31, linh);
+
+        verifyNoInteractions(signals);
+        verify(requests, never()).assign(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void anAssignmentThatLostTheRaceSignalsNothing() {
+        UUID linh = UUID.randomUUID();
+        UUID busy = UUID.randomUUID();
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(row(busy, 30, RequestStatus.NEW)));
+        when(requests.assign(any(), any(), any(), any(), any())).thenReturn(false);
+
+        assertProblem(() -> service.assign(admin, 30, linh), HttpStatus.CONFLICT, "request-state-changed");
+
+        verifyNoInteractions(signals);
+    }
+
+    @Test
+    void bulkAssignSignalsOnlyTheRequestsItChanged() {
+        UUID linh = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        RequestRow fresh = row(UUID.randomUUID(), 30, RequestStatus.NEW);
+        RequestRow already = row(UUID.randomUUID(), 31, RequestStatus.IN_PROGRESS, member, linh);
+        RequestRow closed = row(UUID.randomUUID(), 9, RequestStatus.CLOSED);
+        RequestRow racing = row(UUID.randomUUID(), 32, RequestStatus.IN_PROGRESS, member, other);
+        when(adminPermissions.holds(linh, Permission.SUPPORT_TICKET_REPLY)).thenReturn(true);
+        when(requests.findByNumber(30)).thenReturn(Optional.of(fresh));
+        when(requests.findByNumber(31)).thenReturn(Optional.of(already));
+        when(requests.findByNumber(9)).thenReturn(Optional.of(closed));
+        when(requests.findByNumber(32)).thenReturn(Optional.of(racing));
+        when(requests.findByNumber(999)).thenReturn(Optional.empty());
+        when(requests.assign(fresh.id(), RequestStatus.NEW, RequestStatus.IN_PROGRESS, linh, NOW)).thenReturn(true);
+        when(requests.assign(racing.id(), RequestStatus.IN_PROGRESS, RequestStatus.IN_PROGRESS, linh, NOW))
+                .thenReturn(false);
+
+        service.bulkAssign(admin, List.of(30L, 31L, 9L, 999L, 32L), linh);
+
+        verify(signals).changed(member, 30L);
+        verifyNoMoreInteractions(signals);
+    }
+
+    @Test
+    void openingSignalsOnlyWhenMarkSeenChangedTheRow() {
+        UUID id = UUID.randomUUID();
+        RequestRow resolved = row(id, 12, RequestStatus.RESOLVED);
+        when(requests.findByNumber(12)).thenReturn(Optional.of(resolved));
+        when(requests.findById(id)).thenReturn(Optional.of(resolved));
+        when(requests.markSeen(id, NOW)).thenReturn(true, false);
+
+        service.open(member, 12);
+        service.open(member, 12);
+
+        verify(signals, times(1)).changed(member, 12L);
+        verifyNoMoreInteractions(signals);
+    }
+
+    @Test
+    void anAutoCloseThatLostTheRaceSignalsNothing() {
+        RequestRow resolved = row(UUID.randomUUID(), 12, RequestStatus.RESOLVED);
+        Instant cutoff = NOW.minusSeconds(7 * 24 * 3600);
+        when(requests.closeSeenResolution(resolved.id(), "auto", cutoff, NOW)).thenReturn(false);
+
+        service.autoClose(resolved, cutoff);
+
+        verifyNoInteractions(signals);
+    }
+
     private RequestRow row(UUID id, long number, RequestStatus status) {
         return row(id, number, status, member);
     }
@@ -566,6 +799,11 @@ class RequestServiceTest {
         return new RequestRow(id, number, requester, "credit", "Không thấy credit", status, null, false, false, NOW,
                 status == RequestStatus.RESOLVED ? NOW : null, null,
                 status == RequestStatus.CLOSED ? "cancelled" : null, NOW, assignee, "en");
+    }
+
+    private static RequestRow rowActive(UUID id, long number, RequestStatus status, Instant lastActivityAt) {
+        return new RequestRow(id, number, UUID.randomUUID(), "credit", "Không thấy credit", status, null, false, false,
+                lastActivityAt, null, null, null, NOW, null, "en");
     }
 
     private static void assertProblem(Runnable call, HttpStatus status, String code) {

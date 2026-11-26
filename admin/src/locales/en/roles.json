@@ -2,6 +2,42 @@
   "title": "Roles & permissions",
   "eyebrow": "System",
   "description": "Create staff roles and choose which actions each role may use in the admin console.",
+  "runtime": {
+    "label": "Role and permission changes",
+    "on": "On",
+    "off": "Off",
+    "loading": "Loading the role edit switch…",
+    "loadFailed": "Could not load the role edit switch, so role edits stay disabled.",
+    "retry": "Retry",
+    "notice": "Role and permission changes are turned off",
+    "vetoed": "Turned off by the server configuration",
+    "saveFailed": "Could not save. Please try again.",
+    "changedBy": "Changed by {{email}} at {{at}}",
+    "changedAt": "Changed at {{at}}",
+    "source": {
+      "STORED": "Set by an admin",
+      "CONFIGURED": "From server configuration",
+      "DEFAULT": "Default",
+      "VETOED": "Server configuration",
+      "DEGRADED": "Settings store unavailable"
+    },
+    "dialog": {
+      "reason": "Reason (optional)",
+      "cancel": "Cancel",
+      "working": "Saving…",
+      "alreadyChanged": "Someone else already changed this switch, so there is nothing left to confirm. Close this dialog to see its current state.",
+      "turnOff": {
+        "title": "Turn off role and permission changes?",
+        "description": "Creating, renaming and deleting roles, saving permissions and changing an account's role are refused until you turn this back on. Reading roles and deactivating or reactivating accounts keep working.",
+        "confirm": "Turn off"
+      },
+      "turnOn": {
+        "title": "Turn on role and permission changes?",
+        "description": "Admins with the right permissions can create, rename and delete roles, save permissions and change account roles again.",
+        "confirm": "Turn on"
+      }
+    }
+  },
   "list": {
     "tableLabel": "Roles table",
     "columns": {
@@ -127,7 +163,8 @@
         "help_topic": "Guide topics",
         "help_article": "Guide articles",
         "document": "Documents",
-        "media": "Media library"
+        "media": "Media library",
+        "trend_template": "Trend templates"
       },
       "platform": {
         "setting": "Settings",
@@ -196,6 +233,10 @@
         "media": {
           "view": "View the media library",
           "manage": "Manage the media library"
+        },
+        "trend_template": {
+          "view": "View trend templates",
+          "manage": "Manage trend templates"
         }
       },
       "platform": {
