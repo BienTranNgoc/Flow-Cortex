@@ -7,16 +7,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * The MCP consent grant holds a session to the same second-factor rule as creating a token by hand: an admin
  * session that never passed a code gets no authorization code and keeps its step-up proof.
  */
 @TotpIt
-@TestPropertySource(properties = {
-        "flowcortex.auth.mcp-oauth.enabled=true",
-        "flowcortex.app.public-url=https://app.nodi.vn/"})
 class TotpOAuthGrantIT extends AbstractTotpIT {
 
     private static final String CALLBACK = "https://claude.ai/api/mcp/auth_callback";

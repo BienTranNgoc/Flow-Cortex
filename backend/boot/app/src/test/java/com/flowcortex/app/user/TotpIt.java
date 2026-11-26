@@ -19,8 +19,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 /**
  * The one application context every TOTP IT shares: Google sign-in configured and its client spied (only the
  * code exchange is stubbed), the account-credentials port spied (only the reset failure case stubs it), personal
- * access tokens on, one movable clock and one mutable console requirement, both reset by {@link AbstractTotpIT}
- * before each case. A property of its own would build another context.
+ * access tokens and the MCP authorization server on, one movable clock and one mutable console requirement,
+ * both reset by {@link AbstractTotpIT} before each case. A property of its own would build another context.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
@@ -29,7 +29,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         "flowcortex.security.oauth.google.client-id=test-client.apps.googleusercontent.com",
         "flowcortex.security.oauth.google.client-secret=test-secret",
         "flowcortex.security.oauth.google.redirect-uri=http://localhost:5173/api/v1/auth/oauth/google/callback",
-        "flowcortex.auth.personal-access-tokens.enabled=true"})
+        "flowcortex.auth.personal-access-tokens.enabled=true",
+        "flowcortex.auth.mcp-oauth.enabled=true",
+        "flowcortex.app.public-url=https://app.nodi.vn/"})
 @AutoConfigureTestRestTemplate
 @Import(TotpIt.Config.class)
 @MockitoSpyBean(types = {GoogleOAuthClient.class, AccountCredentials.class})
