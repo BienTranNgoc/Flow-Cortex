@@ -16,6 +16,7 @@ ErrorCode = Literal[
     "run_timeout",
     "duration_exceeded",
     "no_audio_stream",
+    "speech_too_long",
     "sibling_failed",
     "separation_failed",
     "diarization_failed",

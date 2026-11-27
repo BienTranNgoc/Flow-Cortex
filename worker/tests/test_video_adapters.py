@@ -645,8 +645,8 @@ def test_video_capability_rejects_non_image_reference() -> None:
     storage.presigned_get_url.assert_not_called()
 
 
-def test_video_capability_rejects_more_than_three_reference_images() -> None:
-    """The contract pins maxItems:3; four reference images must fail fast at the boundary."""
+def test_video_capability_rejects_more_than_four_reference_images() -> None:
+    """The contract pins maxItems:4 (1 optional keyframe + up to 3 product refs)."""
     job = _video_job_dict()
     job["inputs"] = [
         {"key": "first", "bucket": "flowcortex-uploads", "objectKey": "a"},
@@ -654,9 +654,11 @@ def test_video_capability_rejects_more_than_three_reference_images() -> None:
         {"key": "third", "bucket": "flowcortex-uploads", "objectKey": "c"},
         {"key": "fourth", "bucket": "flowcortex-uploads", "objectKey": "d"},
     ]
+    ProviderJob.model_validate(job)
+    job["inputs"].append({"key": "fifth", "bucket": "flowcortex-uploads", "objectKey": "e"})
     with pytest.raises(ValidationError) as raised:
         ProviderJob.model_validate(job)
-    assert "at most 3 items" in str(raised.value) or "too_long" in str(raised.value)
+    assert "at most 4 items" in str(raised.value) or "too_long" in str(raised.value)
 
 
 @pytest.mark.parametrize("by_url", [True, False])

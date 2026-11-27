@@ -137,7 +137,7 @@ def test_fallback_adapter_falls_back_to_edge_on_http_429_and_401(
         monkeypatch.setattr(urllib.request, "urlopen", _fail)
         wrapper = FallbackSpeechAdapter(
             primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
-            fallback=_FakeEdge(),  # type: ignore[arg-type]
+            fallback=_FakeEdge(),
         )
         out = wrapper.generate_speech(
             SpeechRequest("Xin chào", REV_ID, voice_gender="female"),
@@ -163,7 +163,7 @@ def test_fallback_adapter_does_not_swallow_content_permanent_error(
 
     wrapper = FallbackSpeechAdapter(
         primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
-        fallback=_NeverEdge(),  # type: ignore[arg-type]
+        fallback=_NeverEdge(),
     )
     with pytest.raises(PermanentError, match="speech script is blank"):
         wrapper.generate_speech(SpeechRequest("   ", REV_ID), _NoAbort())  # type: ignore[arg-type]
@@ -201,7 +201,7 @@ def test_capabilities_accepts_azure_primary_and_edge_fallback(
     monkeypatch.setattr(urllib.request, "urlopen", _fail_500)
     wrapper = FallbackSpeechAdapter(
         primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
-        fallback=_FakeEdge(),  # type: ignore[arg-type]
+        fallback=_FakeEdge(),
     )
     job = ProviderJob.model_validate(
         {
@@ -307,7 +307,7 @@ def test_fallback_distinct_default_voice_and_redelivery_reuse_and_incomplete_rea
         primary=AzureSpeechAdapter(
             AzureSpeechConfig(api_key="az-key", voice="vi-VN-HoaiMyNeural")
         ),
-        fallback=_EdgeDifferentDefault(),  # type: ignore[arg-type]
+        fallback=_EdgeDifferentDefault(),
     )
     prefix = f"runs/{REV_ID}/steps/3/attempts/1/"
     job = ProviderJob.model_validate(
@@ -388,7 +388,7 @@ def test_whitespace_voice_and_truncated_content_length_fallback(
     monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _TruncatedResp())
     wrapper = FallbackSpeechAdapter(
         primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
-        fallback=_FakeEdge(),  # type: ignore[arg-type]
+        fallback=_FakeEdge(),
     )
     prefix = f"runs/{REV_ID}/steps/3/attempts/1/"
     job = ProviderJob.model_validate(
@@ -437,7 +437,7 @@ def test_truncated_wav_without_content_length_and_non_finite_timeout(
     monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: _FakeResp(truncated_wav))
     wrapper = FallbackSpeechAdapter(
         primary=AzureSpeechAdapter(AzureSpeechConfig(api_key="az-key")),
-        fallback=_FakeEdge(),  # type: ignore[arg-type]
+        fallback=_FakeEdge(),
     )
     out = wrapper.generate_speech(SpeechRequest("Xin chào", REV_ID), _NoAbort())  # type: ignore[arg-type]
     assert out.provider == "edge"

@@ -858,7 +858,7 @@ def _open_and_read_http(
 ) -> bytes:
     with urllib.request.urlopen(request, timeout=socket_timeout) as response:
         if attempt_deadline is None:
-            return response.read()
+            return bytes(response.read())
         if isinstance(response, http.client.HTTPResponse):
             return read_bounded_response(
                 response,
@@ -870,7 +870,7 @@ def _open_and_read_http(
             )
         if time.monotonic() >= attempt_deadline:
             raise VendorJobTimeout("openai", model)
-        raw = response.read()
+        raw = bytes(response.read())
         if time.monotonic() >= attempt_deadline:
             raise VendorJobTimeout("openai", model)
         return raw

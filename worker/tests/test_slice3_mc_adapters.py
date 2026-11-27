@@ -571,18 +571,22 @@ def test_read_bounded_response_handles_ssl_socket_success_timeout_and_abort() ->
     import threading
     import time
     from types import SimpleNamespace
+    from typing import Self
 
     from flowcortex_worker.provider.vendor_jobs import VendorJobTimeout, read_bounded_response
 
     class _FakeSSLSocket(socket.socket):
-        def __init__(self) -> None:
+        def __init__(self, on_shutdown: threading.Event | None = None) -> None:
             self.shutdown_calls = 0
+            self._on_shutdown = on_shutdown
 
-        def dup(self) -> socket.socket:
+        def dup(self) -> Self:
             raise NotImplementedError("Cannot dup() SSLSocket")
 
         def shutdown(self, _how: int) -> None:
             self.shutdown_calls += 1
+            if self._on_shutdown is not None:
+                self._on_shutdown.set()
 
         def close(self) -> None:
             return None
@@ -621,14 +625,7 @@ def test_read_bounded_response_handles_ssl_socket_success_timeout_and_abort() ->
 
     # 2. Deadline path shuts down SSLSocket and raises VendorJobTimeout
     unblock = threading.Event()
-    sock_to = _FakeSSLSocket()
-    orig_shutdown = sock_to.shutdown
-
-    def _shutdown_and_unblock(how: int) -> None:
-        orig_shutdown(how)
-        unblock.set()
-
-    sock_to.shutdown = _shutdown_and_unblock  # type: ignore[method-assign]
+    sock_to = _FakeSSLSocket(on_shutdown=unblock)
     resp_to = _StreamingResp(sock_to, [], block_event=unblock)
     with pytest.raises(VendorJobTimeout):
         read_bounded_response(
@@ -663,14 +660,7 @@ def test_read_bounded_response_handles_ssl_socket_success_timeout_and_abort() ->
                 raise _KillError("killed")
 
     unblock_kill = threading.Event()
-    sock_kill = _FakeSSLSocket()
-    orig_kill_shutdown = sock_kill.shutdown
-
-    def _kill_shutdown(how: int) -> None:
-        orig_kill_shutdown(how)
-        unblock_kill.set()
-
-    sock_kill.shutdown = _kill_shutdown  # type: ignore[method-assign]
+    sock_kill = _FakeSSLSocket(on_shutdown=unblock_kill)
     abort = _AbortWithKill()
     resp_kill = _StreamingResp(sock_kill, [], block_event=unblock_kill)
     killer = threading.Timer(0.05, abort.trigger)
@@ -759,14 +749,21 @@ def test_mc_script_split_wav_marker_and_lipsync_trim(monkeypatch: pytest.MonkeyP
         def __init__(self, objs: dict[str, bytes]) -> None:
             self._objs = objs
 
-        def head_object(self, _b: str, key: str) -> int | None:
-            return len(self._objs[key]) if key in self._objs else None
+        def head_object(self, bucket: str, key: str) -> dict[str, object] | None:
+            del bucket
+            return {"ContentLength": len(self._objs[key])} if key in self._objs else None
 
-        def fetch_bytes(self, _b: str, key: str, _a: object) -> bytes:
+        def fetch_bytes(self, bucket: str, key: str, abort: object) -> bytes:
+            del bucket, abort
             return self._objs[key]
 
-        def put(self, key: str, body: bytes, _m: str, _a: object) -> None:
+        def put(self, key: str, body: bytes, mime: str, abort: object) -> int:
+            del mime, abort
             self._objs[key] = body
+            return len(body)
+
+        def presigned_get_url(self, bucket: str, key: str, *, expires_seconds: int = 900) -> str:
+            return f"https://storage.local/{bucket}/{key}?ttl={expires_seconds}"
 
     ctx = ExecutionContext(
         storage=_MemStorage({"k/v.mp4": TINY_MP4, "k/speech.wav": wav_7s}),
