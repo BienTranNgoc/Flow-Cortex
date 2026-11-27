@@ -219,12 +219,12 @@ def test_three_scenes_render_in_three_chunks(tmp_path: Path, profile: str) -> No
     assert {p.name for p in video.parent.iterdir()} == {"input", "video.mp4"}
 
 
-def test_unknown_profile_lists_the_three_allowed(tmp_path: Path) -> None:
+def test_unknown_profile_lists_the_allowed_profiles(tmp_path: Path) -> None:
     keys, paths = write_inputs(tmp_path, three_scene_project())
     with pytest.raises(PermanentError) as refused:
-        render_video.handle(make_job(keys, "vertical_ad_v2"), paths, NeverRuns())
+        render_video.handle(make_job(keys, "vertical_ad_v99"), paths, NeverRuns())
     assert refused.value.code == "contract_violation"
-    for name in ("vertical_ad_v1", "draft", "final"):
+    for name in ("vertical_ad_v1", "vertical_ad_v2", "draft", "final"):
         assert name in refused.value.message
 
 

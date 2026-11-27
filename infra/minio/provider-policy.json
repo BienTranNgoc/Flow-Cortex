@@ -19,7 +19,7 @@
         "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_3",
         "arn:aws:s3:::flowcortex-media/runs/*/inputs/mc",
         "arn:aws:s3:::flowcortex-media/runs/*/inputs/background",
-        "arn:aws:s3:::flowcortex-media/runs/*/inputs/background-*"
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/background-v*-*"
       ]
     }
   ]
