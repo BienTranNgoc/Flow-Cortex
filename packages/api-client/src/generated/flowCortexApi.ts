@@ -15633,7 +15633,7 @@ export const getCreateBillingProfileUrl = () => {
 };
 
 /**
- * The member's first profile becomes the default whatever isDefault says.
+ * The member's first profile becomes the default whatever isDefault says. A member holds at most 20 profiles.
  * @summary Add invoice details
  */
 export const createBillingProfile = async (

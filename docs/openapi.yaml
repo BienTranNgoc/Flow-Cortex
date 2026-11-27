@@ -5429,7 +5429,7 @@ paths:
       - billing-profiles-controller
       summary: Add invoice details
       description: The member's first profile becomes the default whatever isDefault
-        says.
+        says. A member holds at most 20 profiles.
       operationId: createBillingProfile
       requestBody:
         content:
@@ -5448,7 +5448,8 @@ paths:
           description: Not signed in
         "422":
           description: "billing_profile_invalid with errors.<field> (type, legalName,\
-            \ taxCode, personalIdNumber, address, email, isDefault)"
+            \ taxCode, personalIdNumber, address, email, isDefault), or billing_profile_limit_reached\
+            \ when the member already holds 20 profiles"
           content:
             application/problem+json:
               schema:
