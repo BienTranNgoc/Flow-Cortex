@@ -141,6 +141,31 @@ function isFocusRequest(state: unknown): boolean {
   );
 }
 
+function findMcKeyframeStep(
+  steps: NonNullable<RunResponse['steps']>,
+  isMcTemplate: boolean,
+  waitingStep: NonNullable<RunResponse['steps']>[number] | undefined,
+) {
+  if (!isMcTemplate || waitingStep?.type !== 'APPROVAL_CHECKPOINT' || waitingStep.stepOrder === undefined) {
+    return undefined;
+  }
+  return steps.find(
+    (s) => s.stepOrder === waitingStep.stepOrder! - 1 && s.type === 'generate_keyframe',
+  );
+}
+
+function isSingleShotProductVideo(
+  steps: NonNullable<RunResponse['steps']>,
+  isProductVideo: boolean,
+  isMcTemplate: boolean,
+): boolean {
+  return (
+    isProductVideo &&
+    !isMcTemplate &&
+    steps.filter((s) => s.type === 'generate_video').length === 1
+  );
+}
+
 interface RunViewProps {
   run: RunResponse;
   runId: string;
@@ -184,12 +209,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
   const isProductVideo = isProductVideoRun(run, capabilitiesQuery.data?.productVideoWorkflowId);
   const isMcTemplate = isMcProductVideoRun(run);
   const waitingStep = needsYouStep(steps, run.status);
-  const keyframeStep =
-    isMcTemplate && waitingStep?.type === 'APPROVAL_CHECKPOINT' && waitingStep.stepOrder !== undefined
-      ? steps.find(
-          (s) => s.stepOrder === waitingStep.stepOrder! - 1 && s.type === 'generate_keyframe',
-        )
-      : undefined;
+  const keyframeStep = findMcKeyframeStep(steps, isMcTemplate, waitingStep);
   const selectedState = selected ? stepState(selected, steps, run.status) : undefined;
   const announcement =
     selected && selectedState
@@ -246,11 +266,7 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
         fileName={fileName}
         isProductVideo={isProductVideo}
         isMcTemplate={isMcTemplate}
-        isSingleShot={
-          isProductVideo &&
-          !isMcTemplate &&
-          steps.filter((s) => s.type === 'generate_video').length === 1
-        }
+        isSingleShot={isSingleShotProductVideo(steps, isProductVideo, isMcTemplate)}
         keyframeStep={keyframeStep}
         stepTitle={stepLabel(selected, t, steps, isProductVideo)}
         productName={brief?.productName}

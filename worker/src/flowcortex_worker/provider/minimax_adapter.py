@@ -241,7 +241,7 @@ class MinimaxAdapter:
                 )
                 if exc.code not in (408, 429) and not (500 <= exc.code < 600):
                     return CancelResult(confirmed=False, reason=last_reason)
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+            except (urllib.error.URLError, TimeoutError, ValueError) as exc:
                 last_reason = type(exc).__name__
                 log.warning(
                     "MiniMax prediction cancel failed",

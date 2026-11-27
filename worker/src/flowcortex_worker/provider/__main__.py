@@ -26,6 +26,8 @@ from flowcortex_worker.storage import Storage, client_from, remove_leftovers
 from .adapter import (
     CapabilityProviderAdapter,
     FixtureProviderAdapter,
+    KeyframeAdapter,
+    LipsyncAdapter,
     ScriptAdapter,
     SpeechAdapter,
     VideoAdapter,
@@ -269,6 +271,71 @@ def build_probe_registry(adapter: Any, environ: Mapping[str, str]) -> ProbeRegis
     return probes
 
 
+def _resolve_video_credentials(
+    video_provider: str,
+    generic_key: str,
+    generic_url: str,
+    generic_model: str,
+) -> tuple[str, str, str]:
+    if video_provider == PROVIDER_SEEDANCE:
+        return (
+            os.environ.get("SEEDANCE_API_KEY", "").strip() or generic_key,
+            os.environ.get("SEEDANCE_BASE_URL", "").strip() or generic_url,
+            os.environ.get("SEEDANCE_MODEL", "").strip() or generic_model,
+        )
+    if video_provider == PROVIDER_VEO:
+        return (
+            os.environ.get("VEO_API_KEY", "").strip() or generic_key,
+            os.environ.get("VEO_BASE_URL", "").strip() or generic_url,
+            os.environ.get("VEO_MODEL", "").strip() or generic_model,
+        )
+    if video_provider == PROVIDER_WAN:
+        return (
+            os.environ.get("WAN_API_KEY", "").strip() or generic_key,
+            os.environ.get("WAN_BASE_URL", "").strip() or generic_url,
+            os.environ.get("WAN_MODEL", "").strip() or generic_model,
+        )
+    if video_provider == PROVIDER_MINIMAX:
+        return (
+            os.environ.get("MINIMAX_API_KEY", "").strip()
+            or os.environ.get("WAN_API_KEY", "").strip()
+            or generic_key,
+            os.environ.get("MINIMAX_BASE_URL", "").strip() or generic_url,
+            os.environ.get("MINIMAX_MODEL", "").strip() or generic_model,
+        )
+    return generic_key, generic_url, generic_model
+
+
+def _resolve_replicate_key(configured_video_provider: str, generic_video_key: str) -> str:
+    explicit = os.environ.get("REPLICATE_API_TOKEN", "").strip()
+    if explicit:
+        return explicit
+    if configured_video_provider == PROVIDER_MINIMAX:
+        return (
+            os.environ.get("MINIMAX_API_KEY", "").strip()
+            or os.environ.get("WAN_API_KEY", "").strip()
+            or generic_video_key
+        )
+    if configured_video_provider == PROVIDER_WAN:
+        return os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
+    return ""
+
+
+def _build_mc_adapters(
+    configured_video_provider: str,
+    generic_video_key: str,
+) -> tuple[KeyframeAdapter | None, LipsyncAdapter | None]:
+    replicate_key = _resolve_replicate_key(configured_video_provider, generic_video_key)
+    if replicate_key:
+        return (
+            SeedreamKeyframeAdapter(SeedreamConfig(api_key=replicate_key)),
+            KlingLipsyncAdapter(KlingLipsyncConfig(api_key=replicate_key)),
+        )
+    if configured_video_provider == PROVIDER_FIXTURE:
+        return FixtureProviderAdapter(), FixtureProviderAdapter()
+    return None, None
+
+
 def _build_adapter(
     s3_public_endpoint: str = "",
     *,
@@ -327,30 +394,9 @@ def _build_adapter(
     generic_video_key = os.environ.get("VIDEO_PROVIDER_API_KEY", "").strip()
     generic_video_url = os.environ.get("VIDEO_PROVIDER_BASE_URL", "").strip()
     generic_video_model = os.environ.get("VIDEO_PROVIDER_MODEL", "").strip()
-    if video_provider == PROVIDER_SEEDANCE:
-        video_api_key = os.environ.get("SEEDANCE_API_KEY", "").strip() or generic_video_key
-        video_base_url = os.environ.get("SEEDANCE_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("SEEDANCE_MODEL", "").strip() or generic_video_model
-    elif video_provider == PROVIDER_VEO:
-        video_api_key = os.environ.get("VEO_API_KEY", "").strip() or generic_video_key
-        video_base_url = os.environ.get("VEO_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("VEO_MODEL", "").strip() or generic_video_model
-    elif video_provider == PROVIDER_WAN:
-        video_api_key = os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
-        video_base_url = os.environ.get("WAN_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("WAN_MODEL", "").strip() or generic_video_model
-    elif video_provider == PROVIDER_MINIMAX:
-        video_api_key = (
-            os.environ.get("MINIMAX_API_KEY", "").strip()
-            or os.environ.get("WAN_API_KEY", "").strip()
-            or generic_video_key
-        )
-        video_base_url = os.environ.get("MINIMAX_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("MINIMAX_MODEL", "").strip() or generic_video_model
-    else:
-        video_api_key = generic_video_key
-        video_base_url = generic_video_url
-        video_model = generic_video_model
+    video_api_key, video_base_url, video_model = _resolve_video_credentials(
+        video_provider, generic_video_key, generic_video_url, generic_video_model
+    )
 
     script_adapter = _build_script_adapter(
         script_provider,
@@ -366,25 +412,8 @@ def _build_adapter(
     video_adapter = _build_video_adapter(
         video_provider, video_api_key, video_base_url, video_model, s3_public_endpoint
     )
-    configured_replicate_key = (
-        os.environ.get("MINIMAX_API_KEY", "").strip()
-        or os.environ.get("WAN_API_KEY", "").strip()
-        or generic_video_key
-        if configured_video_provider == PROVIDER_MINIMAX
-        else os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
-        if configured_video_provider == PROVIDER_WAN
-        else ""
-    )
-    replicate_key = os.environ.get("REPLICATE_API_TOKEN", "").strip() or configured_replicate_key
-    keyframe_adapter = (
-        SeedreamKeyframeAdapter(SeedreamConfig(api_key=replicate_key))
-        if replicate_key
-        else (FixtureProviderAdapter() if configured_video_provider == PROVIDER_FIXTURE else None)
-    )
-    lipsync_adapter = (
-        KlingLipsyncAdapter(KlingLipsyncConfig(api_key=replicate_key))
-        if replicate_key
-        else (FixtureProviderAdapter() if configured_video_provider == PROVIDER_FIXTURE else None)
+    keyframe_adapter, lipsync_adapter = _build_mc_adapters(
+        configured_video_provider, generic_video_key
     )
     log.info(
         "provider adapters selected",

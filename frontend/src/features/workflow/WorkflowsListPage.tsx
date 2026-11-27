@@ -255,9 +255,8 @@ export function WorkflowsListPage() {
       {filtered && filtered.length > 0 && (
         <>
           {layout === 'list' ? (
-            <div
+            <section
               className="wf-list__table-wrap"
-              role="region"
               aria-label={t('workflow.list.tableLabel')}
               tabIndex={0}
             >
@@ -327,7 +326,7 @@ export function WorkflowsListPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </section>
           ) : (
             <ul className="wf-list__grid">
               {filtered.map((workflow) => {

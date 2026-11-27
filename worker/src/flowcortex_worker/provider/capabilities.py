@@ -67,6 +67,7 @@ _URL_REFERENCE_PROVIDERS = frozenset({PROVIDER_SEEDANCE})
 _CLIP_WIDTH = 480
 _CLIP_HEIGHT = 854
 _CLIP_CRF = "18"
+_CLIP_FILENAME = "clip.mp4"
 
 log = logging.getLogger("flowcortex_provider_worker.vendor_jobs")
 
@@ -483,7 +484,7 @@ def _generate_video(
     return ProviderOutcome(
         data=data,
         files=(
-            ProviderFile("clip.mp4", video.mime, normalized),
+            ProviderFile(_CLIP_FILENAME, video.mime, normalized),
             ProviderFile("manifest.json", "application/json", manifest),
         ),
     )
@@ -740,7 +741,7 @@ def _normalize_video(
 ) -> bytes:
     with tempfile.TemporaryDirectory(prefix="flowcortex-video-") as directory:
         source = Path(directory) / "source.mp4"
-        output = Path(directory) / "clip.mp4"
+        output = Path(directory) / _CLIP_FILENAME
         source.write_bytes(body)
         completed = context.abort.run([
             "ffmpeg",
@@ -941,7 +942,7 @@ def _store_task_checkpoint(
 
 def _probe_duration_seconds(body: bytes, context: ExecutionContext) -> float | None:
     with tempfile.TemporaryDirectory(prefix="flowcortex-probe-") as directory:
-        path = Path(directory) / "clip.mp4"
+        path = Path(directory) / _CLIP_FILENAME
         path.write_bytes(body)
         if not hasattr(context.abort, "run"):
             return None
@@ -960,8 +961,68 @@ def _probe_duration_seconds(body: bytes, context: ExecutionContext) -> float | N
         try:
             value = float((completed.stdout or b"").decode().strip())
             return value if value > 0 else None
-        except (ValueError, UnicodeDecodeError):
+        except ValueError:
             return None
+
+
+def _report_running_vendor_task(
+    context: ExecutionContext,
+    ledger: VendorLedger,
+    *,
+    provider: str,
+    model: str,
+    fingerprint: str,
+    task_id: str,
+) -> None:
+    context.report(
+        VendorTaskReport(
+            vendor=provider,
+            model=model,
+            fingerprint=fingerprint,
+            requestKey=ledger.requestKey,
+            vendorJobId=task_id,
+            handle={},
+            status="running",
+            vendorCreatedAt=datetime.now(UTC),
+        )
+    )
+
+
+def _resolve_keyframe_task(
+    adapter: KeyframeAdapter,
+    request: KeyframeRequest,
+    context: ExecutionContext,
+    ledger: VendorLedger | None,
+    idempotency_key: str,
+    provider: str,
+    model: str,
+) -> str:
+    task_id = _load_task_checkpoint(context, idempotency_key, provider, model)
+    if task_id is not None:
+        return task_id
+    attached: VendorCandidate | None = None
+    if ledger is not None:
+        attached = select_attach(
+            ledger.candidates,
+            idempotency_key,
+            context.probes,
+            lambda candidate, status: _report_verdict(context, candidate, status),
+        )
+    if attached is not None:
+        task_id = attached.vendorJobId
+    else:
+        task_id = adapter.submit_keyframe(request)
+        if ledger is not None:
+            _report_running_vendor_task(
+                context,
+                ledger,
+                provider=provider,
+                model=model,
+                fingerprint=idempotency_key,
+                task_id=task_id,
+            )
+    _store_task_checkpoint(context, task_id, idempotency_key, provider, model)
+    return task_id
 
 
 def _generate_keyframe(
@@ -999,35 +1060,9 @@ def _generate_keyframe(
         )).encode()
     ).hexdigest()
     ledger = job.vendorLedger
-    fingerprint = idempotency_key if ledger else None
-    task_id = _load_task_checkpoint(context, idempotency_key, provider, model)
-    if task_id is None:
-        attached: VendorCandidate | None = None
-        if ledger is not None and fingerprint is not None:
-            attached = select_attach(
-                ledger.candidates,
-                fingerprint,
-                context.probes,
-                lambda candidate, status: _report_verdict(context, candidate, status),
-            )
-        if attached is not None:
-            task_id = attached.vendorJobId
-        else:
-            task_id = adapter.submit_keyframe(request)
-            if ledger is not None and fingerprint is not None:
-                context.report(
-                    VendorTaskReport(
-                        vendor=provider,
-                        model=model,
-                        fingerprint=fingerprint,
-                        requestKey=ledger.requestKey,
-                        vendorJobId=task_id,
-                        handle={},
-                        status="running",
-                        vendorCreatedAt=datetime.now(UTC),
-                    )
-                )
-        _store_task_checkpoint(context, task_id, idempotency_key, provider, model)
+    task_id = _resolve_keyframe_task(
+        adapter, request, context, ledger, idempotency_key, provider, model
+    )
     artifact = adapter.await_keyframe(task_id, context.abort)
     data: dict[str, Any] = {
         "profile": job.params.profile,
@@ -1041,8 +1076,8 @@ def _generate_keyframe(
         "idempotencyKey": idempotency_key,
         "providerTaskId": artifact.provider_task_id,
     }
-    if ledger is not None and fingerprint is not None:
-        data["fingerprint"] = fingerprint
+    if ledger is not None:
+        data["fingerprint"] = idempotency_key
         data["requestKey"] = ledger.requestKey
     manifest = json.dumps(data, ensure_ascii=False, sort_keys=True).encode()
     return ProviderOutcome(
@@ -1052,6 +1087,71 @@ def _generate_keyframe(
             ProviderFile("manifest.json", "application/json", manifest),
         ),
     )
+
+
+def _prepare_lipsync_audio(audio_bytes: bytes, effective_duration: int) -> tuple[float, bytes]:
+    mc_end_ms = extract_mc_end_ms(audio_bytes)
+    if mc_end_ms is None:
+        clip_duration_s = float(effective_duration)
+        return clip_duration_s, trim_wav(audio_bytes, round(clip_duration_s * 1000))
+    if mc_end_ms > effective_duration * 1000:
+        raise PermanentError(
+            "contract_violation",
+            f"MC speech segment ({mc_end_ms} ms) exceeds requested lip-sync duration "
+            f"({effective_duration} s)",
+        )
+    clip_duration_s = round(max(2.0, mc_end_ms / 1000.0), 3)
+    return clip_duration_s, trim_wav(audio_bytes, mc_end_ms)
+
+
+def _resolve_lipsync_task(
+    adapter: LipsyncAdapter,
+    request: LipsyncRequest,
+    context: ExecutionContext,
+    ledger: VendorLedger | None,
+    idempotency_key: str,
+    legacy_idempotency_key: str,
+    provider: str,
+    model: str,
+) -> tuple[str, str]:
+    loaded = _load_task_checkpoint_any(
+        context, (idempotency_key, legacy_idempotency_key), provider, model
+    )
+    if loaded is not None:
+        return loaded
+    active_key = idempotency_key
+    attached: VendorCandidate | None = None
+    if ledger is not None:
+        attached = select_attach(
+            ledger.candidates,
+            idempotency_key,
+            context.probes,
+            lambda candidate, status: _report_verdict(context, candidate, status),
+        )
+        if attached is None and legacy_idempotency_key != idempotency_key:
+            attached = select_attach(
+                ledger.candidates,
+                legacy_idempotency_key,
+                context.probes,
+                lambda candidate, status: _report_verdict(context, candidate, status),
+            )
+            if attached is not None:
+                active_key = legacy_idempotency_key
+    if attached is not None:
+        task_id = attached.vendorJobId
+    else:
+        task_id = adapter.submit_lipsync(request)
+        if ledger is not None:
+            _report_running_vendor_task(
+                context,
+                ledger,
+                provider=provider,
+                model=model,
+                fingerprint=active_key,
+                task_id=task_id,
+            )
+    _store_task_checkpoint(context, task_id, active_key, provider, model)
+    return task_id, active_key
 
 
 def _lipsync_video(
@@ -1073,19 +1173,7 @@ def _lipsync_video(
     video_bytes = context.storage.fetch_bytes(video_ref.bucket, video_ref.objectKey, context.abort)
     audio_bytes = context.storage.fetch_bytes(audio_ref.bucket, audio_ref.objectKey, context.abort)
     effective_duration = payload.durationSeconds or 5
-    mc_end_ms = extract_mc_end_ms(audio_bytes)
-    if mc_end_ms is not None:
-        if mc_end_ms > effective_duration * 1000:
-            raise PermanentError(
-                "contract_violation",
-                f"MC speech segment ({mc_end_ms} ms) exceeds requested lip-sync duration "
-                f"({effective_duration} s)",
-            )
-        clip_duration_s = round(max(2.0, mc_end_ms / 1000.0), 3)
-        lipsync_audio = trim_wav(audio_bytes, mc_end_ms)
-    else:
-        clip_duration_s = float(effective_duration)
-        lipsync_audio = trim_wav(audio_bytes, round(clip_duration_s * 1000))
+    clip_duration_s, lipsync_audio = _prepare_lipsync_audio(audio_bytes, effective_duration)
     is_fixture = isinstance(adapter, FixtureProviderAdapter) or isinstance(
         getattr(adapter, "lipsync_adapter", None), FixtureProviderAdapter
     )
@@ -1116,48 +1204,16 @@ def _lipsync_video(
         )).encode()
     ).hexdigest()
     ledger = job.vendorLedger
-    active_key = idempotency_key
-    loaded = _load_task_checkpoint_any(
-        context, (idempotency_key, legacy_idempotency_key), provider, model
+    task_id, active_key = _resolve_lipsync_task(
+        adapter,
+        request,
+        context,
+        ledger,
+        idempotency_key,
+        legacy_idempotency_key,
+        provider,
+        model,
     )
-    if loaded is not None:
-        task_id, active_key = loaded
-    else:
-        attached: VendorCandidate | None = None
-        if ledger is not None:
-            attached = select_attach(
-                ledger.candidates,
-                idempotency_key,
-                context.probes,
-                lambda candidate, status: _report_verdict(context, candidate, status),
-            )
-            if attached is None and legacy_idempotency_key != idempotency_key:
-                attached = select_attach(
-                    ledger.candidates,
-                    legacy_idempotency_key,
-                    context.probes,
-                    lambda candidate, status: _report_verdict(context, candidate, status),
-                )
-                if attached is not None:
-                    active_key = legacy_idempotency_key
-        if attached is not None:
-            task_id = attached.vendorJobId
-        else:
-            task_id = adapter.submit_lipsync(request)
-            if ledger is not None:
-                context.report(
-                    VendorTaskReport(
-                        vendor=provider,
-                        model=model,
-                        fingerprint=active_key,
-                        requestKey=ledger.requestKey,
-                        vendorJobId=task_id,
-                        handle={},
-                        status="running",
-                        vendorCreatedAt=datetime.now(UTC),
-                    )
-                )
-        _store_task_checkpoint(context, task_id, active_key, provider, model)
     video = adapter.await_lipsync(task_id, context.abort)
     normalized = _normalize_video(video.body, context, duration_seconds=clip_duration_s)
     probed = _probe_duration_seconds(normalized, context)
@@ -1183,7 +1239,7 @@ def _lipsync_video(
     return ProviderOutcome(
         data=data,
         files=(
-            ProviderFile("clip.mp4", video.mime, normalized),
+            ProviderFile(_CLIP_FILENAME, video.mime, normalized),
             ProviderFile("manifest.json", "application/json", manifest),
         ),
     )

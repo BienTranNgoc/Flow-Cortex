@@ -35,6 +35,7 @@ POLL_SECONDS="${POLL_SECONDS:-120}"
 PRODUCT_VIDEO="${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:-false}"
 PRODUCT_VIDEO_MC="${FLOWCORTEX_PRODUCT_VIDEO_MC_ENABLED:-false}"
 WORKFLOW_NAME="Check a video file"
+HTTP_CODE_FMT='%{http_code}'
 
 cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
@@ -70,7 +71,7 @@ grant() {
 # PUTs a file to a grant's URL; prints the HTTP status.
 put() {
   local file=$1 url=$2 mime=${3:-video/mp4}
-  curl -sS -o "$work/put-body" -w '%{http_code}' -T "$file" -H "Content-Type: $mime" "$url"
+  curl -sS -o "$work/put-body" -w "$HTTP_CODE_FMT" -T "$file" -H "Content-Type: $mime" "$url"
 }
 
 # Uploads a file and starts the workflow on it; prints the run id.
@@ -140,7 +141,7 @@ pass "clip run $run completed, videoCodec h264"
 
 url="$(api "$member" "/api/v1/runs/$run/steps/1/outputs/video-details.json/url" | jq -er .url)" \
   || fail "download URL for video-details.json"
-code="$(curl -sS -D "$work/headers" -o "$work/video-details.json" -w '%{http_code}' "$url")"
+code="$(curl -sS -D "$work/headers" -o "$work/video-details.json" -w "$HTTP_CODE_FMT" "$url")"
 [[ "$code" == 200 ]] || fail "technical details download answered $code"
 disposition="$(tr -d '\r' <"$work/headers" | awk 'tolower($1) == "content-disposition:" { sub(/^[^:]*: */, ""); print }')"
 [[ "$disposition" == 'attachment; filename="video-details.json"' ]] \
@@ -150,7 +151,7 @@ pass "technical details downloaded (200, $disposition)"
 
 url="$(api "$member" "/api/v1/runs/$run/steps/2/outputs/source-audio.wav/url" | jq -er .url)" \
   || fail "download URL for source-audio.wav"
-code="$(curl -sS -D "$work/audio-headers" -o "$work/source-audio.wav" -w '%{http_code}' "$url")"
+code="$(curl -sS -D "$work/audio-headers" -o "$work/source-audio.wav" -w "$HTTP_CODE_FMT" "$url")"
 [[ "$code" == 200 ]] || fail "audio download answered $code"
 
 docker compose cp "$work/source-audio.wav" worker:/tmp/source-audio.wav >/dev/null
@@ -170,7 +171,7 @@ printf 'not a video' >"$work/bad.mp4"
 g="$(grant bad.mp4 "$(stat -c %s "$work/bad.mp4")")" || fail "upload grant for bad.mp4"
 code="$(put "$work/bad.mp4" "$(jq -er .url <<<"$g")")"
 [[ "$code" == 200 ]] || fail "PUT bad.mp4 answered $code: $(cat "$work/put-body")"
-code="$(curl -sS -o "$work/start-body" -w '%{http_code}' -H "Authorization: Bearer $member" \
+code="$(curl -sS -o "$work/start-body" -w "$HTTP_CODE_FMT" -H "Authorization: Bearer $member" \
   -H 'Content-Type: application/json' \
   -d "$(jq -n --arg u "$(jq -er .uploadId <<<"$g")" '{uploadId: $u, originalName: "bad.mp4"}')" \
   "$API_URL/api/v1/workflows/$workflow/runs")"
@@ -221,7 +222,7 @@ render_step="$(jq -er '.steps[] | select(.type == "render_video") | .stepOrder' 
   || fail "find render_video stepOrder in Product Video run $run"
 url="$(api "$member" "/api/v1/runs/$run/steps/$render_step/outputs/video.mp4/url" | jq -er .url)" \
   || fail "download URL for video.mp4"
-code="$(curl -sS -o "$work/video.mp4" -w '%{http_code}' "$url")"
+code="$(curl -sS -o "$work/video.mp4" -w "$HTTP_CODE_FMT" "$url")"
 [[ "$code" == 200 && -s "$work/video.mp4" ]] || fail "video.mp4 download answered $code"
 docker compose cp "$work/video.mp4" worker:/tmp/product-video.mp4 >/dev/null
 video="$(docker compose exec -T worker ffprobe -v error \
@@ -245,7 +246,7 @@ jq -e 'any(.templates[]; .id == "mc-v1" and .available == true)
 pass "Product Video templates catalog lists mc-v1 (available) and presets"
 
 for preset_path in /api/v1/product-videos/presets/mc/mc-nu-tre /api/v1/product-videos/presets/backgrounds/bg-studio-minimal; do
-  code="$(curl -sS -o "$work/preset.jpg" -w '%{http_code}' -H "Authorization: Bearer $member" "$API_URL$preset_path")"
+  code="$(curl -sS -o "$work/preset.jpg" -w "$HTTP_CODE_FMT" -H "Authorization: Bearer $member" "$API_URL$preset_path")"
   [[ "$code" == 200 && -s "$work/preset.jpg" ]] || fail "GET $preset_path answered $code"
 done
 pass "Built-in MC & background preset images served (200)"

@@ -261,6 +261,24 @@ def probe_media(
     raise TransientError(f"vendor result probe answered HTTP {status}")
 
 
+def _extract_raw_socket(resp: Any) -> socket.socket | None:
+    raw = getattr(getattr(resp, "fp", None), "raw", None)
+    base_sock = getattr(raw, "_sock", None)
+    return base_sock if isinstance(base_sock, socket.socket) else None
+
+
+def _check_abort_or_deadline(
+    abort: Any,
+    timed_out: bool,
+    deadline: float,
+    provider: str,
+    task_id: str,
+) -> None:
+    abort.check()
+    if timed_out or time.monotonic() >= deadline:
+        raise VendorJobTimeout(provider, task_id)
+
+
 def read_bounded_response(
     resp: Any,
     *,
@@ -271,13 +289,9 @@ def read_bounded_response(
     deadline: float,
 ) -> bytes:
     """Read an HTTP response body while cutting the underlying socket on abort or deadline."""
-    raw = getattr(getattr(resp, "fp", None), "raw", None)
-    base_sock = getattr(raw, "_sock", None)
     # SSLSocket subclasses socket.socket and raises NotImplementedError on dup(); hold the live
     # socket under a lock and clear it before urlopen's context manager closes the response.
-    active_sock: socket.socket | None = (
-        base_sock if isinstance(base_sock, socket.socket) else None
-    )
+    active_sock = _extract_raw_socket(resp)
     lock = threading.Lock()
     timed_out = False
 
@@ -304,18 +318,14 @@ def read_bounded_response(
     chunks = bytearray()
     try:
         while True:
-            abort.check()
-            if timed_out or time.monotonic() >= deadline:
-                raise VendorJobTimeout(provider, task_id)
+            _check_abort_or_deadline(abort, timed_out, deadline, provider, task_id)
             chunk = read_fn(65536)
             if not chunk:
                 break
             chunks.extend(chunk)
             if len(chunks) > max_bytes:
                 return bytes(chunks)
-        abort.check()
-        if timed_out or time.monotonic() >= deadline:
-            raise VendorJobTimeout(provider, task_id)
+        _check_abort_or_deadline(abort, timed_out, deadline, provider, task_id)
         expected_len = _expected_content_length(resp)
         if expected_len is not None and len(chunks) < expected_len:
             raise TransientError(
@@ -323,9 +333,7 @@ def read_bounded_response(
             )
         return bytes(chunks)
     except OSError:
-        abort.check()
-        if timed_out or time.monotonic() >= deadline:
-            raise VendorJobTimeout(provider, task_id) from None
+        _check_abort_or_deadline(abort, timed_out, deadline, provider, task_id)
         raise
     finally:
         timer.cancel()
@@ -394,7 +402,7 @@ def _download_replicate_once(
         finally:
             with suppress(Exception):
                 exc.close()
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+    except OSError as exc:
         raise TransientError(f"{label} download failed: {type(exc).__name__}") from exc
 
 

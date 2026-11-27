@@ -118,7 +118,7 @@ export function findFinalVideoArtifact(
   const renderStep = steps.find(
     (step) => step.type === 'render_video' && step.status === 'completed',
   );
-  if (!renderStep || renderStep.stepOrder === undefined) return null;
+  if (renderStep?.stepOrder === undefined) return null;
   const artifact = (renderStep.outputs ?? []).find(
     (output) => output.mime?.startsWith('video/') || output.name.endsWith('.mp4'),
   );

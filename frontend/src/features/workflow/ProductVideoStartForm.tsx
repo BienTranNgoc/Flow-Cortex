@@ -134,6 +134,43 @@ function startButtonLabel(phase: MultiUploadPhase | null, t: TFunction): string 
   return t('workflow.start.button');
 }
 
+function resolveMcPreview(
+  templateId: ProductVideoTemplateId,
+  mcMode: AssetMode,
+  mcUploadPreviewUrl: string | null,
+  mcFile: File | null,
+  preset: { imageUrl: string; label: string } | null,
+): { url: string | null; label: string | null } {
+  if (templateId !== 'mc-v1') return { url: null, label: null };
+  if (mcMode === 'upload') return { url: mcUploadPreviewUrl, label: mcFile?.name ?? null };
+  return { url: preset?.imageUrl ?? null, label: preset?.label ?? null };
+}
+
+function resolveBgPreview(
+  bgMode: AssetMode,
+  bgUploadPreviewUrl: string | null,
+  bgFile: File | null,
+  sceneNote: string,
+  preset: { imageUrl: string; label: string } | null,
+): { url: string | null; label: string | null } {
+  if (bgMode === 'upload') return { url: bgUploadPreviewUrl, label: bgFile?.name ?? null };
+  if (bgMode === 'note') return { url: null, label: sceneNote.trim() || null };
+  return { url: preset?.imageUrl ?? null, label: preset?.label ?? null };
+}
+
+function mergeUniqueFiles(current: File[], incoming: File[]): File[] {
+  const seen = new Set(current.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
+  const merged = [...current];
+  for (const file of incoming) {
+    const key = `${file.name}:${file.size}:${file.lastModified}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(file);
+    }
+  }
+  return merged;
+}
+
 /**
  * Product Video start form: captures product name, description, and 1 product photo alongside a 9:16 preview.
  */
@@ -273,31 +310,20 @@ export function ProductVideoStartForm({
   const selectedMcPreset = catalog.mcPresets.find((p) => p.id === mcPresetId) ?? null;
   const selectedBgPreset = catalog.backgroundPresets.find((p) => p.id === bgPresetId) ?? null;
 
-  const mcPreviewUrl =
-    templateId === 'mc-v1'
-      ? mcMode === 'upload'
-        ? mcUploadPreviewUrl
-        : (selectedMcPreset?.imageUrl ?? null)
-      : null;
-  const mcLabel =
-    templateId === 'mc-v1'
-      ? mcMode === 'upload'
-        ? (mcFile?.name ?? null)
-        : (selectedMcPreset?.label ?? null)
-      : null;
-
-  const bgPreviewUrl =
-    bgMode === 'upload'
-      ? bgUploadPreviewUrl
-      : bgMode === 'preset'
-        ? (selectedBgPreset?.imageUrl ?? null)
-        : null;
-  const bgLabel =
-    bgMode === 'upload'
-      ? (bgFile?.name ?? null)
-      : bgMode === 'note'
-        ? sceneNote.trim() || null
-        : (selectedBgPreset?.label ?? null);
+  const { url: mcPreviewUrl, label: mcLabel } = resolveMcPreview(
+    templateId,
+    mcMode,
+    mcUploadPreviewUrl,
+    mcFile,
+    selectedMcPreset,
+  );
+  const { url: bgPreviewUrl, label: bgLabel } = resolveBgPreview(
+    bgMode,
+    bgUploadPreviewUrl,
+    bgFile,
+    sceneNote,
+    selectedBgPreset,
+  );
 
   const onSelectTemplate = (next: ProductVideoTemplateId) => {
     setTemplateId(next);
@@ -320,16 +346,7 @@ export function ProductVideoStartForm({
 
   const applyPickedFiles = (fileList: FileList | null) => {
     if (phase || !fileList || fileList.length === 0) return;
-    const incoming = Array.from(fileList);
-    const seen = new Set(files.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
-    const merged = [...files];
-    for (const file of incoming) {
-      const key = `${file.name}:${file.size}:${file.lastModified}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        merged.push(file);
-      }
-    }
+    const merged = mergeUniqueFiles(files, Array.from(fileList));
     setFiles(merged);
     setFailure(null);
     setImageError(asCheck(firstImageProblem(merged)));

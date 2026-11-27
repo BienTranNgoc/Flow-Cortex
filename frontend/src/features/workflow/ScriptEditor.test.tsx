@@ -33,6 +33,22 @@ describe('ScriptEditor', () => {
       'Câu một hay lắm!',
       'Câu hai chốt đơn ngay.',
     ]);
+    expect(splitMcScript('… Bình này giữ lạnh rất lâu! Mua ngay hôm nay.')).toEqual([
+      '… Bình này giữ lạnh rất lâu!',
+      'Mua ngay hôm nay.',
+    ]);
+    expect(splitMcScript('… Bình này giữ lạnh rất lâu!')).toEqual([
+      '… Bình này giữ lạnh rất lâu!',
+      '',
+    ]);
+    expect(splitMcScript('Bình giữ lạnh! Mua ngay.\u2028Miễn phí giao hàng.')).toEqual([
+      'Bình giữ lạnh! Mua ngay.',
+      'Miễn phí giao hàng.',
+    ]);
+    expect(splitMcScript('Bình giữ lạnh! Mua ngay.\rMiễn phí giao hàng.')).toEqual([
+      'Bình giữ lạnh! Mua ngay.',
+      'Miễn phí giao hàng.',
+    ]);
     expect(joinMcScript('  Đoạn 1 ', ' Đoạn 2  ')).toBe('Đoạn 1\n\nĐoạn 2');
     // Collapses inner blank lines so the \n\n boundary survives API content.trim() intact.
     expect(splitMcScript(joinMcScript('Dòng 1\n\nDòng 2', 'Lời SP').trim())).toEqual([

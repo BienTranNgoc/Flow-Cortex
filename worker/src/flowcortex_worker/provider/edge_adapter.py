@@ -309,6 +309,21 @@ def split_mc_script_segments(script: str) -> tuple[str, str] | None:
     return None
 
 
+def _extract_info_icmt(wav_bytes: bytes, start: int, end: int) -> bytes | None:
+    sub_offset = start
+    while sub_offset + 8 <= end:
+        sub_id = wav_bytes[sub_offset : sub_offset + 4]
+        sub_size = int.from_bytes(wav_bytes[sub_offset + 4 : sub_offset + 8], "little")
+        sub_start = sub_offset + 8
+        sub_end = sub_start + sub_size
+        if sub_end > end:
+            break
+        if sub_id == b"ICMT":
+            return wav_bytes[sub_start:sub_end].rstrip(b"\x00").strip()
+        sub_offset = sub_end + (sub_size & 1)
+    return None
+
+
 def _extract_riff_icmt(wav_bytes: bytes) -> bytes | None:
     """Read raw RIFF WAVE LIST/INFO/ICMT metadata bounded strictly by declared RIFF size."""
     if len(wav_bytes) < 12 or wav_bytes[:4] != b"RIFF" or wav_bytes[8:12] != b"WAVE":
@@ -330,17 +345,9 @@ def _extract_riff_icmt(wav_bytes: bytes) -> bytes | None:
             and wav_bytes[body_start : body_start + 4] == b"INFO"
         )
         if is_info_list:
-            sub_offset = body_start + 4
-            while sub_offset + 8 <= body_end:
-                sub_id = wav_bytes[sub_offset : sub_offset + 4]
-                sub_size = int.from_bytes(wav_bytes[sub_offset + 4 : sub_offset + 8], "little")
-                sub_start = sub_offset + 8
-                sub_end = sub_start + sub_size
-                if sub_end > body_end:
-                    break
-                if sub_id == b"ICMT":
-                    return wav_bytes[sub_start:sub_end].rstrip(b"\x00").strip()
-                sub_offset = sub_end + (sub_size & 1)
+            found = _extract_info_icmt(wav_bytes, body_start + 4, body_end)
+            if found is not None:
+                return found
         offset = body_end + (chunk_size & 1)
     return None
 

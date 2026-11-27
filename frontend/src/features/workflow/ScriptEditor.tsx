@@ -16,11 +16,33 @@ function wordCount(text: string): number {
 }
 
 function sanitizeMcSegment(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
+  return text.replaceAll('\r\n', '\n').replace(/\n{2,}/g, '\n').trim();
+}
+
+const SENTENCE_END_RE = /[.!?…]/;
+const LINE_BREAK_RE = /[\r\n\u2028\u2029]/;
+
+function findSentenceBoundary(text: string): number {
+  const firstBr = text.search(LINE_BREAK_RE);
+  if (firstBr === -1) {
+    const relIdx = text.slice(1).search(/[.!?…]\s/);
+    return relIdx === -1 ? -1 : relIdx + 1;
+  }
+  let lastBr = text.length - 1;
+  while (lastBr > firstBr && !LINE_BREAK_RE.test(text[lastBr] ?? '')) {
+    lastBr -= 1;
+  }
+  let idx = firstBr - 1;
+  while (idx >= 0 && /\s/.test(text[idx] ?? '')) {
+    idx -= 1;
+  }
+  if (idx < 1 || !SENTENCE_END_RE.test(text[idx] ?? '')) return -1;
+  if (/\S/.test(text.slice(idx + 1, lastBr + 1))) return -1;
+  return idx;
 }
 
 export function splitMcScript(text: string): [string, string] {
-  const normalized = text.replace(/\r\n/g, '\n');
+  const normalized = text.replaceAll('\r\n', '\n');
   if (!normalized.trim()) return ['', ''];
   const sep = normalized.indexOf('\n\n');
   if (sep !== -1) {
@@ -34,9 +56,11 @@ export function splitMcScript(text: string): [string, string] {
   if (lines.length >= 2) {
     return [lines[0] ?? '', lines.slice(1).join(' ')];
   }
-  const sentenceMatch = trimmed.match(/^(.+?[.!?…])\s+(.+)$/);
-  if (sentenceMatch?.[1] && sentenceMatch[2]) {
-    return [sentenceMatch[1].trim(), sentenceMatch[2].trim()];
+  const boundaryIdx = findSentenceBoundary(trimmed);
+  if (boundaryIdx !== -1) {
+    const first = trimmed.slice(0, boundaryIdx + 1).trim();
+    const rest = trimmed.slice(boundaryIdx + 1).trim();
+    if (first && rest) return [first, rest];
   }
   return [trimmed, ''];
 }
@@ -46,6 +70,49 @@ export function joinMcScript(mcHook: string, productClose: string): string {
   const second = sanitizeMcSegment(productClose);
   if (!first && !second) return '';
   return `${first}\n\n${second}`;
+}
+
+function McSegmentField({
+  id,
+  label,
+  value,
+  onChange,
+}: Readonly<{
+  id: string;
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+}>) {
+  const { t } = useTranslation();
+  const words = wordCount(value);
+  const over = words > MAX_MC_SEGMENT_WORDS;
+  const pct = Math.min(100, Math.round((words / MAX_MC_SEGMENT_WORDS) * 100));
+  return (
+    <div className="field">
+      <div className="pv-field-header">
+        <label htmlFor={id}>{label}</label>
+        <span className={over ? 'pv-script-counter pv-script-counter--over' : 'pv-script-counter'}>
+          {t('workflow.script.segmentMeter', {
+            words,
+            max: MAX_MC_SEGMENT_WORDS,
+            seconds: Math.max(0, Math.round(words / 3)),
+          })}
+        </span>
+      </div>
+      <div className={over ? 'pv-script-meter pv-script-meter--over' : 'pv-script-meter'}>
+        <div className="pv-script-meter-track">
+          <div className="pv-script-meter-fill" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      <textarea
+        id={id}
+        rows={3}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-describedby={over ? 'script-length-warning' : undefined}
+      />
+    </div>
+  );
 }
 
 interface ScriptEditorProps {
@@ -124,62 +191,18 @@ export function ScriptEditor({
       />
       {isMcTemplate ? (
         <div className="pv-mc-script-grid">
-          <div className="field">
-            <div className="pv-field-header">
-              <label htmlFor="script-mc-hook">{t('workflow.script.mcHookLabel')}</label>
-              <span className={mcHookOver ? 'pv-script-counter pv-script-counter--over' : 'pv-script-counter'}>
-                {t('workflow.script.segmentMeter', {
-                  words: mcHookWords,
-                  max: MAX_MC_SEGMENT_WORDS,
-                  seconds: Math.max(0, Math.round(mcHookWords / 3)),
-                })}
-              </span>
-            </div>
-            <div className={mcHookOver ? 'pv-script-meter pv-script-meter--over' : 'pv-script-meter'}>
-              <div className="pv-script-meter-track">
-                <div
-                  className="pv-script-meter-fill"
-                  style={{ width: `${Math.min(100, Math.round((mcHookWords / MAX_MC_SEGMENT_WORDS) * 100))}%` }}
-                />
-              </div>
-            </div>
-            <textarea
-              id="script-mc-hook"
-              rows={3}
-              value={mcSegments[0]}
-              onChange={(event) => setMcSegments([event.target.value, mcSegments[1]])}
-              aria-describedby={mcHookOver ? 'script-length-warning' : undefined}
-            />
-          </div>
-
-          <div className="field">
-            <div className="pv-field-header">
-              <label htmlFor="script-mc-close">{t('workflow.script.productCloseLabel')}</label>
-              <span className={mcCloseOver ? 'pv-script-counter pv-script-counter--over' : 'pv-script-counter'}>
-                {t('workflow.script.segmentMeter', {
-                  words: mcCloseWords,
-                  max: MAX_MC_SEGMENT_WORDS,
-                  seconds: Math.max(0, Math.round(mcCloseWords / 3)),
-                })}
-              </span>
-            </div>
-            <div className={mcCloseOver ? 'pv-script-meter pv-script-meter--over' : 'pv-script-meter'}>
-              <div className="pv-script-meter-track">
-                <div
-                  className="pv-script-meter-fill"
-                  style={{ width: `${Math.min(100, Math.round((mcCloseWords / MAX_MC_SEGMENT_WORDS) * 100))}%` }}
-                />
-              </div>
-            </div>
-            <textarea
-              id="script-mc-close"
-              rows={3}
-              value={mcSegments[1]}
-              onChange={(event) => setMcSegments([mcSegments[0], event.target.value])}
-              aria-describedby={mcCloseOver ? 'script-length-warning' : undefined}
-            />
-          </div>
-
+          <McSegmentField
+            id="script-mc-hook"
+            label={t('workflow.script.mcHookLabel')}
+            value={mcSegments[0]}
+            onChange={(val) => setMcSegments([val, mcSegments[1]])}
+          />
+          <McSegmentField
+            id="script-mc-close"
+            label={t('workflow.script.productCloseLabel')}
+            value={mcSegments[1]}
+            onChange={(val) => setMcSegments([mcSegments[0], val])}
+          />
           <div aria-live="polite">
             {(tooLong || mcHookOver || mcCloseOver) && (
               <p id="script-length-warning" className="field-hint">

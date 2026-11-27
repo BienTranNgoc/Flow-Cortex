@@ -280,47 +280,37 @@ class CapabilityProviderAdapter:
     def cancel_video(self, task_id: str) -> CancelResult:
         return self.video_adapter.cancel_video(task_id)
 
-    def submit_keyframe(self, request: KeyframeRequest) -> str:
+    def _require_keyframe_adapter(self) -> KeyframeAdapter:
         if self.keyframe_adapter is None:
             raise PermanentError(
                 "provider_capability_unavailable", "Keyframe adapter is not configured"
             )
-        return self.keyframe_adapter.submit_keyframe(request)
+        return self.keyframe_adapter
+
+    def _require_lipsync_adapter(self) -> LipsyncAdapter:
+        if self.lipsync_adapter is None:
+            raise PermanentError(
+                "provider_capability_unavailable", "Lipsync adapter is not configured"
+            )
+        return self.lipsync_adapter
+
+    def submit_keyframe(self, request: KeyframeRequest) -> str:
+        return self._require_keyframe_adapter().submit_keyframe(request)
 
     def await_keyframe(self, task_id: str, abort: VideoAbort) -> KeyframeArtifact:
-        if self.keyframe_adapter is None:
-            raise PermanentError(
-                "provider_capability_unavailable", "Keyframe adapter is not configured"
-            )
-        return self.keyframe_adapter.await_keyframe(task_id, abort)
+        return self._require_keyframe_adapter().await_keyframe(task_id, abort)
 
     def probe_keyframe(self, task_id: str) -> VendorProbe:
-        if self.keyframe_adapter is None:
-            raise PermanentError(
-                "provider_capability_unavailable", "Keyframe adapter is not configured"
-            )
-        return self.keyframe_adapter.probe_keyframe(task_id)
+        return self._require_keyframe_adapter().probe_keyframe(task_id)
 
     def submit_lipsync(self, request: LipsyncRequest) -> str:
-        if self.lipsync_adapter is None:
-            raise PermanentError(
-                "provider_capability_unavailable", "Lipsync adapter is not configured"
-            )
-        return self.lipsync_adapter.submit_lipsync(request)
+        return self._require_lipsync_adapter().submit_lipsync(request)
 
     def await_lipsync(self, task_id: str, abort: VideoAbort) -> VideoArtifact:
-        if self.lipsync_adapter is None:
-            raise PermanentError(
-                "provider_capability_unavailable", "Lipsync adapter is not configured"
-            )
-        return self.lipsync_adapter.await_lipsync(task_id, abort)
+        return self._require_lipsync_adapter().await_lipsync(task_id, abort)
 
     def probe_lipsync(self, task_id: str) -> VendorProbe:
-        if self.lipsync_adapter is None:
-            raise PermanentError(
-                "provider_capability_unavailable", "Lipsync adapter is not configured"
-            )
-        return self.lipsync_adapter.probe_lipsync(task_id)
+        return self._require_lipsync_adapter().probe_lipsync(task_id)
 
 
 class FixtureProviderAdapter:
@@ -334,6 +324,7 @@ class FixtureProviderAdapter:
         abort: ScriptAbort | None = None,
         deadline_monotonic: float | None = None,
     ) -> str:
+        _ = (reference_image, deadline_monotonic)
         if abort is not None:
             abort.check()
         parts = [
@@ -359,6 +350,7 @@ class FixtureProviderAdapter:
         abort: ScriptAbort | None = None,
         deadline_monotonic: float | None = None,
     ) -> StoryboardArtifact:
+        _ = (request, reference_image, reference_images, deadline_monotonic)
         if abort is not None:
             abort.check()
         return StoryboardArtifact(
@@ -402,12 +394,14 @@ class FixtureProviderAdapter:
         return f"fixture-{digest}"
 
     def probe_video(self, task_id: str) -> VendorProbe:
+        _ = task_id
         return "succeeded"
 
     def vendor_scope(self) -> dict[str, str]:
         return {"endpoint": "fixture", "account": "fixture"}
 
     def cancel_video(self, task_id: str) -> CancelResult:
+        _ = task_id
         return CancelResult(confirmed=True, status="canceled")
 
     def await_video(self, task_id: str, abort: VideoAbort) -> VideoArtifact:

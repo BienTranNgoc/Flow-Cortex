@@ -198,55 +198,63 @@ class WanAdapter:
             else:
                 time.sleep(delay)
 
+    def _cancel_video_attempt(
+        self, url: str, task_id: str, attempt: int
+    ) -> tuple[CancelResult | None, str]:
+        request = urllib.request.Request(
+            url,
+            data=b"",
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self.config.api_key}",
+                "User-Agent": WORKER_USER_AGENT,
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=_CANCEL_TIMEOUT_SECONDS) as response:
+                parsed = json.loads(response.read())
+            if not isinstance(parsed, dict):
+                return None, "cancel response was not a JSON object"
+            status = (_string(parsed, "status") or "").lower()
+            if status in _CANCEL_SETTLED_STATUSES:
+                log.info(
+                    "Wan prediction cancel settled",
+                    extra={"providerTaskId": task_id, "taskStatus": status},
+                )
+                return CancelResult(confirmed=True, status=status), ""
+            return None, f"unexpected prediction status '{status or 'missing'}'"
+        except urllib.error.HTTPError as exc:
+            reason = f"HTTP {exc.code}"
+            log.warning(
+                "Wan prediction cancel HTTP error",
+                extra={
+                    "providerTaskId": task_id,
+                    "status": exc.code,
+                    "cancelAttempt": attempt,
+                },
+            )
+            if exc.code not in (408, 429) and not (500 <= exc.code < 600):
+                return CancelResult(confirmed=False, reason=reason), reason
+            return None, reason
+        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+            reason = type(exc).__name__
+            log.warning(
+                "Wan prediction cancel failed",
+                extra={
+                    "providerTaskId": task_id,
+                    "errorType": reason,
+                    "cancelAttempt": attempt,
+                },
+            )
+            return None, reason
+
     def cancel_video(self, task_id: str) -> CancelResult:
         url = f"{self._task_url(task_id)}/cancel"
         last_reason = "cancel request failed"
         for attempt in range(1, _CANCEL_ATTEMPTS + 1):
-            request = urllib.request.Request(
-                url,
-                data=b"",
-                method="POST",
-                headers={
-                    "Authorization": f"Bearer {self.config.api_key}",
-                    "User-Agent": WORKER_USER_AGENT,
-                },
-            )
-            try:
-                with urllib.request.urlopen(request, timeout=_CANCEL_TIMEOUT_SECONDS) as response:
-                    parsed = json.loads(response.read())
-                if not isinstance(parsed, dict):
-                    last_reason = "cancel response was not a JSON object"
-                else:
-                    status = (_string(parsed, "status") or "").lower()
-                    if status in _CANCEL_SETTLED_STATUSES:
-                        log.info(
-                            "Wan prediction cancel settled",
-                            extra={"providerTaskId": task_id, "taskStatus": status},
-                        )
-                        return CancelResult(confirmed=True, status=status)
-                    last_reason = f"unexpected prediction status '{status or 'missing'}'"
-            except urllib.error.HTTPError as exc:
-                last_reason = f"HTTP {exc.code}"
-                log.warning(
-                    "Wan prediction cancel HTTP error",
-                    extra={
-                        "providerTaskId": task_id,
-                        "status": exc.code,
-                        "cancelAttempt": attempt,
-                    },
-                )
-                if exc.code not in (408, 429) and not (500 <= exc.code < 600):
-                    return CancelResult(confirmed=False, reason=last_reason)
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
-                last_reason = type(exc).__name__
-                log.warning(
-                    "Wan prediction cancel failed",
-                    extra={
-                        "providerTaskId": task_id,
-                        "errorType": last_reason,
-                        "cancelAttempt": attempt,
-                    },
-                )
+            result, last_reason = self._cancel_video_attempt(url, task_id, attempt)
+            if result is not None:
+                return result
             if attempt < _CANCEL_ATTEMPTS:
                 time.sleep(_CANCEL_RETRY_DELAYS[attempt - 1])
         log.warning(
