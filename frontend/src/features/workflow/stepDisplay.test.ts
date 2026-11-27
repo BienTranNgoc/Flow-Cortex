@@ -14,6 +14,8 @@ import {
   stepLabel,
   stepState,
   formatTime,
+  inputPicked,
+  RUN_INPUT_KEY,
   type StepChoice,
 } from './stepDisplay';
 import { outputFields } from './stepOutputFields';
@@ -262,6 +264,48 @@ describe('selectedStep', () => {
 
   it('uses the default with no choice', () => {
     expect(selectedStep(steps, 'running', undefined)?.id).toBe('b');
+  });
+
+  describe('the run input pick', () => {
+    const inputPick = (runStatus: string, needsYouId?: string): StepChoice =>
+      pick(RUN_INPUT_KEY, runStatus, needsYouId);
+
+    it('is kept on a running run although no step has its key', () => {
+      expect(choiceTakenBack(steps, 'running', inputPick('running'))).toBe(false);
+      expect(inputPicked(steps, 'running', inputPick('running'))).toBe(true);
+    });
+
+    it('is kept on a completed run', () => {
+      expect(choiceTakenBack(steps, 'completed', inputPick('completed'))).toBe(false);
+    });
+
+    it('is taken back when the run waits for approval on another step than at the pick', () => {
+      const waiting = [steps[0]!, checkpoint({ id: 'cp', stepOrder: 2 })];
+      expect(choiceTakenBack(waiting, 'waiting_approval', inputPick('running'))).toBe(true);
+      expect(inputPicked(waiting, 'waiting_approval', inputPick('running'))).toBe(false);
+    });
+
+    it('is kept when it was picked while the run already waited on the same step', () => {
+      const waiting = [steps[0]!, checkpoint({ id: 'cp', stepOrder: 2 })];
+      expect(choiceTakenBack(waiting, 'waiting_approval', inputPick('waiting_approval', 'cp'))).toBe(
+        false,
+      );
+    });
+
+    it('is taken back when the run ends in error after a pick under another status', () => {
+      const failed = [steps[0]!, step({ id: 'b', stepOrder: 2, status: 'error' })];
+      expect(choiceTakenBack(failed, 'error', inputPick('running'))).toBe(true);
+      expect(inputPicked(failed, 'error', inputPick('running'))).toBe(false);
+    });
+
+    it('is not a pick without a choice or with a step pick', () => {
+      expect(inputPicked(steps, 'running', undefined)).toBe(false);
+      expect(inputPicked(steps, 'running', pick('a', 'running'))).toBe(false);
+    });
+
+    it('leaves the default step selected', () => {
+      expect(selectedStep(steps, 'running', inputPick('running'))?.id).toBe('b');
+    });
   });
 });
 

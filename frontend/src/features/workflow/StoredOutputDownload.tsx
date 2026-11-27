@@ -34,6 +34,15 @@ function isAudioOutput(output: RunStepOutputResponse): boolean {
   );
 }
 
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
+
+function isImageOutput(output: RunStepOutputResponse): boolean {
+  const name = output.name.toLowerCase();
+  return Boolean(
+    output.mime?.startsWith('image/') || IMAGE_EXTENSIONS.some((ext) => name.endsWith(ext)),
+  );
+}
+
 /** Step artifact viewer and downloader, supporting preview-only intermediate outputs for Ad Video. */
 export function StoredOutputDownload({
   runId,
@@ -292,6 +301,49 @@ export function StoredOutputDownload({
 
   if (!allowDownload) {
     return null;
+  }
+
+  if (isImageOutput(output)) {
+    return (
+      <div className="run-step-downloads result-image">
+        {showMedia && mediaUrl && !mediaFailed && (
+          <img className="result-image-frame" src={mediaUrl} alt={output.name} onError={retryMedia} />
+        )}
+        {showMedia && mediaFailed && (
+          <p role="alert" className="run-step-download-error">
+            {t('workflow.result.imageFailed')}
+          </p>
+        )}
+        <button
+          type="button"
+          aria-expanded={showMedia}
+          aria-disabled={outputUrl.isPending}
+          aria-busy={outputUrl.isPending}
+          onClick={toggleMedia}
+        >
+          {showMedia
+            ? t('workflow.result.hideImage')
+            : outputUrl.isPending
+              ? t('workflow.result.loadingImage')
+              : t('workflow.result.viewImage')}
+        </button>
+        <button
+          type="button"
+          onClick={download}
+          aria-disabled={outputUrl.isPending}
+          aria-busy={outputUrl.isPending}
+        >
+          {outputUrl.isPending
+            ? t('workflow.download.gettingFile')
+            : (downloadLabel ?? label(output, t))}
+        </button>
+        {outputUrl.isError && (
+          <p role="alert" className="run-step-download-error">
+            {t('workflow.download.linkError')}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (

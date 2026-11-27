@@ -211,3 +211,81 @@ describe('StoredOutputDownload for a video', () => {
     expect(screen.queryByRole('button', { name: /Download/i })).not.toBeInTheDocument();
   });
 });
+
+describe('StoredOutputDownload for an image', () => {
+  const IMAGE = { name: 'sheet.jpg', mime: 'image/jpeg', bytes: 90_000 };
+  const IMAGE_URL_PATH = '/api/v1/runs/r1/steps/5/outputs/sheet.jpg/url';
+
+  function serveImageUrls() {
+    let signed = 0;
+    return stubApi({
+      [`GET ${IMAGE_URL_PATH}`]: () => {
+        signed += 1;
+        return {
+          status: 200,
+          body: {
+            url: `http://localhost:9000/flowcortex-media/sheet.jpg?sig=${signed}`,
+            expiresAt: '2026-10-01T10:15:00Z',
+          },
+        };
+      },
+    });
+  }
+
+  function renderImage() {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <StoredOutputDownload runId="r1" stepOrder={5} output={IMAGE} />
+      </QueryClientProvider>,
+    );
+  }
+
+  const requests = (calls: { path: string }[]) =>
+    calls.filter((call) => call.path === IMAGE_URL_PATH).length;
+
+  it('requests no link until the member presses "View image", then shows it with its name as alt', async () => {
+    const user = userEvent.setup();
+    const calls = serveImageUrls();
+    renderImage();
+
+    expect(requests(calls)).toBe(0);
+    expect(screen.getByRole('button', { name: 'View image' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await user.click(screen.getByRole('button', { name: 'View image' }));
+
+    expect(await screen.findByRole('img', { name: 'sheet.jpg' })).toHaveAttribute(
+      'src',
+      expect.stringContaining('sig=1'),
+    );
+    expect(requests(calls)).toBe(1);
+    await user.click(screen.getByRole('button', { name: 'Hide image' }));
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Download sheet.jpg' })).toBeInTheDocument();
+  });
+
+  it('renews the link once when the image cannot load, then says so', async () => {
+    const user = userEvent.setup();
+    const calls = serveImageUrls();
+    renderImage();
+
+    await user.click(screen.getByRole('button', { name: 'View image' }));
+    fireEvent.error(await screen.findByRole('img', { name: 'sheet.jpg' }));
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'sheet.jpg' })).toHaveAttribute(
+        'src',
+        expect.stringContaining('sig=2'),
+      ),
+    );
+    fireEvent.error(screen.getByRole('img', { name: 'sheet.jpg' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This image can't be shown right now.",
+    );
+    expect(requests(calls)).toBe(2);
+  });
+});

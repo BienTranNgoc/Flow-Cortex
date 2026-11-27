@@ -136,6 +136,56 @@
     "minimap": "Tổng quan sơ đồ",
     "splitHandle": "Đổi kích thước sơ đồ và phần chi tiết"
   },
+  "result": {
+    "label": "Kết quả",
+    "working": "Đang xử lý…",
+    "savedNote": "Kết quả sẽ được lưu khi bước này xong — bạn có thể rời trang này.",
+    "longRunNote": "Lượt chạy vẫn tiếp tục trên máy chủ dù bạn đóng thẻ này.",
+    "veryLongRunNote": "Lâu hơn thường lệ — vẫn đang chạy. Bạn có thể đóng thẻ này.",
+    "noResultYet": "Bước này chưa có kết quả.",
+    "skipped": "Bước này đã được bỏ qua.",
+    "empty": "Bước này đã xong nhưng không có kết quả.",
+    "tableSummary": "1 bảng · {{rows}} dòng · {{cols}} cột",
+    "tableLimited": "Đang hiển thị {{shown}} trên {{total}} dòng đầu tiên.",
+    "tableRegion": "Bảng kết quả",
+    "sortBy": "Sắp xếp theo {{column}}",
+    "characters_one": "{{n}} ký tự",
+    "characters_other": "{{n}} ký tự",
+    "textRegion": "Nội dung kết quả",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không sao chép được. Hãy tự chọn đoạn văn bản.",
+    "files": {
+      "video_one": "{{count}} video",
+      "video_other": "{{count}} video",
+      "audio_one": "{{count}} tệp âm thanh",
+      "audio_other": "{{count}} tệp âm thanh",
+      "image_one": "{{count}} ảnh",
+      "image_other": "{{count}} ảnh",
+      "file_one": "{{count}} tệp",
+      "file_other": "{{count}} tệp"
+    },
+    "viewImage": "Xem ảnh",
+    "hideImage": "Ẩn ảnh",
+    "loadingImage": "Đang tải ảnh…",
+    "imageFailed": "Hiện chưa hiển thị được ảnh này.",
+    "iterateSummary": "{{succeeded}} trên {{total}} mục thành công",
+    "item": "Mục {{n}}",
+    "itemFiles_one": "{{count}} tệp",
+    "itemFiles_other": "{{count}} tệp"
+  },
+  "runMeta": {
+    "label": "Thông tin lượt chạy",
+    "position": "Bước {{current}} trên {{total}} · {{name}}",
+    "credits_one": "{{amount}} Credit",
+    "credits_other": "{{amount}} Credit"
+  },
+  "inputPanel": {
+    "title": "Đầu vào",
+    "file": "Tệp: {{name}}",
+    "empty": "Lượt chạy này bắt đầu không có đầu vào.",
+    "textRegion": "Nội dung đầu vào của lượt chạy"
+  },
   "run": {
     "heading": {
       "pending": "Lượt chạy đang chờ",

@@ -166,16 +166,20 @@ export function defaultStep(
   );
 }
 
+/** The pick id of the run input on the run canvas, which is no step of the run. */
+export const RUN_INPUT_KEY = 'run-input';
+
 /**
- * Whether the pick no longer applies: its step left the run, the run waits on another approval step
- * than at the pick, or the run ended in error after a pick made under another status.
+ * Whether the pick no longer applies: its step left the run (the run input never does), the run
+ * waits on another approval step than at the pick, or the run ended in error after a pick made
+ * under another status.
  */
 export function choiceTakenBack(
   steps: readonly RunStepResponse[],
   runStatus: string | undefined,
   choice: StepChoice,
 ): boolean {
-  if (!steps.some((step) => stepKey(step) === choice.stepId)) {
+  if (choice.stepId !== RUN_INPUT_KEY && !steps.some((step) => stepKey(step) === choice.stepId)) {
     return true;
   }
   if (runStatus === 'waiting_approval') {
@@ -183,6 +187,15 @@ export function choiceTakenBack(
     return (waitingOn && stepKey(waitingOn)) !== choice.needsYouId;
   }
   return runStatus === 'error' && choice.runStatus !== runStatus;
+}
+
+/** Whether the member's pick is the run input and still applies; the step shown is then the default. */
+export function inputPicked(
+  steps: readonly RunStepResponse[],
+  runStatus: string | undefined,
+  choice: StepChoice | undefined,
+): boolean {
+  return choice?.stepId === RUN_INPUT_KEY && !choiceTakenBack(steps, runStatus, choice);
 }
 
 export function selectedStep(
