@@ -44,7 +44,7 @@
     "cvTitle": "Resume (PDF Format)",
     "cvPlaceholder": "Paste resume text here...",
     "dropzoneTitle": "Drag & drop PDF CV here",
-    "dropzoneDesc": "or click to browse from your computer · PDF only (.pdf), max 10MB",
+    "dropzoneDesc": "or click to browse from your computer · PDF only (.pdf), max 8MB",
     "dropzoneAria": "PDF CV upload frame",
     "pdfPreviewTitle": "PDF CV Preview",
     "jdTitle": "Job Description (JD)",
@@ -102,7 +102,7 @@
   },
   "error": {
     "notACv": "This PDF does not look like a CV or resume. Please double-check and upload your actual resume file.",
-    "fileTooLarge": "This PDF exceeds the 10MB size limit. Please compress the file or upload a smaller PDF.",
+    "fileTooLarge": "This PDF exceeds the 8MB size limit. Please compress the file or upload a smaller PDF.",
     "general": "An error occurred while evaluating the CV. Please verify your PDF file or try again in a few moments."
   }
 }

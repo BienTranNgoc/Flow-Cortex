@@ -44,7 +44,7 @@
     "cvTitle": "Hồ sơ CV (Định dạng PDF)",
     "cvPlaceholder": "Dán nội dung văn bản CV vào đây...",
     "dropzoneTitle": "Kéo & thả file CV PDF vào đây",
-    "dropzoneDesc": "hoặc bấm để chọn từ máy tính · Chỉ hỗ trợ .pdf, tối đa 10MB",
+    "dropzoneDesc": "hoặc bấm để chọn từ máy tính · Chỉ hỗ trợ .pdf, tối đa 8MB",
     "dropzoneAria": "Khung tải lên file CV PDF",
     "pdfPreviewTitle": "Xem trước CV PDF",
     "jdTitle": "Bản mô tả công việc (JD)",
@@ -102,7 +102,7 @@
   },
   "error": {
     "notACv": "Có vẻ file PDF này không phải là CV. Vui lòng kiểm tra lại và tải lên đúng hồ sơ xin việc của bạn.",
-    "fileTooLarge": "File PDF vượt quá dung lượng tối đa 10MB. Vui lòng nén nhỏ file hoặc chọn file khác.",
+    "fileTooLarge": "File PDF vượt quá dung lượng tối đa 8MB. Vui lòng nén nhỏ file hoặc chọn file khác.",
     "general": "Đã xảy ra lỗi khi phân tích CV. Vui lòng kiểm tra lại file PDF hoặc thử lại sau ít phút."
   }
 }

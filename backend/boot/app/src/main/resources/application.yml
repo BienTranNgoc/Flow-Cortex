@@ -4,8 +4,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 12MB
+      max-file-size: 8MB
+      max-request-size: 8MB
 
   # Local defaults for a bare `./gradlew bootRun` against a manually-started
   # Postgres; SPRING_DATASOURCE_* env vars (docker compose) and Testcontainers

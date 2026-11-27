@@ -16,7 +16,7 @@ COPY admin/package.json ./admin/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/i18n/package.json ./packages/i18n/
 COPY packages/ui-kit/package.json ./packages/ui-kit/
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY packages ./packages
 COPY admin ./admin

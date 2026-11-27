@@ -146,6 +146,9 @@
 
 /* PDF Box & Dropzone */
 .cv-check-pdf-dropzone {
+  width: 100%;
+  font: inherit;
+  color: inherit;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1146,5 +1149,12 @@
   }
   100% {
     transform: translateX(280%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-check-loading-strip__bar,
+  .spinner {
+    animation: none;
   }
 }
