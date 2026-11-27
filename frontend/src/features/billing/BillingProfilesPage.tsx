@@ -10,6 +10,7 @@ import '../drive/shared/DriveShared.css';
 import { BillingProfileForm } from './BillingProfileForm';
 import {
   isGone,
+  MAX_PROFILES,
   useBillingProfiles,
   useDeleteBillingProfile,
   useSetDefaultBillingProfile,
@@ -22,6 +23,7 @@ type Editor = { readonly profile?: BillingProfileResponse } | null;
 export function BillingProfilesPage() {
   const { t } = useTranslation();
   const titleId = useId();
+  const limitId = useId();
   const list = useBillingProfiles();
   const setDefault = useSetDefaultBillingProfile();
   const remove = useDeleteBillingProfile();
@@ -63,12 +65,17 @@ export function BillingProfilesPage() {
     });
   };
 
+  const atLimit = profiles.length >= MAX_PROFILES;
   const addButton = (
     <button
       ref={addRef}
       type="button"
       className="drive-button drive-button--primary"
-      onClick={() => setEditor({})}
+      aria-disabled={atLimit || undefined}
+      aria-describedby={atLimit ? limitId : undefined}
+      onClick={() => {
+        if (!atLimit) setEditor({});
+      }}
     >
       {t('billing.profiles.add')}
     </button>
@@ -98,6 +105,11 @@ export function BillingProfilesPage() {
         {rowError && (
           <p role="alert" className="billing-form__failure">
             {rowError}
+          </p>
+        )}
+        {atLimit && (
+          <p id={limitId} className="billing-field__hint">
+            {t('billing.profiles.limitReached', { max: MAX_PROFILES })}
           </p>
         )}
         {list.isSuccess && profiles.length === 0 && (

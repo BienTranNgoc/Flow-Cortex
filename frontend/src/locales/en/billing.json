@@ -10,6 +10,7 @@
     "listLabel": "Your invoice details",
     "loadError": "Could not load your invoice details.",
     "retry": "Retry",
+    "limitReached": "You can keep at most {{max}} invoice details. Delete one to add another.",
     "empty": "You have no invoice details yet. Add them so an invoice can be issued to you.",
     "default": "Default",
     "type": {
@@ -55,6 +56,7 @@
       "delete": "Could not delete. Please try again.",
       "setDefault": "Could not set the default. Please try again.",
       "notFound": "These invoice details no longer exist.",
+      "limitReached": "You can keep at most {{max}} invoice details. Delete one to add another.",
       "legalName": {
         "required": "Enter the name to print on the invoice.",
         "tooLong": "The name can be at most 400 characters.",

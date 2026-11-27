@@ -1,7 +1,14 @@
 import type { BillingProfileRequest, BillingProfileResponse } from '@flow-cortex/api-client';
 import { useId, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fieldErrorsOf, isGone, useSaveBillingProfile, type ProfileField } from './useBillingProfiles';
+import {
+  fieldErrorsOf,
+  isGone,
+  isLimitReached,
+  MAX_PROFILES,
+  useSaveBillingProfile,
+  type ProfileField,
+} from './useBillingProfiles';
 import './billing.css';
 
 export const PROFILE_TYPES = ['personal', 'business', 'household'] as const;
@@ -169,6 +176,8 @@ export function BillingProfileForm({
           if (fields) {
             setServerErrors(fields);
             requestAnimationFrame(() => focusFirstInvalid(fields));
+          } else if (isLimitReached(error)) {
+            setFailure(error.problem?.detail ?? t('billing.profiles.error.limitReached', { max: MAX_PROFILES }));
           } else {
             setFailure(t(isGone(error) ? 'billing.profiles.error.notFound' : 'billing.profiles.error.save'));
           }

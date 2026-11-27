@@ -17,6 +17,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -220,6 +221,61 @@ class BillingProfilesIT extends AbstractPostgresBootTest {
     }
 
     @Test
+    void theTwentyFirstProfileIsRefusedWithTheLimitCodeAndStoresNothing() {
+        createProfiles(userA, BillingProfiles.MAX_PER_MEMBER);
+
+        assertThatThrownBy(() -> profiles.create(userA, json(BUSINESS)))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo("billing_profile_limit_reached");
+                    assertThat(e.getDetail().code()).isEqualTo("billingProfile.limitReached");
+                    assertThat(e.getErrors()).isEmpty();
+                });
+
+        assertThat(profiles.list(userA)).hasSize(BillingProfiles.MAX_PER_MEMBER);
+        assertThat(defaultCount(userA)).isEqualTo(1);
+    }
+
+    @Test
+    void theLimitIsPerMember() {
+        createProfiles(userA, BillingProfiles.MAX_PER_MEMBER);
+
+        profiles.create(userB, json(PERSONAL));
+
+        assertThat(profiles.list(userB)).hasSize(1);
+    }
+
+    @Test
+    void deletingOneProfileFreesASlotForANewOne() {
+        createProfiles(userA, BillingProfiles.MAX_PER_MEMBER);
+        profiles.delete(userA, profiles.list(userA).get(1).id());
+
+        profiles.create(userA, json(BUSINESS));
+
+        assertThat(profiles.list(userA)).hasSize(BillingProfiles.MAX_PER_MEMBER);
+        assertThatThrownBy(() -> profiles.create(userA, json(BUSINESS)))
+                .isInstanceOf(UnprocessableEntityException.class);
+    }
+
+    @Test
+    void concurrentCreatesAtNineteenLeaveExactlyTwenty() throws Exception {
+        createProfiles(userA, BillingProfiles.MAX_PER_MEMBER - 1);
+        AtomicInteger refused = new AtomicInteger();
+        Supplier<Object> create = () -> {
+            try {
+                return profiles.create(userA, json(BUSINESS));
+            } catch (UnprocessableEntityException e) {
+                refused.incrementAndGet();
+                return e;
+            }
+        };
+
+        runAtOnce(create, create, create, create);
+
+        assertThat(profiles.list(userA)).hasSize(BillingProfiles.MAX_PER_MEMBER);
+        assertThat(refused.get()).isEqualTo(3);
+    }
+
+    @Test
     void deletingTheUserRemovesTheProfiles() {
         profiles.create(userA, json(PERSONAL));
         profiles.create(userA, json(BUSINESS));
@@ -255,6 +311,12 @@ class BillingProfilesIT extends AbstractPostgresBootTest {
             }
         } finally {
             pool.shutdownNow();
+        }
+    }
+
+    private void createProfiles(UUID user, int count) {
+        for (int i = 0; i < count; i++) {
+            profiles.create(user, json(i == 0 ? PERSONAL : BUSINESS));
         }
     }
 

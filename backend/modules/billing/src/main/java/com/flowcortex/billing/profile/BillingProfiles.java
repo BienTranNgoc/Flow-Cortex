@@ -24,8 +24,15 @@ import tools.jackson.databind.JsonNode;
 @Service
 public class BillingProfiles {
 
+    /** The most profiles one member keeps; the next create is refused until one is deleted. */
+    public static final int MAX_PER_MEMBER = 20;
+
+    static final String LIMIT_REACHED_CODE = "billing_profile_limit_reached";
+
     private static final String INVALID_CODE = "billing_profile_invalid";
     private static final LocalizedMessage INVALID_DETAIL = new LocalizedMessage("billingProfile.invalid");
+    private static final LocalizedMessage LIMIT_REACHED_DETAIL = new LocalizedMessage("billingProfile.limitReached",
+            MAX_PER_MEMBER);
 
     private final BillingProfileRepository repository;
     private final Clock clock;
@@ -54,7 +61,8 @@ public class BillingProfiles {
     /**
      * Stores a profile; the member's first one becomes the default whatever the body says.
      *
-     * @throws UnprocessableEntityException when the body breaks the rules of a profile; nothing is stored then
+     * @throws UnprocessableEntityException when the body breaks the rules of a profile, or the member already
+     *         holds {@link #MAX_PER_MEMBER} of them (code {@value #LIMIT_REACHED_CODE}); nothing is stored then
      */
     @Transactional
     public BillingProfile create(UUID user, JsonNode body) {
@@ -62,7 +70,11 @@ public class BillingProfiles {
         Instant now = clock.instant();
         UUID id = UUID.randomUUID();
         repository.lock(user);
-        boolean first = repository.count(user) == 0;
+        int held = repository.count(user);
+        if (held >= MAX_PER_MEMBER) {
+            throw new UnprocessableEntityException(LIMIT_REACHED_DETAIL, LIMIT_REACHED_CODE);
+        }
+        boolean first = held == 0;
         repository.insert(user, id, valid.fields(), now);
         if (first || valid.makeDefault()) {
             makeDefault(user, id, now);

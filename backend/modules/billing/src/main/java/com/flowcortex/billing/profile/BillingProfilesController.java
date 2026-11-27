@@ -67,14 +67,16 @@ class BillingProfilesController {
     }
 
     @Operation(operationId = "createBillingProfile", summary = "Add invoice details",
-            description = "The member's first profile becomes the default whatever isDefault says.",
+            description = "The member's first profile becomes the default whatever isDefault says. A member holds"
+                    + " at most 20 profiles.",
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
                     content = @Content(schema = @Schema(implementation = BillingProfileResponse.Request.class))))
     @ApiResponse(responseCode = "201", description = "The stored profile")
     @ApiResponse(responseCode = "401", description = "Not signed in", content = @Content)
     @ApiResponse(responseCode = "422",
             description = "billing_profile_invalid with errors.<field> (type, legalName, taxCode,"
-                    + " personalIdNumber, address, email, isDefault)",
+                    + " personalIdNumber, address, email, isDefault), or billing_profile_limit_reached when the"
+                    + " member already holds 20 profiles",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

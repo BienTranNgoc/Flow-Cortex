@@ -10,6 +10,7 @@
     "listLabel": "Thông tin xuất hoá đơn của bạn",
     "loadError": "Không tải được thông tin xuất hoá đơn của bạn.",
     "retry": "Thử lại",
+    "limitReached": "Bạn chỉ lưu được tối đa {{max}} thông tin xuất hoá đơn. Hãy xoá bớt một thông tin để thêm mới.",
     "empty": "Bạn chưa có thông tin xuất hoá đơn. Hãy thêm để chúng tôi xuất hoá đơn cho bạn.",
     "default": "Mặc định",
     "type": {
@@ -55,6 +56,7 @@
       "delete": "Không xoá được. Vui lòng thử lại.",
       "setDefault": "Không đặt được mặc định. Vui lòng thử lại.",
       "notFound": "Thông tin xuất hoá đơn này không còn tồn tại.",
+      "limitReached": "Bạn chỉ lưu được tối đa {{max}} thông tin xuất hoá đơn. Hãy xoá bớt một thông tin để thêm mới.",
       "legalName": {
         "required": "Nhập tên in trên hoá đơn.",
         "tooLong": "Tên tối đa 400 ký tự.",

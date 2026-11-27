@@ -23,6 +23,16 @@ export function fieldErrorsOf(error: unknown): Partial<Record<ProfileField, stri
   return error.problem?.errors as Partial<Record<ProfileField, string>> | undefined;
 }
 
+/** How many profiles a member may keep; the server refuses the next one. */
+export const MAX_PROFILES = 20;
+
+const LIMIT_REACHED_CODE = 'billing_profile_limit_reached';
+
+/** The member already holds {@link MAX_PROFILES} profiles, so a create is refused (422 with no field errors). */
+export function isLimitReached(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 422 && error.problem?.code === LIMIT_REACHED_CODE;
+}
+
 /** The profile is gone, or never was the member's: the list is re-read instead of showing a stale card. */
 export function isGone(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404;
