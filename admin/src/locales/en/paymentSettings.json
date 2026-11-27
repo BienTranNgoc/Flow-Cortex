@@ -5,7 +5,40 @@
   "tabs": {
     "label": "Payment settings sections",
     "settings": "Settings",
-    "history": "History"
+    "history": "History",
+    "vat": "VAT"
+  },
+  "vat": {
+    "loading": "Loading the VAT rate…",
+    "loadFailed": "Could not load the VAT rate.",
+    "forbidden": "You do not have permission to view the VAT rate.",
+    "currentTitle": "Rate in force today",
+    "since": "In force since {{date}}",
+    "noNote": "No source note was recorded for this rate.",
+    "notSet": "No rate covers today. Set one before the next payment is collected.",
+    "setRate": "Set rate",
+    "readOnly": "Setting the rate needs the payment settings update permission.",
+    "rateSet": "Rate set to {{rate}} from {{date}}.",
+    "timelineTitle": "Rate timeline",
+    "tableLabel": "VAT rate timeline, newest first",
+    "columns": {
+      "rate": "Rate",
+      "from": "From",
+      "to": "Until (not included)",
+      "note": "Source note"
+    },
+    "openEnded": "No end date",
+    "errors": {
+      "save": "Could not set the rate. Please try again."
+    },
+    "dialog": {
+      "title": "Set the VAT rate",
+      "description": "The new rate applies from today, {{date}} (Vietnam time), and replaces any rate scheduled after today.",
+      "percentLabel": "Rate (percent)",
+      "invalidPercent": "Enter a percentage from 0 to 100 with at most two decimals, for example 8 or 8.5.",
+      "noteLabel": "Source note (optional)",
+      "save": "Set rate"
+    }
   },
   "loading": "Loading…",
   "loadFailed": "Could not load the payment settings.",

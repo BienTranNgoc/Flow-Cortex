@@ -5406,6 +5406,54 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/profiles:
+    get:
+      tags:
+      - billing-profiles-controller
+      summary: List the member's invoice details
+      description: "The default first, then oldest first."
+      operationId: listBillingProfiles
+      responses:
+        "200":
+          description: The member's profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BillingProfileResponse"
+        "401":
+          description: Not signed in
+    post:
+      tags:
+      - billing-profiles-controller
+      summary: Add invoice details
+      description: The member's first profile becomes the default whatever isDefault
+        says. A member holds at most 20 profiles.
+      operationId: createBillingProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingProfileRequest"
+        required: true
+      responses:
+        "201":
+          description: The stored profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingProfileResponse"
+        "401":
+          description: Not signed in
+        "422":
+          description: "billing_profile_invalid with errors.<field> (type, legalName,\
+            \ taxCode, personalIdNumber, address, email, isDefault), or billing_profile_limit_reached\
+            \ when the member already holds 20 profiles"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/billing/journey-events:
     post:
       tags:
@@ -5988,6 +6036,82 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/vat-rates:
+    get:
+      tags:
+      - vat-rates-admin-controller
+      operationId: getVatRateTimeline
+      parameters:
+      - name: jurisdiction
+        in: query
+        required: false
+        schema:
+          type: string
+          default: VN
+          pattern: VN
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+          default: it_services
+          pattern: it_services
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VatRateTimelineResponse"
+        "400":
+          description: "validation-failed (errors.jurisdiction, errors.category)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: forbidden (needs payment.setting.view)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    post:
+      tags:
+      - vat-rates-admin-controller
+      operationId: publishVatRate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishVatRateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VatRatePublishedResponse"
+        "400":
+          description: "validation-failed (errors.rateBps, errors.jurisdiction, errors.category,\
+            \ errors.sourceNote)"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: forbidden (needs payment.setting.update)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: "vat_rate_no_open_row, vat_rate_multiple_open_rows, vat_rate_no_precedent\
+            \ or vat_rate_in_use"
           content:
             application/problem+json:
               schema:
@@ -7327,6 +7451,124 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/TelegramDefaultChat"
+  /api/v1/billing/profiles/{id}:
+    get:
+      tags:
+      - billing-profiles-controller
+      summary: Read one of the member's invoice details
+      operationId: getBillingProfile
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingProfileResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's profile (code billing_profile_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - billing-profiles-controller
+      summary: Delete invoice details
+      description: When the default is deleted the oldest remaining profile becomes
+        the default.
+      operationId: deleteBillingProfile
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's profile (code billing_profile_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - billing-profiles-controller
+      summary: Edit invoice details
+      description: "Fields present replace the stored ones, null clears, absent ones\
+        \ are kept; the merged profile must pass the same rules as a new one."
+      operationId: updateBillingProfile
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingProfileRequest"
+        required: true
+      responses:
+        "200":
+          description: The stored profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingProfileResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's profile (code billing_profile_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: billing_profile_invalid with errors.<field>
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/profiles/{id}/default:
+    patch:
+      tags:
+      - billing-profiles-controller
+      summary: Make one of the member's profiles the default
+      operationId: setDefaultBillingProfile
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "The profile, now the default"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingProfileResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's profile (code billing_profile_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/profile/preferences/ui:
     patch:
       tags:
@@ -10409,6 +10651,103 @@ paths:
           description: Not signed in
         "404":
           description: Not the member's payment (code transaction_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/profiles/default:
+    get:
+      tags:
+      - billing-profiles-controller
+      summary: Read the member's default invoice details
+      description: profile is null when the member has none.
+      operationId: getDefaultBillingProfile
+      responses:
+        "200":
+          description: "The default profile, or null"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DefaultBillingProfileResponse"
+        "401":
+          description: Not signed in
+  /api/v1/billing/agreements:
+    get:
+      tags:
+      - agreements-controller
+      summary: List the member's purchases with their terms
+      description: "Newest first. Each entry says which publication of the payment\
+        \ terms the purchase is under, without the text."
+      operationId: listPurchaseAgreements
+      parameters:
+      - name: page
+        in: query
+        description: Page number from 0 to 10000; default 0
+        required: false
+        schema:
+          type: integer
+          default: 0
+          maximum: 10000
+          minimum: 0
+      - name: size
+        in: query
+        description: Rows per page from 1 to 100; default 20
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: One page of the member's purchases
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgreementListResponse"
+        "400":
+          description: page or size out of range (code invalid_pagination)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Not signed in
+        "503":
+          description: A purchase has no terms to show (code payment_agreement_terms_unavailable)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/billing/agreements/{transactionId}:
+    get:
+      tags:
+      - agreements-controller
+      summary: Read the terms behind one of the member's purchases
+      operationId: getPurchaseAgreement
+      parameters:
+      - name: transactionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "The purchase, where its terms come from, and their text"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgreementDetailResponse"
+        "401":
+          description: Not signed in
+        "404":
+          description: Not the member's payment (code payment_agreement_not_found)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: No terms to show (code payment_agreement_terms_unavailable)
           content:
             application/problem+json:
               schema:
@@ -15895,6 +16234,84 @@ components:
           format: uuid
         card:
           $ref: "#/components/schemas/ChatMessage"
+    BillingProfileRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+          - personal
+          - business
+          - household
+        legalName:
+          type: string
+          maxLength: 400
+        taxCode:
+          type:
+          - string
+          - "null"
+          description: "business and household: 10 digits, optionally -3 digits"
+        personalIdNumber:
+          type:
+          - string
+          - "null"
+          description: "personal: 12 digits"
+        address:
+          type: string
+          maxLength: 500
+        email:
+          type:
+          - string
+          - "null"
+          maxLength: 255
+        isDefault:
+          type: boolean
+          description: true makes this the default; false and absence change nothing
+    JsonNode: {}
+    BillingProfileResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+          - personal
+          - business
+          - household
+        legalName:
+          type: string
+        taxCode:
+          type:
+          - string
+          - "null"
+        personalIdNumber:
+          type:
+          - string
+          - "null"
+        address:
+          type: string
+        email:
+          type:
+          - string
+          - "null"
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - address
+      - createdAt
+      - id
+      - isDefault
+      - legalName
+      - type
+      - updatedAt
     ResetPasswordRequest:
       type: object
       properties:
@@ -16192,6 +16609,80 @@ components:
       - stepOrder
       - type
       - value
+    PublishVatRateRequest:
+      type: object
+      properties:
+        jurisdiction:
+          type:
+          - string
+          - "null"
+          enum:
+          - VN
+          pattern: VN
+        category:
+          type:
+          - string
+          - "null"
+          enum:
+          - it_services
+          pattern: it_services
+        rateBps:
+          type: integer
+          format: int32
+          maximum: 10000
+          minimum: 0
+        sourceNote:
+          type:
+          - string
+          - "null"
+          maxLength: 1000
+          minLength: 0
+      required:
+      - rateBps
+    VatRatePublishedResponse:
+      type: object
+      properties:
+        jurisdiction:
+          type: string
+        category:
+          type: string
+        rates:
+          type: array
+          items:
+            $ref: "#/components/schemas/VatRateView"
+        publishedRateId:
+          type: string
+          format: uuid
+      required:
+      - category
+      - jurisdiction
+      - publishedRateId
+      - rates
+    VatRateView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        rateBps:
+          type: integer
+          format: int32
+        validFrom:
+          type: string
+          format: date
+        validTo:
+          type:
+          - string
+          - "null"
+          format: date
+        sourceNote:
+          type:
+          - string
+          - "null"
+      required:
+      - id
+      - rateBps
+      - validFrom
     AdminTrendTagCreateRequest:
       type: object
       properties:
@@ -16619,7 +17110,7 @@ components:
           maxLength: 255
           minLength: 0
         config:
-          type: string
+          $ref: "#/components/schemas/JsonNode"
     PublishedVersionRequest:
       type: object
       properties:
@@ -16763,7 +17254,6 @@ components:
           enum:
           - pinned
           - rail
-    JsonNode: {}
     PrivacySettings:
       type: object
       properties:
@@ -19287,6 +19777,141 @@ components:
       - at
       - code
       - kind
+    DefaultBillingProfileResponse:
+      type: object
+      properties:
+        profile:
+          type: "null"
+          $ref: "#/components/schemas/BillingProfileResponse"
+      required:
+      - profile
+    AgreementListMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - page
+      - size
+      - total
+    AgreementListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgreementSummaryResponse"
+        meta:
+          $ref: "#/components/schemas/AgreementListMeta"
+      required:
+      - data
+      - meta
+    AgreementPurchaseResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        acceptedAt:
+          type: string
+          format: date-time
+        collectedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        amountVnd:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        kind:
+          type: string
+          enum:
+          - plan_purchase
+          - topup
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - expired
+          - partially_refunded
+          - refunded
+          - disputed
+        description:
+          type: string
+      required:
+      - acceptedAt
+      - amountVnd
+      - collectedAt
+      - currency
+      - description
+      - kind
+      - status
+      - transactionId
+    AgreementSummaryResponse:
+      type: object
+      properties:
+        purchase:
+          $ref: "#/components/schemas/AgreementPurchaseResponse"
+        terms:
+          $ref: "#/components/schemas/AgreementTermsResponse"
+      required:
+      - purchase
+      - terms
+    AgreementTermsResponse:
+      type: object
+      properties:
+        source:
+          type: string
+          enum:
+          - recorded
+          - reconstructed
+          - no_record
+        slug:
+          type: string
+        revisionId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+      - publishedAt
+      - revisionId
+      - slug
+      - source
+    AgreementDetailResponse:
+      type: object
+      properties:
+        purchase:
+          $ref: "#/components/schemas/AgreementPurchaseResponse"
+        terms:
+          $ref: "#/components/schemas/AgreementTermsResponse"
+        sections:
+          type: string
+          description: "The document's sections as published: [{type, schemaVersion,\
+            \ data}]"
+        seoMeta:
+          $ref: "#/components/schemas/JsonNode"
+          description: "The document's SEO text as published: {title, description}\
+            \ in vi and en"
+      required:
+      - purchase
+      - sections
+      - seoMeta
+      - terms
     PageViewBatchResponse:
       type: object
       properties:
@@ -19744,6 +20369,21 @@ components:
       - countsByStatus
       - series
       - workflow
+    VatRateTimelineResponse:
+      type: object
+      properties:
+        jurisdiction:
+          type: string
+        category:
+          type: string
+        rates:
+          type: array
+          items:
+            $ref: "#/components/schemas/VatRateView"
+      required:
+      - category
+      - jurisdiction
+      - rates
     AdminTrendTaxonomy:
       type: object
       properties:

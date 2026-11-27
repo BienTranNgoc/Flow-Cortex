@@ -2658,6 +2658,67 @@ export interface ChatCardConfirmed {
   card?: ChatMessage;
 }
 
+export type BillingProfileRequestType =
+  (typeof BillingProfileRequestType)[keyof typeof BillingProfileRequestType];
+
+export const BillingProfileRequestType = {
+  personal: 'personal',
+  business: 'business',
+  household: 'household',
+} as const;
+
+export interface BillingProfileRequest {
+  type?: BillingProfileRequestType;
+  /** @maxLength 400 */
+  legalName?: string;
+  /**
+   * business and household: 10 digits, optionally -3 digits
+   * @nullable
+   */
+  taxCode?: string | null;
+  /**
+   * personal: 12 digits
+   * @nullable
+   */
+  personalIdNumber?: string | null;
+  /** @maxLength 500 */
+  address?: string;
+  /**
+   * @maxLength 255
+   * @nullable
+   */
+  email?: string | null;
+  /** true makes this the default; false and absence change nothing */
+  isDefault?: boolean;
+}
+
+export interface JsonNode {}
+
+export type BillingProfileResponseType =
+  (typeof BillingProfileResponseType)[keyof typeof BillingProfileResponseType];
+
+export const BillingProfileResponseType = {
+  personal: 'personal',
+  business: 'business',
+  household: 'household',
+} as const;
+
+export interface BillingProfileResponse {
+  id: string;
+  type: BillingProfileResponseType;
+  legalName: string;
+  /** @nullable */
+  taxCode?: string | null;
+  /** @nullable */
+  personalIdNumber?: string | null;
+  address: string;
+  /** @nullable */
+  email?: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ResetPasswordRequest {
   /**
    * @minLength 0
@@ -2850,6 +2911,69 @@ export interface ImportReviewResponse {
   outbound: boolean;
   issues: ImportIssueResponse[];
   outboundTargets: OutboundTargetResponse[];
+}
+
+/**
+ * @nullable
+ * @pattern VN
+ */
+export type PublishVatRateRequestJurisdiction =
+  (typeof PublishVatRateRequestJurisdiction)[keyof typeof PublishVatRateRequestJurisdiction] | null;
+
+export const PublishVatRateRequestJurisdiction = {
+  VN: 'VN',
+} as const;
+
+/**
+ * @nullable
+ * @pattern it_services
+ */
+export type PublishVatRateRequestCategory =
+  (typeof PublishVatRateRequestCategory)[keyof typeof PublishVatRateRequestCategory] | null;
+
+export const PublishVatRateRequestCategory = {
+  it_services: 'it_services',
+} as const;
+
+export interface PublishVatRateRequest {
+  /**
+   * @nullable
+   * @pattern VN
+   */
+  jurisdiction?: PublishVatRateRequestJurisdiction;
+  /**
+   * @nullable
+   * @pattern it_services
+   */
+  category?: PublishVatRateRequestCategory;
+  /**
+   * @minimum 0
+   * @maximum 10000
+   */
+  rateBps: number;
+  /**
+   * @minLength 0
+   * @maxLength 1000
+   * @nullable
+   */
+  sourceNote?: string | null;
+}
+
+export interface VatRateView {
+  id: string;
+  rateBps: number;
+  validFrom: string;
+  /** @nullable */
+  validTo?: string | null;
+  /** @nullable */
+  sourceNote?: string | null;
+}
+
+export interface VatRatePublishedResponse {
+  jurisdiction: string;
+  category: string;
+  rates: VatRateView[];
+  publishedRateId: string;
 }
 
 export interface AdminTrendTagCreateRequest {
@@ -3123,7 +3247,7 @@ export interface UpdateStepRequest {
    * @maxLength 255
    */
   inputRef?: string;
-  config?: string;
+  config?: JsonNode;
 }
 
 export interface PublishedVersionRequest {
@@ -3220,8 +3344,6 @@ export interface UiPreferences {
   theme?: UiPreferencesTheme;
   sidebarMode?: UiPreferencesSidebarMode;
 }
-
-export interface JsonNode {}
 
 export type PrivacySettingsProfile =
   (typeof PrivacySettingsProfile)[keyof typeof PrivacySettingsProfile];
@@ -4673,6 +4795,86 @@ export interface TransactionDetailResponse {
   timeline: TransactionTimelineEvent[];
 }
 
+export interface DefaultBillingProfileResponse {
+  /** @nullable */
+  profile: BillingProfileResponse;
+}
+
+export interface AgreementListMeta {
+  total: number;
+  page: number;
+  size: number;
+}
+
+export type AgreementPurchaseResponseKind =
+  (typeof AgreementPurchaseResponseKind)[keyof typeof AgreementPurchaseResponseKind];
+
+export const AgreementPurchaseResponseKind = {
+  plan_purchase: 'plan_purchase',
+  topup: 'topup',
+} as const;
+
+export type AgreementPurchaseResponseStatus =
+  (typeof AgreementPurchaseResponseStatus)[keyof typeof AgreementPurchaseResponseStatus];
+
+export const AgreementPurchaseResponseStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  expired: 'expired',
+  partially_refunded: 'partially_refunded',
+  refunded: 'refunded',
+  disputed: 'disputed',
+} as const;
+
+export interface AgreementPurchaseResponse {
+  transactionId: string;
+  acceptedAt: string;
+  /** @nullable */
+  collectedAt: string | null;
+  amountVnd: number;
+  currency: string;
+  kind: AgreementPurchaseResponseKind;
+  status: AgreementPurchaseResponseStatus;
+  description: string;
+}
+
+export type AgreementTermsResponseSource =
+  (typeof AgreementTermsResponseSource)[keyof typeof AgreementTermsResponseSource];
+
+export const AgreementTermsResponseSource = {
+  recorded: 'recorded',
+  reconstructed: 'reconstructed',
+  no_record: 'no_record',
+} as const;
+
+export interface AgreementTermsResponse {
+  source: AgreementTermsResponseSource;
+  slug: string;
+  /** @nullable */
+  revisionId: string | null;
+  publishedAt: string;
+}
+
+export interface AgreementSummaryResponse {
+  purchase: AgreementPurchaseResponse;
+  terms: AgreementTermsResponse;
+}
+
+export interface AgreementListResponse {
+  data: AgreementSummaryResponse[];
+  meta: AgreementListMeta;
+}
+
+export interface AgreementDetailResponse {
+  purchase: AgreementPurchaseResponse;
+  terms: AgreementTermsResponse;
+  /** The document's sections as published: [{type, schemaVersion, data}] */
+  sections: string;
+  /** The document's SEO text as published: {title, description} in vi and en */
+  seoMeta: JsonNode;
+}
+
 export interface PageViewBatchResponse {
   items: BatchResponse[];
   page: number;
@@ -4893,6 +5095,12 @@ export interface WorkflowReportResponse {
   countsByStatus: WorkflowReportResponseCountsByStatus;
   lastRunAt?: string;
   series: DayCountResponse[];
+}
+
+export interface VatRateTimelineResponse {
+  jurisdiction: string;
+  category: string;
+  rates: VatRateView[];
 }
 
 export interface AdminTrendTaxonomy {
@@ -5547,6 +5755,17 @@ export const ListAdminWorkflowsStatus = {
   published: 'published',
 } as const;
 
+export type GetVatRateTimelineParams = {
+  /**
+   * @pattern VN
+   */
+  jurisdiction?: string;
+  /**
+   * @pattern it_services
+   */
+  category?: string;
+};
+
 export type ListContentMediaParams = {
   /**
    * @pattern image|video
@@ -6039,6 +6258,21 @@ export type ListBillingTransactionsParams = {
    * true or 1 lists only succeeded, partially refunded and refunded payments
    */
   settled?: boolean;
+};
+
+export type ListPurchaseAgreementsParams = {
+  /**
+   * Page number from 0 to 10000; default 0
+   * @minimum 0
+   * @maximum 10000
+   */
+  page?: number;
+  /**
+   * Rows per page from 1 to 100; default 20
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
 };
 
 export type ListBatchesParams = {
@@ -15330,6 +15564,109 @@ export const confirmChatCard = async (
   });
 };
 
+export type listBillingProfilesResponse200 = {
+  data: BillingProfileResponse[];
+  status: 200;
+};
+
+export type listBillingProfilesResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type listBillingProfilesResponseSuccess = listBillingProfilesResponse200 & {
+  headers: Headers;
+};
+export type listBillingProfilesResponseError = listBillingProfilesResponse401 & {
+  headers: Headers;
+};
+
+export type listBillingProfilesResponse =
+  listBillingProfilesResponseSuccess | listBillingProfilesResponseError;
+
+export const getListBillingProfilesUrl = () => {
+  return `/api/v1/billing/profiles`;
+};
+
+/**
+ * The default first, then oldest first.
+ * @summary List the member's invoice details
+ */
+export const listBillingProfiles = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listBillingProfilesResponse> => {
+  return customFetch<listBillingProfilesResponse>(getListBillingProfilesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type createBillingProfileResponse201 = {
+  data: BillingProfileResponse;
+  status: 201;
+};
+
+export type createBillingProfileResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type createBillingProfileResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type createBillingProfileResponseSuccess = createBillingProfileResponse201 & {
+  headers: Headers;
+};
+export type createBillingProfileResponseError = (
+  createBillingProfileResponse401 | createBillingProfileResponse422
+) & {
+  headers: Headers;
+};
+
+export type createBillingProfileResponse =
+  createBillingProfileResponseSuccess | createBillingProfileResponseError;
+
+export const getCreateBillingProfileUrl = () => {
+  return `/api/v1/billing/profiles`;
+};
+
+/**
+ * The member's first profile becomes the default whatever isDefault says. A member holds at most 20 profiles.
+ * @summary Add invoice details
+ */
+export const createBillingProfile = async (
+  billingProfileRequest: BillingProfileRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<createBillingProfileResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<createBillingProfileResponse>(getCreateBillingProfileUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(billingProfileRequest),
+  });
+};
+
 export type recordPaymentJourneyEventResponse204 = {
   data: void;
   status: 204;
@@ -16333,6 +16670,125 @@ export const reviewAdminWorkflowImport = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(workflowArtifact),
+  });
+};
+
+export type getVatRateTimelineResponse200 = {
+  data: VatRateTimelineResponse;
+  status: 200;
+};
+
+export type getVatRateTimelineResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type getVatRateTimelineResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type getVatRateTimelineResponseSuccess = getVatRateTimelineResponse200 & {
+  headers: Headers;
+};
+export type getVatRateTimelineResponseError = (
+  getVatRateTimelineResponse400 | getVatRateTimelineResponse403
+) & {
+  headers: Headers;
+};
+
+export type getVatRateTimelineResponse =
+  getVatRateTimelineResponseSuccess | getVatRateTimelineResponseError;
+
+export const getGetVatRateTimelineUrl = (params?: GetVatRateTimelineParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/vat-rates?${stringifiedParams}`
+    : `/api/v1/admin/vat-rates`;
+};
+
+export const getVatRateTimeline = async (
+  params?: GetVatRateTimelineParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getVatRateTimelineResponse> => {
+  return customFetch<getVatRateTimelineResponse>(getGetVatRateTimelineUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type publishVatRateResponse200 = {
+  data: VatRatePublishedResponse;
+  status: 200;
+};
+
+export type publishVatRateResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type publishVatRateResponse403 = {
+  data: ProblemDetail;
+  status: 403;
+};
+
+export type publishVatRateResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type publishVatRateResponseSuccess = publishVatRateResponse200 & {
+  headers: Headers;
+};
+export type publishVatRateResponseError = (
+  publishVatRateResponse400 | publishVatRateResponse403 | publishVatRateResponse409
+) & {
+  headers: Headers;
+};
+
+export type publishVatRateResponse = publishVatRateResponseSuccess | publishVatRateResponseError;
+
+export const getPublishVatRateUrl = () => {
+  return `/api/v1/admin/vat-rates`;
+};
+
+export const publishVatRate = async (
+  publishVatRateRequest: PublishVatRateRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<publishVatRateResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<publishVatRateResponse>(getPublishVatRateUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(publishVatRateRequest),
   });
 };
 
@@ -18508,6 +18964,213 @@ export const setDefaultChat = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(telegramDefaultChatRequest),
+  });
+};
+
+export type getBillingProfileResponse200 = {
+  data: BillingProfileResponse;
+  status: 200;
+};
+
+export type getBillingProfileResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getBillingProfileResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getBillingProfileResponseSuccess = getBillingProfileResponse200 & {
+  headers: Headers;
+};
+export type getBillingProfileResponseError = (
+  getBillingProfileResponse401 | getBillingProfileResponse404
+) & {
+  headers: Headers;
+};
+
+export type getBillingProfileResponse =
+  getBillingProfileResponseSuccess | getBillingProfileResponseError;
+
+export const getGetBillingProfileUrl = (id: string) => {
+  return `/api/v1/billing/profiles/${id}`;
+};
+
+/**
+ * @summary Read one of the member's invoice details
+ */
+export const getBillingProfile = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getBillingProfileResponse> => {
+  return customFetch<getBillingProfileResponse>(getGetBillingProfileUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type deleteBillingProfileResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteBillingProfileResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type deleteBillingProfileResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type deleteBillingProfileResponseSuccess = deleteBillingProfileResponse204 & {
+  headers: Headers;
+};
+export type deleteBillingProfileResponseError = (
+  deleteBillingProfileResponse401 | deleteBillingProfileResponse404
+) & {
+  headers: Headers;
+};
+
+export type deleteBillingProfileResponse =
+  deleteBillingProfileResponseSuccess | deleteBillingProfileResponseError;
+
+export const getDeleteBillingProfileUrl = (id: string) => {
+  return `/api/v1/billing/profiles/${id}`;
+};
+
+/**
+ * When the default is deleted the oldest remaining profile becomes the default.
+ * @summary Delete invoice details
+ */
+export const deleteBillingProfile = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<deleteBillingProfileResponse> => {
+  return customFetch<deleteBillingProfileResponse>(getDeleteBillingProfileUrl(id), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type updateBillingProfileResponse200 = {
+  data: BillingProfileResponse;
+  status: 200;
+};
+
+export type updateBillingProfileResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type updateBillingProfileResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type updateBillingProfileResponse422 = {
+  data: ProblemDetail;
+  status: 422;
+};
+
+export type updateBillingProfileResponseSuccess = updateBillingProfileResponse200 & {
+  headers: Headers;
+};
+export type updateBillingProfileResponseError = (
+  | updateBillingProfileResponse401
+  | updateBillingProfileResponse404
+  | updateBillingProfileResponse422
+) & {
+  headers: Headers;
+};
+
+export type updateBillingProfileResponse =
+  updateBillingProfileResponseSuccess | updateBillingProfileResponseError;
+
+export const getUpdateBillingProfileUrl = (id: string) => {
+  return `/api/v1/billing/profiles/${id}`;
+};
+
+/**
+ * Fields present replace the stored ones, null clears, absent ones are kept; the merged profile must pass the same rules as a new one.
+ * @summary Edit invoice details
+ */
+export const updateBillingProfile = async (
+  id: string,
+  billingProfileRequest: BillingProfileRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<updateBillingProfileResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<updateBillingProfileResponse>(getUpdateBillingProfileUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(billingProfileRequest),
+  });
+};
+
+export type setDefaultBillingProfileResponse200 = {
+  data: BillingProfileResponse;
+  status: 200;
+};
+
+export type setDefaultBillingProfileResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type setDefaultBillingProfileResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type setDefaultBillingProfileResponseSuccess = setDefaultBillingProfileResponse200 & {
+  headers: Headers;
+};
+export type setDefaultBillingProfileResponseError = (
+  setDefaultBillingProfileResponse401 | setDefaultBillingProfileResponse404
+) & {
+  headers: Headers;
+};
+
+export type setDefaultBillingProfileResponse =
+  setDefaultBillingProfileResponseSuccess | setDefaultBillingProfileResponseError;
+
+export const getSetDefaultBillingProfileUrl = (id: string) => {
+  return `/api/v1/billing/profiles/${id}/default`;
+};
+
+/**
+ * @summary Make one of the member's profiles the default
+ */
+export const setDefaultBillingProfile = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<setDefaultBillingProfileResponse> => {
+  return customFetch<setDefaultBillingProfileResponse>(getSetDefaultBillingProfileUrl(id), {
+    ...options,
+    method: 'PATCH',
   });
 };
 
@@ -22476,6 +23139,158 @@ export const getBillingTransactionByOrder = async (
       method: 'GET',
     },
   );
+};
+
+export type getDefaultBillingProfileResponse200 = {
+  data: DefaultBillingProfileResponse;
+  status: 200;
+};
+
+export type getDefaultBillingProfileResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getDefaultBillingProfileResponseSuccess = getDefaultBillingProfileResponse200 & {
+  headers: Headers;
+};
+export type getDefaultBillingProfileResponseError = getDefaultBillingProfileResponse401 & {
+  headers: Headers;
+};
+
+export type getDefaultBillingProfileResponse =
+  getDefaultBillingProfileResponseSuccess | getDefaultBillingProfileResponseError;
+
+export const getGetDefaultBillingProfileUrl = () => {
+  return `/api/v1/billing/profiles/default`;
+};
+
+/**
+ * profile is null when the member has none.
+ * @summary Read the member's default invoice details
+ */
+export const getDefaultBillingProfile = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getDefaultBillingProfileResponse> => {
+  return customFetch<getDefaultBillingProfileResponse>(getGetDefaultBillingProfileUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listPurchaseAgreementsResponse200 = {
+  data: AgreementListResponse;
+  status: 200;
+};
+
+export type listPurchaseAgreementsResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type listPurchaseAgreementsResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type listPurchaseAgreementsResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type listPurchaseAgreementsResponseSuccess = listPurchaseAgreementsResponse200 & {
+  headers: Headers;
+};
+export type listPurchaseAgreementsResponseError = (
+  | listPurchaseAgreementsResponse400
+  | listPurchaseAgreementsResponse401
+  | listPurchaseAgreementsResponse503
+) & {
+  headers: Headers;
+};
+
+export type listPurchaseAgreementsResponse =
+  listPurchaseAgreementsResponseSuccess | listPurchaseAgreementsResponseError;
+
+export const getListPurchaseAgreementsUrl = (params?: ListPurchaseAgreementsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/billing/agreements?${stringifiedParams}`
+    : `/api/v1/billing/agreements`;
+};
+
+/**
+ * Newest first. Each entry says which publication of the payment terms the purchase is under, without the text.
+ * @summary List the member's purchases with their terms
+ */
+export const listPurchaseAgreements = async (
+  params?: ListPurchaseAgreementsParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listPurchaseAgreementsResponse> => {
+  return customFetch<listPurchaseAgreementsResponse>(getListPurchaseAgreementsUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getPurchaseAgreementResponse200 = {
+  data: AgreementDetailResponse;
+  status: 200;
+};
+
+export type getPurchaseAgreementResponse401 = {
+  data: void;
+  status: 401;
+};
+
+export type getPurchaseAgreementResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type getPurchaseAgreementResponse503 = {
+  data: ProblemDetail;
+  status: 503;
+};
+
+export type getPurchaseAgreementResponseSuccess = getPurchaseAgreementResponse200 & {
+  headers: Headers;
+};
+export type getPurchaseAgreementResponseError = (
+  | getPurchaseAgreementResponse401
+  | getPurchaseAgreementResponse404
+  | getPurchaseAgreementResponse503
+) & {
+  headers: Headers;
+};
+
+export type getPurchaseAgreementResponse =
+  getPurchaseAgreementResponseSuccess | getPurchaseAgreementResponseError;
+
+export const getGetPurchaseAgreementUrl = (transactionId: string) => {
+  return `/api/v1/billing/agreements/${transactionId}`;
+};
+
+/**
+ * @summary Read the terms behind one of the member's purchases
+ */
+export const getPurchaseAgreement = async (
+  transactionId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getPurchaseAgreementResponse> => {
+  return customFetch<getPurchaseAgreementResponse>(getGetPurchaseAgreementUrl(transactionId), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type listBatchesResponse200 = {

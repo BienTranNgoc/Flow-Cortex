@@ -69,11 +69,17 @@ class TransactionHistoryIT extends AbstractPostgresBootTest {
     private void moveTo(OpenedPayment payment, String from, String to, String code, Instant at, boolean paid) {
         jdbc.update("""
                 UPDATE payment_transaction SET status = ?, provider_result_code = ?, provider_transaction_id = ?,
-                    provider_pay_type = ?, provider_status_at = ?, updated_at = ?, succeeded_at = ?
+                    provider_pay_type = ?, provider_status_at = ?, updated_at = ?, succeeded_at = ?,
+                    base_amount_vnd = CASE WHEN ? THEN amount_vnd - amount_vnd / 11 END,
+                    tax_amount_vnd = CASE WHEN ? THEN amount_vnd / 11 END,
+                    tax_rate_bps = CASE WHEN ? THEN 1000 END,
+                    tax_rate_id = CASE WHEN ? THEN (SELECT id FROM vat_rate WHERE valid_from = DATE '1900-01-01') END,
+                    tax_inclusive = CASE WHEN ? THEN TRUE END
                 WHERE id = ?
                 """,
                 to, code, paid ? "4088878653" : null, paid ? "webApp" : null, Timestamp.from(at),
-                Timestamp.from(at), paid ? Timestamp.from(at) : null, payment.transactionId());
+                Timestamp.from(at), paid ? Timestamp.from(at) : null, paid, paid, paid, paid, paid,
+                payment.transactionId());
         jdbc.update("""
                 INSERT INTO payment_transaction_event (id, transaction_id, from_status, to_status, reason,
                     provider_result_code, evidence_ref, provider_timestamp, occurred_at)

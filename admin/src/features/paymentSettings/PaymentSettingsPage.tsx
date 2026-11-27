@@ -10,10 +10,16 @@ import { useMeQuery } from '../auth/useAuth';
 import { PaymentSettingRow } from './PaymentSettingRow';
 import { PaymentSettingsHistory } from './PaymentSettingsHistory';
 import { usePaymentSettingsList } from './usePaymentSettings';
+import { VatRatesTab } from './VatRatesTab';
 import './paymentSettings.css';
 
-const TABS = ['settings', 'history'] as const;
+const TABS = ['settings', 'history', 'vat'] as const;
 type Tab = (typeof TABS)[number];
+
+/** An unknown or absent `?tab=` is the settings tab. */
+function tabOf(value: string | null): Tab {
+  return TABS.find((name) => name === value) ?? 'settings';
+}
 
 /** Keeps the API's order: a group's position is that of its first setting. */
 function byGroup(items: readonly PaymentSettingView[]): [string, PaymentSettingView[]][] {
@@ -31,8 +37,12 @@ export function PaymentSettingsPage() {
   const query = usePaymentSettingsList();
   const items = query.data;
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get('tab') === 'history' ? 'history' : 'settings';
-  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({ settings: null, history: null });
+  const tab = tabOf(params.get('tab'));
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
+    settings: null,
+    history: null,
+    vat: null,
+  });
 
   const select = (next: Tab) => {
     setParams((current) => {
@@ -93,6 +103,7 @@ export function PaymentSettingsPage() {
         className="payment-panel"
       >
         {tab === 'history' && <PaymentSettingsHistory settings={items ?? []} />}
+        {tab === 'vat' && <VatRatesTab canUpdate={canUpdate} />}
         {tab === 'settings' && (
           <>
             {query.isPending && (

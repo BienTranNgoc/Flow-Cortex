@@ -11,6 +11,10 @@ import com.flowcortex.billing.ledger.PaymentOpeningRefusedException;
 import com.flowcortex.billing.provider.PaymentInstrument;
 import com.flowcortex.billing.provider.PaymentOrderLookup;
 import com.flowcortex.billing.provider.PaymentOrderLookup.RecordedOrder;
+import com.flowcortex.content.api.PublicationIndex;
+import com.flowcortex.content.api.PublicationIndex.PublicationRef;
+import com.flowcortex.content.document.ContentDocumentService;
+import com.flowcortex.content.document.PublishedDocuments;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,11 +50,29 @@ class PaymentLedgerIT extends AbstractPostgresBootTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private PublicationIndex publications;
+
+    @Autowired
+    private ContentDocumentService documents;
+
+    @Autowired
+    private PublishedDocuments publishedDocuments;
+
+    private PaymentTermsFixture terms;
+
+    @BeforeEach
+    void noTermsPublished() {
+        terms = new PaymentTermsFixture(documents, publishedDocuments, jdbc);
+        terms.clear();
+    }
+
     @AfterEach
     void clean() {
         jdbc.update("DELETE FROM payment_transaction_event WHERE transaction_id IN "
                 + "(SELECT id FROM payment_transaction WHERE user_id = ?)", user);
         jdbc.update("DELETE FROM payment_transaction WHERE user_id = ?", user);
+        terms.clear();
     }
 
     private OpenPayment topUp() {
@@ -98,6 +121,37 @@ class PaymentLedgerIT extends AbstractPostgresBootTest {
                 .containsEntry("provider_result_code", null)
                 .containsEntry("evidence_ref", null);
         assertThat(history.get(0).get("occurred_at")).isEqualTo(row.get("created_at"));
+    }
+
+    @Test
+    void anOpenedPaymentPinsTheNewestPublicationOfThePaymentTerms() {
+        terms.publish(1);
+        UUID newest = terms.publish(2);
+
+        OpenedPayment opened = ledger.open(topUp());
+
+        assertThat(jdbc.queryForObject("SELECT terms_revision_id FROM payment_transaction WHERE id = ?", UUID.class,
+                opened.transactionId())).isEqualTo(newest);
+    }
+
+    @Test
+    void anOpenedPaymentWithNoPublishedTermsPinsNothingAndIsStored() {
+        OpenedPayment opened = ledger.open(topUp());
+
+        assertThat(jdbc.queryForObject("SELECT terms_revision_id FROM payment_transaction WHERE id = ?", UUID.class,
+                opened.transactionId())).isNull();
+        assertThat(paymentRows()).isEqualTo(1);
+    }
+
+    @Test
+    void thePublicationIndexListsPaymentTermsNewestFirstAndNothingForAnotherDocument() {
+        UUID first = terms.publish(1);
+        UUID second = terms.publish(2);
+
+        assertThat(publications.publications(PaymentTermsFixture.SLUG)).extracting(PublicationRef::id)
+                .containsExactly(second, first);
+        assertThat(publications.publications("legal-index")).isEmpty();
+        assertThat(publications.publications("internal-notes")).isEmpty();
     }
 
     @Test
@@ -218,11 +272,17 @@ class PaymentLedgerIT extends AbstractPostgresBootTest {
 
     private void insert(String orderRef, UUID requestRef, String status, String kind, long amount, String currency,
             Timestamp succeededAt) {
+        boolean paid = succeededAt != null;
+        long tax = paid ? amount / 11 : 0;
+        UUID rate = paid ? jdbc.queryForObject("SELECT id FROM vat_rate WHERE valid_from = DATE '1900-01-01'",
+                UUID.class) : null;
         jdbc.update("INSERT INTO payment_transaction (id, user_id, kind, item_ref, description, amount_vnd, currency, "
-                + "provider, merchant_code, order_ref, request_ref, status, created_at, updated_at, succeeded_at) "
-                + "VALUES (?, ?, ?, 'pkg-50k', 'Top-up', ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)",
+                + "provider, merchant_code, order_ref, request_ref, status, created_at, updated_at, succeeded_at, "
+                + "base_amount_vnd, tax_amount_vnd, tax_rate_bps, tax_rate_id, tax_inclusive) "
+                + "VALUES (?, ?, ?, 'pkg-50k', 'Top-up', ?, ?, ?, ?, ?, ?, ?, now(), now(), ?, ?, ?, ?, ?, ?)",
                 UUID.randomUUID(), user, kind, amount, currency, PROVIDER, MERCHANT, orderRef, requestRef, status,
-                succeededAt);
+                succeededAt, paid ? amount - tax : null, paid ? tax : null, paid ? 1000 : null, rate,
+                paid ? Boolean.TRUE : null);
     }
 
     private void insertHistory(UUID transactionId, String from, String to, String reason) {

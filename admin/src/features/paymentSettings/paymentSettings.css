@@ -199,6 +199,54 @@
   margin-top: 1rem;
 }
 
+.vat-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.vat-current {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 48rem;
+}
+
+.vat-current h2,
+.vat-timeline h2 {
+  margin: 0;
+}
+
+.vat-current__rate {
+  margin: 0;
+  color: var(--admin-ink);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.vat-current__note {
+  margin: 0;
+  color: var(--admin-ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vat-timeline {
+  min-width: 0;
+}
+
+.vat-timeline h2 {
+  margin-bottom: 0.75rem;
+}
+
+.vat-timeline tr[aria-current='true'] td {
+  background: var(--admin-chrome-active);
+  font-weight: 600;
+}
+
 @media (min-width: 768px) {
   .payment-row__head {
     flex-direction: row;

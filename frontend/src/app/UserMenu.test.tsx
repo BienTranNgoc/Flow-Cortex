@@ -56,6 +56,19 @@ describe('UserMenu', () => {
     expect(trigger).toHaveFocus();
   });
 
+  it('links Invoice details to the profiles page and closes the menu when it is chosen', async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    const trigger = screen.getByRole('button', { name: /open account menu/i });
+    await user.click(trigger);
+
+    const link = screen.getByRole('link', { name: 'Invoice details' });
+    expect(link).toHaveAttribute('href', '/billing/profiles');
+    await user.click(link);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('hides Connected services while the demo pages are off and shows it when on', async () => {
     const user = userEvent.setup();
     const { unmount } = renderMenu();

@@ -14,6 +14,7 @@ import { Layout } from './app/Layout';
 import { queryClient } from './app/queryClient';
 import { useFeatures } from './app/useFeatures';
 import { AuthLayout } from './features/auth/AuthLayout';
+import { BillingProfilesPage } from './features/billing/BillingProfilesPage';
 import { PaymentHistoryPage } from './features/billing/PaymentHistoryPage';
 import { TransactionDetailPage } from './features/billing/TransactionDetailPage';
 import { BuilderDashboardPage } from './features/builderDashboard/BuilderDashboardPage';
@@ -177,6 +178,7 @@ export function App() {
             <Route element={<ContainedOutlet />}>
               <Route index element={<HomePage />} />
               <Route path="profile" element={<ProfilePage />} />
+              <Route path="billing/profiles" element={<BillingProfilesPage />} />
               <Route path="billing/transactions" element={<PaymentHistoryPage />} />
               <Route
                 path="billing/transactions/:transactionId"

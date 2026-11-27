@@ -2,6 +2,10 @@ package com.flowcortex.app.billing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.billing.ledger.LedgerApplier;
 import com.flowcortex.billing.ledger.OpenPayment;
@@ -16,6 +20,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -64,6 +71,7 @@ class LedgerApplierIT extends AbstractPostgresBootTest {
     @AfterEach
     void clean() {
         dropFailure();
+        restoreTimeline();
         for (String requestId : requestIds) {
             jdbc.update("DELETE FROM payment_webhook_event WHERE provider_request_id = ?", requestId);
         }
@@ -154,6 +162,106 @@ class LedgerApplierIT extends AbstractPostgresBootTest {
         assertThat(decided).containsEntry("application_outcome", "applied")
                 .containsEntry("transaction_id", opened.transactionId());
         assertThat(decided.get("applied_at")).isNotNull();
+    }
+
+    private OpenedPayment open(long amount) {
+        return ledger.open(new OpenPayment(user, "topup", "pkg-50k", "Top-up", amount, PROVIDER, MERCHANT,
+                Optional.of(PaymentInstrument.WALLET)));
+    }
+
+    private Map<String, Object> split(UUID id) {
+        return jdbc.queryForMap("SELECT base_amount_vnd, tax_amount_vnd, tax_rate_bps, tax_rate_id, tax_inclusive "
+                + "FROM payment_transaction WHERE id = ?", id);
+    }
+
+    private UUID seedRateId() {
+        return jdbc.queryForObject("SELECT id FROM vat_rate WHERE valid_from = DATE '1900-01-01'", UUID.class);
+    }
+
+    private void restoreTimeline() {
+        jdbc.update("UPDATE vat_rate SET valid_to = NULL WHERE valid_from = DATE '1900-01-01'");
+    }
+
+    private double lookups(String outcome) {
+        return meters.find("billing.vat.rate.lookup").tag("outcome", outcome).counters().stream()
+                .mapToDouble(Counter::count).sum();
+    }
+
+    @Test
+    void aSuccessCallbackWritesTheSplitAtTheRateInForce() {
+        OpenedPayment opened = open();
+        accept(event(opened.orderRef(), "0", 50_000L, PAID_AT), RECEIVED);
+
+        applier.applyPending();
+
+        assertThat(split(opened.transactionId())).containsEntry("base_amount_vnd", 45_455L)
+                .containsEntry("tax_amount_vnd", 4_545L)
+                .containsEntry("tax_rate_bps", 1_000)
+                .containsEntry("tax_rate_id", seedRateId())
+                .containsEntry("tax_inclusive", true);
+    }
+
+    @Test
+    void aLatePaymentAfterExpiryWritesTheSplit() {
+        OpenedPayment opened = open(99_000L);
+        jdbc.update("UPDATE payment_transaction SET status = 'expired' WHERE id = ?", opened.transactionId());
+        accept(event(opened.orderRef(), "0", 99_000L, PAID_AT), RECEIVED);
+
+        applier.applyPending();
+
+        assertThat(payment(opened.transactionId())).containsEntry("status", "succeeded");
+        assertThat(split(opened.transactionId())).containsEntry("base_amount_vnd", 90_000L)
+                .containsEntry("tax_amount_vnd", 9_000L);
+    }
+
+    @Test
+    void aFailureCallbackWritesNoSplit() {
+        OpenedPayment opened = open();
+        accept(event(opened.orderRef(), "1006", 50_000L, PAID_AT), RECEIVED);
+
+        applier.applyPending();
+
+        assertThat(payment(opened.transactionId())).containsEntry("status", "failed");
+        assertThat(split(opened.transactionId())).containsEntry("base_amount_vnd", null)
+                .containsEntry("tax_amount_vnd", null)
+                .containsEntry("tax_rate_bps", null)
+                .containsEntry("tax_rate_id", null)
+                .containsEntry("tax_inclusive", null);
+    }
+
+    @Test
+    void aSuccessCallbackWithNoRateInForceIsHeldBackAndAppliedOnceTheTimelineIsFixed() {
+        OpenedPayment opened = open();
+        UUID callbackId = accept(event(opened.orderRef(), "0", 50_000L, PAID_AT), RECEIVED);
+        jdbc.update("UPDATE vat_rate SET valid_to = DATE '2026-01-01' WHERE valid_from = DATE '1900-01-01'");
+        double missingBefore = lookups("missing");
+        Logger repositoryLog = (Logger) LoggerFactory.getLogger("com.flowcortex.billing.ledger.PaymentTransactionRepository");
+        ListAppender<ILoggingEvent> logged = new ListAppender<>();
+        logged.start();
+        repositoryLog.addAppender(logged);
+        try {
+            applier.applyPending();
+        } finally {
+            repositoryLog.detachAppender(logged);
+        }
+
+        assertThat(payment(opened.transactionId())).containsEntry("status", "pending");
+        assertThat(split(opened.transactionId())).containsEntry("base_amount_vnd", null);
+        assertThat(callback(callbackId)).containsEntry("applied_at", null).containsEntry("apply_attempts", 1);
+        assertThat(lookups("missing")).isEqualTo(missingBefore + 1);
+        List<ILoggingEvent> errors = logged.list.stream().filter(line -> line.getLevel() == Level.ERROR).toList();
+        assertThat(errors).hasSize(1);
+        assertThat(errors.get(0).getFormattedMessage()).contains("VN", "it_services")
+                .contains(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString())
+                .doesNotContain(opened.transactionId().toString(), user.toString(), "50000");
+
+        restoreTimeline();
+        jdbc.update("UPDATE payment_webhook_event SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)), callbackId);
+        applier.applyPending();
+
+        assertThat(callback(callbackId)).containsEntry("application_outcome", "applied");
+        assertThat(split(opened.transactionId())).containsEntry("base_amount_vnd", 45_455L);
     }
 
     @Test

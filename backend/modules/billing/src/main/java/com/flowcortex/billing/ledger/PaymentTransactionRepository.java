@@ -4,10 +4,16 @@ import com.flowcortex.billing.ledger.LedgerDecision.ProviderFacts;
 import com.flowcortex.billing.ledger.LedgerDecision.TransactionSnapshot;
 import com.flowcortex.billing.provider.PaymentInstrument;
 import com.flowcortex.billing.provider.PaymentOrderLookup.RecordedOrder;
+import com.flowcortex.billing.tax.StoredSplit;
+import com.flowcortex.billing.tax.VatRateAmbiguousException;
+import com.flowcortex.billing.tax.VatRateUnavailableException;
+import com.flowcortex.billing.tax.VatRates;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -16,18 +22,25 @@ import org.springframework.stereotype.Repository;
 @Repository
 class PaymentTransactionRepository {
 
-    private final NamedParameterJdbcTemplate jdbc;
+    private static final Logger LOG = LoggerFactory.getLogger(PaymentTransactionRepository.class);
 
-    PaymentTransactionRepository(NamedParameterJdbcTemplate jdbc) {
+    private final NamedParameterJdbcTemplate jdbc;
+    private final VatRates vatRates;
+
+    PaymentTransactionRepository(NamedParameterJdbcTemplate jdbc, VatRates vatRates) {
         this.jdbc = jdbc;
+        this.vatRates = vatRates;
     }
 
-    void insertOpened(UUID id, OpenPayment opening, String orderRef, String requestRef, Instant now) {
+    /** {@code termsRevisionId} is the publication of the payment terms in force now, or null when none exists. */
+    void insertOpened(UUID id, OpenPayment opening, String orderRef, String requestRef, UUID termsRevisionId,
+            Instant now) {
         jdbc.update("""
                 INSERT INTO payment_transaction (id, user_id, kind, item_ref, description, amount_vnd, provider,
-                    merchant_code, instrument, order_ref, request_ref, status, created_at, updated_at)
+                    merchant_code, instrument, order_ref, request_ref, terms_revision_id, status, created_at,
+                    updated_at)
                 VALUES (:id, :userId, :kind, :itemRef, :description, :amountVnd, :provider, :merchantCode,
-                    :instrument, :orderRef, CAST(:requestRef AS uuid), 'pending', :now, :now)
+                    :instrument, :orderRef, CAST(:requestRef AS uuid), :termsRevisionId, 'pending', :now, :now)
                 """,
                 new MapSqlParameterSource("id", id)
                         .addValue("userId", opening.userId())
@@ -40,6 +53,7 @@ class PaymentTransactionRepository {
                         .addValue("instrument", opening.instrument().map(PaymentInstrument::wire).orElse(null))
                         .addValue("orderRef", orderRef)
                         .addValue("requestRef", requestRef)
+                        .addValue("termsRevisionId", termsRevisionId)
                         .addValue("now", Timestamp.from(now)));
     }
 
@@ -85,14 +99,24 @@ class PaymentTransactionRepository {
 
     /**
      * Moves the payment when it is still at {@code from}; the row count says whether it was. The paid time is
-     * set only by a move to {@code succeeded} and is kept by every later move.
+     * set only by a move to {@code succeeded} and is kept by every later move. That move also writes the tax
+     * split at the rate in force on the day of {@code now}: this is the one statement that moves a payment, so
+     * every applier gets the split. A day with no single rate raises, and the caller's transaction keeps nothing.
+     * Call it inside the transaction that locked the payment.
      */
     int applyMove(UUID id, MoneyStatus from, MoneyStatus to, ProviderFacts facts, Instant now) {
+        boolean collected = to == MoneyStatus.SUCCEEDED;
+        StoredSplit split = collected ? splitOf(id, now) : null;
         return jdbc.update("""
                 UPDATE payment_transaction SET status = :to, provider_result_code = :resultCode,
                     provider_message = :message, provider_transaction_id = :providerTransactionId,
                     provider_pay_type = :payType, provider_status_at = :providerTimestamp, updated_at = :now,
-                    succeeded_at = COALESCE(CAST(:succeededAt AS timestamptz), succeeded_at)
+                    succeeded_at = COALESCE(CAST(:succeededAt AS timestamptz), succeeded_at),
+                    base_amount_vnd = COALESCE(base_amount_vnd, CAST(:base AS bigint)),
+                    tax_amount_vnd = COALESCE(tax_amount_vnd, CAST(:tax AS bigint)),
+                    tax_rate_bps = COALESCE(tax_rate_bps, CAST(:rateBps AS integer)),
+                    tax_rate_id = COALESCE(tax_rate_id, CAST(:rateId AS uuid)),
+                    tax_inclusive = COALESCE(tax_inclusive, CAST(:inclusive AS boolean))
                 WHERE id = :id AND status = :from
                 """,
                 new MapSqlParameterSource("id", id)
@@ -103,8 +127,30 @@ class PaymentTransactionRepository {
                         .addValue("providerTransactionId", facts.providerTransactionId())
                         .addValue("payType", facts.payType())
                         .addValue("providerTimestamp", timestamp(facts.providerTimestamp()))
-                        .addValue("succeededAt", to == MoneyStatus.SUCCEEDED ? Timestamp.from(now) : null)
+                        .addValue("succeededAt", collected ? Timestamp.from(now) : null)
+                        .addValue("base", split == null ? null : split.baseVnd())
+                        .addValue("tax", split == null ? null : split.taxVnd())
+                        .addValue("rateBps", split == null ? null : split.rateBps())
+                        .addValue("rateId", split == null ? null : split.rateId())
+                        .addValue("inclusive", split == null ? null : Boolean.TRUE)
                         .addValue("now", Timestamp.from(now)));
+    }
+
+    private StoredSplit splitOf(UUID id, Instant collectedAt) {
+        long amount = jdbc.queryForObject("SELECT amount_vnd FROM payment_transaction WHERE id = :id",
+                new MapSqlParameterSource("id", id), Long.class);
+        try {
+            return vatRates.splitAt(amount, collectedAt);
+        } catch (VatRateUnavailableException e) {
+            LOG.error("Settlement refused, no VAT rate: event=billing.vat.rate.settlement_refused outcome=missing"
+                    + " jurisdiction={} category={} day={}", e.jurisdiction(), e.category(), e.day());
+            throw e;
+        } catch (VatRateAmbiguousException e) {
+            LOG.error("Settlement refused, several VAT rates: event=billing.vat.rate.settlement_refused"
+                    + " outcome=ambiguous jurisdiction={} category={} day={}", e.jurisdiction(), e.category(),
+                    e.day());
+            throw e;
+        }
     }
 
     Optional<RecordedOrder> findRecordedOrder(String provider, String orderRef) {
