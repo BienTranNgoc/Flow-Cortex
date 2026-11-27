@@ -23,9 +23,9 @@ from .vendor_jobs import (
     VendorJobEnded,
     VendorJobTimeout,
     VendorResultGone,
+    download_replicate_media,
     probe_json,
     probe_media,
-    read_bounded_response,
     vendor_scope,
 )
 from .wan_adapter import _image_mime, _is_replicate_delivery, _string
@@ -223,71 +223,21 @@ class SeedreamKeyframeAdapter:
             raise PermanentError(
                 "provider_response_invalid", "Seedream output URL outside Replicate"
             )
-        job_deadline = getattr(abort, "deadline_monotonic", None)
-        effective_deadline = (
-            min(deadline, float(job_deadline))
-            if isinstance(job_deadline, (int, float))
-            else deadline
+        body = download_replicate_media(
+            url,
+            provider=PROVIDER_SEEDREAM,
+            label="Seedream",
+            task_id=task_id,
+            max_bytes=_MAX_IMAGE_BYTES,
+            request_timeout_seconds=self.config.request_timeout_seconds,
+            abort=abort,
+            deadline=deadline,
+            on_http_error=lambda exc: _raise_http_error(exc, gone=RESULT_GONE_STATUSES),
+            logger=log,
         )
-        body = b""
-        for attempt in range(1, 5):
-            abort.check()
-            remaining = effective_deadline - time.monotonic()
-            if remaining <= 0:
-                raise VendorJobTimeout(PROVIDER_SEEDREAM, task_id)
-            try:
-                body = self._download_once(
-                    url,
-                    task_id=task_id,
-                    abort=abort,
-                    deadline=effective_deadline,
-                    timeout=min(self.config.request_timeout_seconds, remaining),
-                )
-                break
-            except TransientError as exc:
-                if attempt == 4:
-                    raise
-                remaining = effective_deadline - time.monotonic()
-                if remaining <= 0:
-                    raise VendorJobTimeout(PROVIDER_SEEDREAM, task_id) from exc
-                log.warning(
-                    "Seedream image download will retry",
-                    extra={"downloadAttempt": attempt, "errorType": type(exc.__cause__).__name__},
-                )
-                delay = min(float(2 ** (attempt - 1)), remaining)
-                wait_fn = getattr(abort, "wait", None)
-                if callable(wait_fn):
-                    wait_fn(delay)
-                else:
-                    time.sleep(delay)
         if len(body) > _MAX_IMAGE_BYTES or len(body) < 12:
             raise PermanentError("provider_response_invalid", "Seedream output image size invalid")
         return bytes(body)
-
-    def _download_once(
-        self,
-        url: str,
-        *,
-        task_id: str,
-        abort: VideoAbort,
-        deadline: float,
-        timeout: float,
-    ) -> bytes:
-        req = urllib.request.Request(url, method="GET", headers={"User-Agent": WORKER_USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return read_bounded_response(
-                    resp,
-                    max_bytes=_MAX_IMAGE_BYTES,
-                    provider=PROVIDER_SEEDREAM,
-                    task_id=task_id,
-                    abort=abort,
-                    deadline=deadline,
-                )
-        except urllib.error.HTTPError as exc:
-            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise TransientError(f"Seedream download failed: {type(exc).__name__}") from exc
 
 
 def _extract_output_url(output: Any) -> str | None:

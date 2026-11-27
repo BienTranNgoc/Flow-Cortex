@@ -64,6 +64,7 @@ x-provider-worker-env: &provider-worker-env
   OTEL_TRACES_EXPORTER: none
   OTEL_LOGS_EXPORTER: none
   OTEL_METRICS_EXPORTER: none
+  REPLICATE_DELIVERY_FALLBACK_BASE_URL: ${REPLICATE_DELIVERY_FALLBACK_BASE_URL:-}
 
 # What worker and render-worker share: one image, one broker and store identity, the same
 # health and shutdown handling. Each service adds the queue it consumes and its identity.

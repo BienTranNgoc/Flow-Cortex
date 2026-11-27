@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn
 
 from ..errors import PermanentError, TransientError
 from .adapter import (
@@ -34,6 +34,7 @@ from .vendor_jobs import (
     VendorJobEnded,
     VendorJobTimeout,
     VendorResultGone,
+    download_replicate_media,
     probe_json,
     probe_media,
     vendor_scope,
@@ -44,9 +45,6 @@ log = logging.getLogger("flowcortex_provider_worker.minimax")
 
 PROVIDER_MINIMAX = "minimax"
 _MAX_VIDEO_BYTES = 100 * 1024 * 1024
-_DOWNLOAD_ATTEMPTS = 8
-_DOWNLOAD_TIMEOUT_SECONDS = 8.0
-_DOWNLOAD_RETRY_DELAY_SECONDS = 1.0
 _TERMINAL_FAILURES = {"failed", "canceled"}
 _CANCEL_ATTEMPTS = 3
 _CANCEL_RETRY_DELAYS = (1.0, 2.0)
@@ -181,7 +179,12 @@ class MinimaxAdapter:
                     raise PermanentError(
                         "provider_response_invalid", "MiniMax completed without a video URL"
                     )
-                return VideoArtifact(self._download_video(video_url), task_id)
+                return VideoArtifact(
+                    self._download_video(
+                        video_url, task_id=task_id, abort=abort, deadline=deadline
+                    ),
+                    task_id,
+                )
             if status in _TERMINAL_FAILURES:
                 log.warning("MiniMax prediction failed", extra={"taskStatus": status})
                 raise VendorJobEnded("failed", f"MiniMax prediction ended with status {status}")
@@ -384,54 +387,30 @@ class MinimaxAdapter:
             )
         return parsed
 
-    def _download_video(self, url: str) -> bytes:
+    def _download_video(
+        self, url: str, *, task_id: str, abort: VideoAbort, deadline: float
+    ) -> bytes:
         if not _is_replicate_delivery(url):
             raise PermanentError(
                 "provider_response_invalid", "MiniMax video URL is outside Replicate"
             )
-        last_error: TransientError | None = None
-        for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
-            try:
-                body = self._download_once(url)
-                break
-            except TransientError as exc:
-                last_error = exc
-                if attempt == _DOWNLOAD_ATTEMPTS:
-                    raise
-                log.warning(
-                    "MiniMax video download will retry",
-                    extra={"downloadAttempt": attempt, "errorType": type(exc.__cause__).__name__},
-                )
-                time.sleep(_DOWNLOAD_RETRY_DELAY_SECONDS)
-        else:  # pragma: no cover
-            raise last_error or TransientError("MiniMax video download failed")
+        body = download_replicate_media(
+            url,
+            provider=PROVIDER_MINIMAX,
+            label="MiniMax video",
+            task_id=task_id,
+            max_bytes=_MAX_VIDEO_BYTES,
+            request_timeout_seconds=self.config.request_timeout_seconds,
+            abort=abort,
+            deadline=deadline,
+            on_http_error=lambda exc: _raise_http_error(exc, gone=RESULT_GONE_STATUSES),
+            logger=log,
+        )
         if len(body) > _MAX_VIDEO_BYTES:
             raise PermanentError("provider_response_invalid", "MiniMax video exceeds 100 MB")
         if len(body) < 12 or body[4:8] != b"ftyp":
             raise PermanentError("provider_response_invalid", "MiniMax output is not an MP4 file")
         return body
-
-    def _download_once(self, url: str) -> bytes:
-        try:
-            req = urllib.request.Request(
-                url,
-                method="GET",
-                headers={"User-Agent": WORKER_USER_AGENT},
-            )
-            with urllib.request.urlopen(
-                req,
-                timeout=min(self.config.request_timeout_seconds, _DOWNLOAD_TIMEOUT_SECONDS),
-            ) as response:
-                raw_sock = getattr(
-                    getattr(getattr(response, "fp", None), "raw", None), "_sock", None
-                )
-                if raw_sock is not None and hasattr(raw_sock, "settimeout"):
-                    raw_sock.settimeout(self.config.request_timeout_seconds)
-                return cast(bytes, response.read(_MAX_VIDEO_BYTES + 1))
-        except urllib.error.HTTPError as exc:
-            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
-        except (urllib.error.URLError, TimeoutError) as exc:
-            raise TransientError(f"MiniMax video download failed: {type(exc).__name__}") from exc
 
 
 def _extract_video_url(output: Any) -> str | None:

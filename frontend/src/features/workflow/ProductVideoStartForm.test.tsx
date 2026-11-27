@@ -646,5 +646,68 @@ describe('ProductVideoStartForm', () => {
       expect(screen.getByText('2 / 3 photos')).toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
+
+    it('ignores mc and background images when restoring productDraft images', async () => {
+      stubApi({
+        'GET /api/v1/workflows': { status: 200, body: [PRODUCT_VIDEO] },
+        'GET /api/v1/capabilities': {
+          status: 200,
+          body: {
+            mediaEnabled: true,
+            productVideoEnabled: true,
+            productVideoWorkflowId: PRODUCT_VIDEO_ID,
+          },
+        },
+        [`GET /api/v1/workflows/${PRODUCT_VIDEO_ID}`]: { status: 200, body: PRODUCT_VIDEO },
+      });
+      const stubbedFetch = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : input.toString();
+          return url.startsWith('http://minio.test/')
+            ? Promise.resolve(jpeg())
+            : stubbedFetch(input, init);
+        }),
+      );
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: `/workflows/${PRODUCT_VIDEO_ID}`,
+                state: {
+                  productDraft: {
+                    productName: 'Redmi Watch 5 Lite',
+                    description: 'Màn hình AMOLED',
+                    images: [
+                      { name: 'mc', mimeType: 'image/jpeg', url: 'http://minio.test/mc' },
+                      { name: 'image_1', mimeType: 'image/jpeg', url: 'http://minio.test/image_1' },
+                      {
+                        name: 'background',
+                        mimeType: 'image/jpeg',
+                        url: 'http://minio.test/background',
+                      },
+                    ],
+                  },
+                },
+              },
+            ]}
+          >
+            <Routes>
+              <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByText('image_1.jpg')).toBeInTheDocument();
+      expect(screen.queryByText('mc.jpg')).not.toBeInTheDocument();
+      expect(screen.queryByText('background.jpg')).not.toBeInTheDocument();
+      expect(screen.getByText('1 / 3 photos')).toBeInTheDocument();
+    });
   });
 });

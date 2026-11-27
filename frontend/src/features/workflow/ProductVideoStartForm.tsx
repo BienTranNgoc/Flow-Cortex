@@ -109,10 +109,14 @@ function readInitialDraft(state: unknown): Record<TextFieldName, string> {
   };
 }
 
+const NON_PRODUCT_DRAFT_NAMES = new Set(['mc', 'background']);
+
 function readInitialImages(state: unknown): DraftImage[] {
   const parsed = ProductDraftStateSchema.safeParse(state);
   if (!parsed.success || !parsed.data.productDraft.images) return [];
-  return parsed.data.productDraft.images.slice(0, MAX_IMAGES);
+  return parsed.data.productDraft.images
+    .filter((item) => !NON_PRODUCT_DRAFT_NAMES.has(item.name.trim().toLowerCase()))
+    .slice(0, MAX_IMAGES);
 }
 
 function formatBytes(bytes: number): string {
