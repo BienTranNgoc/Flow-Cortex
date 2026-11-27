@@ -333,7 +333,9 @@ class ClusterJobsIT extends AbstractPostgresBootTest {
                     Map.entry("trash.purge-sweep", 3_600_000L),
                     Map.entry("trash.expiry-reminder", 3_600_000L),
                     Map.entry("user.mcp-oauth-retention", 3_600_000L),
-                    Map.entry("trend.template-purge", 900_000L));
+                    Map.entry("trend.template-purge", 900_000L),
+                    Map.entry("billing.payment-reconcile-ageing", 300_000L),
+                    Map.entry("billing.payment-reconcile-daily", 600_000L));
 
             await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
                 Map<String, Long> stored = rows.queryForList(

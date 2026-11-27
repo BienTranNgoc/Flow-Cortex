@@ -117,6 +117,20 @@ class PaymentTransactionRepository {
                 .stream().findFirst();
     }
 
+    /** What a payment's status event states about it besides the move; the row is read after the move. */
+    record EventFacts(UUID userId, String kind, String itemRef, long amountVnd) {
+    }
+
+    EventFacts eventFacts(UUID id) {
+        return jdbc.query("""
+                SELECT user_id, kind, item_ref, amount_vnd FROM payment_transaction WHERE id = :id
+                """,
+                new MapSqlParameterSource("id", id),
+                (rs, row) -> new EventFacts(rs.getObject("user_id", UUID.class), rs.getString("kind"),
+                        rs.getString("item_ref"), rs.getLong("amount_vnd")))
+                .stream().findFirst().orElseThrow(() -> new IllegalStateException("The payment row is gone"));
+    }
+
     private static Timestamp timestamp(Instant instant) {
         return instant == null ? null : Timestamp.from(instant);
     }
