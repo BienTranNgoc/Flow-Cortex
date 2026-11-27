@@ -19,7 +19,7 @@ import {
   type CvCheckReport,
   type JobRecommendationsResponse,
 } from './cvCheckTypes';
-import { useCvCheckMutation, useRecommendJobsMutation } from './useCvCheck';
+import { CvCheckError, useCvCheckMutation, useRecommendJobsMutation } from './useCvCheck';
 import './CvCheckPage.css';
 
 type ActiveTab = 'evaluation' | 'bullets' | 'interview' | 'jobs';
@@ -35,13 +35,16 @@ function formatSize(bytes: number): string {
 
 export function CvCheckPage() {
   const { t, i18n } = useTranslation();
-  const activeLang = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'vi';
+  const activeLang = (i18n.resolvedLanguage ?? i18n.language)?.toLowerCase().startsWith('en')
+    ? 'en'
+    : 'vi';
   const fileUploadId = useId();
 
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvPdfUrl, setCvPdfUrl] = useState<string | null>(null);
   const [cvText, setCvText] = useState('');
   const [report, setReport] = useState<CvCheckReport | null>(null);
+  const [reportLang, setReportLang] = useState<'en' | 'vi' | null>(null);
   const [jobRecs, setJobRecs] = useState<JobRecommendationsResponse | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('evaluation');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -94,6 +97,7 @@ export function CvCheckPage() {
     setPdfFile(null);
     setCvText('');
     setReport(null);
+    setReportLang(null);
     setJobRecs(null);
     jobsMutation.reset();
   };
@@ -144,9 +148,12 @@ export function CvCheckPage() {
     });
   };
 
-  const triggerJobSearch = async (profile: NonNullable<CvCheckReport['jobProfile']>) => {
+  const triggerJobSearch = async (
+    profile: NonNullable<CvCheckReport['jobProfile']>,
+    lang: 'en' | 'vi' = activeLang,
+  ) => {
     try {
-      const recs = await jobsMutation.mutateAsync({ ...profile, lang: activeLang });
+      const recs = await jobsMutation.mutateAsync({ ...profile, lang });
       setJobRecs(recs);
     } catch {
       // Handled via jobsMutation.isError
@@ -155,7 +162,7 @@ export function CvCheckPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const runAnalysis = async (lang: 'en' | 'vi') => {
     if (!cvFile && !cvText.trim()) return;
     clearProgressTimers();
     setJobRecs(null);
@@ -175,13 +182,14 @@ export function CvCheckPage() {
       const result = await checkMutation.mutateAsync({
         cvFile,
         cvText: cvText.trim(),
-        lang: activeLang,
+        lang,
       });
       setReport(result);
+      setReportLang(lang);
       setActiveTab('evaluation');
       if (result.jobProfile?.primaryRole) {
         setProgressStep(3);
-        void triggerJobSearch(result.jobProfile);
+        void triggerJobSearch(result.jobProfile, lang);
       } else {
         finishProgress();
       }
@@ -191,6 +199,20 @@ export function CvCheckPage() {
       // Handled via checkMutation.isError and checkMutation.error
     }
   };
+
+  const handleSubmit = () => runAnalysis(activeLang);
+
+  useEffect(() => {
+    if (
+      report &&
+      reportLang &&
+      reportLang !== activeLang &&
+      (cvFile || cvText.trim()) &&
+      !checkMutation.isPending
+    ) {
+      void runAnalysis(activeLang);
+    }
+  }, [activeLang]);
 
   const getScoreVerdict = (score: number) => {
     if (score >= 90) {
@@ -243,42 +265,53 @@ export function CvCheckPage() {
         }
       />
 
-      {checkMutation.isError && (
-        <div className="cv-check-error-banner" role="alert">
-          <WarningCircle size={20} weight="fill" aria-hidden="true" />
-          <span>
-            {t(
-              'cvCheck.error.general',
-              'Đã xảy ra lỗi khi phân tích CV. Vui lòng kiểm tra lại file PDF hoặc thử lại sau ít phút.',
-            )}
-          </span>
-        </div>
-      )}
+      {checkMutation.isError && (() => {
+        const errCode = checkMutation.error instanceof CvCheckError ? checkMutation.error.code : undefined;
+        const isNotCv = errCode === 'cv-not-a-cv';
+        const isTooLarge = errCode === 'cv-file-too-large';
+        const extraReason = isNotCv ? checkMutation.error.message : '';
+        return (
+          <div
+            className={isNotCv ? 'cv-check-warning-banner' : 'cv-check-error-banner'}
+            role="alert"
+          >
+            <WarningCircle size={20} weight="fill" aria-hidden="true" />
+            <div className="cv-check-banner-text">
+              <span>
+                {isNotCv
+                  ? t(
+                      'cvCheck.error.notACv',
+                      'Có vẻ file PDF này không phải là CV. Vui lòng kiểm tra lại và tải lên đúng hồ sơ xin việc của bạn.',
+                    )
+                  : isTooLarge
+                    ? t(
+                        'cvCheck.error.fileTooLarge',
+                        'File PDF vượt quá dung lượng tối đa 10MB. Vui lòng nén nhỏ file hoặc chọn file khác.',
+                      )
+                    : t(
+                        'cvCheck.error.general',
+                        'Đã xảy ra lỗi khi phân tích CV. Vui lòng kiểm tra lại file PDF hoặc thử lại sau ít phút.',
+                      )}
+              </span>
+              {extraReason && <span className="cv-check-banner-reason">{extraReason}</span>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* PDF Upload (Left) + Analyze Action (Right) */}
       <div className="cv-check-workspace">
-        <section className="cv-check-panel" aria-labelledby="cv-panel-title">
-          <header className="cv-check-panel__head">
-            <h3 id="cv-panel-title" className="cv-check-panel__title">
-              <FilePdf size={18} weight="fill" aria-hidden="true" style={{ color: 'var(--red)' }} />
-              {t('cvCheck.form.cvTitle', 'Hồ sơ CV (Định dạng PDF)')}
-            </h3>
-            <div className="cv-check-panel__tools">
-              <input
-                id={fileUploadId}
-                type="file"
-                accept="application/pdf,.pdf"
-                style={{ display: 'none' }}
-                onChange={handleFileUpload}
-              />
-              {cvFile && (
-                <label htmlFor={fileUploadId} className="cv-check-tool-btn">
-                  <UploadSimple size={14} aria-hidden="true" />
-                  {t('cvCheck.actions.changePdf', 'Đổi PDF khác')}
-                </label>
-              )}
-            </div>
-          </header>
+        <section
+          className="cv-check-panel"
+          aria-label={t('cvCheck.form.dropzoneAria', 'Khung tải lên file CV PDF')}
+        >
+          <input
+            id={fileUploadId}
+            type="file"
+            accept="application/pdf,.pdf"
+            style={{ display: 'none' }}
+            onChange={handleFileUpload}
+          />
           <div className="cv-check-panel__body">
             {cvFile && cvPdfUrl ? (
               <div className="cv-check-pdf-preview-box">
@@ -288,15 +321,21 @@ export function CvCheckPage() {
                     <span title={cvFile.name}>{cvFile.name}</span>
                     <span className="cv-check-pdf-size">({formatSize(cvFile.size)})</span>
                   </div>
-                  <button
-                    type="button"
-                    className="cv-check-tool-btn"
-                    onClick={() => setPdfFile(null)}
-                    title={t('cvCheck.actions.removePdf', 'Xóa file PDF')}
-                  >
-                    <Trash size={14} aria-hidden="true" />
-                    {t('cvCheck.actions.removePdf', 'Xóa')}
-                  </button>
+                  <div className="cv-check-panel__tools">
+                    <label htmlFor={fileUploadId} className="cv-check-tool-btn">
+                      <UploadSimple size={14} aria-hidden="true" />
+                      {t('cvCheck.actions.changePdf', 'Đổi PDF khác')}
+                    </label>
+                    <button
+                      type="button"
+                      className="cv-check-tool-btn"
+                      onClick={() => setPdfFile(null)}
+                      title={t('cvCheck.actions.removePdf', 'Xóa file PDF')}
+                    >
+                      <Trash size={14} aria-hidden="true" />
+                      {t('cvCheck.actions.removePdf', 'Xóa')}
+                    </button>
+                  </div>
                 </div>
                 <iframe
                   src={cvPdfUrl}
@@ -332,7 +371,7 @@ export function CvCheckPage() {
                 <p className="cv-check-pdf-dropzone__desc">
                   {t(
                     'cvCheck.form.dropzoneDesc',
-                    'hoặc bấm để chọn file PDF từ máy tính của bạn (hỗ trợ .pdf tối đa 10MB)',
+                    'hoặc bấm để chọn từ máy tính · Chỉ hỗ trợ .pdf, tối đa 10MB',
                   )}
                 </p>
                 <div

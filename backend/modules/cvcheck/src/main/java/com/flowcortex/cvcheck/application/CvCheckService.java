@@ -17,7 +17,12 @@ public class CvCheckService {
     private static final String STANDALONE_PROMPT = """
             You are a senior technical recruiter and executive resume reviewer applying the international
             Google XYZ · Harvard OCS · SHRM ATS evaluation standard (G-Eval anchored rubric).
-            Evaluate this candidate's CV strictly using only evidence present in the CV; never invent facts or metrics.
+            FIRST, determine whether the uploaded document is actually a candidate's CV / Resume.
+            If it is NOT a CV/Resume (e.g. a job description/JD, invoice, receipt, textbook/lecture notes,
+            research paper, contract, slide deck, or unrelated article), set isCv=false, explain briefly in
+            notCvReason (1 concise sentence strictly in %s), and set all numeric scores to 0.
+            Otherwise set isCv=true, notCvReason="", and evaluate this candidate's CV strictly using only
+            evidence present in the CV; never invent facts or metrics.
 
             Score each dimension 0-100 using these anchored bands:
             - 90-100 (Exemplary / Tier 1): Concrete evidence exceeds top-tier benchmarks; strong metrics, zero fluff.
@@ -67,8 +72,10 @@ public class CvCheckService {
             """;
 
     private static final String SCHEMA = """
-            {"type":"object","required":["overallScore","dimensions","strengths","weaknesses","missingKeywords",
-            "rewrittenBullets","interviewQuestions","jobProfile"],"properties":{
+            {"type":"object","required":["isCv","notCvReason","overallScore","dimensions","strengths","weaknesses",
+            "missingKeywords","rewrittenBullets","interviewQuestions","jobProfile"],"properties":{
+            "isCv":{"type":"boolean"},
+            "notCvReason":{"type":"string"},
             "overallScore":{"type":"integer"},
             "dimensions":{"type":"object","required":["hardSkills","experienceImpact","softSkills","atsCompliance",
             "domainRelevance"],"properties":{"hardSkills":{"type":"integer"},"experienceImpact":{"type":"integer"},
@@ -104,9 +111,14 @@ public class CvCheckService {
     }
 
     public Outcome check(String cvText, String jobDescription, int pageCount, String lang) {
-        String outputLang = CvDeterministicAuditor.isEnglish(lang) ? "English" : "Vietnamese";
+        if (!CvValidityGate.looksLikeCv(cvText, pageCount)) {
+            return new Outcome.Refused(Refusal.NOT_A_CV);
+        }
+        String outputLang = CvDeterministicAuditor.isEnglish(lang)
+                ? "English"
+                : "Vietnamese (Tiếng Việt — even if the CV is written in English, every explanation, strength, weakness, rewritten bullet, and interview question MUST be in natural Vietnamese)";
         String prompt = (jobDescription == null || jobDescription.isBlank())
-                ? STANDALONE_PROMPT.formatted(outputLang, cvText)
+                ? STANDALONE_PROMPT.formatted(outputLang, outputLang, cvText)
                 : JD_PROMPT.formatted(outputLang, jobDescription, cvText);
         LlmJsonResult result = llm.generateJson(SLOT, prompt, SCHEMA);
         return switch (result) {
@@ -120,6 +132,10 @@ public class CvCheckService {
     private Outcome parse(String answer, String cvText, int pageCount, String lang) {
         try {
             JsonNode report = json.readTree(answer);
+            if (report.has("isCv") && !report.path("isCv").asBoolean(true)) {
+                String reason = report.path("notCvReason").asString("").strip();
+                return new Outcome.Refused(Refusal.NOT_A_CV, reason.isEmpty() ? null : reason);
+            }
             if (!report.hasNonNull("overallScore")) {
                 return new Outcome.Refused(Refusal.UNAVAILABLE);
             }
@@ -138,11 +154,14 @@ public class CvCheckService {
         record Report(JsonNode report) implements Outcome {
         }
 
-        record Refused(Refusal reason) implements Outcome {
+        record Refused(Refusal reason, String detail) implements Outcome {
+            public Refused(Refusal reason) {
+                this(reason, null);
+            }
         }
     }
 
     public enum Refusal {
-        BLOCKED, BUSY, UNAVAILABLE
+        NOT_A_CV, BLOCKED, BUSY, UNAVAILABLE
     }
 }

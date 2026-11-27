@@ -65,14 +65,23 @@ export async function executeCvCheck(params: CheckCvParams): Promise<CvCheckRepo
   if (!response.ok) {
     let errorDetail = '';
     try {
-      const body = (await response.json()) as { detail?: string; title?: string };
-      errorDetail = body.detail ?? body.title ?? '';
+      const body = (await response.json()) as { detail?: string; message?: string; title?: string };
+      errorDetail = body.detail ?? body.message ?? body.title ?? '';
     } catch {
       // ignore
     }
 
+    if (response.status === 413) {
+      throw new CvCheckError(errorDetail || 'cv-file-too-large', 413, 'cv-file-too-large');
+    }
     if (response.status === 422) {
-      throw new CvCheckError(errorDetail || 'cv-check-blocked', 422, 'cv-check-blocked');
+      if (errorDetail.includes('cv-check-blocked')) {
+        throw new CvCheckError(errorDetail, 422, 'cv-check-blocked');
+      }
+      const idx = errorDetail.indexOf('cv-not-a-cv');
+      const reason =
+        idx >= 0 ? errorDetail.slice(idx + 'cv-not-a-cv'.length).replace(/^:\s*/, '').trim() : '';
+      throw new CvCheckError(reason, 422, 'cv-not-a-cv');
     }
     if (response.status === 429) {
       throw new CvCheckError(errorDetail || 'cv-check-busy', 429, 'cv-check-busy');

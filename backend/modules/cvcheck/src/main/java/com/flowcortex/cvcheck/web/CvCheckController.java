@@ -3,6 +3,7 @@ package com.flowcortex.cvcheck.web;
 import com.flowcortex.cvcheck.application.CvCheckService;
 import com.flowcortex.cvcheck.application.CvCheckService.Outcome;
 import com.flowcortex.cvcheck.application.CvJobRecommendationService;
+import com.flowcortex.cvcheck.application.CvValidityGate;
 import com.flowcortex.cvcheck.application.PdfTextExtractor;
 import io.swagger.v3.oas.annotations.Operation;
 import java.io.IOException;
@@ -62,7 +63,7 @@ class CvCheckController {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cv-file-invalid");
             }
             if (cv.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cv-pdf-empty-text");
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "cv-not-a-cv");
             }
         } else if (cvText != null && !cvText.isBlank()) {
             cv = cvText;
@@ -70,6 +71,9 @@ class CvCheckController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cvFile or cvText must be provided");
         }
 
+        if (!CvValidityGate.looksLikeCv(cv, pageCount)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "cv-not-a-cv");
+        }
         String cleanedCv = clean(cv, CvCheckService.MAX_CV_CHARS, "cvText", true);
         String cleanedJd = clean(jobDescription, CvCheckService.MAX_JD_CHARS, "jobDescription", false);
         return evaluate(cleanedCv, cleanedJd, pageCount, lang);
@@ -95,12 +99,18 @@ class CvCheckController {
     private JsonNode evaluate(String cv, String jd, int pageCount, String lang) {
         return switch (service.check(cv, jd, pageCount, lang)) {
             case Outcome.Report ok -> ok.report();
-            case Outcome.Refused refused -> throw mapRefusal(refused.reason());
+            case Outcome.Refused refused -> throw mapRefusal(refused.reason(), refused.detail());
         };
     }
 
     private static ResponseStatusException mapRefusal(CvCheckService.Refusal reason) {
+        return mapRefusal(reason, null);
+    }
+
+    private static ResponseStatusException mapRefusal(CvCheckService.Refusal reason, String detail) {
         return switch (reason) {
+            case NOT_A_CV -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    detail == null || detail.isBlank() ? "cv-not-a-cv" : "cv-not-a-cv: " + detail);
             case BLOCKED -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "cv-check-blocked");
             case BUSY -> new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "cv-check-busy");
             case UNAVAILABLE -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "cv-check-unavailable");

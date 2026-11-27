@@ -152,4 +152,28 @@ describe('CvCheckPage', () => {
     expect(await screen.findByText('Middle/Senior Java Backend Developer')).toBeInTheDocument();
     expect(screen.getByText('FinTech Vietnam')).toBeInTheDocument();
   });
+
+  it('shows friendly warning when uploaded PDF is not a CV', async () => {
+    const calls = stubApi({
+      'POST /api/v1/cv-check': {
+        status: 422,
+        body: { detail: 'cv-not-a-cv: This file looks like an invoice.' },
+      },
+    });
+    const user = userEvent.setup();
+    const { container, queryClient } = renderRoute('/check-cv', '/check-cv', <CvCheckPage />);
+    await settled(queryClient);
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const pdfFile = new File(['%PDF-1.4 invoice'], 'invoice.pdf', { type: 'application/pdf' });
+    await user.upload(input, pdfFile);
+
+    const submitBtn = screen.getByRole('button', { name: /Analyze CV|Đánh giá CV/i });
+    await user.click(submitBtn);
+    await settled(queryClient);
+
+    expect(calls.length).toBe(1);
+    expect(screen.getByRole('alert')).toHaveTextContent(/không phải là CV|does not look like a CV/i);
+    expect(screen.getByText('This file looks like an invoice.')).toBeInTheDocument();
+  });
 });

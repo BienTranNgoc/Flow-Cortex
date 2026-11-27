@@ -1115,6 +1115,31 @@
   animation: cv-check-indeterminate 1.4s ease-in-out infinite;
 }
 
+.cv-check-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.95rem 1.25rem;
+  border-radius: var(--radius-md);
+  background: var(--tone-amber-bg);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  color: var(--tone-amber-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.cv-check-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cv-check-banner-reason {
+  font-size: 0.84rem;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
 @keyframes cv-check-indeterminate {
   0% {
     transform: translateX(-110%);
