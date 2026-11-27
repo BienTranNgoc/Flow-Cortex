@@ -41,7 +41,7 @@ class CvCheckController {
     JsonNode check(@RequestBody CheckRequest request) {
         String cv = clean(request.cvText(), CvCheckService.MAX_CV_CHARS, "cvText", true);
         String jd = clean(request.jobDescription(), CvCheckService.MAX_JD_CHARS, "jobDescription", false);
-        return evaluate(cv, jd);
+        return evaluate(cv, jd, 0);
     }
 
     @Operation(operationId = "checkCvMultipart")
@@ -51,9 +51,12 @@ class CvCheckController {
             @RequestParam(value = "cvText", required = false) String cvText,
             @RequestParam(value = "jobDescription", required = false) String jobDescription) {
         String cv;
+        int pageCount = 0;
         if (cvFile != null && !cvFile.isEmpty()) {
             try {
-                cv = PdfTextExtractor.extract(cvFile.getBytes());
+                PdfTextExtractor.ExtractedPdf extracted = PdfTextExtractor.extractWithMeta(cvFile.getBytes());
+                cv = extracted.text();
+                pageCount = extracted.pageCount();
             } catch (IOException e) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cv-file-invalid");
             }
@@ -68,7 +71,7 @@ class CvCheckController {
 
         String cleanedCv = clean(cv, CvCheckService.MAX_CV_CHARS, "cvText", true);
         String cleanedJd = clean(jobDescription, CvCheckService.MAX_JD_CHARS, "jobDescription", false);
-        return evaluate(cleanedCv, cleanedJd);
+        return evaluate(cleanedCv, cleanedJd, pageCount);
     }
 
     @Operation(operationId = "recommendJobsForCv")
@@ -88,8 +91,8 @@ class CvCheckController {
         };
     }
 
-    private JsonNode evaluate(String cv, String jd) {
-        return switch (service.check(cv, jd)) {
+    private JsonNode evaluate(String cv, String jd, int pageCount) {
+        return switch (service.check(cv, jd, pageCount)) {
             case Outcome.Report ok -> ok.report();
             case Outcome.Refused refused -> throw mapRefusal(refused.reason());
         };

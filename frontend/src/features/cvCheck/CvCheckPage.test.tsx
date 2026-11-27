@@ -30,6 +30,23 @@ const MOCK_REPORT: CvCheckReport = {
     topSkills: ['Java', 'Spring Boot', 'PostgreSQL', 'Redis'],
     location: 'Hà Nội',
   },
+  rubric: {
+    id: 'google-xyz-harvard-shrm-v1',
+    name: 'Google XYZ · Harvard OCS · SHRM ATS',
+    tier: 'TIER_2',
+    weights: {
+      experienceImpact: 30,
+      hardSkills: 25,
+      atsCompliance: 20,
+      domainRelevance: 15,
+      softSkills: 10,
+    },
+    capsApplied: [],
+  },
+  atsChecks: [
+    { id: 'page_count', status: 'PASS', detail: '1 trang (đạt chuẩn 1–2 trang)', standard: 'Harvard OCS' },
+    { id: 'quantified_metrics', status: 'PASS', detail: 'Phát hiện 5 chỉ số định lượng (tốt)', standard: 'Google XYZ' },
+  ],
 };
 
 const MOCK_JOBS = {
@@ -120,6 +137,8 @@ describe('CvCheckPage', () => {
     expect(calls[0]?.path).toBe('/api/v1/cv-check');
     expect(calls[1]?.path).toBe('/api/v1/cv-check/jobs');
     expect(screen.getByText('85')).toBeInTheDocument();
+    expect(screen.getByText('Google XYZ · Harvard OCS · SHRM ATS')).toBeInTheDocument();
+    expect(screen.getByText('1 trang (đạt chuẩn 1–2 trang)')).toBeInTheDocument();
     expect(screen.getByText(/Thành thạo Java và Spring Boot/i)).toBeInTheDocument();
 
     const jobsTab = screen.getByRole('button', { name: /Việc làm phù hợp|Matching Jobs/i });

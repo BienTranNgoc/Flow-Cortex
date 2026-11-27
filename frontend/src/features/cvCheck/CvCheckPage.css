@@ -876,3 +876,137 @@
   border-color: var(--primary);
   color: var(--primary);
 }
+
+/* International Rubric & Deterministic ATS Checklist */
+.cv-check-rubric-tag {
+  margin-top: 0.45rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--paper-2);
+  border: 1px solid var(--card-border);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.cv-check-dim-weight {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-4);
+}
+
+.cv-check-ats-card {
+  background: var(--paper-2);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cv-check-ats-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cv-check-ats-card__title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cv-check-ats-card__sub {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+.cv-check-ats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .cv-check-ats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1040px) {
+  .cv-check-ats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.cv-check-ats-item {
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cv-check-ats-item--pass {
+  border-left-color: var(--green);
+}
+
+.cv-check-ats-item--warn {
+  border-left-color: var(--warning);
+}
+
+.cv-check-ats-item--fail {
+  border-left-color: var(--red);
+}
+
+.cv-check-ats-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cv-check-ats-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 0.14rem 0.48rem;
+  border-radius: var(--radius-full);
+}
+
+.cv-check-ats-item--pass .cv-check-ats-badge {
+  background: color-mix(in srgb, var(--green-soft) 75%, var(--paper-2));
+  color: var(--green);
+}
+
+.cv-check-ats-item--warn .cv-check-ats-badge {
+  background: var(--tone-amber-bg);
+  color: var(--tone-amber-text);
+}
+
+.cv-check-ats-item--fail .cv-check-ats-badge {
+  background: color-mix(in srgb, var(--red) 14%, var(--paper-2));
+  color: var(--red);
+}
+
+.cv-check-ats-standard {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-4);
+}
+
+.cv-check-ats-item__detail {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+}

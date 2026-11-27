@@ -148,27 +148,27 @@ export function CvCheckPage() {
   };
 
   const getScoreVerdict = (score: number) => {
-    if (score >= 80) {
+    if (score >= 90) {
       return {
         cls: 'score--excellent',
-        label: t('cvCheck.verdict.excellent', 'Rất phù hợp (Strong Fit)'),
+        label: t('cvCheck.verdict.tier1', 'Tier 1 — Xuất sắc (Chuẩn Big Tech)'),
       };
     }
-    if (score >= 65) {
+    if (score >= 75) {
       return {
         cls: 'score--good',
-        label: t('cvCheck.verdict.good', 'Tiềm năng tốt (Good Fit)'),
+        label: t('cvCheck.verdict.tier2', 'Tier 2 — Đạt chuẩn tuyển dụng (SHRM 75+)'),
       };
     }
-    if (score >= 50) {
+    if (score >= 60) {
       return {
         cls: 'score--moderate',
-        label: t('cvCheck.verdict.moderate', 'Cần bổ sung (Moderate Fit)'),
+        label: t('cvCheck.verdict.tier3', 'Tier 3 — Cần tối ưu trước khi nộp'),
       };
     }
     return {
       cls: 'score--poor',
-      label: t('cvCheck.verdict.poor', 'Chưa phù hợp (Weak Fit)'),
+      label: t('cvCheck.verdict.tier4', 'Tier 4 — Nguy cơ bị ATS loại sớm'),
     };
   };
 
@@ -369,28 +369,21 @@ export function CvCheckPage() {
             <div className={`cv-check-score-box ${verdict?.cls ?? ''}`}>
               <span className="cv-check-score-number">{report.overallScore}</span>
               <span className="cv-check-score-label">
-                {t('cvCheck.results.overallScore', 'Điểm phù hợp')} / 100
+                {t('cvCheck.results.overallScore', 'Điểm chuẩn quốc tế')} / 100
               </span>
               <span className="cv-check-score-verdict">{verdict?.label}</span>
+              <span className="cv-check-rubric-tag">
+                {report.rubric?.name ?? 'Google XYZ · Harvard OCS · SHRM ATS'}
+              </span>
             </div>
 
             <div className="cv-check-dimension-list">
               <div className="cv-check-dim-row">
                 <div className="cv-check-dim-head">
-                  <span>{t('cvCheck.dimensions.hardSkills', 'Kỹ năng cốt lõi (Hard Skills)')}</span>
-                  <span>{report.dimensions.hardSkills}%</span>
-                </div>
-                <div className="cv-check-dim-bar">
-                  <div
-                    className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.hardSkills))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="cv-check-dim-row">
-                <div className="cv-check-dim-head">
-                  <span>{t('cvCheck.dimensions.experienceImpact', 'Tác động & Thành tích (STAR)')}</span>
+                  <span>
+                    {t('cvCheck.dimensions.experienceImpact', 'Tác động & Định lượng (Google XYZ)')}{' '}
+                    <em className="cv-check-dim-weight">({report.rubric?.weights.experienceImpact ?? 30}%)</em>
+                  </span>
                   <span>{report.dimensions.experienceImpact}%</span>
                 </div>
                 <div className="cv-check-dim-bar">
@@ -403,20 +396,26 @@ export function CvCheckPage() {
 
               <div className="cv-check-dim-row">
                 <div className="cv-check-dim-head">
-                  <span>{t('cvCheck.dimensions.softSkills', 'Kỹ năng mềm & Văn hóa')}</span>
-                  <span>{report.dimensions.softSkills}%</span>
+                  <span>
+                    {t('cvCheck.dimensions.hardSkills', 'Kỹ năng cốt lõi (ESCO / O*NET)')}{' '}
+                    <em className="cv-check-dim-weight">({report.rubric?.weights.hardSkills ?? 25}%)</em>
+                  </span>
+                  <span>{report.dimensions.hardSkills}%</span>
                 </div>
                 <div className="cv-check-dim-bar">
                   <div
                     className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.softSkills))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.hardSkills))}%` }}
                   />
                 </div>
               </div>
 
               <div className="cv-check-dim-row">
                 <div className="cv-check-dim-head">
-                  <span>{t('cvCheck.dimensions.atsCompliance', 'Chuẩn ATS & Từ khóa')}</span>
+                  <span>
+                    {t('cvCheck.dimensions.atsCompliance', 'Chuẩn ATS & Cấu trúc (SHRM)')}{' '}
+                    <em className="cv-check-dim-weight">({report.rubric?.weights.atsCompliance ?? 20}%)</em>
+                  </span>
                   <span>{report.dimensions.atsCompliance}%</span>
                 </div>
                 <div className="cv-check-dim-bar">
@@ -429,7 +428,10 @@ export function CvCheckPage() {
 
               <div className="cv-check-dim-row">
                 <div className="cv-check-dim-head">
-                  <span>{t('cvCheck.dimensions.domainRelevance', 'Độ phù hợp nghiệp vụ')}</span>
+                  <span>
+                    {t('cvCheck.dimensions.domainRelevance', 'Lộ trình & Độ rõ ràng (Harvard OCS)')}{' '}
+                    <em className="cv-check-dim-weight">({report.rubric?.weights.domainRelevance ?? 15}%)</em>
+                  </span>
                   <span>{report.dimensions.domainRelevance}%</span>
                 </div>
                 <div className="cv-check-dim-bar">
@@ -439,8 +441,58 @@ export function CvCheckPage() {
                   />
                 </div>
               </div>
+
+              <div className="cv-check-dim-row">
+                <div className="cv-check-dim-head">
+                  <span>
+                    {t('cvCheck.dimensions.softSkills', 'Kỹ năng mềm & Văn phong')}{' '}
+                    <em className="cv-check-dim-weight">({report.rubric?.weights.softSkills ?? 10}%)</em>
+                  </span>
+                  <span>{report.dimensions.softSkills}%</span>
+                </div>
+                <div className="cv-check-dim-bar">
+                  <div
+                    className="cv-check-dim-fill"
+                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.softSkills))}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Deterministic International ATS Checklist */}
+          {report.atsChecks && report.atsChecks.length > 0 && (
+            <div className="cv-check-ats-card">
+              <div className="cv-check-ats-card__head">
+                <h3 className="cv-check-ats-card__title">
+                  {t('cvCheck.atsChecklist.title', 'Kiểm tra ATS & Chuẩn Quốc tế (Tất định)')}
+                </h3>
+                <span className="cv-check-ats-card__sub">
+                  {t('cvCheck.atsChecklist.subtitle', 'Đo trực tiếp từ cấu trúc PDF & nội dung CV')}
+                </span>
+              </div>
+              <div className="cv-check-ats-grid">
+                {report.atsChecks.map((check) => (
+                  <div
+                    key={check.id}
+                    className={`cv-check-ats-item cv-check-ats-item--${check.status.toLowerCase()}`}
+                  >
+                    <div className="cv-check-ats-item__top">
+                      <span className="cv-check-ats-badge">
+                        {check.status === 'PASS'
+                          ? t('cvCheck.atsChecklist.pass', 'ĐẠT')
+                          : check.status === 'WARN'
+                            ? t('cvCheck.atsChecklist.warn', 'CẢNH BÁO')
+                            : t('cvCheck.atsChecklist.fail', 'CHƯA ĐẠT')}
+                      </span>
+                      <span className="cv-check-ats-standard">{check.standard}</span>
+                    </div>
+                    <p className="cv-check-ats-item__detail">{check.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Detailed Tabs */}
           <div className="cv-check-tabs-container">

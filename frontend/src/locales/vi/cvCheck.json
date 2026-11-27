@@ -6,10 +6,10 @@
     "desc": "Tải trực tiếp file CV PDF để xem trước toàn diện và trích xuất nội dung tự động bằng Apache PDFBox + Google Gemini 3.5 Flash."
   },
   "verdict": {
-    "excellent": "Rất phù hợp (Strong Fit)",
-    "good": "Tiềm năng tốt (Good Fit)",
-    "moderate": "Cần bổ sung (Moderate Fit)",
-    "poor": "Chưa phù hợp (Weak Fit)"
+    "tier1": "Tier 1 — Xuất sắc (Chuẩn Big Tech)",
+    "tier2": "Tier 2 — Đạt chuẩn tuyển dụng (SHRM 75+)",
+    "tier3": "Tier 3 — Cần tối ưu trước khi nộp",
+    "tier4": "Tier 4 — Nguy cơ bị ATS loại sớm"
   },
   "actions": {
     "loadSample": "Tải CV PDF mẫu",
@@ -43,11 +43,18 @@
     "missingKeywords": "Từ khóa kỹ năng còn thiếu trong CV"
   },
   "dimensions": {
-    "hardSkills": "Kỹ năng cốt lõi (Hard Skills)",
-    "experienceImpact": "Tác động & Thành tích (STAR)",
-    "softSkills": "Kỹ năng mềm & Văn hóa",
-    "atsCompliance": "Chuẩn ATS & Từ khóa",
-    "domainRelevance": "Độ phù hợp nghiệp vụ"
+    "hardSkills": "Kỹ năng cốt lõi (ESCO / O*NET)",
+    "experienceImpact": "Tác động & Định lượng (Google XYZ)",
+    "softSkills": "Kỹ năng mềm & Văn phong",
+    "atsCompliance": "Chuẩn ATS & Cấu trúc (SHRM)",
+    "domainRelevance": "Lộ trình & Độ rõ ràng (Harvard OCS)"
+  },
+  "atsChecklist": {
+    "title": "Kiểm tra ATS & Chuẩn Quốc tế (Tất định)",
+    "subtitle": "Đo trực tiếp từ cấu trúc PDF & nội dung CV",
+    "pass": "ĐẠT",
+    "warn": "CẢNH BÁO",
+    "fail": "CHƯA ĐẠT"
   },
   "tabs": {
     "evaluation": "Điểm mạnh & Điểm yếu",

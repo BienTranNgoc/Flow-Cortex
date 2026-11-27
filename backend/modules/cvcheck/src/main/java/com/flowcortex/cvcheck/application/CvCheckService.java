@@ -5,6 +5,7 @@ import com.flowcortex.llm.api.LlmSlots;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Service
 public class CvCheckService {
@@ -14,21 +15,29 @@ public class CvCheckService {
     public static final int MAX_JD_CHARS = 10_000;
 
     private static final String STANDALONE_PROMPT = """
-            You are a senior technical recruiter, executive resume reviewer and CV coach.
-            Evaluate this candidate's CV thoroughly on its own merits to help them improve it.
-            Score each dimension 0-100 using only evidence in the CV; never invent experience:
-            - hardSkills: Technical depth, clarity, and industry-standard proficiency of the skill stack.
-            - experienceImpact: Action-oriented achievements, measurable business/technical outcomes, and strong use of metrics (STAR/XYZ format).
-            - softSkills: Leadership, collaboration, communication, and ownership evident in project and job descriptions.
-            - atsCompliance: ATS-friendliness, formatting clarity, clean sectioning, professional contact info, and industry keyword density.
-            - domainRelevance: Career progression consistency, credibility, and overall professional presentation.
+            You are a senior technical recruiter and executive resume reviewer applying the international
+            Google XYZ · Harvard OCS · SHRM ATS evaluation standard (G-Eval anchored rubric).
+            Evaluate this candidate's CV strictly using only evidence present in the CV; never invent facts or metrics.
 
-            overallScore: Weighted overall assessment (0-100).
+            Score each dimension 0-100 using these anchored bands:
+            - 90-100 (Exemplary / Tier 1): Concrete evidence exceeds top-tier benchmarks; strong metrics, zero fluff.
+            - 75-89 (Proficient / Tier 2 - SHRM 75+ Benchmark): Solid, recruiter-ready, minor areas to sharpen.
+            - 60-74 (Conditional / Tier 3): Acceptable baseline but lacks quantification, depth, or ATS polish.
+            - 0-59 (Substandard / Tier 4): Passive task lists, missing critical structure, or major gaps.
+
+            Dimensions & Standards:
+            - experienceImpact (Weight 30%% — Google XYZ / STAR): Measurable outcomes ("Accomplished X as measured by Y, by doing Z"), scale, and strong action verbs. Penalize passive responsibility lists.
+            - hardSkills (Weight 25%% — ESCO / O*NET): Technical depth, modern stack proficiency, and concrete proof of skills applied in projects/roles.
+            - atsCompliance (Weight 20%% — SHRM / Enterprise ATS): Clean sectioning, parseable structure, contact completeness, and industry keyword density.
+            - domainRelevance (Weight 15%% — Harvard OCS): Reverse-chronological clarity, consistent career progression, and credible professional positioning.
+            - softSkills (Weight 10%% — SHRM / Harvard Tone): Ownership, collaboration, leadership signals, concise active-voice writing.
+
+            overallScore: Weighted score (0-100) using 0.30*experienceImpact + 0.25*hardSkills + 0.20*atsCompliance + 0.15*domainRelevance + 0.10*softSkills.
             Write all text in the language of the CV (e.g. Vietnamese if the CV is in Vietnamese, English if in English).
-            strengths: 3-5 outstanding strong points of this CV.
-            weaknesses: 3-5 weaknesses, vague descriptions, or gaps that should be improved.
+            strengths: 3-5 concrete strong points backed by evidence in the CV.
+            weaknesses: 3-5 specific weaknesses or gaps referencing the international standards above.
             missingKeywords: 4-8 important industry keywords or certifications that would elevate this CV.
-            rewrittenBullets: Select up to 5 weak, passive, or vague bullets in the CV and rewrite them in punchy STAR style with strong action verbs (without fabricating facts).
+            rewrittenBullets: Select up to 5 weak, passive, or vague bullets in the CV and rewrite them in Google XYZ / STAR style with strong action verbs (never fabricate fake numbers).
             interviewQuestions: 5-8 insightful technical and behavioral interview questions hiring managers will likely ask based on this CV.
             jobProfile: Extract the candidate's target job search profile from the CV:
             - primaryRole: Concise standard job title (e.g. "Java Backend Developer", "Frontend React Engineer").
@@ -83,27 +92,37 @@ public class CvCheckService {
     }
 
     public Outcome check(String cvText) {
-        return check(cvText, null);
+        return check(cvText, null, 0);
     }
 
     public Outcome check(String cvText, String jobDescription) {
+        return check(cvText, jobDescription, 0);
+    }
+
+    public Outcome check(String cvText, String jobDescription, int pageCount) {
         String prompt = (jobDescription == null || jobDescription.isBlank())
                 ? STANDALONE_PROMPT.formatted(cvText)
                 : JD_PROMPT.formatted(jobDescription, cvText);
         LlmJsonResult result = llm.generateJson(SLOT, prompt, SCHEMA);
         return switch (result) {
-            case LlmJsonResult.Answered answered -> parse(answered.json());
+            case LlmJsonResult.Answered answered -> parse(answered.json(), cvText, pageCount);
             case LlmJsonResult.Blocked blocked -> new Outcome.Refused(Refusal.BLOCKED);
             case LlmJsonResult.Failed failed -> new Outcome.Refused(failed.kind() == LlmJsonResult.Kind.QUOTA_EXCEEDED
                     ? Refusal.BUSY : Refusal.UNAVAILABLE);
         };
     }
 
-    private Outcome parse(String answer) {
+    private Outcome parse(String answer, String cvText, int pageCount) {
         try {
             JsonNode report = json.readTree(answer);
-            return report.hasNonNull("overallScore") ? new Outcome.Report(report)
-                    : new Outcome.Refused(Refusal.UNAVAILABLE);
+            if (!report.hasNonNull("overallScore")) {
+                return new Outcome.Refused(Refusal.UNAVAILABLE);
+            }
+            if (report instanceof ObjectNode obj && obj.path("dimensions").isObject()) {
+                CvDeterministicAuditor.AuditResult audit = CvDeterministicAuditor.audit(cvText, pageCount);
+                CvScoringArbiter.arbitrate(obj, audit);
+            }
+            return new Outcome.Report(report);
         } catch (RuntimeException e) {
             return new Outcome.Refused(Refusal.UNAVAILABLE);
         }

@@ -44,6 +44,29 @@ export interface JobRecommendationsResponse {
   readonly configured?: boolean;
 }
 
+export interface CvRubricWeights {
+  readonly experienceImpact: number;
+  readonly hardSkills: number;
+  readonly atsCompliance: number;
+  readonly domainRelevance: number;
+  readonly softSkills: number;
+}
+
+export interface CvRubricInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly tier: 'TIER_1' | 'TIER_2' | 'TIER_3' | 'TIER_4';
+  readonly weights: CvRubricWeights;
+  readonly capsApplied: readonly string[];
+}
+
+export interface CvAtsCheck {
+  readonly id: string;
+  readonly status: 'PASS' | 'WARN' | 'FAIL';
+  readonly detail: string;
+  readonly standard: string;
+}
+
 export interface CvCheckReport {
   readonly overallScore: number;
   readonly dimensions: CvCheckDimensions;
@@ -53,6 +76,8 @@ export interface CvCheckReport {
   readonly rewrittenBullets: readonly CvCheckBullet[];
   readonly interviewQuestions: readonly string[];
   readonly jobProfile?: CvJobProfile;
+  readonly rubric?: CvRubricInfo;
+  readonly atsChecks?: readonly CvAtsCheck[];
 }
 
 export const SAMPLE_CV = `HỌ VÀ TÊN: NGUYỄN VĂN AN

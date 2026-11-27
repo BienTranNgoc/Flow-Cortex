@@ -6,10 +6,10 @@
     "desc": "Upload your PDF CV directly for full in-browser preview and automated text extraction via Apache PDFBox + Google Gemini 3.5 Flash."
   },
   "verdict": {
-    "excellent": "Strong Fit",
-    "good": "Good Fit",
-    "moderate": "Moderate Fit",
-    "poor": "Weak Fit"
+    "tier1": "Tier 1 — Fast-Track (Big Tech Standard)",
+    "tier2": "Tier 2 — Recruiter Ready (SHRM 75+)",
+    "tier3": "Tier 3 — Conditional (Needs Optimization)",
+    "tier4": "Tier 4 — High ATS Rejection Risk"
   },
   "actions": {
     "loadSample": "Load Sample PDF CV",
@@ -43,11 +43,18 @@
     "missingKeywords": "Missing Keywords & Skills"
   },
   "dimensions": {
-    "hardSkills": "Hard Skills Match",
-    "experienceImpact": "Experience & Impact (STAR)",
-    "softSkills": "Soft Skills & Culture",
-    "atsCompliance": "ATS Compliance & Keywords",
-    "domainRelevance": "Domain Relevance"
+    "hardSkills": "Hard Skills Depth (ESCO / O*NET)",
+    "experienceImpact": "Impact & Metrics (Google XYZ)",
+    "softSkills": "Soft Skills & Tone",
+    "atsCompliance": "ATS & Structure (SHRM)",
+    "domainRelevance": "Career Clarity (Harvard OCS)"
+  },
+  "atsChecklist": {
+    "title": "Deterministic International ATS Audit",
+    "subtitle": "Measured directly from PDF structure & resume content",
+    "pass": "PASS",
+    "warn": "WARN",
+    "fail": "FAIL"
   },
   "tabs": {
     "evaluation": "Strengths & Weaknesses",
