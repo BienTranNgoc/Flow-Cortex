@@ -7,6 +7,8 @@ import com.flowcortex.workflow.api.AdminRunDetailView;
 import com.flowcortex.workflow.api.AdminRunStepView;
 import com.flowcortex.workflow.api.AdminRunView;
 import com.flowcortex.workflow.api.MediaJobView;
+import com.flowcortex.workflow.api.RunFeedbackView;
+import com.flowcortex.workflow.api.RunInsightView;
 import com.flowcortex.workflow.api.RunStepChildView;
 import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
@@ -50,7 +52,8 @@ final class WorkflowMapper {
                 steps.stream().map(step -> toStepView(step, isRemoteType)).toList(),
                 steps.stream().map(WorkflowStep::getType).allMatch(isAvailableType),
                 wire(workflow.getStatus().name()), publishedVersionId, servedVersion, workflow.isAllowFork(),
-                workflow.getForkCount(), workflow.getForkedFromId(), startInput(steps, snapshotsRunInputs));
+                workflow.getForkCount(), workflow.getForkedFromId(), startInput(steps, snapshotsRunInputs),
+                workflow.isGenerateInsight());
     }
 
     private static String startInput(List<WorkflowStep> steps, Predicate<String> snapshotsRunInputs) {
@@ -81,7 +84,7 @@ final class WorkflowMapper {
                                 step.mode(), null, null))
                         .toList(),
                 view.available(), view.status(), view.publishedVersionId(), view.servedVersion(), view.allowFork(),
-                view.forkCount(), view.forkedFromId(), view.startInput());
+                view.forkCount(), view.forkedFromId(), view.startInput(), view.generateInsight());
     }
 
     static WorkflowStepView toStepView(WorkflowStep step, Predicate<String> isRemoteType) {
@@ -98,10 +101,12 @@ final class WorkflowMapper {
      * server; it is shown as {@code null}. The run's own input is shown: when the first step is
      * remote it is only the cleaned name of the uploaded file. A step offers only the outputs stored
      * in a bucket {@code isDownloadable} accepts. {@code children} are the items of the run's iterate steps in
-     * the attempt each step is in now; each step shows those whose parent it is, in the order given.
+     * the attempt each step is in now; each step shows those whose parent it is, in the order given. {@code facts}
+     * (from {@link RunViewFactsFactory#of} over the same {@code steps}) say which steps are editable and at which
+     * revision, and whether an insight is pending.
      */
     static RunView toRunView(WorkflowRun run, List<RunStep> steps, List<RunStep> children,
-            Predicate<String> isRemoteType, Predicate<String> isDownloadable) {
+            Predicate<String> isRemoteType, Predicate<String> isDownloadable, RunViewFacts facts) {
         Map<UUID, List<RunStep>> itemsByParent = children.stream()
                 .collect(Collectors.groupingBy(RunStep::getParentStepId, LinkedHashMap::new, Collectors.toList()));
         return new RunView(run.getId(), run.getWorkflowId(), run.getOwnerId(), wire(run.getStatus().name()),
@@ -109,19 +114,36 @@ final class WorkflowMapper {
                 run.getFinishedAt(),
                 steps.stream()
                         .map(step -> toRunStepView(step, itemsByParent.getOrDefault(step.getId(), List.of()),
-                                isRemoteType, isDownloadable))
-                        .toList());
+                                isRemoteType, isDownloadable, facts.step(step.getId())))
+                        .toList(),
+                feedback(run), insight(run), facts.insightPending());
+    }
+
+    private static RunFeedbackView feedback(WorkflowRun run) {
+        if (run.getFeedbackVerdict() == null) {
+            return null;
+        }
+        return new RunFeedbackView(run.getFeedbackVerdict(), run.getFeedbackIssue(), run.getFeedbackDetail(),
+                run.getFeedbackAt());
+    }
+
+    private static RunInsightView insight(WorkflowRun run) {
+        return InsightAnswer.parse(run.getInsight())
+                .map(answer -> new RunInsightView(answer.headline(), answer.highlights()))
+                .orElse(null);
     }
 
     private static RunStepView toRunStepView(RunStep step, List<RunStep> children, Predicate<String> isRemoteType,
-            Predicate<String> isDownloadable) {
+            Predicate<String> isDownloadable, RunViewFacts.StepEdit edit) {
         Short percent = step.getProgressPercent();
         return new RunStepView(step.getId(), step.getStepOrder(), step.getType(), wire(step.getStatus().name()),
                 isRemoteType.test(step.getType()) ? null : step.getInput(), step.getOutput(), step.getErrorMessage(),
                 step.getStartedAt(), step.getFinishedAt(), percent == null ? null : percent.intValue(),
                 step.getAttempt(), step.getErrorCode(), step.getDeliveryCount(), step.getPickedUpAt(),
                 outputs(step, isDownloadable), mode(step.getType(), isRemoteType),
-                children.stream().map(child -> toRunStepChildView(child, isDownloadable)).toList());
+                children.stream().map(child -> toRunStepChildView(child, isDownloadable)).toList(),
+                edit.editable(), edit.fields(), step.getEditedOutput(), step.getEditedAt(), step.getEditDiffPct(),
+                edit.revision());
     }
 
     private static RunStepChildView toRunStepChildView(RunStep child, Predicate<String> isDownloadable) {

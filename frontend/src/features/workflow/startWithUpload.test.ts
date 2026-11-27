@@ -38,7 +38,7 @@ function fakeDeps(overrides: Partial<StartWithUploadDeps> = {}) {
     }),
     startRun: vi.fn(async (body) => {
       calls.push(`POST /runs ${JSON.stringify(body)}`);
-      return { id: 'run-1' };
+      return { id: 'run-1', insightPending: false };
     }),
     ...overrides,
   };

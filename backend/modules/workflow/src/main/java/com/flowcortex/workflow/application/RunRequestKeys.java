@@ -24,14 +24,15 @@ final class RunRequestKeys {
     }
 
     static Optional<RunView> existing(WorkflowRunRepository runs, RunStepRepository runSteps,
-            StepExecutorRegistry registry, Predicate<String> isDownloadable, UUID ownerId, String requestKey) {
+            StepExecutorRegistry registry, Predicate<String> isDownloadable, RunViewFactsFactory viewFacts,
+            UUID ownerId, String requestKey) {
         if (requestKey == null) {
             return Optional.empty();
         }
         return runs.findByOwnerIdAndRequestKey(ownerId, requestKey).map(run -> {
             List<RunStep> steps = runSteps.findByRunIdOrderByStepOrderAsc(run.getId());
             return WorkflowMapper.toRunView(run, steps, runSteps.findCurrentChildren(run.getId()), registry::isRemote,
-                    isDownloadable);
+                    isDownloadable, viewFacts.of(run, steps));
         });
     }
 
@@ -42,7 +43,8 @@ final class RunRequestKeys {
      * rethrown.
      */
     static RunView orWinner(Supplier<RunView> start, WorkflowRunRepository runs, RunStepRepository runSteps,
-            StepExecutorRegistry registry, Predicate<String> isDownloadable, UUID ownerId, String requestKey) {
+            StepExecutorRegistry registry, Predicate<String> isDownloadable, RunViewFactsFactory viewFacts,
+            UUID ownerId, String requestKey) {
         try {
             return start.get();
         } catch (DataIntegrityViolationException e) {
@@ -51,7 +53,7 @@ final class RunRequestKeys {
             }
             Instant deadline = Instant.now().plus(WINNER_WAIT);
             while (true) {
-                Optional<RunView> winner = existing(runs, runSteps, registry, isDownloadable, ownerId,
+                Optional<RunView> winner = existing(runs, runSteps, registry, isDownloadable, viewFacts, ownerId,
                         requestKey);
                 if (winner.isPresent()) {
                     return winner.get();

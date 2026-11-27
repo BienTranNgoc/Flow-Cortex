@@ -2,6 +2,8 @@ package com.flowcortex.workflow.infrastructure;
 
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
+import jakarta.persistence.LockModeType;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -367,4 +370,24 @@ public interface RunStepRepository extends JpaRepository<RunStep, UUID> {
             countQuery = "SELECT count(s) FROM RunStep s WHERE s.type IN :types AND (:status IS NULL OR s.status = :status)")
     Page<RunStep> findByTypeNewestFirst(@Param("types") Collection<String> types,
             @Param("status") RunStepStatus status, Pageable page);
+
+    /**
+     * The run's top-level step with its row locked until the transaction ends: edit, undo and discard of one step
+     * run one at a time. An iterate item is not found.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM RunStep r WHERE r.id = :id AND r.runId = :runId AND r.parentStepId IS NULL")
+    Optional<RunStep> findByIdAndRunIdForUpdate(@Param("id") UUID id, @Param("runId") UUID runId);
+
+    /**
+     * Writes the step's current edit (all three {@code null} clears it) and moves its change counter from
+     * {@code expectedSeq} to the next value; {@code 0} when the counter is not {@code expectedSeq}.
+     */
+    @Modifying
+    @Query("UPDATE RunStep r SET r.editedOutput = :editedOutput, r.editedAt = :editedAt, "
+            + "r.editDiffPct = :editDiffPct, r.editSeq = r.editSeq + 1 "
+            + "WHERE r.id = :id AND r.editSeq = :expectedSeq")
+    int applyEdit(@Param("id") UUID id, @Param("expectedSeq") int expectedSeq,
+            @Param("editedOutput") String editedOutput, @Param("editedAt") Instant editedAt,
+            @Param("editDiffPct") BigDecimal editDiffPct);
 }

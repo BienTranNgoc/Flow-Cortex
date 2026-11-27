@@ -356,6 +356,73 @@
     "creatorLink": "Paste a valid TikTok or Douyin link",
     "linkRequired": "Paste a link that starts with http:// or https://"
   },
+  "edit": {
+    "open": "Edit result",
+    "edited": "Edited · revision {{revision}}",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "undo": "Undo",
+    "undoing": "Undoing…",
+    "discard": "Discard edit",
+    "discarding": "Discarding…",
+    "field": {
+      "output": "Result",
+      "script": "Script",
+      "line": "Line {{number}}"
+    },
+    "confirm": {
+      "title": "Discard your edit?",
+      "text": "The result goes back to the original. Undo won't bring this edit back.",
+      "keep": "Keep edit",
+      "discard": "Discard edit"
+    },
+    "error": {
+      "field": "This text can't be saved. Check it and try again.",
+      "conflict": "This result was changed somewhere else. The current text is shown now.",
+      "nothingToUndo": "There is no edit left to undo. The current result is shown now.",
+      "notEditable": "This result can't be edited any more.",
+      "gone": "This step is no longer available.",
+      "retry": "Couldn't reach the server. Your text is kept; try again."
+    }
+  },
+  "insight": {
+    "title": "Summary of this result"
+  },
+  "eval": {
+    "question": "How is this result?",
+    "up": "Good",
+    "down": "Not good",
+    "sent": {
+      "up": "You rated this result good. Thanks for the feedback.",
+      "down": "You rated this result not good. Thanks for the feedback."
+    },
+    "change": "Change",
+    "dialog": {
+      "titleUp": "What worked well?",
+      "titleDown": "What went wrong?",
+      "note": "Your feedback goes to the Nodi team.",
+      "issue": "Issue",
+      "issuePlaceholder": "Choose an issue",
+      "detail": "Details (optional)",
+      "send": "Send",
+      "sending": "Sending…",
+      "cancel": "Cancel"
+    },
+    "issues": {
+      "wrong_request": "The result doesn't match what I asked for",
+      "low_quality": "The quality is low",
+      "off_brand": "It doesn't fit my brand",
+      "technical_error": "Something looks broken",
+      "inappropriate": "The content is inappropriate",
+      "other": "Something else"
+    },
+    "error": {
+      "send": "Couldn't send your feedback. What you wrote is kept; try again.",
+      "invalid": "Your feedback can't be sent as written. Check the details and try again."
+    }
+  },
   "stop": {
     "open": "Stop workflow",
     "title": "Stop this workflow?",

@@ -54,10 +54,13 @@ class RunCreation {
     private final MediaJobs mediaJobs;
     private final TransactionTemplate transactionTemplate;
     private final ObjectProvider<Tracer> tracer;
+    private final RunViewFactsFactory viewFacts;
 
     RunCreation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             ApplicationEventPublisher events, RunUpdates runUpdates, ObjectProvider<StepExecutorRegistry> registry,
-            MediaJobs mediaJobs, TransactionTemplate transactionTemplate, ObjectProvider<Tracer> tracer) {
+            MediaJobs mediaJobs, TransactionTemplate transactionTemplate, ObjectProvider<Tracer> tracer,
+            RunViewFactsFactory viewFacts) {
+        this.viewFacts = viewFacts;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.events = events;
@@ -100,7 +103,8 @@ class RunCreation {
             // Published within this tx; RunAdvancer's @ApplicationModuleListener only
             // fires after commit — the caller returns first.
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, runSteps, List.of(), steps::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(run, runSteps, List.of(), steps::isRemote, mediaJobs::isDownloadable,
+                    viewFacts.of(run, runSteps));
         });
     }
 

@@ -82,13 +82,15 @@ class WorkflowRunServiceImplTest {
         ObjectProvider<StepExecutorRegistry> provider = mock(ObjectProvider.class);
         when(provider.getObject()).thenReturn(executors);
         return new RunCreation(workflowRunRepository, runStepRepository, events, runUpdates, provider, mediaJobs,
-                new TransactionTemplate(transactions), new StaticListableBeanFactory().getBeanProvider(Tracer.class));
+                new TransactionTemplate(transactions), new StaticListableBeanFactory().getBeanProvider(Tracer.class),
+                RunViewFactsFactories.insightOff());
     }
 
     private WorkflowRunServiceImpl newService(boolean workflowEnabled) {
         return new WorkflowRunServiceImpl(workflowRepository, servedDefinitions, workflowRunRepository,
                 runStepRepository, registry, mediaJobs, mock(UserDirectory.class), new RunStartGuards(List.of()),
-                runCreation(registry), mock(CreditAccounts.class), workflowEnabled);
+                runCreation(registry), mock(CreditAccounts.class), RunViewFactsFactories.insightOff(),
+                workflowEnabled);
     }
 
     private Workflow givenWorkflow(UUID ownerId, String... types) {
@@ -141,7 +143,8 @@ class WorkflowRunServiceImplTest {
         StepExecutorRegistry dubRegistry = new StepExecutorRegistry(List.of(translate));
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
                 workflowRunRepository, runStepRepository, dubRegistry, mediaJobs, mock(UserDirectory.class),
-                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), mock(CreditAccounts.class), true);
+                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), mock(CreditAccounts.class),
+                RunViewFactsFactories.insightOff(), true);
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = givenWorkflow(ownerId, "translate");
 
@@ -166,7 +169,7 @@ class WorkflowRunServiceImplTest {
         return new WorkflowRunServiceImpl(workflowRepository, servedDefinitions, workflowRunRepository,
                 runStepRepository, unavailableRegistry, mediaJobs, mock(UserDirectory.class),
                 new RunStartGuards(List.of(creditGuard)), runCreation(unavailableRegistry), mock(CreditAccounts.class),
-                true);
+                RunViewFactsFactories.insightOff(), true);
     }
 
     private static StepExecutor unavailableExecutor(String type) {
@@ -238,7 +241,8 @@ class WorkflowRunServiceImplTest {
         StepExecutorRegistry dubRegistry = new StepExecutorRegistry(List.of(iterate, tts));
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
                 workflowRunRepository, runStepRepository, dubRegistry, mediaJobs, mock(UserDirectory.class),
-                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), mock(CreditAccounts.class), true);
+                new RunStartGuards(List.of(creditGuard)), runCreation(dubRegistry), mock(CreditAccounts.class),
+                RunViewFactsFactories.insightOff(), true);
         UUID ownerId = UUID.randomUUID();
         Workflow workflow = new Workflow(UUID.randomUUID(), ownerId, "Demo", false);
         when(workflowRepository.findVisibleTo(workflow.getId(), ownerId)).thenReturn(Optional.of(workflow));
@@ -380,7 +384,7 @@ class WorkflowRunServiceImplTest {
         WorkflowRunServiceImpl service = new WorkflowRunServiceImpl(workflowRepository, servedDefinitions,
                 workflowRunRepository, runStepRepository, registry, mediaJobs, mock(UserDirectory.class),
                 new RunStartGuards(List.of(new WorkflowReadinessGuard())), runCreation(registry),
-                mock(CreditAccounts.class), true);
+                mock(CreditAccounts.class), RunViewFactsFactories.insightOff(), true);
 
         assertThatThrownBy(() -> service.startRun(binh, workflow.getId(), "hi"))
                 .isInstanceOfSatisfying(UnprocessableEntityException.class,

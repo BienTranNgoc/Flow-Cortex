@@ -8,11 +8,13 @@ import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.domain.RunStatus;
+import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,10 +45,13 @@ public class RunCancellation {
     private final ChildRuns childRuns;
     private final RunStepTransactions transactions;
     private final Settings settings;
+    private final RunViewFactsFactory viewFacts;
 
     RunCancellation(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             StepExecutorRegistry registry, MediaJobs mediaJobs, Clock clock, RunUpdates runUpdates,
-            ChildRuns childRuns, RunStepTransactions transactions, Settings settings) {
+            ChildRuns childRuns, RunStepTransactions transactions, Settings settings,
+            RunViewFactsFactory viewFacts) {
+        this.viewFacts = viewFacts;
         this.runUpdates = runUpdates;
         this.childRuns = childRuns;
         this.transactions = transactions;
@@ -115,7 +120,8 @@ public class RunCancellation {
 
     private RunView currentView(UUID currentUserId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, currentUserId).orElseThrow();
-        return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                runStepRepository.findCurrentChildren(runId), registry::isRemote, mediaJobs::isDownloadable);
+        List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
+        return WorkflowMapper.toRunView(run, steps, runStepRepository.findCurrentChildren(runId), registry::isRemote,
+                mediaJobs::isDownloadable, viewFacts.of(run, steps));
     }
 }

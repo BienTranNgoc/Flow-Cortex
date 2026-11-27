@@ -94,6 +94,24 @@ class WorkflowRunRequestKeyIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
+    void aProductVideoStartAnswersTheEditStateAFreshReadGives() {
+        UserView owner = newUser("key-edit-state");
+
+        RunView started = productVideoRuns.start(owner.id(), draft(), List.of(uploadImage(owner)), false,
+                "card-" + UUID.randomUUID());
+
+        RunView fresh = workflowRunService.getRun(owner.id(), started.id());
+        for (RunView view : List.of(started, fresh)) {
+            assertThat(view.steps()).isNotEmpty().allSatisfy(step -> {
+                assertThat(step.editable()).isFalse();
+                assertThat(step.editableFields()).isEmpty();
+                assertThat(step.editedOutput()).isNull();
+                assertThat(step.editRevision()).isEqualTo(1);
+            });
+        }
+    }
+
+    @Test
     void twoThreadsStartingWithOneKeyEndUpWithOneRun() throws Exception {
         UserView owner = newUser("key-concurrent");
         List<UUID> uploads = List.of(uploadImage(owner));

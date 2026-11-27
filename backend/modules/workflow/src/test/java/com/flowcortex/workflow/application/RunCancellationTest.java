@@ -41,10 +41,10 @@ class RunCancellationTest {
     private final RunStepTransactions transactions = mock(RunStepTransactions.class);
     private final RunCancellation cancellation = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, childRuns, transactions, switchReading(true));
+            runUpdates, childRuns, transactions, switchReading(true), RunViewFactsFactories.insightOff());
     private final RunCancellation switchedOff = new RunCancellation(runs, steps,
             new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs, Clock.fixed(NOW, ZoneOffset.UTC),
-            runUpdates, childRuns, transactions, switchReading(false));
+            runUpdates, childRuns, transactions, switchReading(false), RunViewFactsFactories.insightOff());
     private final UUID adminId = UUID.randomUUID();
 
     private final UUID ownerId = UUID.randomUUID();

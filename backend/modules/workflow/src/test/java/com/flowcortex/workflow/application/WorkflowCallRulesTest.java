@@ -186,6 +186,18 @@ class WorkflowCallRulesTest {
     }
 
     @Test
+    void aCompletedChildWhoseLastStepWasEditedGivesTheEdit() {
+        RunStep edited = RunStep.reused(UUID.randomUUID(), UUID.randomUUID(), (short) 2, "echo", "in", null, null,
+                "two", null, java.time.Instant.EPOCH, java.time.Instant.EPOCH, "two, corrected",
+                java.time.Instant.EPOCH, new java.math.BigDecimal("30.00"), 1);
+
+        WorkflowCallRules.Outcome outcome = WorkflowCallRules.outcome(RunStatus.COMPLETED, null,
+                List.of(step(1, "one"), edited));
+
+        assertThat(outcome).isEqualTo(new WorkflowCallRules.Complete("two, corrected"));
+    }
+
+    @Test
     void aCompletedChildWhoseLastOutputIsNullCompletesWithNull() {
         WorkflowCallRules.Outcome outcome = WorkflowCallRules.outcome(RunStatus.COMPLETED, null,
                 List.of(step(1, "one"), step(2, null)));

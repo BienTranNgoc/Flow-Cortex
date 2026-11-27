@@ -136,12 +136,20 @@ export function useOutputUrlMutation(runId: string, stepOrder: number, name: str
   });
 }
 
-/** Loads the run and, while it is live, refetches it on each push from its event stream. */
+/** How often the page re-reads a finished run while its insight is still being written. */
+const INSIGHT_POLL_MS = 4_000;
+
+/**
+ * Loads the run and, while it is live, refetches it on each push from its event stream. The
+ * stream closes once the run settles and the insight lands after that, so a run that reports its
+ * insight as pending is also re-read on a timer; the server ends the flag after two minutes.
+ */
 export function useRunQuery(runId: string | undefined) {
   const query = useQuery({
     queryKey: ['runs', runId],
     queryFn: () => unwrap(getRun(runId as string, authHeaders())),
     enabled: Boolean(runId),
+    refetchInterval: (current) => (current.state.data?.insightPending ? INSIGHT_POLL_MS : false),
   });
   useRunEvents(runId, query.data?.status, query.refetch, query.data?.steps);
   return query;

@@ -169,7 +169,8 @@ class ProductVideoParallelDispatchTest {
                 mock(ReviewCheckpointTransactions.class), mediaJobs, validator, null, true);
         jobControl = new WorkflowJobControl(runRepo, stepRepo);
         cancellation = new RunCancellation(runRepo, stepRepo, registry, mediaJobs,
-                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, transactions, cancellationSwitchOn());
+                Clock.fixed(NOW, ZoneOffset.UTC), runUpdates, childRuns, transactions, cancellationSwitchOn(),
+                RunViewFactsFactories.insightOff());
     }
 
     private static Settings cancellationSwitchOn() {

@@ -58,7 +58,8 @@ class IterateRegenerationTest {
 
     private IterateRegeneration service(boolean workflowEnabled) {
         return new IterateRegeneration(runs, steps, registry, mediaJobs, credits, advancer,
-                new TransactionTemplate(transactionManager), runUpdates, events, workflowEnabled);
+                new TransactionTemplate(transactionManager), runUpdates, events, RunViewFactsFactories.insightOff(),
+                workflowEnabled);
     }
 
     /** A completed run whose completed iterate step has one completed item, priced at 1 with credits on. */

@@ -15,6 +15,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
+import com.flowcortex.workflow.infrastructure.RunStepOutputVersionRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
@@ -64,8 +65,9 @@ class RunResumptionTest {
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
         return new RunResumption(workflowRepository, workflowRunRepository, runStepRepository,
-                new StepExecutorRegistry(List.of(iterate, tts)), mediaJobs, transactionTemplate,
-                mock(RunUpdates.class), new RunStartGuards(List.of()), events, true);
+                mock(RunStepOutputVersionRepository.class), new StepExecutorRegistry(List.of(iterate, tts)),
+                mediaJobs, transactionTemplate, mock(RunUpdates.class), new RunStartGuards(List.of()), events,
+                RunViewFactsFactories.insightOff(), true);
     }
 
     /** A failed run whose one step is an iterate step over {@code tts} items, in {@code status}. */

@@ -85,6 +85,23 @@ public class WorkflowRun {
     @Column(name = "call_depth", nullable = false, updatable = false)
     private short callDepth;
 
+    @Column(name = "feedback_verdict")
+    private String feedbackVerdict;
+
+    @Column(name = "feedback_issue")
+    private String feedbackIssue;
+
+    @Column(name = "feedback_detail")
+    private String feedbackDetail;
+
+    @Column(name = "feedback_at")
+    private Instant feedbackAt;
+
+    /** The JSON insight written once after completion; the entity never writes it. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "insight", updatable = false)
+    private String insight;
+
     /** Required by JPA. */
     protected WorkflowRun() {
     }
@@ -215,6 +232,36 @@ public class WorkflowRun {
 
     public String getTraceId() {
         return traceId;
+    }
+
+    /** Replaces the owner's verdict; the values are already validated, {@code issue} and {@code detail} may be null. */
+    public void giveFeedback(String verdict, String issue, String detail, Instant at) {
+        this.feedbackVerdict = verdict;
+        this.feedbackIssue = issue;
+        this.feedbackDetail = detail;
+        this.feedbackAt = at;
+    }
+
+    /** {@code up} or {@code down}; {@code null} while the owner has given no feedback. */
+    public String getFeedbackVerdict() {
+        return feedbackVerdict;
+    }
+
+    public String getFeedbackIssue() {
+        return feedbackIssue;
+    }
+
+    public String getFeedbackDetail() {
+        return feedbackDetail;
+    }
+
+    public Instant getFeedbackAt() {
+        return feedbackAt;
+    }
+
+    /** The stored insight JSON, or {@code null} when none was written. */
+    public String getInsight() {
+        return insight;
     }
 
     public String getErrorMessage() {

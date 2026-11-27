@@ -324,7 +324,7 @@ class RunAdvancer {
         Map<Integer, String> assetOutputsByOrder = new LinkedHashMap<>();
         for (RunStep runStep : runSteps) {
             if (runStep.getStatus() == RunStepStatus.COMPLETED) {
-                outputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutput());
+                outputsByOrder.put((int) runStep.getStepOrder(), runStep.effectiveOutput());
                 assetOutputsByOrder.put((int) runStep.getStepOrder(), runStep.getOutputs());
             }
         }

@@ -16,6 +16,7 @@ import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
 import com.flowcortex.workflow.domain.WorkflowStep;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -105,7 +106,7 @@ class WorkflowMapperTest {
         step.markRunning(Instant.now());
         step.markCompleted("in", "out", Instant.now());
 
-        RunView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE);
+        RunView view = runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE);
 
         assertThat(view.status()).isEqualTo("running");
         assertThat(view.steps().get(0).status()).isEqualTo("completed");
@@ -118,7 +119,7 @@ class WorkflowMapperTest {
                 Instant.now());
         run.markError("boom", Instant.now());
 
-        RunView view = WorkflowMapper.toRunView(run, List.of(), List.of(), type -> false, DOWNLOADABLE);
+        RunView view = runView(run, List.of(), List.of(), type -> false, DOWNLOADABLE);
 
         assertThat(view.status()).isEqualTo("error");
         assertThat(view.errorMessage()).isEqualTo("boom");
@@ -137,7 +138,7 @@ class WorkflowMapperTest {
                 + "\"bucket\":\"flowcortex-media\",\"objectKey\":\"runs/x/steps/1/video-details.json\","
                 + "\"mime\":\"application/json\",\"bytes\":42,\"meta\":{\"k\":\"v\"}}]");
 
-        RunStepView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0);
+        RunStepView view = runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0);
 
         assertThat(view.pickedUpAt()).isEqualTo(pickedUpAt);
         assertThat(view.progressPercent()).isEqualTo(40);
@@ -158,7 +159,7 @@ class WorkflowMapperTest {
                 + "{\"name\":\"voice-manifest.json\",\"bucket\":\"flowcortex-media\","
                 + "\"objectKey\":\"runs/x/steps/7/voice-manifest.json\",\"mime\":\"application/json\",\"bytes\":2}]");
 
-        RunStepView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0);
+        RunStepView view = runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0);
 
         assertThat(view.outputs())
                 .containsExactly(new RunStepOutputView("voice-manifest.json", "application/json", 2L));
@@ -176,7 +177,7 @@ class WorkflowMapperTest {
         echo.markRunning(Instant.now());
         echo.markCompleted("{\"videoCodec\":\"h264\"}", "{\"videoCodec\":\"h264\"}", Instant.now());
 
-        RunView view = WorkflowMapper.toRunView(run, List.of(probe, echo), List.of(), "probe"::equals, DOWNLOADABLE);
+        RunView view = runView(run, List.of(probe, echo), List.of(), "probe"::equals, DOWNLOADABLE);
 
         assertThat(view.input()).isEqualTo("clip.mp4");
         assertThat(view.steps().get(0).input()).isNull();
@@ -190,7 +191,7 @@ class WorkflowMapperTest {
                 Instant.now());
         RunStep echo = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "echo");
 
-        assertThat(WorkflowMapper.toRunView(run, List.of(echo), List.of(), "probe"::equals, DOWNLOADABLE).input())
+        assertThat(runView(run, List.of(echo), List.of(), "probe"::equals, DOWNLOADABLE).input())
                 .isEqualTo("hello");
     }
 
@@ -201,7 +202,7 @@ class WorkflowMapperTest {
         RunStep probe = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "probe");
         RunStep echo = new RunStep(UUID.randomUUID(), run.getId(), (short) 2, "echo");
 
-        RunView view = WorkflowMapper.toRunView(run, List.of(probe, echo), List.of(), "probe"::equals, DOWNLOADABLE);
+        RunView view = runView(run, List.of(probe, echo), List.of(), "probe"::equals, DOWNLOADABLE);
 
         assertThat(view.steps()).extracting(RunStepView::mode).containsExactly("remote", "inline");
     }
@@ -212,7 +213,7 @@ class WorkflowMapperTest {
         WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
                 Instant.now());
 
-        assertThat(WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0).outputs())
+        assertThat(runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0).outputs())
                 .isEmpty();
     }
 
@@ -223,7 +224,7 @@ class WorkflowMapperTest {
 
         WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
                 Instant.now());
-        RunView view = WorkflowMapper.toRunView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE);
+        RunView view = runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE);
 
         assertThat(view.steps().get(0).status()).isEqualTo("pending");
     }
@@ -245,7 +246,7 @@ class WorkflowMapperTest {
         item1.markError("b", "echo_failed", "no luck", at.plusSeconds(2));
         RunStep item2 = RunStep.child(run.getId(), (short) 2, "echo", iterate.getId(), (short) 1, (short) 2, "c");
 
-        RunView view = WorkflowMapper.toRunView(run, List.of(first, iterate), List.of(item0, item1, item2),
+        RunView view = runView(run, List.of(first, iterate), List.of(item0, item1, item2),
                 type -> false, DOWNLOADABLE);
 
         assertThat(view.steps().get(0).children()).isEmpty();
@@ -270,7 +271,7 @@ class WorkflowMapperTest {
                 Instant.now());
         RunStep iterate = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "iterate");
 
-        assertThat(WorkflowMapper.toRunView(run, List.of(iterate), List.of(), type -> false, DOWNLOADABLE).steps()
+        assertThat(runView(run, List.of(iterate), List.of(), type -> false, DOWNLOADABLE).steps()
                 .get(0).children()).isEmpty();
     }
 
@@ -282,10 +283,74 @@ class WorkflowMapperTest {
         RunStep iterate = new RunStep(UUID.randomUUID(), run.getId(), (short) 2, "iterate");
         RunStep item = RunStep.child(run.getId(), (short) 2, "echo", iterate.getId(), (short) 1, (short) 0, "a");
 
-        RunView view = WorkflowMapper.toRunView(run, List.of(echo, iterate), List.of(item), type -> false,
+        RunView view = runView(run, List.of(echo, iterate), List.of(item), type -> false,
                 DOWNLOADABLE);
 
         assertThat(view.steps().get(0).children()).isEmpty();
         assertThat(view.steps().get(1).children()).hasSize(1);
+    }
+
+    @Test
+    void anUneditedCompletedEchoStepIsEditableAtRevisionOneWithItsOriginalTextAsTheField() {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        RunStep step = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "echo");
+        step.markRunning(Instant.now());
+        step.markCompleted("in", "Hello world", Instant.now());
+
+        RunStepView view = runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0);
+
+        assertThat(view.editable()).isTrue();
+        assertThat(view.editRevision()).isEqualTo(1);
+        assertThat(view.editedOutput()).isNull();
+        assertThat(view.editedAt()).isNull();
+        assertThat(view.editDiffPct()).isNull();
+        assertThat(view.editableFields()).singleElement().satisfies(field -> {
+            assertThat(field.pointer()).isEmpty();
+            assertThat(field.label()).isEqualTo("output");
+            assertThat(field.text()).isEqualTo("Hello world");
+        });
+    }
+
+    @Test
+    void aCarriedEditShowsBesideTheOriginalAndTheFieldsCarryTheEditedText() {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        Instant editedAt = Instant.now();
+        RunStep step = RunStep.reused(UUID.randomUUID(), run.getId(), (short) 1, "echo", "in", null, null,
+                "Hello world", null, Instant.now(), Instant.now(), "Hello Hanoi", editedAt,
+                new BigDecimal("45.45"), 1);
+
+        RunStepView view = runView(run, List.of(step), List.of(), type -> false, DOWNLOADABLE).steps().get(0);
+
+        assertThat(view.output()).isEqualTo("Hello world");
+        assertThat(view.editedOutput()).isEqualTo("Hello Hanoi");
+        assertThat(view.editedAt()).isEqualTo(editedAt);
+        assertThat(view.editDiffPct()).isEqualByComparingTo("45.45");
+        assertThat(view.editRevision()).isEqualTo(2);
+        assertThat(view.editableFields()).extracting(field -> field.text()).containsExactly("Hello Hanoi");
+    }
+
+    @Test
+    void aRunningEchoStepAndAnIterateStepAreNotEditableAndOfferNoFields() {
+        WorkflowRun run = new WorkflowRun(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "in",
+                Instant.now());
+        RunStep running = new RunStep(UUID.randomUUID(), run.getId(), (short) 1, "echo");
+        running.markRunning(Instant.now());
+        RunStep iterate = new RunStep(UUID.randomUUID(), run.getId(), (short) 2, "iterate");
+        iterate.markRunning(Instant.now());
+        iterate.markCompleted("in", "[\"a\"]", Instant.now());
+
+        RunView view = runView(run, List.of(running, iterate), List.of(), type -> false, DOWNLOADABLE);
+
+        assertThat(view.steps()).extracting(RunStepView::editable).containsExactly(false, false);
+        assertThat(view.steps()).extracting(step -> step.editableFields().size()).containsExactly(0, 0);
+        assertThat(view.steps()).extracting(RunStepView::editRevision).containsExactly(1, 1);
+    }
+
+    private static RunView runView(WorkflowRun run, List<RunStep> steps, List<RunStep> children,
+            Predicate<String> isRemoteType, Predicate<String> isDownloadable) {
+        return WorkflowMapper.toRunView(run, steps, children, isRemoteType, isDownloadable,
+                RunViewFacts.of(steps, false));
     }
 }

@@ -54,7 +54,8 @@ class ProductVideoServiceTest {
 
     private ProductVideoService service(boolean enabled) {
         return new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media, registry, events,
-                runUpdates, transactions, new RunStartGuards(List.of()), Tracer.NOOP, enabled, true);
+                runUpdates, transactions, new RunStartGuards(List.of()), Tracer.NOOP,
+                RunViewFactsFactories.insightOff(), enabled, true);
     }
 
     @Test
@@ -82,7 +83,8 @@ class ProductVideoServiceTest {
             throw new IllegalStateException("refused");
         };
         ProductVideoService service = new ProductVideoService(workflows, workflowSteps, runs, runSteps, inputs, media,
-                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), Tracer.NOOP, true, true);
+                registry, events, runUpdates, transactions, new RunStartGuards(List.of(refusing)), Tracer.NOOP,
+                RunViewFactsFactories.insightOff(), true, true);
 
         assertThatThrownBy(() -> service.start(ownerId, draft(), List.of(UUID.randomUUID()), true))
                 .hasMessage("refused");

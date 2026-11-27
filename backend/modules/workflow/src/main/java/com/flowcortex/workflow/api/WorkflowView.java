@@ -14,18 +14,20 @@ import java.util.UUID;
  * live draft, null when {@code steps} are the live ones. {@code allowFork} is the owner's switch, {@code forkCount}
  * how many times it was forked and {@code forkedFromId} the workflow it was forked from, null when it is not a fork.
  * {@code startInput} is what a run needs from the member: {@code link} (a pasted link), {@code image} (one uploaded
- * image), {@code upload} (an uploaded file) or {@code text}.
+ * image), {@code upload} (an uploaded file) or {@code text}. {@code generateInsight} is the owner's switch for a
+ * model-written reading of a table result.
  */
 public record WorkflowView(
         UUID id, UUID ownerId, String name, WorkflowVisibility visibility, Instant createdAt, Instant updatedAt,
         List<WorkflowStepView> steps, boolean available, String status, UUID publishedVersionId,
-        Integer servedVersion, boolean allowFork, int forkCount, UUID forkedFromId, String startInput) {
+        Integer servedVersion, boolean allowFork, int forkCount, UUID forkedFromId, String startInput,
+        boolean generateInsight) {
 
     public WorkflowView(UUID id, UUID ownerId, String name, WorkflowVisibility visibility, Instant createdAt,
             Instant updatedAt, List<WorkflowStepView> steps, boolean available, String status, UUID publishedVersionId,
             Integer servedVersion) {
         this(id, ownerId, name, visibility, createdAt, updatedAt, steps, available, status, publishedVersionId,
-                servedVersion, false, 0, null, "text");
+                servedVersion, false, 0, null, "text", false);
     }
 
     /**

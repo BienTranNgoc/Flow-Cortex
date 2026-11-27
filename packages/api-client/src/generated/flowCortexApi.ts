@@ -231,6 +231,40 @@ export interface UserResponse {
   staffTarget?: boolean;
 }
 
+export type RunFeedbackRequestVerdict =
+  (typeof RunFeedbackRequestVerdict)[keyof typeof RunFeedbackRequestVerdict];
+
+export const RunFeedbackRequestVerdict = {
+  up: 'up',
+  down: 'down',
+} as const;
+
+export type RunFeedbackRequestIssue =
+  (typeof RunFeedbackRequestIssue)[keyof typeof RunFeedbackRequestIssue];
+
+export const RunFeedbackRequestIssue = {
+  wrong_request: 'wrong_request',
+  low_quality: 'low_quality',
+  off_brand: 'off_brand',
+  technical_error: 'technical_error',
+  inappropriate: 'inappropriate',
+  other: 'other',
+} as const;
+
+export interface RunFeedbackRequest {
+  verdict?: RunFeedbackRequestVerdict;
+  issue?: RunFeedbackRequestIssue;
+  /** @maxLength 1000 */
+  detail?: string;
+}
+
+export interface RunFeedbackResponse {
+  verdict: string;
+  issue?: string;
+  detail?: string;
+  updatedAt: string;
+}
+
 export interface UploadedImageRequest {
   uploadId: string;
 }
@@ -1179,6 +1213,7 @@ export interface WorkflowResponse {
   /** @nullable */
   forkedFromId?: string | null;
   startInput: WorkflowResponseStartInput;
+  generateInsight: boolean;
 }
 
 export interface SaveVersionRequest {
@@ -1236,6 +1271,19 @@ export interface CreateStepRequest {
   config?: string;
 }
 
+export interface EditableFieldResponse {
+  pointer: string;
+  label: string;
+  index?: number;
+  source?: string;
+  text: string;
+}
+
+export interface RunInsightResponse {
+  headline: string;
+  highlights: string[];
+}
+
 export interface RunStepOutputResponse {
   name: string;
   mime: string;
@@ -1280,6 +1328,17 @@ export interface RunStepResponse {
   outputs: RunStepOutputResponse[];
   mode: RunStepResponseMode;
   children: RunStepChildResponse[];
+  /** Whether the member may correct this step's text */
+  editable: boolean;
+  /** The editable texts with their current value; empty unless editable */
+  editableFields: EditableFieldResponse[];
+  /** The whole result with the member's edit applied; null when no edit is current */
+  editedOutput?: string;
+  editedAt?: string;
+  /** How far the edit is from the original, 0 to 100; null when no edit is current */
+  editDiffPct?: number;
+  /** The token an edit must send back */
+  editRevision: number;
 }
 
 export interface RunResponse {
@@ -1292,6 +1351,9 @@ export interface RunResponse {
   finishedAt?: string;
   steps?: RunStepResponse[];
   chargedCredits?: number;
+  feedback?: RunFeedbackResponse;
+  insight?: RunInsightResponse;
+  insightPending: boolean;
 }
 
 /**
@@ -1737,6 +1799,16 @@ export interface SupportAssistantReply {
   conversationId: string;
   message: SupportAssistantReplyMessage;
   quota: SupportAssistantQuota;
+}
+
+export interface StepEditResponse {
+  runId: string;
+  stepId: string;
+  editedOutput?: string;
+  fields: EditableFieldResponse[];
+  editDiffPct?: number;
+  editedAt?: string;
+  revision: number;
 }
 
 export interface RetryRunRequest {
@@ -3083,6 +3155,7 @@ export interface UpdateWorkflowRequest {
   /** @pattern draft|published */
   status?: UpdateWorkflowRequestStatus;
   allowFork?: boolean;
+  generateInsight?: boolean;
 }
 
 /**
@@ -3128,6 +3201,21 @@ export interface UpdateStepRequest {
 
 export interface PublishedVersionRequest {
   versionId?: string;
+}
+
+export interface FieldEditRequest {
+  pointer: string;
+  text: string;
+}
+
+export interface EditStepOutputRequest {
+  /**
+   * @minItems 1
+   * @maxItems 2000
+   */
+  fields: FieldEditRequest[];
+  /** @minimum 1 */
+  expectedRevision: number;
 }
 
 export interface UpdateRunRequest {
@@ -7354,6 +7442,73 @@ export const _delete = async (
   return customFetch<_deleteResponse>(getDeleteUrl(id), {
     ...options,
     method: 'DELETE',
+  });
+};
+
+export type putRunFeedbackResponse200 = {
+  data: RunFeedbackResponse;
+  status: 200;
+};
+
+export type putRunFeedbackResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type putRunFeedbackResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type putRunFeedbackResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type putRunFeedbackResponseSuccess = putRunFeedbackResponse200 & {
+  headers: Headers;
+};
+export type putRunFeedbackResponseError = (
+  putRunFeedbackResponse400 | putRunFeedbackResponse404 | putRunFeedbackResponse429
+) & {
+  headers: Headers;
+};
+
+export type putRunFeedbackResponse = putRunFeedbackResponseSuccess | putRunFeedbackResponseError;
+
+export const getPutRunFeedbackUrl = (runId: string) => {
+  return `/api/v1/runs/${runId}/feedback`;
+};
+
+export const putRunFeedback = async (
+  runId: string,
+  runFeedbackRequest: RunFeedbackRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<putRunFeedbackResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<putRunFeedbackResponse>(getPutRunFeedbackUrl(runId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(runFeedbackRequest),
   });
 };
 
@@ -11793,6 +11948,66 @@ export const askSupportAssistantAsGuest = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(supportAssistantQuestion),
+  });
+};
+
+export type undoRunStepEditResponse200 = {
+  data: StepEditResponse;
+  status: 200;
+};
+
+export type undoRunStepEditResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type undoRunStepEditResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type undoRunStepEditResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type undoRunStepEditResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type undoRunStepEditResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type undoRunStepEditResponseSuccess = undoRunStepEditResponse200 & {
+  headers: Headers;
+};
+export type undoRunStepEditResponseError = (
+  | undoRunStepEditResponse400
+  | undoRunStepEditResponse404
+  | undoRunStepEditResponse409
+  | undoRunStepEditResponse422
+  | undoRunStepEditResponse429
+) & {
+  headers: Headers;
+};
+
+export type undoRunStepEditResponse = undoRunStepEditResponseSuccess | undoRunStepEditResponseError;
+
+export const getUndoRunStepEditUrl = (runId: string, stepId: string) => {
+  return `/api/v1/runs/${runId}/steps/${stepId}/edit/undo`;
+};
+
+export const undoRunStepEdit = async (
+  runId: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<undoRunStepEditResponse> => {
+  return customFetch<undoRunStepEditResponse>(getUndoRunStepEditUrl(runId, stepId), {
+    ...options,
+    method: 'POST',
   });
 };
 
@@ -18066,6 +18281,131 @@ export const setPublishedWorkflowVersion = async (
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(publishedVersionRequest),
+  });
+};
+
+export type discardRunStepEditResponse200 = {
+  data: StepEditResponse;
+  status: 200;
+};
+
+export type discardRunStepEditResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type discardRunStepEditResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type discardRunStepEditResponseSuccess = discardRunStepEditResponse200 & {
+  headers: Headers;
+};
+export type discardRunStepEditResponseError = (
+  discardRunStepEditResponse404 | discardRunStepEditResponse429
+) & {
+  headers: Headers;
+};
+
+export type discardRunStepEditResponse =
+  discardRunStepEditResponseSuccess | discardRunStepEditResponseError;
+
+export const getDiscardRunStepEditUrl = (runId: string, stepId: string) => {
+  return `/api/v1/runs/${runId}/steps/${stepId}/edit`;
+};
+
+export const discardRunStepEdit = async (
+  runId: string,
+  stepId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<discardRunStepEditResponse> => {
+  return customFetch<discardRunStepEditResponse>(getDiscardRunStepEditUrl(runId, stepId), {
+    ...options,
+    method: 'DELETE',
+  });
+};
+
+export type editRunStepOutputResponse200 = {
+  data: StepEditResponse;
+  status: 200;
+};
+
+export type editRunStepOutputResponse400 = {
+  data: ProblemDetail;
+  status: 400;
+};
+
+export type editRunStepOutputResponse404 = {
+  data: ProblemDetail;
+  status: 404;
+};
+
+export type editRunStepOutputResponse409 = {
+  data: ProblemDetail;
+  status: 409;
+};
+
+export type editRunStepOutputResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type editRunStepOutputResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type editRunStepOutputResponseSuccess = editRunStepOutputResponse200 & {
+  headers: Headers;
+};
+export type editRunStepOutputResponseError = (
+  | editRunStepOutputResponse400
+  | editRunStepOutputResponse404
+  | editRunStepOutputResponse409
+  | editRunStepOutputResponse422
+  | editRunStepOutputResponse429
+) & {
+  headers: Headers;
+};
+
+export type editRunStepOutputResponse =
+  editRunStepOutputResponseSuccess | editRunStepOutputResponseError;
+
+export const getEditRunStepOutputUrl = (runId: string, stepId: string) => {
+  return `/api/v1/runs/${runId}/steps/${stepId}/edit`;
+};
+
+export const editRunStepOutput = async (
+  runId: string,
+  stepId: string,
+  editStepOutputRequest: EditStepOutputRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<editRunStepOutputResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<editRunStepOutputResponse>(getEditRunStepOutputUrl(runId, stepId), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(editStepOutputRequest),
   });
 };
 

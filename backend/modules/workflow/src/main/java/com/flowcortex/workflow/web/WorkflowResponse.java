@@ -16,7 +16,7 @@ import java.util.UUID;
  * {@code servedVersion} is the number of the version {@code steps} come from, null when they are the live draft;
  * {@code publishedVersionId} is the pointer. {@code allowFork} is the owner's switch, {@code forkCount} how many
  * times it was forked and {@code forkedFromId} the workflow it was forked from. {@code startInput} names the start
- * form the workflow needs.
+ * form the workflow needs. {@code generateInsight} is the owner's switch for a model-written reading of a table result.
  */
 record WorkflowResponse(
         UUID id, String name, WorkflowVisibility visibility, Instant createdAt, Instant updatedAt,
@@ -27,12 +27,14 @@ record WorkflowResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) boolean allowFork,
         @Schema(requiredMode = RequiredMode.REQUIRED) int forkCount, @Schema(nullable = true) UUID forkedFromId,
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"link", "image", "upload", "text"})
-        String startInput) {
+        String startInput,
+        @Schema(requiredMode = RequiredMode.REQUIRED) boolean generateInsight) {
 
     static WorkflowResponse from(WorkflowView view, CreditAccounts credits) {
         return new WorkflowResponse(view.id(), view.name(), view.visibility(), view.createdAt(), view.updatedAt(),
                 view.steps().stream().map(WorkflowStepResponse::from).toList(),
                 view.estimatedCredits(credits), view.available(), view.status(), view.publishedVersionId(),
-                view.servedVersion(), view.allowFork(), view.forkCount(), view.forkedFromId(), view.startInput());
+                view.servedVersion(), view.allowFork(), view.forkCount(), view.forkedFromId(), view.startInput(),
+                view.generateInsight());
     }
 }

@@ -31,6 +31,9 @@ function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
     deliveryCount: 0,
     outputs: [],
     children: [],
+    editable: false,
+    editableFields: [],
+    editRevision: 1,
     ...overrides,
   };
 }
@@ -49,6 +52,7 @@ const run = (overrides: Partial<RunResponse> = {}): RunResponse => ({
   id: 'r1',
   status: 'running',
   steps: steps('completed', 'running', 'pending'),
+  insightPending: false,
   ...overrides,
 });
 
@@ -90,7 +94,7 @@ describe('runCanvasGraph', () => {
 
   it('returns no nodes for a run with no steps', () => {
     expect(runCanvasGraph(run({ steps: [] }))).toEqual({ nodes: [], edges: [] });
-    expect(runCanvasGraph({ id: 'r1' })).toEqual({ nodes: [], edges: [] });
+    expect(runCanvasGraph({ id: 'r1', insightPending: false })).toEqual({ nodes: [], edges: [] });
   });
 });
 
