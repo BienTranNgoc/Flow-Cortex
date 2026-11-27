@@ -5,6 +5,7 @@ import { activeLocale } from '../../lib/i18n';
 import { ApprovalPanel } from './ApprovalPanel';
 import { parseStoryboardOutput } from './productVideoSchemas';
 import { StepActivityCard } from './StepActivityCard';
+import { StepEditPanel } from './StepEditPanel';
 import { StepDownloads } from './StepDownloads';
 import { formatTime, stepDuration, stepKey, stepNameId } from './stepDisplay';
 import { stepErrorSentence } from './stepErrorMessages';
@@ -92,6 +93,7 @@ export function StepDetail({
     : artifacts;
   const storyboard =
     step.type === 'generate_storyboard' ? parseStoryboardOutput(step.output) : null;
+  const shownOutput = step.editedOutput ?? step.output;
   const allowDownloadForStep = !isProductVideo || step.type === 'render_video';
   const stepOrder = step.stepOrder;
   const duration = stepDuration(step, t, locale);
@@ -148,8 +150,9 @@ export function StepDetail({
           <StoryboardOutputView storyboard={storyboard} />
         ) : (
           status === 'completed' &&
-          step.output && <StepOutput output={step.output} hideRaw={isProductVideo} />
+          shownOutput && <StepOutput output={shownOutput} hideRaw={isProductVideo} />
         )}
+        <StepEditPanel runId={runId} step={step} />
         {status === 'completed' && !isProductVideo && details && stepOrder !== undefined && (
           <StepDownloads
             runId={runId}

@@ -29,6 +29,9 @@ function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
     deliveryCount: 0,
     outputs: [],
     children: [],
+    editable: false,
+    editableFields: [],
+    editRevision: 1,
     ...overrides,
   };
 }

@@ -356,6 +356,73 @@
     "creatorLink": "Hãy dán một liên kết TikTok hoặc Douyin hợp lệ",
     "linkRequired": "Hãy dán một liên kết bắt đầu bằng http:// hoặc https://"
   },
+  "edit": {
+    "open": "Sửa kết quả",
+    "edited": "Đã sửa · phiên bản {{revision}}",
+    "save": "Lưu",
+    "saving": "Đang lưu…",
+    "cancel": "Hủy",
+    "retry": "Thử lại",
+    "undo": "Hoàn tác",
+    "undoing": "Đang hoàn tác…",
+    "discard": "Bỏ bản sửa",
+    "discarding": "Đang bỏ…",
+    "field": {
+      "output": "Kết quả",
+      "script": "Kịch bản",
+      "line": "Dòng {{number}}"
+    },
+    "confirm": {
+      "title": "Bỏ bản sửa của bạn?",
+      "text": "Kết quả quay về bản gốc. Hoàn tác sẽ không khôi phục bản sửa này.",
+      "keep": "Giữ bản sửa",
+      "discard": "Bỏ bản sửa"
+    },
+    "error": {
+      "field": "Không lưu được nội dung này. Hãy kiểm tra và thử lại.",
+      "conflict": "Kết quả này vừa được thay đổi ở nơi khác. Nội dung hiện tại đang được hiển thị.",
+      "nothingToUndo": "Không còn bản sửa nào để hoàn tác. Kết quả hiện tại đang được hiển thị.",
+      "notEditable": "Kết quả này không còn sửa được nữa.",
+      "gone": "Bước này không còn khả dụng.",
+      "retry": "Không kết nối được máy chủ. Nội dung của bạn vẫn được giữ, hãy thử lại."
+    }
+  },
+  "insight": {
+    "title": "Tóm tắt kết quả"
+  },
+  "eval": {
+    "question": "Kết quả này thế nào?",
+    "up": "Tốt",
+    "down": "Chưa tốt",
+    "sent": {
+      "up": "Bạn đã đánh giá kết quả này là tốt. Cảm ơn bạn đã góp ý.",
+      "down": "Bạn đã đánh giá kết quả này là chưa tốt. Cảm ơn bạn đã góp ý."
+    },
+    "change": "Thay đổi",
+    "dialog": {
+      "titleUp": "Điều gì làm bạn hài lòng?",
+      "titleDown": "Điều gì chưa ổn?",
+      "note": "Góp ý của bạn được gửi tới đội ngũ Nodi.",
+      "issue": "Vấn đề",
+      "issuePlaceholder": "Chọn một vấn đề",
+      "detail": "Chi tiết (không bắt buộc)",
+      "send": "Gửi",
+      "sending": "Đang gửi…",
+      "cancel": "Hủy"
+    },
+    "issues": {
+      "wrong_request": "Kết quả không đúng với yêu cầu của tôi",
+      "low_quality": "Chất lượng thấp",
+      "off_brand": "Không hợp với thương hiệu của tôi",
+      "technical_error": "Có vẻ bị lỗi",
+      "inappropriate": "Nội dung không phù hợp",
+      "other": "Vấn đề khác"
+    },
+    "error": {
+      "send": "Không gửi được góp ý. Nội dung bạn đã nhập vẫn được giữ, hãy thử lại.",
+      "invalid": "Không thể gửi góp ý như đã nhập. Hãy kiểm tra phần chi tiết và thử lại."
+    }
+  },
   "stop": {
     "open": "Dừng quy trình",
     "title": "Dừng quy trình này?",

@@ -19,6 +19,7 @@ const CHECK: WorkflowResponse = {
   visibility: 'public',
   available: true,
   allowFork: false,
+  generateInsight: false,
   forkCount: 0,
   startInput: 'upload',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Check the file', type: 'probe', mode: 'remote' }],
@@ -30,6 +31,7 @@ const ECHO: WorkflowResponse = {
   visibility: 'public',
   available: true,
   allowFork: false,
+  generateInsight: false,
   forkCount: 0,
   startInput: 'text',
   steps: [{ id: 'ws1', stepOrder: 1, name: 'Echo', type: 'echo', mode: 'inline' }],
@@ -50,6 +52,7 @@ const INCOMPLETE: WorkflowResponse = {
   visibility: 'public',
   available: true,
   allowFork: false,
+  generateInsight: false,
   forkCount: 0,
   startInput: 'text',
   steps: [
@@ -135,6 +138,7 @@ describe('WorkflowDetailPage', () => {
       visibility: 'public',
       available: true,
       allowFork: false,
+      generateInsight: false,
       forkCount: 0,
       startInput: 'upload',
       steps: [

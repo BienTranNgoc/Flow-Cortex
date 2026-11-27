@@ -101,6 +101,9 @@ function step(overrides: Partial<RunStepResponse> = {}): RunStepResponse {
     deliveryCount: 0,
     outputs: [],
     children: [],
+    editable: false,
+    editableFields: [],
+    editRevision: 1,
     ...overrides,
   };
 }
@@ -112,6 +115,7 @@ function run(steps: RunStepResponse[], overrides: Partial<RunResponse> = {}): Ru
     status: 'running',
     input: 'holiday clip.mp4',
     steps,
+    insightPending: false,
     ...overrides,
   };
 }

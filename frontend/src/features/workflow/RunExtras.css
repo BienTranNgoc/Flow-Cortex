@@ -1,0 +1,356 @@
+/* Step result editor: edit, undo and discard under a step's output. Fluid down to 360px; the
+   source line sits beside its textarea only when the panel itself is wide enough. */
+
+.step-edit {
+  container-type: inline-size;
+  min-width: 0;
+  margin: 0.75rem 0 0;
+}
+
+.step-edit-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-edit-bar button,
+.step-edit-actions button,
+.step-edit-problem button {
+  margin-right: 0;
+}
+
+.step-edit-mark {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-full);
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+  font-weight: 600;
+}
+
+.step-edit-form {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
+.step-edit-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.step-edit-field label {
+  font-weight: 600;
+}
+
+.step-edit-source {
+  margin: 0;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.step-edit-field textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: inherit;
+  resize: vertical;
+}
+
+.step-edit-field textarea[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+.step-edit-field textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.step-edit-error {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.step-edit-actions,
+.step-edit-problem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-edit-problem {
+  margin: 0.75rem 0 0;
+}
+
+@container (min-width: 36rem) {
+  .step-edit-field:has(.step-edit-source) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    column-gap: 1rem;
+    align-items: start;
+  }
+
+  .step-edit-field:has(.step-edit-source) label {
+    grid-column: 1 / -1;
+  }
+
+  .step-edit-field:has(.step-edit-source) .step-edit-error {
+    grid-column: 2;
+  }
+}
+
+.step-edit-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.step-edit-dialog[open] {
+  animation: step-edit-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.step-edit-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.step-edit-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.step-edit-dialog p {
+  margin: 0 0 0.75rem;
+}
+
+.step-edit-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.step-edit-dialog-actions button {
+  margin-right: 0;
+}
+
+.step-edit-discard-confirm {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.step-edit-dialog-actions button[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.step-edit-dialog-actions button[aria-busy='true'] {
+  cursor: progress;
+}
+
+@keyframes step-edit-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-edit-dialog[open] {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .step-edit-actions,
+  .step-edit-dialog-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Run-level result: the insight card and the eval bar under the pipeline and the step detail. */
+
+.run-result {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 1.5rem 0 0;
+}
+
+.run-insight {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.run-insight-headline {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.run-insight-highlights {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.run-insight-highlights li + li {
+  margin-top: 0.25rem;
+}
+
+.run-eval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-2);
+}
+
+.run-eval-question {
+  margin: 0;
+  font-weight: 600;
+}
+
+.run-eval-thumbs,
+.run-eval-sent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.run-eval-sent p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.run-eval-thumbs button,
+.run-eval-sent button,
+.run-eval-actions button {
+  margin-right: 0;
+}
+
+.run-eval-thumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.run-eval-thumb--down svg {
+  transform: rotate(180deg);
+}
+
+.run-eval-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper-3);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.run-eval-dialog[open] {
+  animation: step-edit-dialog-enter var(--dur-standard) var(--ease-standard);
+}
+
+.run-eval-dialog::backdrop {
+  background: color-mix(in srgb, var(--shadow-color) 60%, transparent);
+}
+
+.run-eval-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.run-eval-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.run-eval-note {
+  margin: 0;
+  color: var(--ink-3);
+}
+
+.run-eval-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.run-eval-field label {
+  font-weight: 600;
+}
+
+.run-eval-field select,
+.run-eval-field textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font: inherit;
+}
+
+.run-eval-field textarea {
+  resize: vertical;
+}
+
+.run-eval-field select:focus-visible,
+.run-eval-field textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.run-eval-error {
+  margin: 0;
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+
+.run-eval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-eval-dialog[open] {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .run-eval {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .run-eval-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}

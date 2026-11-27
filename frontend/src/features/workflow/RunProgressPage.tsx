@@ -18,7 +18,9 @@ import {
   parseProductBrief,
 } from './productVideoSchemas';
 import { RunCanvas, useRunCanvasWide } from './RunCanvas';
+import { RunEvalBar } from './RunEvalBar';
 import { RunInputs } from './RunInputs';
+import { RunInsightCard } from './RunInsightCard';
 import { RunLogPanel } from './RunLogPanel';
 import { RunSplitHandle } from './RunSplitHandle';
 import { StepDetail } from './StepDetail';
@@ -329,6 +331,12 @@ function RunView({ run, runId, workflowId }: Readonly<RunViewProps>) {
             />
           </div>
           {detail}
+        </div>
+      )}
+      {run.status === 'completed' && (
+        <div className="run-result">
+          {run.insight && <RunInsightCard insight={run.insight} />}
+          <RunEvalBar runId={runId} feedback={run.feedback} />
         </div>
       )}
       <RunLogPanel runId={runId} />

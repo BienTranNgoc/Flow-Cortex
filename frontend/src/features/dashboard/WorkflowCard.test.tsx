@@ -11,6 +11,7 @@ const PRODUCT_VIDEO: WorkflowResponse = {
   visibility: 'public',
   available: true,
   allowFork: false,
+  generateInsight: false,
   forkCount: 0,
   startInput: 'text',
   steps: [
