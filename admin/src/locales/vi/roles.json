@@ -174,7 +174,8 @@
         "admin_account": "Tài khoản quản trị"
       },
       "ai": {
-        "provider": "Nhà cung cấp AI"
+        "provider": "Nhà cung cấp AI",
+        "model": "Mô hình AI"
       },
       "payment": {
         "setting": "Cài đặt thanh toán"
@@ -257,6 +258,10 @@
         "provider": {
           "view": "Xem nhà cung cấp AI",
           "update": "Đổi nhà cung cấp AI"
+        },
+        "model": {
+          "view": "Xem mô hình AI",
+          "update": "Đổi mô hình AI"
         }
       },
       "payment": {

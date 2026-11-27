@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Books,
   ChatsCircle,
   ChatText,
   ClipboardText,
@@ -104,6 +105,12 @@ export const NAV: NavGroup[] = [
         path: '/providers',
         icon: Cpu,
         key: 'ai.provider.view',
+      },
+      {
+        label: 'common.shell.nav.items.modelCatalog',
+        path: '/model-catalog',
+        icon: Books,
+        key: 'ai.model.view',
       },
       {
         label: 'common.shell.nav.items.paymentSettings',

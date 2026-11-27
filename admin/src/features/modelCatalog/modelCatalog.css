@@ -1,0 +1,277 @@
+.model-catalog-page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.model-catalog-tab,
+.model-catalog-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.model-catalog-panel {
+  gap: 0;
+}
+
+/* Wide screens: the page itself stays put and the table region is the one vertical scroller. */
+@media (min-width: 1024px) {
+  .model-catalog-page {
+    height: calc(100svh - var(--admin-topbar-h) - 2 * var(--admin-content-pad));
+  }
+
+  .model-catalog-page .cortex-admin-page-heading {
+    margin-bottom: 0.75rem;
+  }
+
+  .model-catalog-page .cortex-admin-table-wrapper {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+
+.model-catalog-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--admin-card-edge);
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+}
+
+.model-catalog-tab-button {
+  min-height: var(--admin-hit-min);
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--admin-ink-3);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--dur-quick) var(--ease-standard),
+    background var(--dur-quick) var(--ease-standard);
+}
+
+.model-catalog-tab-button[aria-selected='true'] {
+  color: var(--admin-primary);
+  border-bottom-color: var(--admin-primary);
+}
+
+.model-catalog-tab-button:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (hover: hover) {
+  .model-catalog-tab-button:not([aria-selected='true']):hover {
+    background: var(--admin-chrome-hover);
+    color: var(--admin-ink);
+  }
+}
+
+.model-catalog-tab-button:active {
+  transform: scale(0.98);
+}
+
+/* Below 1024px a table keeps its key, status and action columns; the rest shows on the wider layout. */
+@media (max-width: 1023px) {
+  .cortex-admin-table .model-catalog-col-extra {
+    display: none;
+  }
+
+  .model-catalog-table td:last-child .cortex-admin-row-actions {
+    flex-wrap: wrap;
+  }
+}
+
+.model-catalog-table .cortex-admin-table-job-id {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.model-catalog-table .cortex-admin-table-job-id + .cortex-admin-pill {
+  margin-left: 0.5rem;
+}
+
+.model-catalog-sub {
+  display: block;
+  color: var(--admin-ink-4);
+  font-size: 0.85rem;
+}
+
+.model-catalog-descriptor {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.model-catalog-switch {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+}
+
+.model-catalog-switch input,
+.model-catalog-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--admin-primary);
+  cursor: pointer;
+}
+
+.model-catalog-switch input:focus-visible,
+.model-catalog-check input:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.model-catalog-switch input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.model-catalog-note,
+.model-catalog-hint {
+  margin: 0.25rem 0 0;
+  color: var(--admin-ink-4);
+  font-size: 0.85rem;
+}
+
+.model-catalog-note--inline[role='alert'] {
+  color: var(--admin-warning);
+}
+
+.model-catalog-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.model-catalog-section-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--admin-ink);
+}
+
+.model-catalog-section-head .cortex-admin-toolbar {
+  margin: 0;
+}
+
+/* ===== CAPABILITY DISPLAY FIELDS ======================================== */
+
+.model-catalog-display-form,
+.model-catalog-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  align-items: start;
+  gap: 0 0.75rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--admin-card-edge);
+  border-radius: var(--radius-lg);
+  background: var(--admin-card-surface);
+}
+
+.model-catalog-display-form .cortex-admin-field {
+  max-width: none;
+}
+
+.model-catalog-display-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  align-self: end;
+  margin-bottom: 0.5rem;
+}
+
+.model-catalog-display-form .cortex-admin-form-error {
+  grid-column: 1 / -1;
+}
+
+.model-catalog-facts > div {
+  min-width: 0;
+}
+
+.model-catalog-facts dt {
+  color: var(--admin-ink-3);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.model-catalog-facts dd {
+  margin: 0.25rem 0 0;
+  color: var(--admin-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ===== DIALOGS ========================================================== */
+
+.model-catalog-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: calc(100dvh - 2rem);
+  padding: 1.25rem 1.4rem;
+  overflow-y: auto;
+}
+
+.model-catalog-dialog__body h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.model-catalog-dialog .cortex-admin-field {
+  max-width: none;
+}
+
+.model-catalog-dialog__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0 0.75rem;
+}
+
+.model-catalog-dialog__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.model-catalog-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--target-min);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.model-catalog-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-catalog-tab-button {
+    transition: none;
+  }
+}
