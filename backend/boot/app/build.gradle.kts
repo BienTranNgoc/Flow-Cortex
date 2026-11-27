@@ -110,9 +110,36 @@ tasks.withType<Test> {
 
 // ITs tagged multi-instance boot extra full app contexts of their own; sharing the main suite's
 // heap with its context cache runs it out of memory, so they get a JVM of their own.
+val testShardIndex = providers.gradleProperty("testShardIndex").orNull?.toInt()
+val testShardTotal = providers.gradleProperty("testShardTotal").orNull?.toInt()
+
+if (testShardTotal != null || testShardIndex != null) {
+    require(testShardTotal != null && testShardIndex != null && testShardTotal > 0 && testShardIndex in 0 until testShardTotal) {
+        "Both -PtestShardIndex (0..N-1) and -PtestShardTotal (> 0) must be set together."
+    }
+}
+
 tasks.test {
     useJUnitPlatform {
         excludeTags("multi-instance")
+    }
+    if (testShardTotal != null && testShardIndex != null) {
+        inputs.property("testShardIndex", testShardIndex)
+        inputs.property("testShardTotal", testShardTotal)
+        val testSourceRoot = file("src/test/java")
+        val allTestSources = fileTree(testSourceRoot) { include("**/*.java") }
+            .files
+            .map { it.relativeTo(testSourceRoot).invariantSeparatorsPath }
+            // OpenApiSnapshotTest runs in the dedicated OpenAPI drift-check job in CI.
+            .filterNot { it == "com/flowcortex/app/openapi/OpenApiSnapshotTest.java" }
+            .sorted()
+        val start = testShardIndex * allTestSources.size / testShardTotal
+        val end = (testShardIndex + 1) * allTestSources.size / testShardTotal
+        val shardPatterns = allTestSources.subList(start, end).flatMap { relPath ->
+            val base = relPath.removeSuffix(".java")
+            listOf("$base.class", "$base\$*.class")
+        }
+        include(shardPatterns)
     }
 }
 

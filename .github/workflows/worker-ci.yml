@@ -5,6 +5,19 @@ name: worker-ci
 # and run the real ffprobe, so the runner installs ffmpeg.
 on:
   workflow_call:
+    inputs:
+      run_overlay:
+        type: boolean
+        default: true
+      run_audio:
+        type: boolean
+        default: true
+      run_trend:
+        type: boolean
+        default: true
+      run_preview:
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -45,6 +58,7 @@ jobs:
         run: uv run --frozen --no-build --extra overlay pytest -rs
 
   overlay-image:
+    if: inputs.run_overlay
     # Builds the overlay image and proves it cleans a captioned picture with networking off, that
     # its ffmpeg has libvidstab and that the video ops' vision child runs in it.
     runs-on: ubuntu-latest
@@ -110,6 +124,7 @@ jobs:
             /bench/bench_clean_overlay.py | tee "$GITHUB_STEP_SUMMARY"
 
   audio-engines:
+    if: inputs.run_audio
     # Builds the audio image (hash-pinned packages, digest-checked models) and runs the engine
     # tests inside it with no network, so a model fetched at run time fails here, not in prod.
     runs-on: ubuntu-latest
@@ -147,6 +162,7 @@ jobs:
             -m pytest -m engines -o "markers=engines: needs the audio image" -p no:cacheprovider -rs tests/engines/test_engines.py
 
   trend-engines:
+    if: inputs.run_trend
     # Builds the trend image (hash-pinned packages, digest-checked detector files), runs its engine
     # tests with no network, measures the cost of the largest job, and checks that a container
     # started before its queue exists refuses to run.
@@ -217,6 +233,7 @@ jobs:
   # preview-runtime image (whose build runs its own render gate) and the render-cost
   # measurement inside it. Blender renders on Mesa's software rasteriser here, as in production.
   preview:
+    if: inputs.run_preview
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
