@@ -26,8 +26,10 @@ import com.flowcortex.workflow.application.RunResumeRules.StepState;
 import com.flowcortex.workflow.application.RunResumeRules.Verdict;
 import com.flowcortex.workflow.domain.RunStatus;
 import com.flowcortex.workflow.domain.RunStep;
+import com.flowcortex.workflow.domain.RunStepOutputVersion;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.WorkflowRun;
+import com.flowcortex.workflow.infrastructure.RunStepOutputVersionRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
@@ -77,22 +79,27 @@ public class RunResumption {
     private final WorkflowRepository workflowRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final RunStepRepository runStepRepository;
+    private final RunStepOutputVersionRepository versionRepository;
     private final StepExecutorRegistry registry;
     private final MediaJobs mediaJobs;
     private final TransactionTemplate transactionTemplate;
     private final RunUpdates runUpdates;
     private final RunStartGuards runStartGuards;
     private final ApplicationEventPublisher events;
+    private final RunViewFactsFactory viewFacts;
     private final boolean workflowEnabled;
 
     RunResumption(WorkflowRepository workflowRepository, WorkflowRunRepository workflowRunRepository,
-            RunStepRepository runStepRepository, StepExecutorRegistry registry, MediaJobs mediaJobs,
-            TransactionTemplate transactionTemplate, RunUpdates runUpdates, RunStartGuards runStartGuards,
-            ApplicationEventPublisher events, @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+            RunStepRepository runStepRepository, RunStepOutputVersionRepository versionRepository,
+            StepExecutorRegistry registry, MediaJobs mediaJobs, TransactionTemplate transactionTemplate,
+            RunUpdates runUpdates, RunStartGuards runStartGuards, ApplicationEventPublisher events,
+            RunViewFactsFactory viewFacts, @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this.viewFacts = viewFacts;
         this.workflowRepository = workflowRepository;
         this.runStartGuards = runStartGuards;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
+        this.versionRepository = versionRepository;
         this.registry = registry;
         this.mediaJobs = mediaJobs;
         this.transactionTemplate = transactionTemplate;
@@ -284,13 +291,15 @@ public class RunResumption {
                 newIds.put(step.getId(), newStepId);
                 carried.add(RunStep.reused(newStepId, newRunId, step.getStepOrder(), step.getType(), step.getInput(),
                         step.getConfig(), step.getInputRef(), step.getOutput(), reusedOutputs.get(step.getId()),
-                        step.getStartedAt(), step.getFinishedAt()));
+                        step.getStartedAt(), step.getFinishedAt(), step.getEditedOutput(), step.getEditedAt(),
+                        step.getEditDiffPct(), step.getEditedOutput() == null ? 0 : 1));
             }
             for (RunStep step : tail) {
                 carried.add(new RunStep(UUID.randomUUID(), newRunId, step.getStepOrder(), step.getType(),
                         snapshotsUpload(steps, step) ? tailInput : null, step.getConfig(), step.getInputRef()));
             }
             List<RunStep> saved = runStepRepository.saveAll(carried);
+            carryEditHistory(reusedSteps, newIds);
             for (RunStep step : reusedSteps) {
                 List<MediaOutput> copied = reusedCopies.get(step.getId());
                 if (copied != null && registry.isRemote(step.getType())) {
@@ -300,10 +309,33 @@ public class RunResumption {
             }
             runUpdates.touched(newRunId);
             events.publishEvent(new WorkflowRunStartedEvent(newRunId));
-            return WorkflowMapper.toRunView(created, saved, List.of(), registry::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(created, saved, List.of(), registry::isRemote, mediaJobs::isDownloadable,
+                    viewFacts.of(created, saved));
         });
         LOG.info("Run resume: op=retryRun outcome=created runId={} newRunId={} fromStepOrder={}", runId, newRunId, from);
         return view;
+    }
+
+    /**
+     * Stores each carried edit's field values as version 1 of its new step, so an undo of the carried edit clears
+     * it and an undo after a later edit returns to it. Runs in the transaction that saved the new steps.
+     */
+    private void carryEditHistory(List<RunStep> reusedSteps, Map<UUID, UUID> newIds) {
+        for (RunStep step : reusedSteps) {
+            if (step.getEditedOutput() == null) {
+                continue;
+            }
+            versionRepository.save(new RunStepOutputVersion(UUID.randomUUID(), newIds.get(step.getId()), 1,
+                    writeValues(EditedOutput.values(step.getType(), step.getEditedOutput())), Instant.now()));
+        }
+    }
+
+    private static String writeValues(Map<String, String> values) {
+        try {
+            return JSON.writeValueAsString(values);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Edit values could not be serialized", e);
+        }
     }
 
     /** Whether {@code step} holds the run's upload, by the rule run start uses. */
@@ -410,7 +442,8 @@ public class RunResumption {
 
     private RunView currentView(UUID callerId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, callerId).orElseThrow();
-        return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                runStepRepository.findCurrentChildren(runId), registry::isRemote, mediaJobs::isDownloadable);
+        List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
+        return WorkflowMapper.toRunView(run, steps, runStepRepository.findCurrentChildren(runId), registry::isRemote,
+                mediaJobs::isDownloadable, viewFacts.of(run, steps));
     }
 }

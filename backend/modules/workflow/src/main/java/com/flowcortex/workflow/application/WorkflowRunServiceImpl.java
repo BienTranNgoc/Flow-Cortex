@@ -88,13 +88,15 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
     private final RunStartPreflight preflight;
     private final RunCreation runCreation;
     private final CreditAccounts creditAccounts;
+    private final RunViewFactsFactory viewFacts;
 
     @Autowired
     WorkflowRunServiceImpl(WorkflowRepository workflowRepository, WorkflowRunRepository workflowRunRepository,
             RunStepRepository runStepRepository, StepExecutorRegistry registry, MediaJobs mediaJobs,
             UserDirectory userDirectory, RunStartPreflight preflight, RunCreation runCreation,
-            CreditAccounts creditAccounts) {
+            CreditAccounts creditAccounts, RunViewFactsFactory viewFacts) {
         this.creditAccounts = creditAccounts;
+        this.viewFacts = viewFacts;
         this.workflowRepository = workflowRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
@@ -110,11 +112,11 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
             WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             StepExecutorRegistry registry, MediaJobs mediaJobs, UserDirectory userDirectory,
             RunStartGuards runStartGuards, RunCreation runCreation, CreditAccounts creditAccounts,
-            boolean workflowEnabled) {
+            RunViewFactsFactory viewFacts, boolean workflowEnabled) {
         this(workflowRepository, workflowRunRepository, runStepRepository, registry, mediaJobs, userDirectory,
                 new RunStartPreflight(workflowRepository, servedDefinitions, registry, mediaJobs, runStartGuards,
                         workflowEnabled),
-                runCreation, creditAccounts);
+                runCreation, creditAccounts, viewFacts);
     }
 
     @Override
@@ -154,7 +156,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
         Workflow workflow = preflight.resolve(currentUserId, workflowId);
         // A retried start answers with its run before any cost guard or object copy runs again.
         Optional<RunView> started = RunRequestKeys.existing(workflowRunRepository, runStepRepository, registry,
-                mediaJobs::isDownloadable, currentUserId, requestKey);
+                mediaJobs::isDownloadable, viewFacts, currentUserId, requestKey);
         if (started.isPresent()) {
             return started.get();
         }
@@ -162,7 +164,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                 () -> startNew(currentUserId, workflow, input, uploadId, uploadIds, originalName, options,
                         acknowledgeCost, requestKey),
                 workflowRunRepository, runStepRepository, registry,
-                mediaJobs::isDownloadable, currentUserId, requestKey);
+                mediaJobs::isDownloadable, viewFacts, currentUserId, requestKey);
     }
 
     private RunView startNew(UUID currentUserId, Workflow workflow, String input, UUID uploadId,
@@ -229,7 +231,7 @@ class WorkflowRunServiceImpl implements WorkflowRunService {
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
         List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
         return WorkflowMapper.toRunView(run, steps, runStepRepository.findCurrentChildren(runId), registry::isRemote,
-                mediaJobs::isDownloadable);
+                mediaJobs::isDownloadable, viewFacts.of(run, steps));
     }
 
     @Override

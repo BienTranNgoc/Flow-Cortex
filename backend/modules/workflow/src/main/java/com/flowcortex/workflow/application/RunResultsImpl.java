@@ -67,7 +67,7 @@ class RunResultsImpl implements RunResults {
                 .flatMap(found -> runStepRepository.findByRunIdOrderByStepOrderAsc(runId).stream()
                         .filter(step -> step.getStepOrder() == stepOrder)
                         .findFirst())
-                .map(RunStep::getOutput);
+                .map(RunStep::effectiveOutput);
     }
 
     private RunResultView toView(RunWithWorkflowName found) {
@@ -89,7 +89,8 @@ class RunResultsImpl implements RunResults {
                 .toList();
         return new RunResultView.Step(step.getId(), step.getStepOrder(), step.getType(),
                 registry.isRemote(step.getType()) ? "remote" : "inline",
-                step.getStatus().name().toLowerCase(Locale.ROOT), step.getOutput(), step.getFinishedAt(), outputs);
+                step.getStatus().name().toLowerCase(Locale.ROOT), step.effectiveOutput(), step.getFinishedAt(),
+                outputs);
     }
 
     /** An output whose key is missing or outside its step's storage prefix is never handed to a caller. */

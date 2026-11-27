@@ -64,6 +64,9 @@ public class Workflow {
     @Column(name = "allow_fork", nullable = false)
     private boolean allowFork;
 
+    @Column(name = "generate_insight", nullable = false)
+    private boolean generateInsight;
+
     /** Written only by the atomic increment in the repository, never through the entity. */
     @Column(name = "fork_count", nullable = false, insertable = false, updatable = false)
     @ColumnDefault("0")
@@ -154,6 +157,11 @@ public class Workflow {
         touch();
     }
 
+    public void setGenerateInsight(boolean generateInsight) {
+        this.generateInsight = generateInsight;
+        touch();
+    }
+
     public void changeStatus(WorkflowStatus status) {
         this.status = status;
         touch();
@@ -224,6 +232,11 @@ public class Workflow {
 
     public boolean isAllowFork() {
         return allowFork;
+    }
+
+    /** Whether a table result of a run of this workflow gets a model-written insight. */
+    public boolean isGenerateInsight() {
+        return generateInsight;
     }
 
     public int getForkCount() {

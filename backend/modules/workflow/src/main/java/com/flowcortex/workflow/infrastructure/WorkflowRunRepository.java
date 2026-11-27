@@ -240,6 +240,16 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
             + "com.flowcortex.workflow.domain.RunStatus.CANCELLING)")
     List<ChildRef> findRunningChildrenOfStep(@Param("parentStepId") UUID parentStepId);
 
+    /**
+     * Stores the run's insight unless one is already there; {@code 0} then, so a completion heard twice, or two
+     * writers racing, never replace the first. Its own transaction: the model call ran outside any.
+     */
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE workflow_run SET insight = CAST(:json AS jsonb) WHERE id = :id AND insight IS NULL",
+            nativeQuery = true)
+    int writeInsightIfAbsent(@Param("id") UUID id, @Param("json") String json);
+
     /** The step that started this run, or empty for a run no step started. */
     @Query("SELECT r.parentStepId FROM WorkflowRun r WHERE r.id = :runId AND r.parentStepId IS NOT NULL")
     Optional<UUID> findParentStepIdById(@Param("runId") UUID runId);

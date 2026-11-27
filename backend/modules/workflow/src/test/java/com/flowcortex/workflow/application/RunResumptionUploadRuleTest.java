@@ -18,6 +18,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
+import com.flowcortex.workflow.infrastructure.RunStepOutputVersionRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
@@ -83,9 +84,10 @@ class RunResumptionUploadRuleTest {
         when(workflows.findVisibleTo(workflowId, owner))
                 .thenReturn(Optional.of(new Workflow(workflowId, owner, "wf", false)));
 
-        resumption = new RunResumption(workflows, runs, runSteps, new StepExecutorRegistry(mediaJobs, Clock.systemUTC()),
-                mediaJobs, new TransactionTemplate(transactionManager), mock(RunUpdates.class),
-                mock(RunStartGuards.class), mock(ApplicationEventPublisher.class), true);
+        resumption = new RunResumption(workflows, runs, runSteps, mock(RunStepOutputVersionRepository.class),
+                new StepExecutorRegistry(mediaJobs, Clock.systemUTC()), mediaJobs,
+                new TransactionTemplate(transactionManager), mock(RunUpdates.class), mock(RunStartGuards.class),
+                mock(ApplicationEventPublisher.class), RunViewFactsFactories.insightOff(), true);
         return steps;
     }
 

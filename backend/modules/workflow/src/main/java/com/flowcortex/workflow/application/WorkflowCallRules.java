@@ -80,7 +80,7 @@ final class WorkflowCallRules {
     static Outcome outcome(RunStatus status, String errorMessage, List<RunStep> steps) {
         return switch (status) {
             case COMPLETED -> new Complete(steps.stream().max(Comparator.comparingInt(RunStep::getStepOrder))
-                    .map(RunStep::getOutput).orElse(null));
+                    .map(RunStep::effectiveOutput).orElse(null));
             case ERROR -> new Fail("workflow_call_child_failed", childFailedMessage(errorMessage));
             case CANCELLED -> new Fail("workflow_call_child_cancelled", "The called workflow was cancelled");
             case RUNNING, WAITING_APPROVAL, CANCELLING -> new NotFinished();

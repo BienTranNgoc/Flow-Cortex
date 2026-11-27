@@ -5,6 +5,7 @@ import com.flowcortex.workflow.api.RunStepOutputView;
 import com.flowcortex.workflow.api.RunStepView;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -20,14 +21,27 @@ record RunStepResponse(
         @Schema(requiredMode = RequiredMode.REQUIRED) int deliveryCount, Instant pickedUpAt,
         @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepOutputResponse> outputs,
         @Schema(requiredMode = RequiredMode.REQUIRED, allowableValues = {"inline", "remote"}) String mode,
-        @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepChildResponse> children) {
+        @Schema(requiredMode = RequiredMode.REQUIRED) List<RunStepChildResponse> children,
+        @Schema(requiredMode = RequiredMode.REQUIRED, description = "Whether the member may correct this step's text")
+        boolean editable,
+        @Schema(requiredMode = RequiredMode.REQUIRED, description = "The editable texts with their current value; "
+                + "empty unless editable") List<StepEditResponse.EditableFieldResponse> editableFields,
+        @Schema(description = "The whole result with the member's edit applied; null when no edit is current")
+        String editedOutput,
+        Instant editedAt,
+        @Schema(description = "How far the edit is from the original, 0 to 100; null when no edit is current")
+        BigDecimal editDiffPct,
+        @Schema(requiredMode = RequiredMode.REQUIRED, description = "The token an edit must send back")
+        int editRevision) {
 
     static RunStepResponse from(RunStepView view) {
         return new RunStepResponse(view.id(), view.stepOrder(), view.type(), view.status(), view.input(),
                 view.output(), view.errorMessage(), view.startedAt(), view.finishedAt(), view.progressPercent(),
                 view.attempt(), view.errorCode(), view.deliveryCount(), view.pickedUpAt(),
                 view.outputs().stream().map(RunStepOutputResponse::from).toList(), view.mode(),
-                view.children().stream().map(RunStepChildResponse::from).toList());
+                view.children().stream().map(RunStepChildResponse::from).toList(), view.editable(),
+                view.editableFields().stream().map(StepEditResponse.EditableFieldResponse::from).toList(),
+                view.editedOutput(), view.editedAt(), view.editDiffPct(), view.editRevision());
     }
 
     /** One item of an iterate step in the attempt the step is in now; {@code attempt} is the item's own. */

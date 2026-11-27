@@ -37,6 +37,7 @@ import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
 import com.flowcortex.workflow.domain.Workflow;
 import com.flowcortex.workflow.domain.WorkflowRun;
+import com.flowcortex.workflow.infrastructure.RunStepOutputVersionRepository;
 import com.flowcortex.workflow.infrastructure.RunStepRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRepository;
 import com.flowcortex.workflow.infrastructure.WorkflowRunRepository;
@@ -64,7 +65,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
@@ -90,7 +93,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "spring.jpa.hibernate.ddl-auto=validate"
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({RunResumption.class, RunStepTransactions.class, RunResumptionIT.Recorder.class})
+@Import({RunResumption.class, RunViewFactsFactory.class, RunStepTransactions.class, RunResumptionIT.Recorder.class,
+        RunResumptionIT.Clocks.class})
 @Testcontainers
 class RunResumptionIT {
 
@@ -119,6 +123,16 @@ class RunResumptionIT {
         @EventListener
         void on(WorkflowRunResumedEvent event) {
             resumed.add(event);
+        }
+    }
+
+    /** The clock the run views read; this slice has no application context to supply one. */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class Clocks {
+
+        @Bean
+        Clock clock() {
+            return Clock.systemUTC();
         }
     }
 
@@ -154,6 +168,12 @@ class RunResumptionIT {
 
     @Autowired
     private RunStepRepository runStepRepository;
+
+    @Autowired
+    private RunStepOutputVersionRepository versionRepository;
+
+    @Autowired
+    private RunViewFactsFactory viewFacts;
 
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -441,8 +461,8 @@ class RunResumptionIT {
         String before = snapshot(seed);
 
         RunResumption disabled = new RunResumption(workflowRepository, workflowRunRepository,
-                runStepRepository, registry, mediaJobs, transactionTemplate, runUpdates, runStartGuards, events,
-                false);
+                runStepRepository, versionRepository, registry, mediaJobs, transactionTemplate, runUpdates,
+                runStartGuards, events, viewFacts, false);
         assertThatThrownBy(() -> disabled.retryStep(seed.ownerId(), seed.runId(), stepId))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));

@@ -57,6 +57,7 @@ public class ProductVideoService implements ProductVideoRuns {
     private final boolean workflowEnabled;
     private final RunUpdates runUpdates;
     private final Tracer tracer;
+    private final RunViewFactsFactory viewFacts;
     private final ObjectMapper json = new ObjectMapper();
 
     @Autowired
@@ -64,18 +65,20 @@ public class ProductVideoService implements ProductVideoRuns {
             WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
             MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
             RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards,
-            ObjectProvider<Tracer> tracer,
+            ObjectProvider<Tracer> tracer, RunViewFactsFactory viewFacts,
             @Value("${flowcortex.product-video.enabled:false}") boolean enabled,
             @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
         this(workflows, workflowSteps, runs, runSteps, productInputs, mediaJobs, registry, events, runUpdates,
-                transactions, runStartGuards, tracer.getIfAvailable(() -> Tracer.NOOP), enabled, workflowEnabled);
+                transactions, runStartGuards, tracer.getIfAvailable(() -> Tracer.NOOP), viewFacts, enabled,
+                workflowEnabled);
     }
 
     ProductVideoService(WorkflowRepository workflows, WorkflowStepRepository workflowSteps,
             WorkflowRunRepository runs, RunStepRepository runSteps, ProductVideoInputRepository productInputs,
             MediaJobs mediaJobs, StepExecutorRegistry registry, ApplicationEventPublisher events,
             RunUpdates runUpdates, TransactionTemplate transactions, RunStartGuards runStartGuards, Tracer tracer,
-            boolean enabled, boolean workflowEnabled) {
+            RunViewFactsFactory viewFacts, boolean enabled, boolean workflowEnabled) {
+        this.viewFacts = viewFacts;
         this.tracer = tracer;
         this.runUpdates = runUpdates;
         this.workflows = workflows;
@@ -122,13 +125,13 @@ public class ProductVideoService implements ProductVideoRuns {
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.productVideo.notInstalled")));
         // A retried start answers with its run before any cost guard or object copy runs again.
         Optional<RunView> started = RunRequestKeys.existing(runs, runSteps, registry, mediaJobs::isDownloadable,
-                ownerId, requestKey);
+                viewFacts, ownerId, requestKey);
         if (started.isPresent()) {
             return started.get();
         }
         return RunRequestKeys.orWinner(
                 () -> startNew(ownerId, workflow, draft, uploadIds, acknowledgeCost, requestKey),
-                runs, runSteps, registry, mediaJobs::isDownloadable, ownerId, requestKey);
+                runs, runSteps, registry, mediaJobs::isDownloadable, viewFacts, ownerId, requestKey);
     }
 
     private RunView startNew(UUID ownerId, Workflow workflow, ProductVideoDraft draft, List<UUID> uploadIds,
@@ -160,7 +163,8 @@ public class ProductVideoService implements ProductVideoRuns {
             steps = runSteps.saveAll(steps);
             runUpdates.touched(run.getId());
             events.publishEvent(new WorkflowRunStartedEvent(run.getId()));
-            return WorkflowMapper.toRunView(run, steps, List.of(), registry::isRemote, mediaJobs::isDownloadable);
+            return WorkflowMapper.toRunView(run, steps, List.of(), registry::isRemote, mediaJobs::isDownloadable,
+                    viewFacts.of(run, steps));
         });
     }
 

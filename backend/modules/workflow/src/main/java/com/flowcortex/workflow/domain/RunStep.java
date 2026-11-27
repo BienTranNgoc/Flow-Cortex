@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -101,6 +102,19 @@ public class RunStep {
     @Column(name = "item_index", updatable = false)
     private Short itemIndex;
 
+    /** Written only by {@code RunStepRepository#applyEdit}, so no entity flush can put a stale copy back. */
+    @Column(name = "edited_output", updatable = false)
+    private String editedOutput;
+
+    @Column(name = "edited_at", updatable = false)
+    private Instant editedAt;
+
+    @Column(name = "edit_diff_pct", updatable = false)
+    private BigDecimal editDiffPct;
+
+    @Column(name = "edit_seq", nullable = false, updatable = false)
+    private int editSeq;
+
     /** Required by JPA. */
     protected RunStep() {
     }
@@ -132,16 +146,22 @@ public class RunStep {
 
     /**
      * A step a run retry carries over from the run it retries: {@code completed} at attempt 1 with the
-     * original's input, output and stored objects (already copied), never dispatched or charged.
+     * original's input, output and stored objects (already copied), never dispatched or charged. The original's
+     * current edit, if any, travels with it at {@code editSeq} 1 (0 when there is none).
      */
     public static RunStep reused(UUID id, UUID runId, short stepOrder, String type, String input, String config,
-            String inputRef, String output, String outputs, Instant startedAt, Instant finishedAt) {
+            String inputRef, String output, String outputs, Instant startedAt, Instant finishedAt,
+            String editedOutput, Instant editedAt, BigDecimal editDiffPct, int editSeq) {
         RunStep step = new RunStep(id, runId, stepOrder, type, input, config, inputRef);
         step.status = RunStepStatus.COMPLETED;
         step.output = output;
         step.outputs = outputs;
         step.startedAt = startedAt;
         step.finishedAt = finishedAt;
+        step.editedOutput = editedOutput;
+        step.editedAt = editedAt;
+        step.editDiffPct = editDiffPct;
+        step.editSeq = editSeq;
         return step;
     }
 
@@ -225,6 +245,30 @@ public class RunStep {
 
     public String getOutput() {
         return output;
+    }
+
+    /** The whole output with the member's edited text applied; {@code null} when no edit is current. */
+    public String getEditedOutput() {
+        return editedOutput;
+    }
+
+    public Instant getEditedAt() {
+        return editedAt;
+    }
+
+    /** How far the edited text is from the original, 0 to 100; {@code null} when no edit is current. */
+    public BigDecimal getEditDiffPct() {
+        return editDiffPct;
+    }
+
+    /** The change counter behind the revision token: raised by every edit, undo and discard that changes the step. */
+    public int getEditSeq() {
+        return editSeq;
+    }
+
+    /** What later steps, Drive and the run's result read: the edit when one is current, else the original. */
+    public String effectiveOutput() {
+        return editedOutput != null ? editedOutput : output;
     }
 
     public String getErrorMessage() {

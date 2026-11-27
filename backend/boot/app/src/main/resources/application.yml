@@ -561,6 +561,17 @@ flowcortex:
       pool:
         size: 2
         queue-capacity: 50
+    # A short reading (headline and highlights) of a table result, for workflows that ask for it.
+    run-insight:
+      # ON SENDS RUN CONTENT TO GEMINI: at most the first 60 rows and 20 columns of the final table, each
+      # cell cut to 300 characters (no names or ids), leave for the provider. Off: no insight is written
+      # whatever a workflow asks for. Env var + restart.
+      enabled: ${FLOWCORTEX_WORKFLOW_RUN_INSIGHT_ENABLED:false}
+      # The model call runs on its own threads so it never starves the shared async pool. `size` run
+      # at once, `queue-capacity` wait; a run arriving with both full gets no insight.
+      pool:
+        size: 2
+        queue-capacity: 50
     share:
       # HMAC key for anonymous access-log dedupe; at least 32 bytes, startup fails without it.
       accessor-hash-secret: ${FLOWCORTEX_WORKFLOW_SHARE_HASH_SECRET:}
@@ -678,6 +689,12 @@ flowcortex:
           call-timeout: 60s
         # Questions for a QA review; its worst case (about 42 s) stays under qa-review.generating-timeout.
         qa-questions:
+          models: gemini-3.5-flash-lite
+          attempts: 2
+          retry-waits: 2s
+          call-timeout: 20s
+        # The insight of a table result; the same values as qa-questions, nothing waits on it.
+        run-insight:
           models: gemini-3.5-flash-lite
           attempts: 2
           retry-waits: 2s

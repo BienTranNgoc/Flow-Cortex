@@ -50,12 +50,14 @@ public class IterateRegeneration {
     private final TransactionTemplate transactionTemplate;
     private final RunUpdates runUpdates;
     private final ApplicationEventPublisher events;
+    private final RunViewFactsFactory viewFacts;
     private final boolean workflowEnabled;
 
     IterateRegeneration(WorkflowRunRepository workflowRunRepository, RunStepRepository runStepRepository,
             StepExecutorRegistry registry, MediaJobs mediaJobs, CreditAccounts creditAccounts, RunAdvancer advancer,
             TransactionTemplate transactionTemplate, RunUpdates runUpdates, ApplicationEventPublisher events,
-            @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+            RunViewFactsFactory viewFacts, @Value("${flowcortex.workflow.enabled:true}") boolean workflowEnabled) {
+        this.viewFacts = viewFacts;
         this.workflowRunRepository = workflowRunRepository;
         this.runStepRepository = runStepRepository;
         this.registry = registry;
@@ -178,7 +180,8 @@ public class IterateRegeneration {
 
     private RunView currentView(UUID callerId, UUID runId) {
         WorkflowRun run = workflowRunRepository.findByIdAndOwnerId(runId, callerId).orElseThrow();
-        return WorkflowMapper.toRunView(run, runStepRepository.findByRunIdOrderByStepOrderAsc(runId),
-                runStepRepository.findCurrentChildren(runId), registry::isRemote, mediaJobs::isDownloadable);
+        List<RunStep> steps = runStepRepository.findByRunIdOrderByStepOrderAsc(runId);
+        return WorkflowMapper.toRunView(run, steps, runStepRepository.findCurrentChildren(runId), registry::isRemote,
+                mediaJobs::isDownloadable, viewFacts.of(run, steps));
     }
 }
