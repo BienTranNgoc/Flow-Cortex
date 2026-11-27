@@ -616,7 +616,7 @@
 
 /* Compact 7-step pipeline layout inside Product Video runs */
 @media (min-width: 900px) {
-  .pv-run-shell .run-layout {
+  .pv-run-shell .run-layout:not(.run-layout--canvas) {
     grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
     gap: 1.25rem;
   }

@@ -44,6 +44,25 @@ describe('stepErrorSentence', () => {
     it('reads the server message verbatim in English', () => {
       expect(stepErrorSentence('speech_too_long', fromServer, true, en, 'en')).toBe(fromServer);
     });
+
+    it('renders clear per-scene 5s limit details in both Vietnamese and English', () => {
+      const closeMsg = 'Product close speech is 5806 ms, exceeding the 5000 ms scene limit';
+      const mcMsg = 'MC hook speech is 6120 ms, exceeding the 5000 ms scene limit';
+
+      expect(stepErrorSentence('speech_too_long', closeMsg, true, vi, 'vi')).toContain(
+        'Cảnh 2 (cận cảnh sản phẩm)',
+      );
+      expect(stepErrorSentence('speech_too_long', closeMsg, true, vi, 'vi')).toContain('5.8 giây');
+      expect(stepErrorSentence('speech_too_long', mcMsg, true, vi, 'vi')).toContain('Cảnh 1 (MC)');
+      expect(stepErrorSentence('speech_too_long', mcMsg, true, vi, 'vi')).toContain('6.1 giây');
+
+      expect(stepErrorSentence('speech_too_long', closeMsg, true, en, 'en')).toContain(
+        'Scene 2 (product close-up) speech is 5.8s, exceeding the 5s scene limit',
+      );
+      expect(stepErrorSentence('speech_too_long', mcMsg, true, en, 'en')).toContain(
+        'Scene 1 (MC) speech is 6.1s, exceeding the 5s scene limit',
+      );
+    });
   });
 
   it('renders localized messages for sibling_failed in English and Vietnamese', () => {

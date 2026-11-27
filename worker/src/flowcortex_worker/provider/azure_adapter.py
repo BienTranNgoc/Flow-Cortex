@@ -83,7 +83,7 @@ class AzureSpeechAdapter:
                 mc_ms = _validate_wav(mc_wav)
             if mc_ms > 5_000:
                 raise PermanentError(
-                    "provider_request_failed",
+                    "speech_too_long",
                     f"MC hook speech is {mc_ms} ms, exceeding the 5000 ms scene limit",
                 )
             if 5_000 < sp_ms <= 5_750:
@@ -91,7 +91,7 @@ class AzureSpeechAdapter:
                 sp_ms = _validate_wav(sp_wav)
             if sp_ms > 5_000:
                 raise PermanentError(
-                    "provider_request_failed",
+                    "speech_too_long",
                     f"Product close speech is {sp_ms} ms, exceeding the 5000 ms scene limit",
                 )
             wav = _concat_aligned_wav(mc_wav, sp_wav, abort)

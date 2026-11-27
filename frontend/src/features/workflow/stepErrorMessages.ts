@@ -72,7 +72,10 @@ const MEMBER_MESSAGE_CODES: ReadonlySet<string> = new Set(['speech_too_long']);
  */
 const MESSAGE_DETAILS: Record<
   string,
-  { key: string; parse: (message: string) => Record<string, string> | null }
+  {
+    key: string;
+    parse: (message: string, t: TFunction) => Record<string, string> | null;
+  }
 > = {
   load_template_missing_input: {
     key: 'workflow.stepError.load_template_missing_input_fields',
@@ -80,6 +83,25 @@ const MESSAGE_DETAILS: Record<
       const match = /^Required input missing: (.+)\.$/.exec(message);
       const fields = match?.[1];
       return fields ? { fields } : null;
+    },
+  },
+  speech_too_long: {
+    key: 'workflow.stepError.speech_too_long_scene',
+    parse: (message, t) => {
+      const match = /^(MC hook|Product close) speech is (\d+) ms, exceeding the (\d+) ms scene limit$/.exec(
+        message.trim(),
+      );
+      if (!match) return null;
+      const [, kind, actualMs, limitMs] = match;
+      const segment =
+        kind === 'MC hook'
+          ? t('workflow.stepError.speechSegmentMc')
+          : t('workflow.stepError.speechSegmentProduct');
+      return {
+        segment,
+        actual: (Number(actualMs) / 1000).toFixed(1),
+        limit: String(Math.round(Number(limitMs) / 1000)),
+      };
     },
   },
 };
@@ -101,6 +123,12 @@ export function stepErrorSentence(
   if (code && REAPED_CODES.has(code) && !remote) {
     return t(REAPED_INLINE);
   }
+  const detail = code && message ? MESSAGE_DETAILS[code] : undefined;
+  const values = detail?.parse(message as string, t);
+  if (detail && values) {
+    // React escapes text nodes, so i18next escaping would only show entities for names like `a&b`.
+    return t(detail.key, { ...values, interpolation: { escapeValue: false } });
+  }
   if (code && MEMBER_MESSAGE_CODES.has(code) && message && locale === 'en') {
     return message;
   }
@@ -109,12 +137,6 @@ export function stepErrorSentence(
     if (contextKey) {
       return t(contextKey);
     }
-  }
-  const detail = code && message ? MESSAGE_DETAILS[code] : undefined;
-  const values = detail?.parse(message as string);
-  if (detail && values) {
-    // React escapes text nodes, so i18next escaping would only show entities for names like `a&b`.
-    return t(detail.key, { ...values, interpolation: { escapeValue: false } });
   }
   const key = code ? SENTENCE_KEYS[code] : undefined;
   if (key) {
