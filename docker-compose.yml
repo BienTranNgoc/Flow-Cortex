@@ -300,6 +300,11 @@ services:
       GOOGLE_CONNECTOR_CLIENT_ID: ${GOOGLE_CONNECTOR_CLIENT_ID:-}
       GOOGLE_CONNECTOR_CLIENT_SECRET: ${GOOGLE_CONNECTOR_CLIENT_SECRET:-}
       GOOGLE_CONNECTOR_REDIRECT_URI: ${GOOGLE_CONNECTOR_REDIRECT_URI:-}
+      # Two-factor sign-in: the key that seals TOTP secrets (startup fails without one), and the switch
+      # that lifts the requirement for console accounts (incident use only).
+      FLOWCORTEX_AUTH_TOTP_KEYS_K1: ${FLOWCORTEX_AUTH_TOTP_KEYS_K1:?Set FLOWCORTEX_AUTH_TOTP_KEYS_K1 (see .env.example)}
+      FLOWCORTEX_AUTH_TOTP_CURRENT_KEY_ID: ${FLOWCORTEX_AUTH_TOTP_CURRENT_KEY_ID:-k1}
+      FLOWCORTEX_AUTH_TOTP_ADMIN_REQUIRED: ${FLOWCORTEX_AUTH_TOTP_ADMIN_REQUIRED:-true}
       # Workflow-execution kill switch: defaults on. Flip it off and restart the
       # backend to refuse new runs (503) without a rebuild:
       #   FLOWCORTEX_WORKFLOW_ENABLED=false docker compose up -d backend

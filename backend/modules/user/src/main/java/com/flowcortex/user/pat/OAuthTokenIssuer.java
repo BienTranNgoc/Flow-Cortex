@@ -18,7 +18,8 @@ public interface OAuthTokenIssuer {
 
     /**
      * Mints a token under the lock, eligibility and cap rules of {@code create}, without a step-up
-     * proof: the grant checks the session's conditions before it calls this.
+     * proof or a session: the grant has already checked the session's second factor, and a code exists
+     * only after it did.
      *
      * @throws PatNotEligibleException when the owner is not an active, unlocked, enabled admin
      * @throws PatLimitReachedException at the live-token cap
@@ -34,4 +35,10 @@ public interface OAuthTokenIssuer {
     boolean eligibleToManage(UUID userId);
 
     boolean atCap(UUID userId);
+
+    /**
+     * Whether a session with this second-factor mark may mint a token: always while the console
+     * requirement is off, otherwise only for a marked session.
+     */
+    boolean mfaSatisfied(boolean sessionMfa);
 }

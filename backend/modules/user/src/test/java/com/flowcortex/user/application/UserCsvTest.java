@@ -17,7 +17,7 @@ class UserCsvTest {
 
     private static UserView view(String name, String username, Instant confirmed, List<String> methods) {
         return new UserView(ID, UUID.randomUUID(), "a@example.com", name, "MEMBER", "Member", "ACTIVE", CREATED,
-                CREATED, username, "active", confirmed, null, methods, false, false);
+                CREATED, username, "active", confirmed, null, methods, false, false, false);
     }
 
     @Test

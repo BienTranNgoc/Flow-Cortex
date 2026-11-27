@@ -39,7 +39,8 @@ public class JwtRefreshTokenService implements RefreshTokenService {
 
     @Override
     @Transactional
-    public AuthSession issueFor(AppUser user, String ip, String userAgent, boolean rememberMe) {
+    public AuthSession issueFor(AppUser user, String ip, String userAgent, boolean rememberMe,
+            Instant mfaVerifiedAt) {
         Instant now = Instant.now(clock);
         Instant expiresAt = now.plus(rememberMe ? properties.rememberMeTtl() : properties.ttl());
 
@@ -47,9 +48,18 @@ public class JwtRefreshTokenService implements RefreshTokenService {
 
         String raw = OpaqueTokens.generateRawToken();
         RefreshToken row = new RefreshToken(UUID.randomUUID(), user.getId(), OpaqueTokens.hash(raw),
-                UUID.randomUUID(), now, expiresAt, rememberMe, ip, truncate(userAgent));
+                UUID.randomUUID(), now, expiresAt, rememberMe, ip, truncate(userAgent), mfaVerifiedAt);
         refreshTokenRepository.save(row);
-        return session(user, raw, expiresAt, rememberMe);
+        return session(user, raw, expiresAt, rememberMe, mfaVerifiedAt != null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean rememberMeOf(UUID userId, String rawToken) {
+        return refreshTokenRepository.findByTokenHash(OpaqueTokens.hash(rawToken))
+                .filter(token -> token.getUserId().equals(userId) && token.isUsable(Instant.now(clock)))
+                .map(RefreshToken::isRememberMe)
+                .orElse(false);
     }
 
     @Override
@@ -83,15 +93,15 @@ public class JwtRefreshTokenService implements RefreshTokenService {
         UUID newId = UUID.randomUUID();
         refreshTokenRepository.save(new RefreshToken(newId, user.getId(), OpaqueTokens.hash(newRaw),
                 existing.getFamilyId(), now, existing.getExpiresAt(), existing.isRememberMe(), ip,
-                truncate(userAgent)));
+                truncate(userAgent), existing.getMfaVerifiedAt()));
 
         if (refreshTokenRepository.markUsed(existing.getId(), now, newId) == 0) {
             // Lost the CAS race with a concurrent rotation of the same token — treat as reuse.
             refreshTokenRepository.revokeFamily(existing.getFamilyId(), now);
             return rejected(RotationResult.Reason.REUSED, existing);
         }
-        return new RotationResult.Rotated(session(user, newRaw, existing.getExpiresAt(), existing.isRememberMe()),
-                user.getId(), existing.getFamilyId());
+        return new RotationResult.Rotated(session(user, newRaw, existing.getExpiresAt(), existing.isRememberMe(),
+                existing.getMfaVerifiedAt() != null), user.getId(), existing.getFamilyId());
     }
 
     @Override
@@ -117,8 +127,9 @@ public class JwtRefreshTokenService implements RefreshTokenService {
         }
     }
 
-    private AuthSession session(AppUser user, String rawRefreshToken, Instant refreshExpiresAt, boolean rememberMe) {
-        return new AuthSession(accessTokenService.mint(user), accessTokenService.accessTokenTtl().toSeconds(),
+    private AuthSession session(AppUser user, String rawRefreshToken, Instant refreshExpiresAt, boolean rememberMe,
+            boolean mfa) {
+        return new AuthSession(accessTokenService.mint(user, mfa), accessTokenService.accessTokenTtl().toSeconds(),
                 rawRefreshToken, refreshExpiresAt, rememberMe);
     }
 

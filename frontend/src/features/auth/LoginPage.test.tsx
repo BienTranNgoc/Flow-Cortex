@@ -23,6 +23,7 @@ function renderLogin(state: unknown, search = '') {
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
           </Route>
+          <Route path="/login/totp" element={<TotpStep />} />
           <Route path="/profile" element={<p>Profile landing</p>} />
           <Route path="/workflows/7" element={<p>Workflow 7</p>} />
           <Route path="/" element={<p>Home</p>} />
@@ -31,6 +32,11 @@ function renderLogin(state: unknown, search = '') {
     </QueryClientProvider>,
   );
   return { ...result, queryClient };
+}
+
+function TotpStep() {
+  const state = useLocation().state as { from?: string } | null;
+  return <p>Code step, return to {state?.from ?? 'nowhere'}</p>;
 }
 
 async function signIn({ remember }: { remember: boolean }) {
@@ -234,6 +240,22 @@ describe('LoginPage', () => {
 
     expect(window.localStorage.getItem(PERSISTENT_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('jwt-1');
+  });
+
+  it('moves to the code step without signing in when the account owes a code', async () => {
+    stubApi({
+      'POST /api/v1/auth/login': { status: 202, body: { status: 'totp_required', expiresIn: 300 } },
+    });
+    const user = userEvent.setup();
+    renderLogin({ from: '/profile' });
+
+    await user.type(screen.getByLabelText('Email'), 'member1@flowcortex.dev');
+    await user.type(screen.getByLabelText('Password'), 'secret');
+    await user.click(screen.getByRole('button', { name: /Sign in to Studio/ }));
+
+    expect(await screen.findByText('Code step, return to /profile')).toBeInTheDocument();
+    expect(window.localStorage.getItem(PERSISTENT_KEY)).toBeNull();
+    expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
   });
 
   it.each([true, false])('sends rememberMe=%s with the credentials', async (remember) => {

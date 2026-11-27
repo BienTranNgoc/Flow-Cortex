@@ -7,8 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.flowcortex.AbstractPostgresBootTest;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.user.api.AuthService;
+import com.flowcortex.user.api.SessionOutcome;
+import com.flowcortex.user.api.TotpDevSeed;
 import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.totp.TotpCodes;
 import com.flowcortex.workflow.api.RunView;
 import com.flowcortex.workflow.api.WorkflowRunService;
 import com.flowcortex.workflow.api.WorkflowService;
@@ -45,12 +48,17 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
     private static final String MEMBER_1_EMAIL = "member1@flowcortex.dev";
     private static final String ADMIN_PASSWORD = "AdminPass123!";
     private static final String MEMBER_PASSWORD = "MemberPass123!";
+    /** The secret LOCAL_SETUP.md documents for admin1; spelled out so a change to the seed fails a test. */
+    private static final String ADMIN_1_TOTP_SECRET = "JBSWY3DPEHPK3PXP";
 
     @Autowired
     private AuthService authService;
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private TotpDevSeed totpDevSeed;
 
     @Autowired
     private JwtDecoder jwtDecoder;
@@ -69,7 +77,14 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
     private WorkflowRunService workflowRunService;
 
     private UUID subjectOf(String email, String password) {
-        String token = authService.login(email, password, false, "127.0.0.1", "devdata").accessToken();
+        SessionOutcome outcome = authService.login(email, password, false, "127.0.0.1", "devdata");
+        if (outcome instanceof SessionOutcome.Challenged challenged) {
+            String code = TotpCodes.codeAt(ADMIN_1_TOTP_SECRET, TotpCodes.stepOf(Instant.now()));
+            String token = authService.completeTotpSignIn(challenged.rawChallenge(), code, "127.0.0.1", "devdata")
+                    .accessToken();
+            return UUID.fromString(jwtDecoder.decode(token).getSubject());
+        }
+        String token = ((SessionOutcome.Opened) outcome).session().accessToken();
         Jwt jwt = jwtDecoder.decode(token);
         return UUID.fromString(jwt.getSubject());
     }
@@ -96,6 +111,23 @@ class DevDataSeederIT extends AbstractPostgresBootTest {
         // Cross-scope: admin2 cannot see the member seeded under admin1's
         // scope, using real seeded data.
         assertThrows(NotFoundException.class, () -> userService.getUser(admin2Id, memberId));
+    }
+
+    @Test
+    void admin1HasTotpOn() {
+        assertThat(authService.login(ADMIN_1_EMAIL, ADMIN_PASSWORD, false, "127.0.0.1", "devdata"))
+                .isInstanceOf(SessionOutcome.Challenged.class);
+        assertThat(authService.login(ADMIN_2_EMAIL, ADMIN_PASSWORD, false, "127.0.0.1", "devdata"))
+                .isInstanceOf(SessionOutcome.Opened.class);
+    }
+
+    @Test
+    void reSeedingKeepsAdmin1Enrolled() throws Exception {
+        seedDemoUsers.run(new DefaultApplicationArguments());
+
+        assertThat(totpDevSeed.enrollWithSecret(ADMIN_1_EMAIL, ADMIN_1_TOTP_SECRET)).isFalse();
+        assertThat(authService.login(ADMIN_1_EMAIL, ADMIN_PASSWORD, false, "127.0.0.1", "devdata"))
+                .isInstanceOf(SessionOutcome.Challenged.class);
     }
 
     @Test

@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { AuthLink } from './AuthLink';
 import { ResendConfirmation } from './ConfirmEmailPage';
 import { setPasswordSchema, type SetPasswordFormValues } from './registerSchema';
+import type { TotpSignInState } from './TotpSignInPage';
 import {
   PASSWORD_LINK_INVALID,
   PASSWORD_SETUP_TOKEN_INVALID,
@@ -88,7 +89,13 @@ export function SetPasswordPage() {
     }
     opened.current = true;
     open(linkToken, {
-      onSuccess: ({ passwordSetupToken }) => {
+      onSuccess: ({ kind, passwordSetupToken }) => {
+        if (kind === 'totp') {
+          // The link is spent; the code step opens the session, then the password form follows.
+          const state: TotpSignInState = { passwordSetup: { token: passwordSetupToken } };
+          navigate('/login/totp', { replace: true, state: { ...state, focusHeading: true } });
+          return;
+        }
         setSetupToken(passwordSetupToken);
         // Takes the spent link out of the address bar and the history entry.
         navigate('/set-password', { replace: true, state: { passwordSetupToken } });

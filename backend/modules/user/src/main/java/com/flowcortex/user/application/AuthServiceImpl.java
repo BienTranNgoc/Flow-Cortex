@@ -1,6 +1,5 @@
 package com.flowcortex.user.application;
 
-import com.flowcortex.shared.web.AccountLockedException;
 import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
@@ -12,6 +11,7 @@ import com.flowcortex.user.api.ConfirmedEmailSession;
 import com.flowcortex.user.api.OAuthFailure;
 import com.flowcortex.user.api.OAuthLoginException;
 import com.flowcortex.user.api.PasswordSetup;
+import com.flowcortex.user.api.SessionOutcome;
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.domain.UserStatus;
@@ -23,6 +23,7 @@ import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.passwordreset.PasswordResetService;
 import com.flowcortex.user.passwordreset.ResetRequestPolicy;
 import com.flowcortex.user.profile.UsernameRules;
+import com.flowcortex.user.totp.ChallengeOrigin;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -36,7 +37,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -84,6 +84,7 @@ class AuthServiceImpl implements AuthService {
     private final RegistrationRateLimiter registrationRateLimiter;
     private final GoogleOAuthClient googleOAuthClient;
     private final AuditEventWriter audit;
+    private final SessionGate sessionGate;
     private final RegistrationProperties registration;
     private final Clock clock;
     private final ApplicationEventPublisher events;
@@ -99,8 +100,9 @@ class AuthServiceImpl implements AuthService {
             RefreshTokenService refreshTokenService, AccountCredentials accountCredentials,
             LoginAttemptRecorder loginAttempts,
             LoginRateLimiter loginRateLimiter, RegistrationRateLimiter registrationRateLimiter,
-            GoogleOAuthClient googleOAuthClient, AuditEventWriter audit, RegistrationProperties registration,
-            Clock clock, ApplicationEventPublisher events, PlatformTransactionManager transactionManager,
+            GoogleOAuthClient googleOAuthClient, AuditEventWriter audit, SessionGate sessionGate,
+            RegistrationProperties registration, Clock clock, ApplicationEventPublisher events,
+            PlatformTransactionManager transactionManager,
             EmailConfirmationService emailConfirmation, EmailConfirmationProperties emailConfirmationProperties,
             PasswordResetRateLimiter passwordResetRateLimiter, PasswordResetService passwordResetService,
             PasswordResetSubmitLimiter passwordResetSubmitLimiter, UsernameRules usernameRules) {
@@ -113,6 +115,7 @@ class AuthServiceImpl implements AuthService {
         this.registrationRateLimiter = registrationRateLimiter;
         this.googleOAuthClient = googleOAuthClient;
         this.audit = audit;
+        this.sessionGate = sessionGate;
         this.registration = registration;
         this.clock = clock;
         this.events = events;
@@ -167,7 +170,7 @@ class AuthServiceImpl implements AuthService {
         }
         // Replacing a suspended unconfirmed account confirms it; like a login, it opens no session.
         requireActive(user, ip, agent);
-        return Optional.of(refreshTokenService.issueFor(user, ip, agent, rememberMe));
+        return Optional.of(refreshTokenService.issueFor(user, ip, agent, rememberMe, null));
     }
 
     private record NewRegistration(UUID ownerId, String email, String passwordHash, String firstName,
@@ -259,13 +262,17 @@ class AuthServiceImpl implements AuthService {
         AppUser user = opened.account();
         requireNotLocked(user, ip, agent);
         requireActive(user, ip, agent);
-        AuthSession session = refreshTokenService.issueFor(user, ip, agent, false);
-        audit.write(AuthEventType.LOGIN_SUCCESS, user.getId(), ip, agent, AuthEventType.userMetadata(user.getId()));
-        return new ConfirmedEmailSession(session, !user.hasPassword(), opened.passwordSetupToken());
+        SessionOutcome outcome = sessionGate.open(user, false, ChallengeOrigin.LINK, ip, agent);
+        if (outcome instanceof SessionOutcome.Opened) {
+            audit.write(AuthEventType.LOGIN_SUCCESS, user.getId(), ip, agent,
+                    AuthEventType.userMetadata(user.getId()));
+        }
+        return new ConfirmedEmailSession(outcome, !user.hasPassword(), opened.passwordSetupToken());
     }
 
     @Override
-    public AuthSession setPassword(UUID userId, PasswordSetup setup, String ip, String userAgent) {
+    public AuthSession setPassword(UUID userId, PasswordSetup setup, boolean callerMfa, String ip,
+            String userAgent) {
         String agent = truncate(userAgent);
         String passwordHash = passwordEncoder.encode(setup.password());
         AppUser user;
@@ -302,7 +309,7 @@ class AuthServiceImpl implements AuthService {
         }
         audit.write(AuthEventType.PASSWORD_SET, userId, ip, agent, AuthEventType.userMetadata(userId));
         LOG.info("Password set: userId={}", userId);
-        return refreshTokenService.issueFor(user, ip, agent, false);
+        return refreshTokenService.issueFor(user, ip, agent, false, callerMfa ? Instant.now(clock) : null);
     }
 
     @Override
@@ -346,7 +353,8 @@ class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthSession login(String rawEmail, String rawPassword, boolean rememberMe, String ip, String userAgent) {
+    public SessionOutcome login(String rawEmail, String rawPassword, boolean rememberMe, String ip,
+            String userAgent) {
         loginRateLimiter.requireWithinLimit(ip);
         String email = normalizeEmail(rawEmail);
         String agent = truncate(userAgent);
@@ -371,34 +379,25 @@ class AuthServiceImpl implements AuthService {
         if (user.getFailedLoginAttempts() > 0 || user.getLockedUntil() != null) {
             loginAttempts.recordSuccess(user.getId());
         }
-        AuthSession session = refreshTokenService.issueFor(user, ip, agent, rememberMe);
-        audit.write(AuthEventType.LOGIN_SUCCESS, user.getId(), ip, agent, AuthEventType.userMetadata(user.getId()));
-        return session;
+        SessionOutcome outcome = sessionGate.open(user, rememberMe, ChallengeOrigin.PASSWORD, ip, agent);
+        if (outcome instanceof SessionOutcome.Opened) {
+            audit.write(AuthEventType.LOGIN_SUCCESS, user.getId(), ip, agent,
+                    AuthEventType.userMetadata(user.getId()));
+        }
+        return outcome;
     }
 
-    /**
-     * Runs before the password is compared: a locked account answers the same 423 for a right and a
-     * wrong password, and the attempt neither counts nor extends the lock.
-     */
+    @Override
+    public AuthSession completeTotpSignIn(String rawChallenge, String code, String ip, String userAgent) {
+        return sessionGate.complete(rawChallenge, code, ip, truncate(userAgent));
+    }
+
     private void requireNotLocked(AppUser user, String ip, String agent) {
-        try {
-            AccountStatusGuard.requireNotLocked(user, Instant.now(clock));
-        } catch (AccountLockedException ex) {
-            audit.write(AuthEventType.LOGIN_FAILED_ACCOUNT_LOCKED, user.getId(), ip, agent,
-                    AuthEventType.userMetadata(user.getId()));
-            throw ex;
-        }
+        sessionGate.requireNotLocked(user, ip, agent);
     }
 
-    /** Reached only with the right password, so the refusal reveals nothing a wrong password wouldn't. */
     private void requireActive(AppUser user, String ip, String agent) {
-        try {
-            AccountStatusGuard.requireActive(user);
-        } catch (AccessDeniedException ex) {
-            audit.write(AuthEventType.LOGIN_FAILED_ACCOUNT_SUSPENDED, user.getId(), ip, agent,
-                    AuthEventType.userMetadata(user.getId()));
-            throw ex;
-        }
+        sessionGate.requireActive(user, ip, agent);
     }
 
     private static String normalizeEmail(String email) {
@@ -406,8 +405,8 @@ class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthSession loginWithGoogle(String code, String codeVerifier, String nonce, boolean rememberMe, String ip,
-            String userAgent) {
+    public SessionOutcome loginWithGoogle(String code, String codeVerifier, String nonce, boolean rememberMe,
+            String ip, String userAgent) {
         String agent = truncate(userAgent);
         GoogleIdTokenClaims claims;
         try {
@@ -418,9 +417,12 @@ class AuthServiceImpl implements AuthService {
         }
         String email = normalizeEmail(claims.email());
         AppUser user = findOrCreateGoogleUser(claims.sub(), email, claims.name(), ip, agent);
-        AuthSession session = refreshTokenService.issueFor(user, ip, agent, rememberMe);
-        audit.write(AuthEventType.OAUTH_LOGIN_SUCCESS, user.getId(), ip, agent, AuthEventType.metadata("email", email));
-        return session;
+        SessionOutcome outcome = sessionGate.open(user, rememberMe, ChallengeOrigin.GOOGLE, ip, agent);
+        if (outcome instanceof SessionOutcome.Opened) {
+            audit.write(AuthEventType.OAUTH_LOGIN_SUCCESS, user.getId(), ip, agent,
+                    AuthEventType.metadata("email", email));
+        }
+        return outcome;
     }
 
     @Override

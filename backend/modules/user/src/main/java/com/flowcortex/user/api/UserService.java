@@ -50,4 +50,14 @@ public interface UserService {
      * @throws ConflictException if the target is the caller, the last active super admin or the registration owner
      */
     void deleteUser(UUID callerId, UUID id);
+
+    /**
+     * Removes the target's second factor (secret, lock state, recovery codes, live sign-in challenges) and
+     * revokes its sessions and personal access tokens, in one transaction: a failure changes nothing.
+     * @throws UnprocessableEntityException {@code TOTP_RESET_SELF} if the target is the caller
+     * @throws NotFoundException if {@code id} does not exist within the caller's owner scope
+     * @throws org.springframework.web.server.ResponseStatusException 409 {@code TOTP_NOT_ENABLED} if the target has
+     *         no second factor
+     */
+    void resetTotp(UUID callerId, UUID id);
 }

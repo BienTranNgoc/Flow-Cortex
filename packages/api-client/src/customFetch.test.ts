@@ -2,7 +2,7 @@ import { authHeaders, unwrap } from './client';
 import { setClientId } from './clientId';
 import { downloadFile } from './customFetch';
 import { ensureSession } from './session';
-import { login, logout, me } from './generated/flowCortexApi';
+import { completeTotpSignIn, enableTotp, login, logout, me } from './generated/flowCortexApi';
 import { subscribeNetworkSignals, type NetworkSignal } from './networkSignals';
 import { getToken, setToken } from './tokenStore';
 import { setLocaleProvider } from './locale';
@@ -157,6 +157,35 @@ describe('customFetch', () => {
       expect(calls.filter((c) => c.path === '/api/v1/auth/me').map((c) => c.client)).toEqual([null, null]);
     });
 
+    it('marks the code step of sign-in and the enrolment confirmation with the client id', async () => {
+      setClientId('admin');
+      const calls = stubFetch(refreshingOnExpiry);
+
+      await completeTotpSignIn({ code: '123456' });
+      await enableTotp({ code: '123456' });
+
+      const marked = Object.fromEntries(calls.map((c) => [c.path, c.client]));
+      expect(marked['/api/v1/auth/login/totp']).toBe('admin');
+      expect(marked['/api/v1/auth/totp/enable']).toBe('admin');
+    });
+
+    it('carries the client id on both calls of the admin two-step sign-in', async () => {
+      setClientId('admin');
+      const calls = stubFetch((call) =>
+        call.path === '/api/v1/auth/login'
+          ? json(202, { totpRequired: true })
+          : json(200, { accessToken: 'a', expiresIn: 900, persistent: false }),
+      );
+
+      await login({ email: 'a@b.c', password: 'x' });
+      await completeTotpSignIn({ code: '123456' });
+
+      expect(calls.map((c) => [c.path, c.client])).toEqual([
+        ['/api/v1/auth/login', 'admin'],
+        ['/api/v1/auth/login/totp', 'admin'],
+      ]);
+    });
+
     it('sends no client header from an app that never configured one', async () => {
       setToken('old', true);
       const calls = stubFetch(refreshingOnExpiry);
@@ -207,6 +236,16 @@ describe('customFetch', () => {
 
       expect(calls.map((c) => c.language)).toEqual([null]);
     });
+  });
+
+  it('returns a 401 on the code step of sign-in without refreshing or replaying', async () => {
+    setToken('old', true);
+    const calls = stubFetch(() => json(401, { code: 'TOTP_CHALLENGE_INVALID' }));
+
+    const result = await completeTotpSignIn({ code: '123456' });
+
+    expect(result.status).toBe(401);
+    expect(calls.map((c) => c.path)).toEqual(['/api/v1/auth/login/totp']);
   });
 
   it('reports a 429 as rate-limited with the wait the problem names, and returns it unchanged', async () => {

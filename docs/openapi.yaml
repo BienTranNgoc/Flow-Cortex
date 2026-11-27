@@ -2740,6 +2740,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserResponse"
+  /api/v1/users/{id}/totp/reset:
+    post:
+      tags:
+      - users-controller
+      operationId: resetUserTotp
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
   /api/v1/uploads:
     post:
       tags:
@@ -4187,7 +4202,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
         "403":
-          description: "PAT_NOT_ELIGIBLE, STEP_UP_REQUIRED or PAT_NOT_ALLOWED"
+          description: "PAT_NOT_ELIGIBLE, PAT_MFA_REQUIRED, STEP_UP_REQUIRED or PAT_NOT_ALLOWED"
           content:
             application/problem+json:
               schema:
@@ -5580,6 +5595,128 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BatchResponse"
+  /api/v1/auth/totp/setup:
+    post:
+      tags:
+      - totp-controller
+      operationId: startTotpSetup
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpSetupResponse"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/auth/totp/recovery-codes:
+    post:
+      tags:
+      - totp-controller
+      operationId: regenerateTotpRecoveryCodes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpRecoveryCodesResponse"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "423":
+          description: Locked
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/auth/totp/enable:
+    post:
+      tags:
+      - totp-controller
+      operationId: enableTotp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpEnableResponse"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "423":
+          description: Locked
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/auth/totp/disable:
+    post:
+      tags:
+      - totp-controller
+      operationId: disableTotp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "423":
+          description: Locked
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -5692,6 +5829,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfirmEmailResponse"
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpLinkChallengeResponse"
         "422":
           description: Unprocessable Content
           content:
@@ -5726,6 +5869,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessTokenResponse"
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpChallengeResponse"
+      security: []
+  /api/v1/auth/login/totp:
+    post:
+      tags:
+      - totp-controller
+      operationId: completeTotpSignIn
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TotpCodeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpSignInResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "423":
+          description: Locked
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
       security: []
   /api/v1/auth/forgot-password:
     post:
@@ -5770,6 +5956,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfirmEmailResponse"
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpLinkChallengeResponse"
         "422":
           description: Unprocessable Content
           content:
@@ -10529,6 +10721,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewBatchRowResponse"
+  /api/v1/auth/totp:
+    get:
+      tags:
+      - totp-controller
+      operationId: getTotpStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TotpStatusResponse"
   /api/v1/auth/profile/preferences:
     get:
       tags:
@@ -10565,7 +10769,8 @@ paths:
       responses:
         "302":
           description: "Signed in: refresh cookie set, redirect to the return path.\
-            \ Refused: redirect to /login?oauth_error=<cancelled|invalid_state|registration_closed|link_required|account_inactive|rate_limited|failed>"
+            \ TOTP on: challenge cookie set, redirect to /login/totp?return_to=<return\
+            \ path>. Refused: redirect to /login?oauth_error=<cancelled|invalid_state|registration_closed|link_required|account_inactive|rate_limited|failed>"
       security: []
   /api/v1/auth/oauth/google/authorize:
     get:
@@ -12271,6 +12476,8 @@ components:
           type: boolean
         staffTarget:
           type: boolean
+        totpEnabled:
+          type: boolean
       required:
       - roleName
     UploadedImageRequest:
@@ -12504,11 +12711,27 @@ components:
           type: boolean
         accountDeletion:
           $ref: "#/components/schemas/AccountDeletionView"
+        totp:
+          $ref: "#/components/schemas/TotpState"
       required:
       - adminDisabled
       - permissions
       - phoneVerificationRequired
       - roleName
+      - totp
+    TotpState:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        required:
+          type: boolean
+        verified:
+          type: boolean
+      required:
+      - enabled
+      - required
+      - verified
     UsernameRequest:
       type: object
       properties:
@@ -15895,6 +16118,54 @@ components:
           format: uuid
         card:
           $ref: "#/components/schemas/ChatMessage"
+    TotpSetupResponse:
+      type: object
+      properties:
+        secret:
+          type: string
+        otpauthUri:
+          type: string
+        qrDataUrl:
+          type: string
+      required:
+      - otpauthUri
+      - qrDataUrl
+      - secret
+    TotpCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 32
+          minLength: 0
+          pattern: "^[0-9 ]{6,7}$|^[A-Za-z2-7 -]{10,13}$"
+      required:
+      - code
+    TotpRecoveryCodesResponse:
+      type: object
+      properties:
+        recoveryCodes:
+          type: array
+          items:
+            type: string
+      required:
+      - recoveryCodes
+    TotpEnableResponse:
+      type: object
+      properties:
+        recoveryCodes:
+          type: array
+          items:
+            type: string
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+      required:
+      - accessToken
+      - expiresIn
+      - recoveryCodes
     ResetPasswordRequest:
       type: object
       properties:
@@ -15991,6 +16262,22 @@ components:
       - accessToken
       - expiresIn
       - passwordSetupRequired
+    TotpLinkChallengeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+        passwordSetupRequired:
+          type: boolean
+        passwordSetupToken:
+          type: string
+      required:
+      - expiresIn
+      - passwordSetupRequired
+      - status
     LoginRequest:
       type: object
       properties:
@@ -16006,6 +16293,31 @@ components:
       required:
       - email
       - password
+    TotpChallengeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+      required:
+      - expiresIn
+      - status
+    TotpSignInResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+        persistent:
+          type: boolean
+      required:
+      - accessToken
+      - expiresIn
+      - persistent
     ForgotPasswordRequest:
       type: object
       properties:
@@ -19365,6 +19677,29 @@ components:
       - page
       - size
       - total
+    TotpStatusResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        pending:
+          type: boolean
+        required:
+          type: boolean
+        verified:
+          type: boolean
+        recoveryCodesLeft:
+          type: integer
+          format: int32
+        lockedUntil:
+          type: string
+          format: date-time
+      required:
+      - enabled
+      - pending
+      - recoveryCodesLeft
+      - required
+      - verified
     PreferencesView:
       type: object
       properties:

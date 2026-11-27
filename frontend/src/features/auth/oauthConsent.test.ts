@@ -153,6 +153,7 @@ describe('grantFailure', () => {
   it('names what a refused grant means for the page', () => {
     expect(grantFailure(403, 'STEP_UP_REQUIRED')).toBe('stepUp');
     expect(grantFailure(403, 'PAT_NOT_ELIGIBLE')).toBe('notEligible');
+    expect(grantFailure(403, 'PAT_MFA_REQUIRED')).toBe('notEligible');
     expect(grantFailure(409, 'PAT_LIMIT_REACHED')).toBe('limitReached');
     expect(grantFailure(400, 'oauth.invalidRequest')).toBe('invalidLink');
     expect(grantFailure(503, undefined)).toBe('unavailable');

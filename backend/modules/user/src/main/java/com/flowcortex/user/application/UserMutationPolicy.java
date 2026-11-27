@@ -19,7 +19,7 @@ final class UserMutationPolicy {
     record UserMutation(Kind kind, RoleRow currentRole, RoleRow requestedRole, UserStatus currentStatus,
             UserStatus requestedStatus) {
 
-        enum Kind { CREATE, UPDATE, DELETE }
+        enum Kind { CREATE, UPDATE, DELETE, TOTP_RESET }
 
         static UserMutation create(RoleRow role) {
             return new UserMutation(Kind.CREATE, null, role, null, null);
@@ -32,6 +32,10 @@ final class UserMutationPolicy {
 
         static UserMutation delete(RoleRow currentRole) {
             return new UserMutation(Kind.DELETE, currentRole, null, null, null);
+        }
+
+        static UserMutation totpReset(RoleRow targetRole) {
+            return new UserMutation(Kind.TOTP_RESET, targetRole, null, null, null);
         }
 
         boolean changesRole() {
@@ -63,7 +67,7 @@ final class UserMutationPolicy {
     private static Permission baseKey(UserMutation.Kind kind) {
         return switch (kind) {
             case CREATE -> Permission.USER_ACCOUNT_CREATE;
-            case UPDATE -> Permission.USER_ACCOUNT_UPDATE;
+            case UPDATE, TOTP_RESET -> Permission.USER_ACCOUNT_UPDATE;
             case DELETE -> Permission.USER_ACCOUNT_DELETE;
         };
     }

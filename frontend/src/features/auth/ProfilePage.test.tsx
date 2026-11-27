@@ -32,6 +32,10 @@ const OWN_ROUTES = {
   'GET /api/v1/auth/me': { status: 200, body: ME },
   'GET /api/v1/auth/profile': { status: 200, body: OWN },
   'GET /api/v1/auth/profile/preferences': { status: 200, body: PREFERENCES },
+  'GET /api/v1/auth/totp': {
+    status: 200,
+    body: { enabled: false, pending: false, required: false, verified: true, recoveryCodesLeft: 0 },
+  },
 };
 
 function renderProfile() {
@@ -55,6 +59,39 @@ describe('ProfilePage', () => {
     expect(screen.queryByText('MEMBER')).not.toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Account statistics' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Request deletion' })).not.toBeInTheDocument();
+  });
+
+  it('shows the two-factor section with the state /auth/totp reports', async () => {
+    stubApi({
+      ...OWN_ROUTES,
+      'GET /api/v1/auth/totp': {
+        status: 200,
+        body: {
+          enabled: true,
+          pending: false,
+          required: false,
+          verified: true,
+          recoveryCodesLeft: 4,
+        },
+      },
+    });
+
+    renderProfile();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Two-factor authentication' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('4 recovery codes left.')).toBeInTheDocument();
+  });
+
+  it('offers to set up two-factor authentication while it is off', async () => {
+    stubApi(OWN_ROUTES);
+
+    renderProfile();
+
+    expect(
+      await screen.findByRole('button', { name: 'Set up two-factor authentication' }),
+    ).toBeInTheDocument();
   });
 
   it('offers no API key, since the backend issues none', async () => {

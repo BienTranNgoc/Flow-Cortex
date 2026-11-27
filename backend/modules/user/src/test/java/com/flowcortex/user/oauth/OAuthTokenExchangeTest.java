@@ -24,6 +24,7 @@ import com.flowcortex.user.oauth.McpOAuthService.ExchangeRequest;
 import com.flowcortex.user.pat.OAuthTokenIssuer;
 import com.flowcortex.user.pat.OAuthTokenIssuer.Live;
 import com.flowcortex.user.pat.PatLimitReachedException;
+import com.flowcortex.user.pat.PatMfaRequiredException;
 import com.flowcortex.user.pat.PatNotEligibleException;
 import java.time.Clock;
 import java.time.Duration;
@@ -204,16 +205,18 @@ class OAuthTokenExchangeTest {
     }
 
     @Test
-    void aGrantChecksEligibilityThenTheCapThenSpendsTheProofThenStoresTheCodeAsItsHash() {
+    void aGrantChecksEligibilityThenTheCapThenTheSecondFactorThenSpendsTheProofThenStoresTheCodeAsItsHash() {
         clientIsRegistered();
         when(issuer.eligibleToManage(userId)).thenReturn(true);
         when(issuer.atCap(userId)).thenReturn(false);
+        when(issuer.mfaSatisfied(true)).thenReturn(true);
 
-        String redirectTo = service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent");
+        String redirectTo = service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent", true);
 
         InOrder order = inOrder(issuer, stepUp, codes, audit);
         order.verify(issuer).eligibleToManage(userId);
         order.verify(issuer).atCap(userId);
+        order.verify(issuer).mfaSatisfied(true);
         order.verify(stepUp).consume(userId, StepUpPurpose.PAT_CREATE, "proof");
         ArgumentCaptor<AuthorizationCode> stored = ArgumentCaptor.forClass(AuthorizationCode.class);
         order.verify(codes).insert(stored.capture());
@@ -237,11 +240,26 @@ class OAuthTokenExchangeTest {
         clientIsRegistered();
         when(issuer.eligibleToManage(userId)).thenReturn(false);
 
-        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent"))
+        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent", true))
                 .isInstanceOf(PatNotEligibleException.class);
 
         verifyNoInteractions(stepUp);
         verify(codes, never()).insert(any());
+    }
+
+    @Test
+    void aGrantFromASessionWithoutTheSecondFactorLeavesTheProofUntouched() {
+        clientIsRegistered();
+        when(issuer.eligibleToManage(userId)).thenReturn(true);
+        when(issuer.atCap(userId)).thenReturn(false);
+        when(issuer.mfaSatisfied(false)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent", false))
+                .isInstanceOf(PatMfaRequiredException.class);
+
+        verifyNoInteractions(stepUp);
+        verify(codes, never()).insert(any());
+        verifyNoInteractions(audit);
     }
 
     @Test
@@ -250,7 +268,7 @@ class OAuthTokenExchangeTest {
         when(issuer.eligibleToManage(userId)).thenReturn(true);
         when(issuer.atCap(userId)).thenReturn(true);
 
-        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent"))
+        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), "proof", IP, "agent", false))
                 .isInstanceOf(PatLimitReachedException.class);
 
         verifyNoInteractions(stepUp);
@@ -261,9 +279,9 @@ class OAuthTokenExchangeTest {
     void aGrantWhoseRequestDoesNotCheckOutSpendsNothingAndStoresNothing() {
         clientIsRegistered();
 
-        assertThatThrownBy(() -> service.grant(userId, params("https://evil.example/cb", CHALLENGE), "proof", IP, null))
-                .isInstanceOf(OAuthRequestRefusedException.class);
-        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, "short"), "proof", IP, null))
+        assertThatThrownBy(() -> service.grant(userId, params("https://evil.example/cb", CHALLENGE), "proof", IP, null,
+                true)).isInstanceOf(OAuthRequestRefusedException.class);
+        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, "short"), "proof", IP, null, true))
                 .isInstanceOf(OAuthRequestRefusedException.class).hasMessageContaining("invalid_request");
 
         verifyNoInteractions(stepUp);
@@ -275,10 +293,11 @@ class OAuthTokenExchangeTest {
     void aMissingProofSurfacesTheStepUpRefusalAndStoresNoCode() {
         clientIsRegistered();
         when(issuer.eligibleToManage(userId)).thenReturn(true);
+        when(issuer.mfaSatisfied(true)).thenReturn(true);
         org.mockito.Mockito.doThrow(new com.flowcortex.user.api.StepUpRequiredException())
                 .when(stepUp).consume(userId, StepUpPurpose.PAT_CREATE, null);
 
-        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), null, IP, null))
+        assertThatThrownBy(() -> service.grant(userId, params(CALLBACK, CHALLENGE), null, IP, null, true))
                 .isInstanceOf(com.flowcortex.user.api.StepUpRequiredException.class);
 
         verify(codes, never()).insert(any());
@@ -299,19 +318,30 @@ class OAuthTokenExchangeTest {
         clientIsRegistered();
         when(issuer.eligibleToManage(userId)).thenReturn(false);
 
-        CheckView view = service.check(userId, params(CALLBACK, null));
+        CheckView view = service.check(userId, params(CALLBACK, null), true);
 
         assertThat(view).isEqualTo(new CheckView("mcp_ab12", "Claude", CALLBACK, "mcp", false, "invalid_request"));
     }
 
     @Test
+    void checkReportsNotEligibleForASessionWithoutTheSecondFactor() {
+        clientIsRegistered();
+        when(issuer.eligibleToManage(userId)).thenReturn(true);
+        when(issuer.mfaSatisfied(false)).thenReturn(false);
+        when(issuer.mfaSatisfied(true)).thenReturn(true);
+
+        assertThat(service.check(userId, params(CALLBACK, CHALLENGE), false).eligible()).isFalse();
+        assertThat(service.check(userId, params(CALLBACK, CHALLENGE), true).eligible()).isTrue();
+    }
+
+    @Test
     void checkRefusesAnUnknownClientAndAnUnregisteredRedirectUri() {
         when(clients.find("mcp_ab12")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.check(userId, params(CALLBACK, CHALLENGE)))
+        assertThatThrownBy(() -> service.check(userId, params(CALLBACK, CHALLENGE), true))
                 .isInstanceOf(OAuthRequestRefusedException.class).hasMessageContaining("oauth.invalidClient");
 
         clientIsRegistered();
-        assertThatThrownBy(() -> service.check(userId, params("https://evil.example/cb", CHALLENGE)))
+        assertThatThrownBy(() -> service.check(userId, params("https://evil.example/cb", CHALLENGE), true))
                 .isInstanceOf(OAuthRequestRefusedException.class).hasMessageContaining("oauth.invalidRedirectUri");
     }
 

@@ -10,6 +10,7 @@ import com.flowcortex.user.application.AuthEventType;
 import com.flowcortex.user.application.OpaqueTokens;
 import com.flowcortex.user.domain.AppUser;
 import com.flowcortex.user.infrastructure.AppUserRepository;
+import com.flowcortex.user.totp.TotpRequirement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,15 +37,18 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
     private final StepUpProofs stepUpProofs;
     private final AuditEventWriter audit;
     private final PersonalAccessTokenProperties properties;
+    private final TotpRequirement totpRequirement;
     private final Clock clock;
 
     PersonalAccessTokenService(PersonalAccessTokenRepository tokens, AppUserRepository users,
-            StepUpProofs stepUpProofs, AuditEventWriter audit, PersonalAccessTokenProperties properties, Clock clock) {
+            StepUpProofs stepUpProofs, AuditEventWriter audit, PersonalAccessTokenProperties properties,
+            TotpRequirement totpRequirement, Clock clock) {
         this.tokens = tokens;
         this.users = users;
         this.stepUpProofs = stepUpProofs;
         this.audit = audit;
         this.properties = properties;
+        this.totpRequirement = totpRequirement;
         this.clock = clock;
     }
 
@@ -57,17 +61,20 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
 
     /**
      * One transaction: the owner's row is locked first so two creates cannot both pass the cap, the
-     * cap is checked before the proof is spent so a refusal for any other reason leaves it usable.
+     * cap and the second factor are checked before the proof is spent so a refusal for any other reason leaves
+     * it usable.
      *
+     * @param sessionMfa whether the caller's access token carries the second-factor claim
      * @throws PatNotEligibleException when the owner is not an active, unlocked admin
+     * @throws PatMfaRequiredException when the second factor is required and the session did not pass it
      * @throws PatLimitReachedException at the live-token cap
      * @throws com.flowcortex.user.api.StepUpRequiredException when the proof is missing, spent, expired or not theirs
      */
     @Transactional
     CreatedToken create(UUID userId, String name, Integer expiresInDays, String stepUpProof, String ip,
-            String userAgent) {
+            String userAgent, boolean sessionMfa) {
         Instant now = clock.instant();
-        lockEligibleBelowCap(userId, now);
+        lockEligibleBelowCap(userId, now, sessionMfa);
         stepUpProofs.consume(userId, StepUpPurpose.PAT_CREATE, stepUpProof);
 
         Duration lifetime = expiresInDays == null ? properties.defaultLifetime() : Duration.ofDays(expiresInDays);
@@ -76,7 +83,7 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
 
     /**
      * Same lock, eligibility and cap path as {@link #create}, without a proof: the grant has checked the
-     * session. Both refusals come before any write and must not mark a caller's transaction
+     * session and its second factor. Both refusals come before any write and must not mark a caller's transaction
      * rollback-only: the code exchange catches them and still commits its redemption. The row is
      * flushed because the caller links it from a table of its own in the same transaction.
      */
@@ -84,7 +91,7 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
     @Transactional(noRollbackFor = {PatNotEligibleException.class, PatLimitReachedException.class})
     public Issued issue(UUID userId, String name, String clientId) {
         Instant now = clock.instant();
-        lockEligibleBelowCap(userId, now);
+        lockEligibleBelowCap(userId, now, true);
         CreatedToken created = mint(userId, name, now, properties.defaultLifetime(), null, null, clientId);
         tokens.flush();
         return new Issued(created.token().getId(), created.rawToken(), created.token().getExpiresAt());
@@ -127,10 +134,22 @@ class PersonalAccessTokenService implements PersonalAccessTokenAuthenticator, OA
         return tokens.countLive(userId, clock.instant()) >= properties.maxLivePerUser();
     }
 
-    /** The owner's row is locked first so two mints cannot both pass the cap. */
-    private void lockEligibleBelowCap(UUID userId, Instant now) {
+    @Override
+    public boolean mfaSatisfied(boolean sessionMfa) {
+        return sessionMfa || !totpRequirement.adminRequired();
+    }
+
+    /**
+     * The owner's row is locked first so two mints cannot both pass the cap. The code exchange passes
+     * {@code sessionMfa = true}: the code it redeems was granted only to a session that satisfied
+     * {@link #mfaSatisfied}.
+     */
+    private void lockEligibleBelowCap(UUID userId, Instant now, boolean sessionMfa) {
         AppUser owner = users.findByIdForUpdate(userId).orElseThrow(PatNotEligibleException::new);
         requireEligible(owner, now);
+        if (!mfaSatisfied(sessionMfa)) {
+            throw new PatMfaRequiredException();
+        }
         if (tokens.countLive(userId, now) >= properties.maxLivePerUser()) {
             throw new PatLimitReachedException();
         }

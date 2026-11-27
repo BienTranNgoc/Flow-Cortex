@@ -74,6 +74,9 @@ export async function settled(queryClient: QueryClient) {
 /** Every catalog key, in the order the API lists them for a super admin. */
 const ALL_PERMISSIONS: MeResponsePermissionsItem[] = Object.values(MeResponsePermissionsItem);
 
+/** What the API reports while the second-factor requirement is off, as in every test deployment. */
+const TOTP_NOT_REQUIRED = { enabled: false, required: false, verified: false };
+
 export const ADMIN_ME = {
   id: 'a1',
   email: 'admin@flowcortex.dev',
@@ -83,6 +86,7 @@ export const ADMIN_ME = {
   permissions: ALL_PERMISSIONS,
   adminDisabled: false,
   phoneVerificationRequired: false,
+  totp: TOTP_NOT_REQUIRED,
 };
 export const MEMBER_ME = {
   id: 'm1',
@@ -93,6 +97,7 @@ export const MEMBER_ME = {
   permissions: [] as MeResponsePermissionsItem[],
   adminDisabled: false,
   phoneVerificationRequired: false,
+  totp: TOTP_NOT_REQUIRED,
 };
 
 /** A staff caller holding only `keys`. */
@@ -106,5 +111,6 @@ export function staffMe(role: string, keys: MeResponsePermissionsItem[]) {
     permissions: keys,
     adminDisabled: false,
     phoneVerificationRequired: false,
+    totp: TOTP_NOT_REQUIRED,
   };
 }

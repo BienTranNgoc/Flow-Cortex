@@ -2,6 +2,7 @@ package com.flowcortex.user.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -49,9 +50,9 @@ class JwtRefreshTokenServiceTest {
     @Test
     void issueForPersistsHashedTokenAndReturnsSession() {
         AppUser user = activeUser();
-        when(accessTokenService.mint(user)).thenReturn("signed-access-jwt");
+        when(accessTokenService.mint(user, false)).thenReturn("signed-access-jwt");
 
-        AuthSession session = service.issueFor(user, "10.0.0.1", "ua", false);
+        AuthSession session = service.issueFor(user, "10.0.0.1", "ua", false, null);
 
         assertThat(session.accessToken()).isEqualTo("signed-access-jwt");
         assertThat(session.expiresIn()).isEqualTo(900L);
@@ -64,6 +65,7 @@ class JwtRefreshTokenServiceTest {
         assertThat(saved.getUserAgent()).isEqualTo("ua");
         assertThat(saved.getExpiresAt()).isEqualTo(NOW.plus(TTL));
         assertThat(saved.isRememberMe()).isFalse();
+        assertThat(saved.getMfaVerifiedAt()).isNull();
         // The stored hash is the SHA-256 of the raw token, never the raw itself.
         assertThat(saved.getTokenHash()).hasSize(64);
         assertThat(saved.getTokenHash()).isNotEqualTo(session.refreshToken());
@@ -71,14 +73,14 @@ class JwtRefreshTokenServiceTest {
 
     @Test
     void issueForTruncatesLongUserAgentToFiveTwelveBytes() {
-        service.issueFor(activeUser(), "ip", "x".repeat(2000), false);
+        service.issueFor(activeUser(), "ip", "x".repeat(2000), false, null);
 
         assertThat(savedToken().getUserAgent()).hasSize(512);
     }
 
     @Test
     void issueForUsesRememberMeTtlAndFlagsTheSessionPersistentWhenRememberMeIsTrue() {
-        AuthSession session = service.issueFor(activeUser(), "ip", "ua", true);
+        AuthSession session = service.issueFor(activeUser(), "ip", "ua", true, null);
 
         assertThat(savedToken().getExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
         assertThat(savedToken().isRememberMe()).isTrue();
@@ -95,7 +97,7 @@ class JwtRefreshTokenServiceTest {
         }
         when(refreshTokenRepository.findActiveByUserId(user.getId(), NOW)).thenReturn(active);
 
-        service.issueFor(user, "ip", "ua", false);
+        service.issueFor(user, "ip", "ua", false, null);
 
         // 3 live sessions with a cap of 2: two go so that the new one is the second.
         verify(refreshTokenRepository).revokeFamily(active.get(0).getFamilyId(), NOW);
@@ -109,9 +111,20 @@ class JwtRefreshTokenServiceTest {
         when(refreshTokenRepository.findActiveByUserId(user.getId(), NOW))
                 .thenReturn(List.of(token(user, UUID.randomUUID(), NOW.minusSeconds(10), NOW.plusSeconds(3600))));
 
-        service.issueFor(user, "ip", "ua", false);
+        service.issueFor(user, "ip", "ua", false, null);
 
         verify(refreshTokenRepository, never()).revokeFamily(any(), any());
+    }
+
+    @Test
+    void issueForRecordsWhenASecondFactorWasPassedAndMintsTheMark() {
+        AppUser user = activeUser();
+        when(accessTokenService.mint(user, true)).thenReturn("marked-access-jwt");
+
+        AuthSession session = service.issueFor(user, "ip", "ua", false, NOW);
+
+        assertThat(session.accessToken()).isEqualTo("marked-access-jwt");
+        assertThat(savedToken().getMfaVerifiedAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -182,7 +195,7 @@ class JwtRefreshTokenServiceTest {
         assertThat(result).isEqualTo(new RotationResult.Rejected(RotationResult.Reason.ACCOUNT_NOT_ALLOWED,
                 user.getId(), familyId));
         verify(refreshTokenRepository).revokeFamily(familyId, NOW);
-        verify(accessTokenService, never()).mint(any());
+        verify(accessTokenService, never()).mint(any(), anyBoolean());
     }
 
     @Test
@@ -205,10 +218,10 @@ class JwtRefreshTokenServiceTest {
         UUID familyId = UUID.randomUUID();
         Instant familyExpiry = NOW.plus(Duration.ofDays(3));
         RefreshToken oldToken = new RefreshToken(UUID.randomUUID(), user.getId(), "h", familyId,
-                NOW.minusSeconds(60), familyExpiry, true, "old-ip", "old-ua");
+                NOW.minusSeconds(60), familyExpiry, true, "old-ip", "old-ua", null);
         when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(oldToken));
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-        when(accessTokenService.mint(user)).thenReturn("new-access-jwt");
+        when(accessTokenService.mint(user, false)).thenReturn("new-access-jwt");
         when(refreshTokenRepository.markUsed(Mockito.eq(oldToken.getId()), Mockito.eq(NOW), any(UUID.class)))
                 .thenReturn(1);
 
@@ -227,6 +240,56 @@ class JwtRefreshTokenServiceTest {
         assertThat(saved.getExpiresAt()).isEqualTo(familyExpiry);
         assertThat(saved.isRememberMe()).isTrue();
         verify(refreshTokenRepository).markUsed(Mockito.eq(oldToken.getId()), Mockito.eq(NOW), any(UUID.class));
+    }
+
+    @Test
+    void aVerifiedFamilyMintsTheMarkOnEveryRotation() {
+        AppUser user = activeUser();
+        Instant verifiedAt = NOW.minus(Duration.ofMinutes(20));
+        RefreshToken oldToken = new RefreshToken(UUID.randomUUID(), user.getId(), "h", UUID.randomUUID(),
+                NOW.minusSeconds(60), NOW.plus(TTL), false, "ip", "ua", verifiedAt);
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(oldToken));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(accessTokenService.mint(user, true)).thenReturn("marked-access-jwt");
+        when(refreshTokenRepository.markUsed(Mockito.eq(oldToken.getId()), Mockito.eq(NOW), any(UUID.class)))
+                .thenReturn(1);
+
+        RotationResult result = service.rotate("raw", "ip", "ua");
+
+        assertThat(result).isInstanceOfSatisfying(RotationResult.Rotated.class,
+                rotated -> assertThat(rotated.session().accessToken()).isEqualTo("marked-access-jwt"));
+        assertThat(savedToken().getMfaVerifiedAt()).isEqualTo(verifiedAt);
+    }
+
+    @Test
+    void anUnverifiedFamilyNeverGainsIt() {
+        AppUser user = activeUser();
+        RefreshToken oldToken = token(user, UUID.randomUUID(), NOW.minusSeconds(60), NOW.plus(TTL));
+        when(refreshTokenRepository.findByTokenHash(any())).thenReturn(Optional.of(oldToken));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(accessTokenService.mint(user, false)).thenReturn("plain-access-jwt");
+        when(refreshTokenRepository.markUsed(Mockito.eq(oldToken.getId()), Mockito.eq(NOW), any(UUID.class)))
+                .thenReturn(1);
+
+        service.rotate("raw", "ip", "ua");
+
+        verify(accessTokenService, never()).mint(user, true);
+        assertThat(savedToken().getMfaVerifiedAt()).isNull();
+    }
+
+    @Test
+    void rememberMeOfIsTrueOnlyForTheOwnersLiveRememberedSession() {
+        AppUser user = activeUser();
+        RefreshToken remembered = new RefreshToken(UUID.randomUUID(), user.getId(), OpaqueTokens.hash("mine"),
+                UUID.randomUUID(), NOW.minusSeconds(60), NOW.plus(TTL), true, "ip", "ua", null);
+        when(refreshTokenRepository.findByTokenHash(OpaqueTokens.hash("mine"))).thenReturn(Optional.of(remembered));
+        when(refreshTokenRepository.findByTokenHash(OpaqueTokens.hash("unknown"))).thenReturn(Optional.empty());
+
+        assertThat(service.rememberMeOf(user.getId(), "mine")).isTrue();
+        assertThat(service.rememberMeOf(UUID.randomUUID(), "mine")).isFalse();
+        assertThat(service.rememberMeOf(user.getId(), "unknown")).isFalse();
+        remembered.revoke(NOW);
+        assertThat(service.rememberMeOf(user.getId(), "mine")).isFalse();
     }
 
     @Test
@@ -285,7 +348,7 @@ class JwtRefreshTokenServiceTest {
 
     private static RefreshToken token(AppUser user, UUID familyId, Instant issuedAt, Instant expiresAt) {
         return new RefreshToken(UUID.randomUUID(), user.getId(), "h", familyId, issuedAt, expiresAt, false, "ip",
-                "ua");
+                "ua", null);
     }
 
     private static AppUser activeUser() {

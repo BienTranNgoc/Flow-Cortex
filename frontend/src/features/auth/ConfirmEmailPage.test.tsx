@@ -21,6 +21,7 @@ function renderConfirm(search: string) {
           </Route>
           <Route path="/" element={<p>Home</p>} />
           <Route path="/set-password" element={<SetPasswordStep />} />
+          <Route path="/login/totp" element={<CodeStep />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -30,6 +31,15 @@ function renderConfirm(search: string) {
 function SetPasswordStep() {
   const state = useLocation().state as { passwordSetupToken?: string } | null;
   return <p>Set password step with {state?.passwordSetupToken ?? 'no token'}</p>;
+}
+
+function CodeStep() {
+  const state = useLocation().state as { passwordSetup?: { token: string | null } } | null;
+  return (
+    <p>
+      Code step, password setup {state?.passwordSetup ? state.passwordSetup.token : 'not needed'}
+    </p>
+  );
 }
 
 const LINK_INVALID = {
@@ -82,6 +92,39 @@ describe('ConfirmEmailPage', () => {
     expect(await screen.findByText('Set password step with setup-1')).toBeInTheDocument();
     expect(screen.queryByText('Home')).not.toBeInTheDocument();
     expect(getToken()).toBe('jwt-d');
+  });
+
+  it('leaves the member signed out and asks for the code when the account owes one', async () => {
+    stubApi({
+      'POST /api/v1/auth/confirm-email': {
+        status: 202,
+        body: {
+          status: 'totp_required',
+          expiresIn: 300,
+          passwordSetupRequired: true,
+          passwordSetupToken: 'setup-2',
+        },
+      },
+    });
+
+    renderConfirm('?token=link-token-3');
+
+    expect(await screen.findByText('Code step, password setup setup-2')).toBeInTheDocument();
+    expect(getToken()).toBeNull();
+  });
+
+  it('asks for the code without a password step when none is needed', async () => {
+    stubApi({
+      'POST /api/v1/auth/confirm-email': {
+        status: 202,
+        body: { status: 'totp_required', expiresIn: 300, passwordSetupRequired: false },
+      },
+    });
+
+    renderConfirm('?token=link-token-4');
+
+    expect(await screen.findByText('Code step, password setup not needed')).toBeInTheDocument();
+    expect(getToken()).toBeNull();
   });
 
   it('says the link is no longer valid and resends a link to the address typed', async () => {

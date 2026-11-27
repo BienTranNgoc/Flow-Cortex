@@ -21,6 +21,8 @@ dependencies {
     implementation("tools.jackson.core:jackson-databind")
     // Confirmation mails the mail transport reports as failed are counted.
     implementation("io.micrometer:micrometer-core")
+    // TotpQr renders the setup QR from a ZXing BitMatrix; no AWT or image IO is involved.
+    implementation("com.google.zxing:core:${providers.gradleProperty("zxingVersion").get()}")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")

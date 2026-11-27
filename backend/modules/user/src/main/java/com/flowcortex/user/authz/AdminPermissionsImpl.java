@@ -3,11 +3,17 @@ package com.flowcortex.user.authz;
 import com.flowcortex.shared.security.authz.Permission;
 import com.flowcortex.user.api.AdminAssignee;
 import com.flowcortex.user.api.AdminPermissions;
+import com.flowcortex.user.application.JwtClaims;
+import com.flowcortex.user.totp.TotpRequirement;
+import com.flowcortex.user.totp.TotpService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +27,28 @@ class AdminPermissionsImpl implements AdminPermissions {
 
     private final CallerFactsLoader factsLoader;
     private final NamedParameterJdbcTemplate jdbc;
+    private final TotpRequirement requirement;
+    private final TotpService totp;
 
-    AdminPermissionsImpl(CallerFactsLoader factsLoader, NamedParameterJdbcTemplate jdbc) {
+    AdminPermissionsImpl(CallerFactsLoader factsLoader, NamedParameterJdbcTemplate jdbc,
+            TotpRequirement requirement, TotpService totp) {
         this.factsLoader = factsLoader;
         this.jdbc = jdbc;
+        this.requirement = requirement;
+        this.totp = totp;
     }
 
     @Override
     public void require(UUID userId, Permission key) {
-        AdminAuthorizationDecision.decide(new Posture.AllOf(Set.of(key)), factsLoader.load(userId)).requireAllowed();
+        CallerFacts facts = factsLoader.load(userId, sessionPassedMfa());
+        AdminAuthorizationDecision.decide(new Posture.AllOf(Set.of(key)), facts, requirement.adminRequired())
+                .requireAllowed(() -> totp.isEnabled(userId));
+    }
+
+    /** The {@code mfa} claim of the request's token, read the way the interceptor reads it; false without one. */
+    private static boolean sessionPassedMfa() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication instanceof JwtAuthenticationToken token && JwtClaims.mfaOf(token.getToken());
     }
 
     @Override

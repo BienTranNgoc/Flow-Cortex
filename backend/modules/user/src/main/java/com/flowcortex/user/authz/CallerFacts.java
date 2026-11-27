@@ -9,9 +9,12 @@ import java.util.Set;
  *
  * @param superAdmin    the role holds every key by its flag
  * @param adminDisabled the account is a staff or super-admin account whose console access is deactivated
+ * @param consoleAccount the role is a super admin or a staff role, the accounts that must pass a second factor
+ * @param sessionMfa    the caller's session passed a second factor (the access token's claim)
  * @param keys          the role's keys for a staff role; empty for a super admin and for an end user
  */
-public record CallerFacts(boolean superAdmin, boolean adminDisabled, Set<Permission> keys) {
+public record CallerFacts(boolean superAdmin, boolean adminDisabled, boolean consoleAccount, boolean sessionMfa,
+        Set<Permission> keys) {
 
     public CallerFacts {
         keys = Set.copyOf(keys);

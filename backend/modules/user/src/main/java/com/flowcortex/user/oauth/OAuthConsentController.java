@@ -1,6 +1,7 @@
 package com.flowcortex.user.oauth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.flowcortex.user.application.JwtClaims;
 import com.flowcortex.user.oauth.AuthorizationRequestCheck.Params;
 import com.flowcortex.user.oauth.McpOAuthService.CheckView;
 import io.swagger.v3.oas.annotations.Operation;
@@ -97,7 +98,7 @@ class OAuthConsentController {
             @RequestParam(name = "resource", required = false) @Size(max = 2048) String resource) {
         Params params = new Params(responseType, clientId, redirectUri, codeChallenge, codeChallengeMethod, scope,
                 state, resource);
-        return CheckResponse.from(service.check(UUID.fromString(jwt.getSubject()), params));
+        return CheckResponse.from(service.check(UUID.fromString(jwt.getSubject()), params, JwtClaims.mfaOf(jwt)));
     }
 
     @Operation(operationId = "grantOAuthAuthorization")
@@ -105,7 +106,8 @@ class OAuthConsentController {
     @ApiResponse(responseCode = "400", description = "oauth.invalidClient, oauth.invalidRedirectUri or oauth.invalidRequest",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(responseCode = "403", description = "PAT_NOT_ELIGIBLE, STEP_UP_REQUIRED or PAT_NOT_ALLOWED",
+    @ApiResponse(responseCode = "403",
+            description = "PAT_NOT_ELIGIBLE, PAT_MFA_REQUIRED, STEP_UP_REQUIRED or PAT_NOT_ALLOWED",
             content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                     schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(responseCode = "409", description = "PAT_LIMIT_REACHED",
@@ -117,7 +119,8 @@ class OAuthConsentController {
     GrantResponse grant(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody GrantRequest request,
             HttpServletRequest servletRequest) {
         String redirectTo = service.grant(UUID.fromString(jwt.getSubject()), request.toParams(),
-                request.stepUpProof(), servletRequest.getRemoteAddr(), userAgent(servletRequest));
+                request.stepUpProof(), servletRequest.getRemoteAddr(), userAgent(servletRequest),
+                JwtClaims.mfaOf(jwt));
         return new GrantResponse(redirectTo);
     }
 

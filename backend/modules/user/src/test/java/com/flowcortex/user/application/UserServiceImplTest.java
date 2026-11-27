@@ -33,6 +33,7 @@ import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
 import com.flowcortex.user.infrastructure.UserDirectoryRepository;
 import com.flowcortex.user.roles.RbacMutationSwitch;
+import com.flowcortex.user.totp.TotpService;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
@@ -67,11 +68,13 @@ class UserServiceImplTest {
     private final RoleCatalog roleCatalog = mock(RoleCatalog.class);
     private final RbacMutationSwitch mutationSwitch = mock(RbacMutationSwitch.class);
     private final UserDirectoryRepository directory = mock(UserDirectoryRepository.class);
+    private final TotpService totp = mock(TotpService.class);
+    private final AuditEventWriter audit = mock(AuditEventWriter.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-08T03:04:05Z"), ZoneOffset.UTC);
     private final UserServiceImpl service =
             new UserServiceImpl(repository, new BCryptPasswordEncoder(), accountCredentials, events, emailLinks,
                     adminPermissions, superAdminInvariant, registrationOwnerGuard, roleCatalog, mutationSwitch,
-                    directory, clock);
+                    directory, totp, audit, clock);
 
     UserServiceImplTest() {
         when(roleCatalog.require(any())).thenAnswer(invocation -> roleRow(invocation.getArgument(0)));
@@ -348,7 +351,7 @@ class UserServiceImplTest {
         Instant now = clock.instant();
         when(directory.count(delegated.getId(), UserQuery.all(), now)).thenReturn(1L);
         when(directory.page(delegated.getId(), UserQuery.all(), now, 0, 100))
-                .thenReturn(List.of(AppUserMapper.toUserView(dung, Map.of(), now, false)));
+                .thenReturn(List.of(AppUserMapper.toUserView(dung, Map.of(), now, false, false)));
 
         assertThat(service.searchUsers(delegated.getId(), UserQuery.all(), 0, 100).items())
                 .extracting(UserView::email).containsExactly("dung@example.com");
@@ -389,8 +392,8 @@ class UserServiceImplTest {
         Instant now = clock.instant();
         when(directory.count(adminId, UserQuery.all(), now)).thenReturn(2L);
         when(directory.page(adminId, UserQuery.all(), now, 0, 100)).thenReturn(
-                List.of(AppUserMapper.toUserView(member, Map.of(), now, false),
-                        AppUserMapper.toUserView(staff, Map.of(), now, true)));
+                List.of(AppUserMapper.toUserView(member, Map.of(), now, false, false),
+                        AppUserMapper.toUserView(staff, Map.of(), now, true, false)));
         when(repository.findByOwnerIdAndId(adminId, member.getId())).thenReturn(Optional.of(member));
 
         assertThat(service.searchUsers(staff.getId(), UserQuery.all(), 0, 100).items()).hasSize(2);

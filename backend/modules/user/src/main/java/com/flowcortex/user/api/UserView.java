@@ -10,7 +10,8 @@ import java.util.UUID;
  *
  * <p>{@code state} is the wire value of the account state; {@code lockedUntil} is {@code null} unless
  * the lockout end is after the instant the view was read; {@code staffTarget} is true when the
- * account's {@code role} row is staff or super admin.
+ * account's {@code role} row is staff or super admin; {@code totpEnabled} is true when the account has
+ * confirmed a second factor.
  */
 public record UserView(
         UUID id,
@@ -28,7 +29,8 @@ public record UserView(
         Instant lockedUntil,
         List<String> signInMethods,
         boolean adminDisabled,
-        boolean staffTarget) {
+        boolean staffTarget,
+        boolean totpEnabled) {
 
     /** {@code PASSWORD} then {@code GOOGLE}, whichever the account has. */
     public static List<String> signInMethodsOf(boolean hasPassword, boolean linkedToGoogle) {

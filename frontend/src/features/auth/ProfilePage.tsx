@@ -19,6 +19,7 @@ import { roleLabel, statusLabel } from './enumLabels';
 import { PhoneVerification } from './PhoneVerification';
 import { PrivacySection } from './PrivacySection';
 import { profileSchema, type ProfileFormValues } from './profileSchema';
+import { TwoFactorSection } from './TwoFactorSection';
 import { UsernameField } from './UsernameField';
 import { failureMessage, useMeQuery } from './useAuth';
 import { useOwnProfileQuery, useUpdateNames } from './useOwnProfile';
@@ -309,6 +310,9 @@ export function ProfilePage() {
               <PhoneVerification />
             </>
           )}
+
+          <hr className="profile-card__divider" />
+          <TwoFactorSection />
 
           {personalAccessTokens && me.role === 'ADMIN' && (
             <>

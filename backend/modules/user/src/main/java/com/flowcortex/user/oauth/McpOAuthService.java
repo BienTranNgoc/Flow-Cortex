@@ -9,6 +9,7 @@ import com.flowcortex.user.oauth.AuthorizationRequestCheck.Checked;
 import com.flowcortex.user.oauth.AuthorizationRequestCheck.Params;
 import com.flowcortex.user.pat.OAuthTokenIssuer;
 import com.flowcortex.user.pat.PatLimitReachedException;
+import com.flowcortex.user.pat.PatMfaRequiredException;
 import com.flowcortex.user.pat.PatNotEligibleException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -68,24 +69,34 @@ class McpOAuthService {
     record ExchangeRequest(String code, String codeVerifier, String redirectUri) {
     }
 
-    /** @throws OAuthRequestRefusedException for an unknown client or an unregistered redirect URI */
-    CheckView check(UUID userId, Params params) {
+    /**
+     * {@code eligible} is false when a grant from this session would be refused for the account or for the
+     * session's missing second factor.
+     *
+     * @param sessionMfa whether the caller's access token carries the second-factor claim
+     * @throws OAuthRequestRefusedException for an unknown client or an unregistered redirect URI
+     */
+    CheckView check(UUID userId, Params params, boolean sessionMfa) {
         Checked checked = verified(params);
         return new CheckView(checked.client().clientId(), checked.client().clientName(), checked.redirectUri(),
-                checked.scope(), issuer.eligibleToManage(userId), checked.error());
+                checked.scope(), issuer.eligibleToManage(userId) && issuer.mfaSatisfied(sessionMfa),
+                checked.error());
     }
 
     /**
      * Spends the step-up proof only after every other refusal has been ruled out, so a refused grant
-     * leaves it usable, and stores the code as its hash.
+     * leaves it usable, and stores the code as its hash. The second factor is held to the same rule as
+     * creating a token by hand: the code exists only for a session that may mint a token.
      *
+     * @param sessionMfa whether the caller's access token carries the second-factor claim
      * @return the redirect URI with {@code code} and, when given, {@code state} added to its query
      * @throws OAuthRequestRefusedException when the request does not check out
      * @throws PatNotEligibleException when the account may not hold tokens
      * @throws PatLimitReachedException at the live-token cap
+     * @throws PatMfaRequiredException when the second factor is required and the session did not pass it
      * @throws com.flowcortex.user.api.StepUpRequiredException when the proof is missing, spent or not theirs
      */
-    String grant(UUID userId, Params params, String stepUpProof, String ip, String userAgent) {
+    String grant(UUID userId, Params params, String stepUpProof, String ip, String userAgent, boolean sessionMfa) {
         Checked checked = verified(params);
         if (checked.error() != null) {
             throw OAuthRequestRefusedException.withError(checked.error());
@@ -95,6 +106,9 @@ class McpOAuthService {
         }
         if (issuer.atCap(userId)) {
             throw new PatLimitReachedException();
+        }
+        if (!issuer.mfaSatisfied(sessionMfa)) {
+            throw new PatMfaRequiredException();
         }
         stepUpProofs.consume(userId, StepUpPurpose.PAT_CREATE, stepUpProof);
 

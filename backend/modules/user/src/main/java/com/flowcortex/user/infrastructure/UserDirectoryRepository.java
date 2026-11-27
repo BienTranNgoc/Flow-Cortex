@@ -35,7 +35,9 @@ public class UserDirectoryRepository {
                    u.email_confirmed_at, u.locked_until, u.has_password,
                    (u.google_subject IS NOT NULL) AS google_linked,
                    (u.admin_disabled_at IS NOT NULL) AS admin_disabled,
-                   (r.staff OR r.super_admin) AS staff_target
+                   (r.staff OR r.super_admin) AS staff_target,
+                   EXISTS (SELECT 1 FROM user_totp t WHERE t.user_id = u.id AND t.enabled_at IS NOT NULL)
+                       AS totp_enabled
             FROM app_user u JOIN role r ON r.code = u.role
             """;
 
@@ -166,7 +168,8 @@ public class UserDirectoryRepository {
                 lockedUntil != null && lockedUntil.isAfter(now) ? lockedUntil : null,
                 UserView.signInMethodsOf(rs.getBoolean("has_password"), rs.getBoolean("google_linked")),
                 rs.getBoolean("admin_disabled"),
-                rs.getBoolean("staff_target"));
+                rs.getBoolean("staff_target"),
+                rs.getBoolean("totp_enabled"));
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

@@ -14,6 +14,13 @@ flowcortex:
       current: k1
       keys:
         k1: ZGV2LW9ubHktaW5zZWN1cmUtY29ubmVjdHIta2V5ISE=
+  # Placeholder TOTP key for a bare bootRun. It is used only when FLOWCORTEX_AUTH_TOTP_KEYS_K1 gives no key
+  # (unset or empty), under the same key id, so the dev profile never carries two keys; the issuer tells a
+  # dev enrolment from a real one.
+  auth:
+    totp:
+      dev-key: ZGV2LW9ubHktaW5zZWN1cmUtdG90cC1rZXktazEhISE=
+      issuer: Nodi (dev)
   # Placeholder share access-log hash key for a bare bootRun; an environment value overrides it.
   # The base file keeps the empty default, so every other profile still refuses to start without one.
   workflow:

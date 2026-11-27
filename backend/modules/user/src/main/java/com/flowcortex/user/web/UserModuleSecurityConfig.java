@@ -22,7 +22,8 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * :shared:security}'s broad default chain. Needed because the shared chain can't express two
  * things without editing its internals:
  * <ol>
- *   <li>{@code POST /api/v1/auth/login} must be reachable pre-auth (shared chain's
+ *   <li>{@code POST /api/v1/auth/login} and {@code POST /api/v1/auth/login/totp} (it carries only the
+ *   sign-in challenge cookie, no bearer token) must be reachable pre-auth (shared chain's
  *   {@code anyRequest().authenticated()} would block it).</li>
  *   <li>the JWT's {@code role} claim is mapped to a {@code ROLE_*} authority
  *   ({@link RoleClaimJwtConverter}) — the shared chain's default converter reads OAuth2
@@ -51,6 +52,7 @@ class UserModuleSecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login/totp").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/confirm-email").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-link").permitAll()

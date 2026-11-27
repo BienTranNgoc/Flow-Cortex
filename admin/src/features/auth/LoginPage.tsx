@@ -3,14 +3,14 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 import { ApiError } from '@flow-cortex/api-client';
-import { NodiMark } from '@flow-cortex/ui-kit';
 import { ArrowRight, CircleNotch, WarningCircle } from '@phosphor-icons/react';
 import { loginSchema, type LoginFormValues } from './loginSchema';
-import { NODI_WORDMARK } from '../../app/brand';
 import { usePageTitle } from '../../app/usePageTitle';
 import { AppLanguageToggle } from '../../lib/AppLanguageToggle';
 import { activeLocale } from '../../lib/i18n';
-import { accountLockedMessage, useAuthToken, useLoginMutation } from './useAuth';
+import { AuthBrand } from './AuthBrand';
+import { TotpCodeStep } from './TotpCodeStep';
+import { accountLockedMessage, isTotpChallenge, useAuthToken, useLoginMutation } from './useAuth';
 
 const PITCH_POINT_KEYS = [
   'auth.login.pitch.runs',
@@ -51,99 +51,95 @@ export function LoginPage() {
         <AppLanguageToggle />
       </div>
       <section className="auth-shell__card">
-        <div className="auth-shell__brand">
-          <span className="auth-shell__brand-mark" aria-hidden="true">
-            <NodiMark size={32} />
-          </span>
-          <div className="auth-shell__brand-text">
-            <strong>{NODI_WORDMARK}</strong>
-            <span>{t('common.header.console')}</span>
-          </div>
-        </div>
-        <div className="auth-shell__form-inner">
-          <header className="auth-shell__form-header">
-            <span className="auth-shell__eyebrow">{t('auth.login.eyebrow')}</span>
-            <h1>{t('auth.login.title')}</h1>
-            <p>{t('auth.login.subtitle')}</p>
-          </header>
+        <AuthBrand />
+        {isTotpChallenge(loginMutation.data) ? (
+          <TotpCodeStep onBack={() => loginMutation.reset()} />
+        ) : (
+          <div className="auth-shell__form-inner">
+            <header className="auth-shell__form-header">
+              <span className="auth-shell__eyebrow">{t('auth.login.eyebrow')}</span>
+              <h1>{t('auth.login.title')}</h1>
+              <p>{t('auth.login.subtitle')}</p>
+            </header>
 
-          <form
-            onSubmit={onSubmit}
-            noValidate
-            aria-label={t('auth.login.title')}
-            className="auth-form"
-          >
-            <div className="auth-form__field">
-              <label htmlFor="login-email" className="auth-form__label">
-                {t('auth.login.email')}
-              </label>
-              <input
-                id="login-email"
-                type="email"
-                autoComplete="username"
-                className={`auth-form__input${errors.email ? ' is-invalid' : ''}`}
-                placeholder={t('auth.login.emailPlaceholder')}
-                {...register('email')}
-              />
-              {errors.email?.message && (
-                <p className="auth-form__error" role="alert">
-                  <WarningCircle aria-hidden="true" size={14} />
-                  {t(errors.email.message)}
-                </p>
-              )}
-            </div>
-
-            <div className="auth-form__field">
-              <label htmlFor="login-password" className="auth-form__label">
-                {t('auth.login.password')}
-              </label>
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                className={`auth-form__input${errors.password ? ' is-invalid' : ''}`}
-                placeholder="••••••••"
-                {...register('password')}
-              />
-              {errors.password?.message && (
-                <p className="auth-form__error" role="alert">
-                  <WarningCircle aria-hidden="true" size={14} />
-                  {t(errors.password.message)}
-                </p>
-              )}
-            </div>
-
-            {serverError && (
-              <p className="auth-form__error auth-form__error--server" role="alert">
-                <WarningCircle aria-hidden="true" size={14} />
-                {serverError}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="auth-form__submit"
-              disabled={loginMutation.isPending}
+            <form
+              onSubmit={onSubmit}
+              noValidate
+              aria-label={t('auth.login.title')}
+              className="auth-form"
             >
-              {loginMutation.isPending ? (
-                <>
-                  <CircleNotch aria-hidden="true" size={16} className="auth-form__spinner" />
-                  {t('auth.login.submitting')}
-                </>
-              ) : (
-                <>
-                  {t('auth.login.submit')}
-                  <ArrowRight aria-hidden="true" size={16} />
-                </>
-              )}
-            </button>
-          </form>
+              <div className="auth-form__field">
+                <label htmlFor="login-email" className="auth-form__label">
+                  {t('auth.login.email')}
+                </label>
+                <input
+                  id="login-email"
+                  type="email"
+                  autoComplete="username"
+                  className={`auth-form__input${errors.email ? ' is-invalid' : ''}`}
+                  placeholder={t('auth.login.emailPlaceholder')}
+                  {...register('email')}
+                />
+                {errors.email?.message && (
+                  <p className="auth-form__error" role="alert">
+                    <WarningCircle aria-hidden="true" size={14} />
+                    {t(errors.email.message)}
+                  </p>
+                )}
+              </div>
 
-          <footer className="auth-shell__form-foot">
-            <span>{t('auth.login.needAccess')}</span>
-            <a href="mailto:ops@flow-cortex.app">{t('auth.login.contactOwner')}</a>
-          </footer>
-        </div>
+              <div className="auth-form__field">
+                <label htmlFor="login-password" className="auth-form__label">
+                  {t('auth.login.password')}
+                </label>
+                <input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  className={`auth-form__input${errors.password ? ' is-invalid' : ''}`}
+                  placeholder="••••••••"
+                  {...register('password')}
+                />
+                {errors.password?.message && (
+                  <p className="auth-form__error" role="alert">
+                    <WarningCircle aria-hidden="true" size={14} />
+                    {t(errors.password.message)}
+                  </p>
+                )}
+              </div>
+
+              {serverError && (
+                <p className="auth-form__error auth-form__error--server" role="alert">
+                  <WarningCircle aria-hidden="true" size={14} />
+                  {serverError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="auth-form__submit"
+                disabled={loginMutation.isPending}
+              >
+                {loginMutation.isPending ? (
+                  <>
+                    <CircleNotch aria-hidden="true" size={16} className="auth-form__spinner" />
+                    {t('auth.login.submitting')}
+                  </>
+                ) : (
+                  <>
+                    {t('auth.login.submit')}
+                    <ArrowRight aria-hidden="true" size={16} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <footer className="auth-shell__form-foot">
+              <span>{t('auth.login.needAccess')}</span>
+              <a href="mailto:ops@flow-cortex.app">{t('auth.login.contactOwner')}</a>
+            </footer>
+          </div>
+        )}
       </section>
 
       <aside className="auth-shell__pitch">

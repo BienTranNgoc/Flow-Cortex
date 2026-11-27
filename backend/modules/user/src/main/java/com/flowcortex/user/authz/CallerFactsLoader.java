@@ -37,9 +37,12 @@ public class CallerFactsLoader {
         this.rolePermissions = rolePermissions;
     }
 
-    /** 404 {@code user.current.notFound} when the row is gone; 403 for a suspended account. */
+    /**
+     * 404 {@code user.current.notFound} when the row is gone; 403 for a suspended account.
+     * {@code sessionMfa} is the caller's access-token claim, carried into the facts unread.
+     */
     @Transactional(readOnly = true)
-    public CallerFacts load(UUID userId) {
+    public CallerFacts load(UUID userId, boolean sessionMfa) {
         CallerRow row = jdbc.query(CALLER_ROW, (rs, rowNum) -> new CallerRow(rs.getString("role"),
                         UserStatus.valueOf(rs.getString("status")), rs.getObject("admin_disabled_at") != null,
                         rs.getBoolean("staff"), rs.getBoolean("super_admin")), userId)
@@ -49,6 +52,6 @@ public class CallerFactsLoader {
         boolean adminDisabled = row.adminDisabledSet() && (row.superAdmin() || row.staff());
         Set<Permission> keys = row.staff() && !adminDisabled
                 ? rolePermissions.keysOf(Role.of(row.role())) : Set.of();
-        return new CallerFacts(row.superAdmin(), adminDisabled, keys);
+        return new CallerFacts(row.superAdmin(), adminDisabled, row.superAdmin() || row.staff(), sessionMfa, keys);
     }
 }

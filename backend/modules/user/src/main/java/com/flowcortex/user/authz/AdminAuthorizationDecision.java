@@ -13,23 +13,27 @@ final class AdminAuthorizationDecision {
     private AdminAuthorizationDecision() {
     }
 
-    static Verdict decide(Posture posture, CallerFacts caller) {
+    /** {@code mfaRequired}: console accounts must hold a session that passed a second factor. */
+    static Verdict decide(Posture posture, CallerFacts caller, boolean mfaRequired) {
         return switch (posture) {
             case Posture.None none -> Verdict.DENY;
             case Posture.Conflict conflict -> Verdict.DENY;
             case Posture.Public open -> Verdict.ALLOW;
             case Posture.AuthenticatedOnly signedIn -> Verdict.ALLOW;
-            case Posture.AllOf all -> byKeys(all.keys(), caller, true);
-            case Posture.AnyOf any -> byKeys(any.keys(), caller, false);
+            case Posture.AllOf all -> byKeys(all.keys(), caller, true, mfaRequired);
+            case Posture.AnyOf any -> byKeys(any.keys(), caller, false, mfaRequired);
         };
     }
 
-    private static Verdict byKeys(Set<Permission> required, CallerFacts caller, boolean all) {
+    private static Verdict byKeys(Set<Permission> required, CallerFacts caller, boolean all, boolean mfaRequired) {
         if (required.isEmpty()) {
             return Verdict.DENY;
         }
         if (caller.adminDisabled()) {
             return Verdict.ADMIN_DISABLED;
+        }
+        if (mfaRequired && caller.consoleAccount() && !caller.sessionMfa()) {
+            return Verdict.MFA_REQUIRED;
         }
         if (caller.superAdmin()) {
             return Verdict.ALLOW;

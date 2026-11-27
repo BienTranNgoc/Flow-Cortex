@@ -1,9 +1,13 @@
 package com.flowcortex.user.authz;
 
+import com.flowcortex.user.application.JwtClaims;
+import com.flowcortex.user.totp.TotpRequirement;
+import com.flowcortex.user.totp.TotpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.Ordered;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
@@ -24,9 +28,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 class AdminAuthorizationInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     private final CallerFactsLoader factsLoader;
+    /** Providers, not beans: a controller slice test registers this interceptor without the TOTP beans. */
+    private final ObjectProvider<TotpRequirement> requirement;
+    private final ObjectProvider<TotpService> totp;
 
-    AdminAuthorizationInterceptor(CallerFactsLoader factsLoader) {
+    AdminAuthorizationInterceptor(CallerFactsLoader factsLoader, ObjectProvider<TotpRequirement> requirement,
+            ObjectProvider<TotpService> totp) {
         this.factsLoader = factsLoader;
+        this.requirement = requirement;
+        this.totp = totp;
     }
 
     @Override
@@ -46,8 +56,15 @@ class AdminAuthorizationInterceptor implements HandlerInterceptor, WebMvcConfigu
         if (posture instanceof Posture.Public) {
             return true;
         }
-        CallerFacts facts = needsCaller(posture) ? factsLoader.load(callerId()) : noCaller();
-        AdminAuthorizationDecision.decide(posture, facts).requireAllowed();
+        if (!needsCaller(posture)) {
+            AdminAuthorizationDecision.decide(posture, noCaller(), false).requireAllowed(() -> false);
+            return true;
+        }
+        JwtAuthenticationToken token = signedInToken();
+        UUID callerId = subjectOf(token);
+        CallerFacts facts = factsLoader.load(callerId, JwtClaims.mfaOf(token.getToken()));
+        AdminAuthorizationDecision.decide(posture, facts, requirement.getObject().adminRequired())
+                .requireAllowed(() -> totp.getObject().isEnabled(callerId));
         return true;
     }
 
@@ -57,7 +74,7 @@ class AdminAuthorizationInterceptor implements HandlerInterceptor, WebMvcConfigu
     }
 
     private static CallerFacts noCaller() {
-        return new CallerFacts(false, false, Set.of());
+        return new CallerFacts(false, false, false, false, Set.of());
     }
 
     private static String matchedPattern(HttpServletRequest request) {
@@ -65,15 +82,19 @@ class AdminAuthorizationInterceptor implements HandlerInterceptor, WebMvcConfigu
     }
 
     /** 401 when no signed-in caller reached the handler; the filter chains normally refuse first. */
-    private static UUID callerId() {
+    private static JwtAuthenticationToken signedInToken() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof JwtAuthenticationToken token && token.isAuthenticated()) {
-            try {
-                return UUID.fromString(token.getToken().getSubject());
-            } catch (IllegalArgumentException | NullPointerException e) {
-                throw new InsufficientAuthenticationException("Token subject is not a user id", e);
-            }
+            return token;
         }
         throw new InsufficientAuthenticationException("Authentication is required");
+    }
+
+    private static UUID subjectOf(JwtAuthenticationToken token) {
+        try {
+            return UUID.fromString(token.getToken().getSubject());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new InsufficientAuthenticationException("Token subject is not a user id", e);
+        }
     }
 }

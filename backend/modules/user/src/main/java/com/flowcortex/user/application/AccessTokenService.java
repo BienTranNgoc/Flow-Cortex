@@ -29,18 +29,23 @@ public class AccessTokenService {
         this.clock = clock;
     }
 
-    /** Mint a fresh access JWT for the user, carrying the user's id (subject) and role. */
-    public String mint(AppUser user) {
+    /**
+     * Mint a fresh access JWT for the user, carrying the user's id (subject) and role, and the
+     * {@link JwtClaims#MFA} claim only when the session passed a second factor.
+     */
+    public String mint(AppUser user, boolean mfa) {
         Instant now = Instant.now(clock);
         Instant expiresAt = now.plus(properties.accessTokenTtl());
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(expiresAt)
                 .subject(user.getId().toString())
-                .claim(JwtClaims.ROLE, user.getRole().code())
-                .build();
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+                .claim(JwtClaims.ROLE, user.getRole().code());
+        if (mfa) {
+            claims.claim(JwtClaims.MFA, true);
+        }
+        return jwtEncoder.encode(JwtEncoderParameters.from(claims.build())).getTokenValue();
     }
 
     public Duration accessTokenTtl() {

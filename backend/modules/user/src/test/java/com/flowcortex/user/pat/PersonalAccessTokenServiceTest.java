@@ -55,8 +55,12 @@ class PersonalAccessTokenServiceTest {
     private final UUID userId = UUID.randomUUID();
 
     private PersonalAccessTokenService service(boolean enabled) {
+        return service(enabled, true);
+    }
+
+    private PersonalAccessTokenService service(boolean enabled, boolean mfaRequired) {
         return new PersonalAccessTokenService(tokens, users, stepUp, audit,
-                new PersonalAccessTokenProperties(enabled, 10, Duration.ofDays(90)), CLOCK);
+                new PersonalAccessTokenProperties(enabled, 10, Duration.ofDays(90)), () -> mfaRequired, CLOCK);
     }
 
     private AppUser owner(Role role, UserStatus status) {
@@ -78,7 +82,7 @@ class PersonalAccessTokenServiceTest {
         ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
         when(tokens.countLive(userId, NOW)).thenReturn(0L);
 
-        CreatedToken created = service(true).create(userId, "CI runner", null, PROOF, IP, AGENT);
+        CreatedToken created = service(true).create(userId, "CI runner", null, PROOF, IP, AGENT, true);
 
         assertThat(created.rawToken()).matches("^fc_pat_[A-Za-z0-9_-]{43}$");
         ArgumentCaptor<PersonalAccessToken> saved = ArgumentCaptor.forClass(PersonalAccessToken.class);
@@ -94,7 +98,7 @@ class PersonalAccessTokenServiceTest {
     void createHonoursAGivenLifetimeAndAuditsWithoutTheToken() {
         ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
 
-        CreatedToken created = service(true).create(userId, "CI runner", 30, PROOF, IP, AGENT);
+        CreatedToken created = service(true).create(userId, "CI runner", 30, PROOF, IP, AGENT, true);
 
         assertThat(created.token().getExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
         ArgumentCaptor<Map<String, Object>> metadata = ArgumentCaptor.captor();
@@ -108,7 +112,7 @@ class PersonalAccessTokenServiceTest {
     void anIneligibleCallerIsRefusedBeforeAnyProofIsSpent() {
         ownerIs(owner(Role.MEMBER, UserStatus.ACTIVE));
 
-        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT))
+        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT, true))
                 .isInstanceOf(PatNotEligibleException.class);
 
         verifyNoInteractions(stepUp);
@@ -121,7 +125,7 @@ class PersonalAccessTokenServiceTest {
         locked.recordFailedLogin(1, Duration.ofMinutes(15), NOW);
         ownerIs(locked);
 
-        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT))
+        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT, true))
                 .isInstanceOf(PatNotEligibleException.class);
         assertThatThrownBy(() -> service(true).list(userId)).isInstanceOf(PatNotEligibleException.class);
         verifyNoInteractions(stepUp);
@@ -132,7 +136,7 @@ class PersonalAccessTokenServiceTest {
         ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
         when(tokens.countLive(userId, NOW)).thenReturn(10L);
 
-        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT))
+        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT, true))
                 .isInstanceOf(PatLimitReachedException.class);
 
         verify(stepUp, never()).consume(any(), any(), anyString());
@@ -144,11 +148,58 @@ class PersonalAccessTokenServiceTest {
         ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
         doThrow(new StepUpRequiredException()).when(stepUp).consume(userId, StepUpPurpose.PAT_CREATE, PROOF);
 
-        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT))
+        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT, true))
                 .isInstanceOf(StepUpRequiredException.class);
 
         verify(tokens, never()).save(any());
         verifyNoInteractions(audit);
+    }
+
+    @Test
+    void createWithoutMfaIsRefusedAndTheProofKept() {
+        ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
+
+        assertThatThrownBy(() -> service(true, true).create(userId, "CI", null, PROOF, IP, AGENT, false))
+                .isInstanceOf(PatMfaRequiredException.class);
+
+        verifyNoInteractions(stepUp);
+        verify(tokens, never()).save(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void createWithMfaSucceeds() {
+        ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
+
+        CreatedToken created = service(true, true).create(userId, "CI", null, PROOF, IP, AGENT, true);
+
+        assertThat(created.rawToken()).startsWith("fc_pat_");
+        verify(stepUp).consume(userId, StepUpPurpose.PAT_CREATE, PROOF);
+    }
+
+    @Test
+    void createWithoutMfaAllowedWhenNotRequired() {
+        ownerIs(owner(Role.ADMIN, UserStatus.ACTIVE));
+
+        CreatedToken created = service(true, false).create(userId, "CI", null, PROOF, IP, AGENT, false);
+
+        assertThat(created.rawToken()).startsWith("fc_pat_");
+        verify(stepUp).consume(userId, StepUpPurpose.PAT_CREATE, PROOF);
+    }
+
+    @Test
+    void aSessionSatisfiesTheSecondFactorWhenMarkedOrWhenTheRequirementIsOff() {
+        assertThat(service(true, true).mfaSatisfied(true)).isTrue();
+        assertThat(service(true, true).mfaSatisfied(false)).isFalse();
+        assertThat(service(true, false).mfaSatisfied(false)).isTrue();
+    }
+
+    @Test
+    void anIneligibleCallerWithoutMfaIsToldItIsNotEligibleFirst() {
+        ownerIs(owner(Role.MEMBER, UserStatus.ACTIVE));
+
+        assertThatThrownBy(() -> service(true, true).create(userId, "CI", null, PROOF, IP, AGENT, false))
+                .isInstanceOf(PatNotEligibleException.class);
     }
 
     @Test
@@ -409,7 +460,7 @@ class PersonalAccessTokenServiceTest {
     @Test
     void createAndAuthenticateRefuseAnRbacDeactivatedAdmin() {
         ownerIs(rbacDeactivatedAdmin());
-        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT))
+        assertThatThrownBy(() -> service(true).create(userId, "CI", null, PROOF, IP, AGENT, true))
                 .isInstanceOf(PatNotEligibleException.class);
         verifyNoInteractions(stepUp);
 

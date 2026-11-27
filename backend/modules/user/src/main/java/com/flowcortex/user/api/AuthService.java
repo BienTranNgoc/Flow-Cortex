@@ -25,10 +25,11 @@ public interface AuthService {
             String username, boolean rememberMe, String ip, String userAgent);
 
     /**
-     * Spends an emailed confirmation link, confirms its account and signs it in. The first confirmation
-     * drops the password, username and names chosen at registration and ends every earlier session,
-     * since nobody had proven they own the address when they were chosen. An account without a password
-     * gets a password-setup token for {@link #setPassword}.
+     * Spends an emailed confirmation link, confirms its account and signs it in, or, when the account has
+     * TOTP on, hands out a challenge that {@link #completeTotpSignIn} turns into the session. The first
+     * confirmation drops the password, username and names chosen at registration and ends every earlier
+     * session, since nobody had proven they own the address when they were chosen. An account without a
+     * password gets a password-setup token for {@link #setPassword}.
      * @throws com.flowcortex.shared.web.UnprocessableEntityException code {@code CONFIRMATION_LINK_INVALID}
      *         when the link is unknown, used, superseded or expired
      * @throws org.springframework.security.access.AccessDeniedException if the account is suspended
@@ -36,7 +37,8 @@ public interface AuthService {
     ConfirmedEmailSession confirmEmail(String rawToken, String ip, String userAgent);
 
     /**
-     * Spends an emailed set-password link and signs its account in with a password-setup token.
+     * Spends an emailed set-password link and signs its account in (or, with TOTP on, challenges it) with a
+     * password-setup token.
      * @throws com.flowcortex.shared.web.UnprocessableEntityException code {@code PASSWORD_LINK_INVALID},
      *         the same for a link that is unknown, used, superseded, expired or whose account has a
      *         password by now
@@ -48,14 +50,15 @@ public interface AuthService {
      * Gives a signed-in account without a password its first one, with the names and username chosen
      * alongside it, spending the setup token an emailed link handed out. Every session of the account
      * ends, a new one replaces the caller's, and the account's address is told. Changing an existing
-     * password is not offered.
+     * password is not offered. {@code callerMfa}: the caller's access token carries the second-factor claim;
+     * the new session then carries it too.
      * @throws com.flowcortex.shared.web.UnprocessableEntityException code {@code PASSWORD_SETUP_TOKEN_INVALID}
      *         when the setup token is unknown, used, expired or another account's
      * @throws com.flowcortex.shared.web.ConflictException if the account already has a password, or the
      *         username is already taken
      * @throws org.springframework.security.access.AccessDeniedException if the account is suspended
      */
-    AuthSession setPassword(UUID userId, PasswordSetup setup, String ip, String userAgent);
+    AuthSession setPassword(UUID userId, PasswordSetup setup, boolean callerMfa, String ip, String userAgent);
 
     /**
      * Mails a new link and retires the earlier ones when the email belongs to an active account that
@@ -86,9 +89,10 @@ public interface AuthService {
     String resetPassword(String rawToken, String rawPassword, String ip, String userAgent);
 
     /**
-     * Verifies the email/password pair and returns an {@link AuthSession}. The password is checked
-     * before the account's state is revealed: a wrong password is always the same 401, whatever
-     * the account (unknown, suspended or locked).
+     * Verifies the email/password pair and returns the {@link SessionOutcome}: a session, or, for an
+     * account with TOTP on, a challenge. The password is checked before the account's state is
+     * revealed: a wrong password is always the same 401, whatever the account (unknown, suspended or
+     * locked).
      * @throws org.springframework.security.authentication.BadCredentialsException if the email is unknown or the
      *         password doesn't match (same exception either way)
      * @throws org.springframework.security.access.AccessDeniedException if the password is right but the account
@@ -97,7 +101,21 @@ public interface AuthService {
      * @throws com.flowcortex.user.emailconfirm.EmailNotConfirmedException (403 {@code EMAIL_NOT_CONFIRMED})
      *         if the password is right but the account has not confirmed its email
      */
-    AuthSession login(String email, String rawPassword, boolean rememberMe, String ip, String userAgent);
+    SessionOutcome login(String email, String rawPassword, boolean rememberMe, String ip, String userAgent);
+
+    /**
+     * Completes the challenge a first factor handed out: a valid TOTP or recovery code spends it and opens
+     * the session its first factor asked for, marked as having passed a second factor. The first factor's
+     * account checks run again.
+     * @throws com.flowcortex.user.totp.TotpProblems.ChallengeInvalid (401 {@code TOTP_CHALLENGE_INVALID})
+     *         when the challenge is unknown, expired, spent or dead, or its account no longer has TOTP on
+     * @throws com.flowcortex.user.totp.TotpProblems.InvalidCode (422) for a wrong code, counted against the
+     *         challenge and the account
+     * @throws com.flowcortex.user.totp.TotpProblems.Locked (423) while the second factor is locked
+     * @throws org.springframework.security.access.AccessDeniedException if the account is now suspended
+     * @throws com.flowcortex.shared.web.AccountLockedException if the account is now locked
+     */
+    AuthSession completeTotpSignIn(String rawChallenge, String code, String ip, String userAgent);
 
     /**
      * Exchanges a Google authorization code (with its PKCE verifier and the nonce the id_token must
@@ -105,10 +123,11 @@ public interface AuthService {
      * registered through the same gate as {@link #register} (owner + rate limit). An email whose account
      * is still unconfirmed is taken over: Google has verified it, so the account is linked, confirmed,
      * loses its password and username, and takes the Google name. An email that belongs to a confirmed
-     * account is never linked. The Google call runs outside any transaction.
+     * account is never linked. The Google call runs outside any transaction. An account with TOTP on gets a
+     * challenge instead of a session.
      * @throws OAuthLoginException when the sign-in is refused (already audited); never an HTTP-mapped error
      */
-    AuthSession loginWithGoogle(String code, String codeVerifier, String nonce, boolean rememberMe, String ip,
+    SessionOutcome loginWithGoogle(String code, String codeVerifier, String nonce, boolean rememberMe, String ip,
             String userAgent);
 
     /** Audits a Google sign-in that was refused before the code exchange (cancelled, invalid state, ...). */

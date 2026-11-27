@@ -40,7 +40,7 @@ class AccessTokenServiceTest {
         when(stub.getTokenValue()).thenReturn("signed-jwt");
         when(encoder.encode(any())).thenReturn(stub);
 
-        String token = service.mint(user);
+        String token = service.mint(user, false);
 
         assertThat(token).isEqualTo("signed-jwt");
         ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
@@ -51,6 +51,20 @@ class AccessTokenServiceTest {
         assertThat(claims.getSubject()).isEqualTo(user.getId().toString());
         assertThat(claims.getClaim("role").toString()).isEqualTo(Role.MEMBER.code());
         assertThat(claims.getClaims()).doesNotContainKey("tv");
+        assertThat(claims.getClaims()).doesNotContainKey(JwtClaims.MFA);
+    }
+
+    @Test
+    void mintCarriesTheMfaClaimOnlyForASessionThatPassedASecondFactor() {
+        Jwt stub = mock(Jwt.class);
+        when(stub.getTokenValue()).thenReturn("signed-jwt");
+        when(encoder.encode(any())).thenReturn(stub);
+
+        service.mint(activeUser(), true);
+
+        ArgumentCaptor<JwtEncoderParameters> captor = ArgumentCaptor.forClass(JwtEncoderParameters.class);
+        verify(encoder).encode(captor.capture());
+        assertThat(captor.getValue().getClaims().getClaim(JwtClaims.MFA).toString()).isEqualTo("true");
     }
 
     private static AppUser activeUser() {
