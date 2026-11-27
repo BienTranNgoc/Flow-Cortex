@@ -24,12 +24,43 @@ const MOCK_REPORT: CvCheckReport = {
     },
   ],
   interviewQuestions: ['Bạn đã giải quyết vấn đề cache stampede hoặc cache invalidation trong Redis như thế nào?'],
+  jobProfile: {
+    primaryRole: 'Java Backend Developer',
+    seniority: 'Middle',
+    topSkills: ['Java', 'Spring Boot', 'PostgreSQL', 'Redis'],
+    location: 'Hà Nội',
+  },
+};
+
+const MOCK_JOBS = {
+  jobs: [
+    {
+      title: 'Middle/Senior Java Backend Developer',
+      company: 'FinTech Vietnam',
+      location: 'Hà Nội',
+      salary: '$1,800 - $2,800',
+      workMode: 'Hybrid',
+      matchScore: 91,
+      matchedSkills: ['Java', 'Spring Boot', 'Redis'],
+      summary: 'Phù hợp kinh nghiệm Spring Boot và hệ thống thanh toán.',
+      source: 'ITviec',
+      applyUrl: 'https://itviec.com/it-jobs/java-backend',
+    },
+  ],
+  searchLinks: [
+    { label: 'ITviec', url: 'https://itviec.com/it-jobs/java-backend-developer' },
+    { label: 'TopCV', url: 'https://www.topcv.vn/tim-viec-lam-java-backend-developer' },
+  ],
 };
 
 const ROUTES = {
   'POST /api/v1/cv-check': {
     status: 200,
     body: MOCK_REPORT,
+  },
+  'POST /api/v1/cv-check/jobs': {
+    status: 200,
+    body: MOCK_JOBS,
   },
 };
 
@@ -85,9 +116,15 @@ describe('CvCheckPage', () => {
 
     await settled(queryClient);
 
-    expect(calls.length).toBe(1);
+    expect(calls.length).toBe(2);
     expect(calls[0]?.path).toBe('/api/v1/cv-check');
+    expect(calls[1]?.path).toBe('/api/v1/cv-check/jobs');
     expect(screen.getByText('85')).toBeInTheDocument();
     expect(screen.getByText(/Thành thạo Java và Spring Boot/i)).toBeInTheDocument();
+
+    const jobsTab = screen.getByRole('button', { name: /Việc làm phù hợp|Matching Jobs/i });
+    await user.click(jobsTab);
+    expect(await screen.findByText('Middle/Senior Java Backend Developer')).toBeInTheDocument();
+    expect(screen.getByText('FinTech Vietnam')).toBeInTheDocument();
   });
 });

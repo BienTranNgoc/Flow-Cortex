@@ -30,6 +30,11 @@ public class CvCheckService {
             missingKeywords: 4-8 important industry keywords or certifications that would elevate this CV.
             rewrittenBullets: Select up to 5 weak, passive, or vague bullets in the CV and rewrite them in punchy STAR style with strong action verbs (without fabricating facts).
             interviewQuestions: 5-8 insightful technical and behavioral interview questions hiring managers will likely ask based on this CV.
+            jobProfile: Extract the candidate's target job search profile from the CV:
+            - primaryRole: Concise standard job title (e.g. "Java Backend Developer", "Frontend React Engineer").
+            - seniority: Estimated level ("Intern", "Fresher", "Junior", "Middle", "Senior", or "Lead").
+            - topSkills: 4-6 strongest concrete technical or domain skills from the CV.
+            - location: City or country inferred from the CV (default to "Vietnam" if unspecified).
 
             CANDIDATE CV:
             %s
@@ -43,6 +48,7 @@ public class CvCheckService {
             overallScore is the weighted judgement 0-100. Write all text in the language of the CV.
             rewrittenBullets: rewrite up to 5 weak CV bullets in STAR style without adding facts.
             interviewQuestions: up to 8 questions the CV makes likely.
+            jobProfile: extract primaryRole, seniority, topSkills (4-6 skills), and location from the CV.
 
             JOB DESCRIPTION:
             %s
@@ -53,7 +59,7 @@ public class CvCheckService {
 
     private static final String SCHEMA = """
             {"type":"object","required":["overallScore","dimensions","strengths","weaknesses","missingKeywords",
-            "rewrittenBullets","interviewQuestions"],"properties":{
+            "rewrittenBullets","interviewQuestions","jobProfile"],"properties":{
             "overallScore":{"type":"integer"},
             "dimensions":{"type":"object","required":["hardSkills","experienceImpact","softSkills","atsCompliance",
             "domainRelevance"],"properties":{"hardSkills":{"type":"integer"},"experienceImpact":{"type":"integer"},
@@ -63,7 +69,10 @@ public class CvCheckService {
             "missingKeywords":{"type":"array","items":{"type":"string"}},
             "rewrittenBullets":{"type":"array","items":{"type":"object","required":["original","improved"],
             "properties":{"original":{"type":"string"},"improved":{"type":"string"}}}},
-            "interviewQuestions":{"type":"array","items":{"type":"string"}}}}
+            "interviewQuestions":{"type":"array","items":{"type":"string"}},
+            "jobProfile":{"type":"object","required":["primaryRole","seniority","topSkills","location"],
+            "properties":{"primaryRole":{"type":"string"},"seniority":{"type":"string"},
+            "topSkills":{"type":"array","items":{"type":"string"}},"location":{"type":"string"}}}}}
             """;
 
     private final LlmSlots llm;

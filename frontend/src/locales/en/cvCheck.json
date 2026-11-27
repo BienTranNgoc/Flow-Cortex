@@ -52,7 +52,21 @@
   "tabs": {
     "evaluation": "Strengths & Weaknesses",
     "bullets": "STAR Bullet Optimization",
-    "interview": "Predicted Interview Questions"
+    "interview": "Predicted Interview Questions",
+    "jobs": "Matching Jobs"
+  },
+  "jobs": {
+    "detectedProfile": "Vietnam job profile:",
+    "syncedNote": "Synced (weekly):",
+    "cachedBadge": "Cached · Refreshes weekly",
+    "loading": "Finding matching Vietnam job openings...",
+    "error": "Unable to load matching jobs right now. Please retry or search directly on job boards.",
+    "retry": "Retry",
+    "matchSuffix": "match",
+    "viewAndApply": "View & Apply",
+    "unconfigured": "SERPAPI_API_KEY or JSEARCH_API_KEY is not configured yet for live Vietnam job sync. Use the quick job board links below.",
+    "empty": "No direct listings found for this role yet. Use the quick search links below.",
+    "moreOnBoards": "Explore more on Vietnam job boards:"
   },
   "bullets": {
     "original": "[Original]:",

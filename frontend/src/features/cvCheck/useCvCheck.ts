@@ -1,6 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
 import { sessionFetch } from '@flow-cortex/api-client';
-import type { CvCheckReport } from './cvCheckTypes';
+import type {
+  CvCheckReport,
+  CvJobProfile,
+  JobRecommendationsResponse,
+} from './cvCheckTypes';
 
 export interface CheckCvParams {
   readonly cvFile?: File | null;
@@ -79,5 +83,36 @@ export async function executeCvCheck(params: CheckCvParams): Promise<CvCheckRepo
 export function useCvCheckMutation() {
   return useMutation({
     mutationFn: executeCvCheck,
+  });
+}
+
+export async function executeRecommendJobs(
+  profile: CvJobProfile,
+): Promise<JobRecommendationsResponse> {
+  const response = await sessionFetch('/api/v1/cv-check/jobs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(profile),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errBody = (await response.json()) as { detail?: string; title?: string };
+      errorDetail = errBody.detail ?? errBody.title ?? '';
+    } catch {
+      // ignore
+    }
+    throw new CvCheckError(errorDetail || 'cv-jobs-failed', response.status);
+  }
+
+  return (await response.json()) as JobRecommendationsResponse;
+}
+
+export function useRecommendJobsMutation() {
+  return useMutation({
+    mutationFn: executeRecommendJobs,
   });
 }

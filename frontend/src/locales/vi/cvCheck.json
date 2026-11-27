@@ -52,7 +52,21 @@
   "tabs": {
     "evaluation": "Điểm mạnh & Điểm yếu",
     "bullets": "Tối ưu câu mô tả (STAR)",
-    "interview": "Dự đoán câu hỏi phỏng vấn"
+    "interview": "Dự đoán câu hỏi phỏng vấn",
+    "jobs": "Việc làm phù hợp"
+  },
+  "jobs": {
+    "detectedProfile": "Hồ sơ tìm việc Việt Nam:",
+    "syncedNote": "Cập nhật (7 ngày/lần):",
+    "cachedBadge": "Từ bộ nhớ đệm · Tự làm mới sau 7 ngày",
+    "loading": "Đang tìm tin tuyển dụng tại Việt Nam phù hợp với hồ sơ...",
+    "error": "Không thể tải danh sách tin tuyển dụng lúc này. Bạn có thể thử lại hoặc tìm trực tiếp trên các trang tuyển dụng.",
+    "retry": "Thử lại",
+    "matchSuffix": "phù hợp",
+    "viewAndApply": "Xem & Ứng tuyển",
+    "unconfigured": "Chưa cấu hình khóa SERPAPI_API_KEY hoặc JSEARCH_API_KEY để tự động lấy tin tuyển dụng Việt Nam. Bạn có thể tìm trực tiếp trên các sàn tuyển dụng bên dưới.",
+    "empty": "Chưa tìm thấy tin tuyển dụng trực tiếp cho vị trí này. Hãy dùng các liên kết tìm kiếm nhanh bên dưới.",
+    "moreOnBoards": "Tìm thêm trên các sàn tuyển dụng Việt Nam:"
   },
   "bullets": {
     "original": "[Bản gốc]:",

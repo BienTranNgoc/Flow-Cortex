@@ -11,6 +11,39 @@ export interface CvCheckBullet {
   readonly improved: string;
 }
 
+export interface CvJobProfile {
+  readonly primaryRole: string;
+  readonly seniority: string;
+  readonly topSkills: readonly string[];
+  readonly location: string;
+}
+
+export interface RecommendedJob {
+  readonly title: string;
+  readonly company: string;
+  readonly location: string;
+  readonly salary?: string;
+  readonly workMode?: string;
+  readonly matchScore: number;
+  readonly matchedSkills: readonly string[];
+  readonly summary: string;
+  readonly source: string;
+  readonly applyUrl: string;
+}
+
+export interface JobSearchLink {
+  readonly label: string;
+  readonly url: string;
+}
+
+export interface JobRecommendationsResponse {
+  readonly jobs: readonly RecommendedJob[];
+  readonly searchLinks: readonly JobSearchLink[];
+  readonly lastSyncedAt?: string | null;
+  readonly cached?: boolean;
+  readonly configured?: boolean;
+}
+
 export interface CvCheckReport {
   readonly overallScore: number;
   readonly dimensions: CvCheckDimensions;
@@ -19,6 +52,7 @@ export interface CvCheckReport {
   readonly missingKeywords: readonly string[];
   readonly rewrittenBullets: readonly CvCheckBullet[];
   readonly interviewQuestions: readonly string[];
+  readonly jobProfile?: CvJobProfile;
 }
 
 export const SAMPLE_CV = `HỌ VÀ TÊN: NGUYỄN VĂN AN

@@ -1,8 +1,12 @@
 import {
+  ArrowSquareOut,
   ArrowsClockwise,
+  Briefcase,
+  Buildings,
   CheckCircle,
   FilePdf,
   FileText,
+  MapPin,
   Sparkle,
   Trash,
   UploadSimple,
@@ -15,11 +19,12 @@ import {
   createSamplePdfBlob,
   SAMPLE_CV,
   type CvCheckReport,
+  type JobRecommendationsResponse,
 } from './cvCheckTypes';
-import { useCvCheckMutation } from './useCvCheck';
+import { useCvCheckMutation, useRecommendJobsMutation } from './useCvCheck';
 import './CvCheckPage.css';
 
-type ActiveTab = 'evaluation' | 'bullets' | 'interview';
+type ActiveTab = 'evaluation' | 'bullets' | 'interview' | 'jobs';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -35,10 +40,12 @@ export function CvCheckPage() {
   const [cvPdfUrl, setCvPdfUrl] = useState<string | null>(null);
   const [cvText, setCvText] = useState('');
   const [report, setReport] = useState<CvCheckReport | null>(null);
+  const [jobRecs, setJobRecs] = useState<JobRecommendationsResponse | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('evaluation');
   const [isDragOver, setIsDragOver] = useState(false);
 
   const checkMutation = useCvCheckMutation();
+  const jobsMutation = useRecommendJobsMutation();
 
   useEffect(() => {
     return () => {
@@ -77,6 +84,8 @@ export function CvCheckPage() {
     setPdfFile(null);
     setCvText('');
     setReport(null);
+    setJobRecs(null);
+    jobsMutation.reset();
   };
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -109,8 +118,19 @@ export function CvCheckPage() {
     }
   };
 
+  const triggerJobSearch = async (profile: NonNullable<CvCheckReport['jobProfile']>) => {
+    try {
+      const recs = await jobsMutation.mutateAsync(profile);
+      setJobRecs(recs);
+    } catch {
+      // Handled via jobsMutation.isError
+    }
+  };
+
   const handleSubmit = async () => {
     if (!cvFile && !cvText.trim()) return;
+    setJobRecs(null);
+    jobsMutation.reset();
 
     try {
       const result = await checkMutation.mutateAsync({
@@ -119,6 +139,9 @@ export function CvCheckPage() {
       });
       setReport(result);
       setActiveTab('evaluation');
+      if (result.jobProfile?.primaryRole) {
+        void triggerJobSearch(result.jobProfile);
+      }
     } catch {
       // Handled via checkMutation.isError and checkMutation.error
     }
@@ -446,6 +469,20 @@ export function CvCheckPage() {
                 <FileText size={16} aria-hidden="true" />
                 {t('cvCheck.tabs.interview', 'Dự đoán câu hỏi phỏng vấn')}
               </button>
+              <button
+                type="button"
+                className={`cv-check-tab-btn ${activeTab === 'jobs' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('jobs')}
+              >
+                <Briefcase size={16} aria-hidden="true" />
+                {t('cvCheck.tabs.jobs', 'Việc làm phù hợp')}
+                {jobsMutation.isPending && (
+                  <ArrowsClockwise className="spinner" size={14} aria-hidden="true" />
+                )}
+                {!jobsMutation.isPending && jobRecs && jobRecs.jobs.length > 0 && (
+                  <span className="cv-check-tab-count">{jobRecs.jobs.length}</span>
+                )}
+              </button>
             </nav>
 
             <div className="cv-check-tab-body">
@@ -531,6 +568,169 @@ export function CvCheckPage() {
                       <p>{t('cvCheck.interview.empty', 'Không có câu hỏi phỏng vấn nào.')}</p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'jobs' && (
+                <div className="cv-check-tab-panel cv-check-jobs-panel">
+                  {report.jobProfile && (
+                    <div className="cv-check-job-profile-bar">
+                      <span className="cv-check-job-profile-label">
+                        {t('cvCheck.jobs.detectedProfile', 'Hồ sơ tìm việc đề xuất:')}
+                      </span>
+                      <span className="cv-check-profile-pill cv-check-profile-pill--role">
+                        {report.jobProfile.primaryRole}
+                      </span>
+                      {report.jobProfile.seniority && (
+                        <span className="cv-check-profile-pill">{report.jobProfile.seniority}</span>
+                      )}
+                      {report.jobProfile.location && (
+                        <span className="cv-check-profile-pill">
+                          <MapPin size={12} aria-hidden="true" />
+                          {report.jobProfile.location}
+                        </span>
+                      )}
+                      {jobRecs?.lastSyncedAt && (
+                        <span className="cv-check-profile-pill">
+                          {t('cvCheck.jobs.syncedNote', 'Cập nhật (7 ngày/lần):')}{' '}
+                          {new Date(jobRecs.lastSyncedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                      {jobRecs?.cached && (
+                        <span className="cv-check-profile-pill cv-check-profile-pill--role">
+                          {t('cvCheck.jobs.cachedBadge', 'Từ bộ nhớ đệm · Tự làm mới sau 7 ngày')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {jobsMutation.isPending && (
+                    <div className="cv-check-jobs-loading" role="status">
+                      <ArrowsClockwise className="spinner" size={20} aria-hidden="true" />
+                      <span>
+                        {t(
+                          'cvCheck.jobs.loading',
+                          'Đang tìm tin tuyển dụng tại Việt Nam phù hợp với hồ sơ...',
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {jobsMutation.isError && !jobsMutation.isPending && (
+                    <div className="cv-check-jobs-error" role="alert">
+                      <WarningCircle size={18} weight="fill" aria-hidden="true" />
+                      <span>
+                        {t(
+                          'cvCheck.jobs.error',
+                          'Không thể tải danh sách tin tuyển dụng lúc này. Bạn có thể thử lại hoặc tìm trực tiếp trên các trang tuyển dụng.',
+                        )}
+                      </span>
+                      {report.jobProfile && (
+                        <button
+                          type="button"
+                          className="cortex-btn cortex-btn--ghost"
+                          onClick={() => void triggerJobSearch(report.jobProfile!)}
+                        >
+                          {t('cvCheck.jobs.retry', 'Thử lại')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {!jobsMutation.isPending && jobRecs && jobRecs.jobs.length > 0 && (
+                    <div className="cv-check-jobs-grid">
+                      {jobRecs.jobs.map((job, idx) => (
+                        <article key={idx} className="cv-check-job-card">
+                          <div className="cv-check-job-card__head">
+                            <div>
+                              <h4 className="cv-check-job-card__title">{job.title}</h4>
+                              <div className="cv-check-job-card__meta">
+                                <span>
+                                  <Buildings size={14} aria-hidden="true" />
+                                  {job.company}
+                                </span>
+                                <span>
+                                  <MapPin size={14} aria-hidden="true" />
+                                  {job.location}
+                                </span>
+                                {job.workMode && <span>{job.workMode}</span>}
+                              </div>
+                            </div>
+                            <span className="cv-check-job-match">
+                              {job.matchScore}% {t('cvCheck.jobs.matchSuffix', 'phù hợp')}
+                            </span>
+                          </div>
+
+                          {job.salary && (
+                            <div className="cv-check-job-salary">{job.salary}</div>
+                          )}
+
+                          {job.summary && (
+                            <p className="cv-check-job-card__summary">{job.summary}</p>
+                          )}
+
+                          {job.matchedSkills.length > 0 && (
+                            <div className="cv-check-chips-wrap">
+                              {job.matchedSkills.map((sk, sIdx) => (
+                                <span key={sIdx} className="cv-check-job-skill">
+                                  {sk}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="cv-check-job-card__foot">
+                            <span className="cv-check-job-source">{job.source}</span>
+                            <a
+                              href={job.applyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="cortex-btn cortex-btn--ghost cv-check-job-link"
+                            >
+                              {t('cvCheck.jobs.viewAndApply', 'Xem & Ứng tuyển')}
+                              <ArrowSquareOut size={14} aria-hidden="true" />
+                            </a>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+
+                  {!jobsMutation.isPending && jobRecs && jobRecs.jobs.length === 0 && (
+                    <p className="cv-check-jobs-empty">
+                      {jobRecs.configured === false
+                        ? t(
+                            'cvCheck.jobs.unconfigured',
+                            'Chưa cấu hình khóa SERPAPI_API_KEY hoặc JSEARCH_API_KEY để tự động lấy tin tuyển dụng Việt Nam. Bạn có thể tìm trực tiếp trên các sàn tuyển dụng bên dưới.',
+                          )
+                        : t(
+                            'cvCheck.jobs.empty',
+                            'Chưa tìm thấy tin tuyển dụng trực tiếp cho vị trí này. Hãy dùng các liên kết tìm kiếm nhanh bên dưới.',
+                          )}
+                    </p>
+                  )}
+
+                  {jobRecs && jobRecs.searchLinks.length > 0 && (
+                    <div className="cv-check-search-links">
+                      <span className="cv-check-search-links__label">
+                        {t('cvCheck.jobs.moreOnBoards', 'Tìm thêm trên các sàn tuyển dụng:')}
+                      </span>
+                      <div className="cv-check-search-links__list">
+                        {jobRecs.searchLinks.map((link, idx) => (
+                          <a
+                            key={idx}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="cv-check-board-link"
+                          >
+                            {link.label}
+                            <ArrowSquareOut size={13} aria-hidden="true" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

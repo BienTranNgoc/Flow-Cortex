@@ -592,16 +592,20 @@ flowcortex:
           retry-waits: 10s,30s
           call-timeout: 60s
         cv-check:
-          models: ${FLOWCORTEX_CV_CHECK_MODELS:gemini-3.5-flash,gemini-3.5-flash-lite}
+          models: ${FLOWCORTEX_CV_CHECK_MODELS:gemini-3.5-flash-lite,gemini-3.5-flash}
           attempts: 2
-          retry-waits: 3s
-          call-timeout: 60s
+          retry-waits: 2s
+          call-timeout: 30s
         # Questions for a QA review; its worst case (about 42 s) stays under qa-review.generating-timeout.
         qa-questions:
           models: gemini-3.5-flash-lite
           attempts: 2
           retry-waits: 2s
           call-timeout: 20s
+  cvcheck:
+    job-sync-interval: ${FLOWCORTEX_CV_CHECK_JOB_SYNC_INTERVAL:P7D}
+    serpapi-api-key: ${SERPAPI_API_KEY:}
+    jsearch-api-key: ${JSEARCH_API_KEY:}
   # Help Center. Off: no help button, member and guest support routes answer 503 (admin routes stay
   # up). The assistant switch and the four daily limits below are configured here and changed at
   # runtime in the console Settings page; FLOWCORTEX_SUPPORT_ASSISTANT_ENABLED=false keeps the

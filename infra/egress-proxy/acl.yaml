@@ -24,3 +24,5 @@ default:
     - api.vilao.ai
     - payment.momo.vn
     - test-payment.momo.vn
+    - serpapi.com
+    - jsearch.p.rapidapi.com

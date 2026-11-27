@@ -2,9 +2,11 @@ package com.flowcortex.cvcheck.web;
 
 import com.flowcortex.cvcheck.application.CvCheckService;
 import com.flowcortex.cvcheck.application.CvCheckService.Outcome;
+import com.flowcortex.cvcheck.application.CvJobRecommendationService;
 import com.flowcortex.cvcheck.application.PdfTextExtractor;
 import io.swagger.v3.oas.annotations.Operation;
 import java.io.IOException;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,12 +23,17 @@ import tools.jackson.databind.JsonNode;
 class CvCheckController {
 
     private final CvCheckService service;
+    private final CvJobRecommendationService jobService;
 
-    CvCheckController(CvCheckService service) {
+    CvCheckController(CvCheckService service, CvJobRecommendationService jobService) {
         this.service = service;
+        this.jobService = jobService;
     }
 
     record CheckRequest(String cvText, String jobDescription) {
+    }
+
+    record RecommendJobsRequest(String primaryRole, String seniority, List<String> topSkills, String location) {
     }
 
     @Operation(operationId = "checkCv")
@@ -64,14 +71,35 @@ class CvCheckController {
         return evaluate(cleanedCv, cleanedJd);
     }
 
+    @Operation(operationId = "recommendJobsForCv")
+    @PostMapping(value = "/jobs", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    JsonNode recommendJobs(@RequestBody RecommendJobsRequest request) {
+        String role = clean(request.primaryRole(), 200, "primaryRole", true);
+        String seniority = clean(request.seniority(), 60, "seniority", false);
+        String location = clean(request.location(), 120, "location", false);
+        List<String> skills = request.topSkills() == null ? List.of() : request.topSkills().stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(s -> clean(s, 80, "topSkills", true))
+                .limit(10)
+                .toList();
+        return switch (jobService.recommend(role, seniority, skills, location)) {
+            case CvJobRecommendationService.Outcome.Found ok -> ok.payload();
+            case CvJobRecommendationService.Outcome.Refused refused -> throw mapRefusal(refused.reason());
+        };
+    }
+
     private JsonNode evaluate(String cv, String jd) {
         return switch (service.check(cv, jd)) {
             case Outcome.Report ok -> ok.report();
-            case Outcome.Refused refused -> throw switch (refused.reason()) {
-                case BLOCKED -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "cv-check-blocked");
-                case BUSY -> new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "cv-check-busy");
-                case UNAVAILABLE -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "cv-check-unavailable");
-            };
+            case Outcome.Refused refused -> throw mapRefusal(refused.reason());
+        };
+    }
+
+    private static ResponseStatusException mapRefusal(CvCheckService.Refusal reason) {
+        return switch (reason) {
+            case BLOCKED -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "cv-check-blocked");
+            case BUSY -> new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "cv-check-busy");
+            case UNAVAILABLE -> new ResponseStatusException(HttpStatus.BAD_GATEWAY, "cv-check-unavailable");
         };
     }
 
