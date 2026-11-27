@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":shared:web"))
 
     implementation("tools.jackson.core:jackson-databind")
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
 
     // Gradle exposes a project dependency's `implementation` deps at runtime only,
     // so the web/security types this module compiles against are declared here.

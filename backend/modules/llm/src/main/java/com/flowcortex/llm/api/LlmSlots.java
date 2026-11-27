@@ -13,8 +13,16 @@ import java.time.Duration;
  */
 public interface LlmSlots {
 
+    /**
+     * Asks the slot's models for a JSON answer to {@code request}. A schema the provider would refuse
+     * throws {@link IllegalArgumentException} before any request is sent.
+     */
+    LlmJsonResult generateJson(LlmSlotRequest request);
+
     /** Asks the slot's models for a JSON answer that follows {@code responseSchemaJson} (nullable). */
-    LlmJsonResult generateJson(String slot, String userText, String responseSchemaJson);
+    default LlmJsonResult generateJson(String slot, String userText, String responseSchemaJson) {
+        return generateJson(new LlmSlotRequest(slot, null, userText, responseSchemaJson, null));
+    }
 
     /**
      * Asks the slot's models for a JSON answer grounded in live Google Search results.

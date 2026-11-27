@@ -6,6 +6,7 @@ import com.flowcortex.user.api.UserService;
 import com.flowcortex.user.api.UserView;
 import com.flowcortex.user.phone.PhoneNumberHasher;
 import com.flowcortex.user.phone.PhoneRetentionJob;
+import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -508,7 +510,9 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
      * they are deleted again because the budget query has no upper bound.
      */
     @Nested
-    @TestPropertySource(properties = "flowcortex.phone-verification.limits.global-sends-per-day=3")
+    @TestPropertySource(properties = {
+            "flowcortex.phone-verification.limits.global-sends-per-day=3",
+            "flowcortex.phone-verification.limits.number-sends-per-day=100"})
     class WithASmallGlobalBudget {
 
         @Autowired
@@ -554,6 +558,173 @@ class PhoneVerificationIT extends AbstractUserModuleIT {
             } finally {
                 budgetJdbc.update("DELETE FROM phone_send_attempt WHERE user_id IN (?, ?)", others.id(), asker.id());
             }
+        }
+
+        @Test
+        void twoMembersAtTheLastSlotGetOneCode() throws Exception {
+            useJdkClient();
+            Instant now = Instant.now().plus(Duration.ofDays(3650)).truncatedTo(ChronoUnit.SECONDS);
+            budgetClock.set(now);
+            UserView others = member("phone-slot-others");
+            UserView first = member("phone-slot-first");
+            UserView second = member("phone-slot-second");
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(1)));
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(3)));
+                String firstToken = tokenOf(first);
+                String secondToken = tokenOf(second);
+                assertThat(sentSince(now.minus(Duration.ofHours(24)))).isEqualTo(2);
+                CountDownLatch ready = new CountDownLatch(2);
+                CountDownLatch go = new CountDownLatch(1);
+                List<Future<ResponseEntity<String>>> answers = new ArrayList<>();
+                for (String token : List.of(firstToken, secondToken)) {
+                    answers.add(pool.submit(() -> {
+                        ready.countDown();
+                        go.await();
+                        return send(token, randomLocalNumber());
+                    }));
+                }
+                assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+                go.countDown();
+
+                List<ResponseEntity<String>> done = new ArrayList<>();
+                for (Future<ResponseEntity<String>> answer : answers) {
+                    done.add(answer.get(10, TimeUnit.SECONDS));
+                }
+                assertThat(done).extracting(answer -> answer.getStatusCode().value())
+                        .containsExactlyInAnyOrder(200, 429);
+                assertThat(done.stream().filter(answer -> answer.getStatusCode().value() == 429).findFirst()
+                        .orElseThrow().getBody()).contains("OTP_GLOBAL_LIMIT");
+                assertThat(sentSince(now.minus(Duration.ofHours(24)))).isEqualTo(3);
+            } finally {
+                pool.shutdownNow();
+                budgetJdbc.update("DELETE FROM phone_send_attempt WHERE user_id IN (?, ?, ?)", others.id(),
+                        first.id(), second.id());
+            }
+        }
+
+        @Test
+        void anUnavailableSendLeavesTheBudgetUntouched() {
+            useJdkClient();
+            Instant now = Instant.now().plus(Duration.ofDays(3650)).truncatedTo(ChronoUnit.SECONDS);
+            budgetClock.set(now);
+            UserView others = member("phone-outage-others");
+            UserView asker = member("phone-outage");
+            String local = randomLocalNumber();
+            String e164 = "+84" + local.substring(1);
+            try {
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(1)));
+                insertAttempt(others, "sent", now.minus(Duration.ofHours(3)));
+                String token = tokenOf(asker);
+                budgetJdbc.execute("CREATE OR REPLACE FUNCTION reject_budget_code() RETURNS trigger AS $$ BEGIN "
+                        + "RAISE EXCEPTION 'code sender down'; END; $$ LANGUAGE plpgsql");
+                budgetJdbc.execute("CREATE TRIGGER reject_budget_code BEFORE INSERT ON sms_outbox FOR EACH ROW WHEN "
+                        + "(NEW.phone_e164 = '" + e164 + "') EXECUTE FUNCTION reject_budget_code()");
+                ResponseEntity<String> down;
+                try {
+                    down = send(token, local);
+                } finally {
+                    budgetJdbc.execute("DROP TRIGGER reject_budget_code ON sms_outbox");
+                    budgetJdbc.execute("DROP FUNCTION reject_budget_code()");
+                }
+
+                assertThat(down.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+                assertThat(down.getBody()).contains("SMS_UNAVAILABLE");
+                assertThat(down.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
+                assertThat(sentSince(now.minus(Duration.ofHours(24)))).isEqualTo(2);
+                assertThat(budgetJdbc.queryForObject("SELECT count(*) FROM phone_send_attempt WHERE user_id = ? "
+                        + "AND outcome = 'sms_unavailable'", Long.class, asker.id())).isEqualTo(1);
+                assertThat(budgetJdbc.queryForObject("SELECT count(*) FROM phone_challenge WHERE user_id = ?",
+                        Long.class, asker.id())).isZero();
+
+                assertThat(send(token, local).getStatusCode()).isEqualTo(HttpStatus.OK);
+                assertThat(sentSince(now.minus(Duration.ofHours(24)))).isEqualTo(3);
+            } finally {
+                budgetJdbc.update("DELETE FROM phone_send_attempt WHERE user_id IN (?, ?)", others.id(), asker.id());
+            }
+        }
+
+        @Test
+        void refusedSendsDoNotWaitOnTheGlobalLock() throws Exception {
+            useJdkClient();
+            Instant now = Instant.now().plus(Duration.ofDays(3650)).truncatedTo(ChronoUnit.SECONDS);
+            budgetClock.set(now);
+            String local = randomLocalNumber();
+            String e164 = "+84" + local.substring(1);
+            List<UserView> members = new ArrayList<>();
+            List<String> tokens = new ArrayList<>();
+            for (int i = 0; i < 20; i++) {
+                UserView member = member("phone-queue-" + i);
+                members.add(member);
+                tokens.add(tokenOf(member));
+                Instant sentAt = now.minusSeconds(10);
+                budgetJdbc.update("INSERT INTO phone_challenge (id, user_id, phone_e164, code_hash, attempts, "
+                                + "expires_at, invalidated_at, created_at) VALUES (?, ?, ?, 'not-a-code', 0, ?, ?, ?)",
+                        UUID.randomUUID(), member.id(), e164, Timestamp.from(sentAt.plusSeconds(300)),
+                        Timestamp.from(sentAt.plusSeconds(1)), Timestamp.from(sentAt));
+            }
+            ExecutorService pool = Executors.newFixedThreadPool(20);
+            try (Connection holder = budgetJdbc.getDataSource().getConnection()) {
+                holder.createStatement().execute("SELECT pg_advisory_lock(hashtext('phone-send-global'))");
+                try {
+                    CountDownLatch ready = new CountDownLatch(20);
+                    CountDownLatch go = new CountDownLatch(1);
+                    List<Future<ResponseEntity<String>>> answers = new ArrayList<>();
+                    for (String token : tokens) {
+                        answers.add(pool.submit(() -> {
+                            ready.countDown();
+                            go.await();
+                            return send(token, local);
+                        }));
+                    }
+                    assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+                    Instant started = Instant.now();
+                    go.countDown();
+
+                    for (Future<ResponseEntity<String>> answer : answers) {
+                        ResponseEntity<String> done = answer.get(5, TimeUnit.SECONDS);
+                        assertThat(done.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                        assertThat(done.getBody()).contains("OTP_COOLDOWN");
+                    }
+                    assertThat(Duration.between(started, Instant.now())).isLessThan(Duration.ofSeconds(5));
+                } finally {
+                    holder.createStatement().execute("SELECT pg_advisory_unlock(hashtext('phone-send-global'))");
+                }
+            } finally {
+                pool.shutdownNow();
+                for (UserView member : members) {
+                    budgetJdbc.update("DELETE FROM phone_send_attempt WHERE user_id = ?", member.id());
+                }
+            }
+        }
+
+        private void useJdkClient() {
+            budgetRestTemplate.getRestTemplate().setRequestFactory(new JdkClientHttpRequestFactory());
+        }
+
+        private UserView member(String prefix) {
+            return budgetUserService.createInitialAdmin(uniqueEmail(prefix), "password123", "Member");
+        }
+
+        private String tokenOf(UserView member) {
+            ResponseEntity<TokenResponse> login = budgetRestTemplate.postForEntity("/api/v1/auth/login",
+                    new LoginRequest(member.email(), "password123"), TokenResponse.class);
+            return login.getBody().accessToken();
+        }
+
+        /** From an IP of its own, so the per-IP bucket refuses none of them. */
+        private ResponseEntity<String> send(String token, String local) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(token);
+            headers.set("X-Forwarded-For", "203.0.113." + NEXT_CLIENT.getAndIncrement());
+            return budgetRestTemplate.exchange("/api/v1/me/phone/send-code", HttpMethod.POST,
+                    new HttpEntity<>(new SendCodeBody(local), headers), String.class);
+        }
+
+        private long sentSince(Instant since) {
+            return budgetJdbc.queryForObject("SELECT count(*) FROM phone_send_attempt WHERE outcome = 'sent' "
+                    + "AND created_at > ?", Long.class, Timestamp.from(since));
         }
 
         private void insertAttempt(UserView user, String outcome, Instant at) {

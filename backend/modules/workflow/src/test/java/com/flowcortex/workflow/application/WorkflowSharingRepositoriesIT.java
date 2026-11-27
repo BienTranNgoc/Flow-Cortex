@@ -205,6 +205,13 @@ class WorkflowSharingRepositoriesIT {
             assertThat(visible(id, owner)).as("owner sees %s", id).isTrue();
         }
         assertThat(visible(deletedPublic, owner)).isFalse();
+
+        List<UUID> all = List.of(publicDraft, publishedPublic, publishedPrivate, unlistedNoGrant, unlistedGranted,
+                unlistedDraftGranted, deletedPublic, privateDraft, UUID.randomUUID());
+        assertThat(workflowRepository.findVisibleIds(all, ben))
+                .containsExactlyInAnyOrder(publishedPublic, unlistedGranted);
+        assertThat(workflowRepository.findVisibleIds(all, owner)).containsExactlyInAnyOrder(publicDraft,
+                publishedPublic, publishedPrivate, unlistedNoGrant, unlistedGranted, unlistedDraftGranted, privateDraft);
     }
 
     @Test

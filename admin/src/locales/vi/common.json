@@ -7,6 +7,17 @@
   "errors": {
     "requestFailed": "Không thực hiện được yêu cầu. Hãy thử lại."
   },
+  "bell": {
+    "label": "Thông báo, {{unread}} chưa đọc",
+    "title": "Thông báo",
+    "unreadMark": "Chưa đọc:",
+    "markAllRead": "Đánh dấu tất cả là đã đọc",
+    "markAllFailed": "Không đánh dấu được các thông báo là đã đọc. Hãy thử lại.",
+    "loading": "Đang tải thông báo…",
+    "empty": "Bạn chưa có thông báo nào.",
+    "loadError": "Không tải được thông báo.",
+    "retry": "Thử lại"
+  },
   "language": {
     "groupLabel": "Ngôn ngữ",
     "vi": "Tiếng Việt",
@@ -89,6 +100,7 @@
         "roles": "Vai trò & quyền",
         "contentDocuments": "Tài liệu",
         "contentMedia": "Thư viện media",
+        "trendTaxonomy": "Phân loại mẫu trend",
         "chatSettings": "Cài đặt"
       }
     },

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://flowcortex.dev/contracts/workflow-artifact.schema.json",
   "title": "WorkflowArtifact",
-  "description": "A workflow definition moved between environments: its name and its ordered steps, nothing environment-bound (no id, owner, status, sharing or fork data). Every key is always written (null, never omitted). Rules a schema cannot state, enforced by the importer: stepOrder equals the step's 1-based position; each step's config, serialized, is at most 50000 characters; duplicate keys are refused. String lengths count code points.",
+  "description": "A workflow definition moved between environments: its name, its ordered steps and, when it has any, its data-store entries; nothing environment-bound (no id, owner, status, sharing or fork data). Every key of a step is always written (null, never omitted); the dataStore section is written only when there are entries and a file without it is valid. Rules a schema cannot state, enforced by the importer: stepOrder equals the step's 1-based position; each step's config, serialized, is at most 50000 characters; a data-store entry must satisfy the store's own rules (key of 1 to 100 letters, digits, dot, underscore or hyphen and not only dots, a dataType of 1 to 32 lowercase letters, digits, underscore or hyphen, a value of at most 524288 bytes compact, at most 100 distinct keys); documents nested deeper than 64 levels and object keys longer than 1000 characters are refused; duplicate keys are refused. String lengths count code points.",
   "type": "object",
   "additionalProperties": false,
   "required": ["formatVersion", "exportedAt", "workflow", "steps"],
@@ -21,9 +21,24 @@
       "type": "array",
       "maxItems": 32767,
       "items": { "$ref": "#/$defs/step" }
+    },
+    "dataStore": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dataEntry" }
     }
   },
   "$defs": {
+    "dataEntry": {
+      "title": "WorkflowArtifactDataEntry",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "dataType", "value"],
+      "properties": {
+        "key": { "type": "string" },
+        "dataType": { "type": "string" },
+        "value": {}
+      }
+    },
     "step": {
       "title": "WorkflowArtifactStep",
       "type": "object",

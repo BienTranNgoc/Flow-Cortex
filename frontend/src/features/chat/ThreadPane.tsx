@@ -11,7 +11,7 @@ import { useChatStream } from './stream/useChatStream';
 import { useStopTurn } from './stream/useStopTurn';
 import { Composer } from './Composer';
 import { MessageItem } from './MessageItem';
-import { useMessages, useSendMessage } from './useConversations';
+import { invalidateConversationViews, useMessages, useSendMessage } from './useConversations';
 
 interface ThreadPaneProps {
   conversationId: string;
@@ -83,6 +83,20 @@ export function ThreadPane({ conversationId, chatEnabled }: Readonly<ThreadPaneP
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' });
   }, [items.length, lastStatus, streamedLength]);
+
+  // The answer's terminal write sets the row preview without bumping last activity, and no list
+  // write follows it, so the sidebar's preview stays the question until this refresh.
+  const last = items[lastIndex];
+  const answerId = last?.role === 'assistant' ? last.id : undefined;
+  const answerStatus = last?.role === 'assistant' ? last.status : undefined;
+  const previousAnswer = useRef<{ id: string | undefined; status: string | undefined }>({ id: undefined, status: undefined });
+  useEffect(() => {
+    const before = previousAnswer.current;
+    previousAnswer.current = { id: answerId, status: answerStatus };
+    if (before.status === 'streaming' && before.id === answerId && answerStatus && answerStatus !== 'streaming') {
+      void invalidateConversationViews(queryClient);
+    }
+  }, [answerId, answerStatus, queryClient]);
 
   const loadProblem = messages.error ? chatProblem(messages.error, t) : null;
   const sendProblem = send.error ? chatProblem(send.error, t) : null;

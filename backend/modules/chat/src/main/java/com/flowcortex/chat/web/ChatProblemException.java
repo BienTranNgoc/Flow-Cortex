@@ -32,6 +32,23 @@ public class ChatProblemException extends RuntimeException {
                 new LocalizedMessage("chat.conversation.notFound"));
     }
 
+    public static ChatProblemException folderNotFound() {
+        return new ChatProblemException(HttpStatus.NOT_FOUND, "chat-folder-not-found",
+                new LocalizedMessage("chat.folder.notFound"));
+    }
+
+    /** 409 {@code chat-folder-limit}: the member already holds {@code max} folders. */
+    public static ChatProblemException folderLimit(int max) {
+        return new ChatProblemException(HttpStatus.CONFLICT, "chat-folder-limit",
+                new LocalizedMessage("chat.folder.limit", max));
+    }
+
+    /** 400 {@code validation-failed}; {@code errors} maps each refused field to its message. */
+    public static ChatProblemException validationFailed(Map<String, LocalizedMessage> errors) {
+        return new ChatProblemException(HttpStatus.BAD_REQUEST, "validation-failed",
+                new LocalizedMessage("problem.validationFailed")).withFieldErrors(errors);
+    }
+
     public static ChatProblemException messageNotFound() {
         return new ChatProblemException(HttpStatus.NOT_FOUND, "chat-message-not-found",
                 new LocalizedMessage("chat.message.notFound"));
