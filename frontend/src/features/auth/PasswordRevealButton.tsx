@@ -40,7 +40,7 @@ interface PasswordRevealButtonProps {
   onToggle: () => void;
 }
 
-export function PasswordRevealButton({ shown, controlsId, onToggle }: PasswordRevealButtonProps) {
+export function PasswordRevealButton({ shown, controlsId, onToggle }: Readonly<PasswordRevealButtonProps>) {
   const { t } = useTranslation();
   return (
     <button

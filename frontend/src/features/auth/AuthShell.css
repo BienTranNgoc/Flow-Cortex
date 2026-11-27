@@ -47,6 +47,7 @@
   left: 41.5%;
   top: 9.5%;
   width: 30%;
+  color: var(--auth-on-ocean);
 }
 
 .auth-stage__badge {
@@ -55,11 +56,19 @@
   gap: 0.9cqw;
   padding: 0.55cqw 1.4cqw;
   font-size: 1.25cqw;
+  border: 0.12cqw solid color-mix(in srgb, var(--auth-on-ocean) 70%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--auth-glass-dark) 70%, transparent);
+  box-shadow: 0 0 1.2cqw color-mix(in srgb, var(--auth-glow) 50%, transparent);
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .auth-stage__badge i {
   width: 0.1cqw;
   height: 1.2cqw;
+  background: currentColor;
+  opacity: 0.8;
 }
 
 .auth-stage__brandline {
@@ -67,23 +76,37 @@
   font-size: 4.6cqw;
   line-height: 1;
   white-space: nowrap;
+  color: color-mix(in srgb, var(--auth-on-ocean) 90%, var(--nodi-body));
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-shadow:
+    0 0.18cqw 0 color-mix(in srgb, var(--auth-ocean) 70%, var(--auth-glass-dark)),
+    0 0 1.2cqw var(--teal-bright),
+    0 0 2.6cqw color-mix(in srgb, var(--primary) 70%, transparent);
+  -webkit-text-stroke: 0.08cqw color-mix(in srgb, var(--primary) 70%, transparent);
 }
 
 .auth-stage__headline {
   margin: 1.2cqw 0 0;
   font-size: 4.1cqw;
   line-height: 1.08;
+  font-weight: 800;
+  text-wrap: balance;
+  text-shadow: 0 0.1cqw 0.5cqw color-mix(in srgb, var(--auth-glass-dark) 70%, transparent);
 }
 
 .auth-stage__headline > span {
   display: block;
 }
 
+/* A dark halo preserves text contrast over the bright stage art. */
 .auth-stage__lede {
   margin: 1.6cqw 0 0;
   max-width: 27cqw;
   font-size: 1.45cqw;
   line-height: 1.35;
+  color: var(--auth-on-ocean);
+  text-shadow: 0 0.08cqw 0.4cqw color-mix(in srgb, var(--auth-glass-dark) 85%, transparent);
 }
 
 .auth-stage__chip {
@@ -95,6 +118,13 @@
   font-size: 1.15cqw;
   white-space: nowrap;
   transform: rotate(-6deg);
+  border: 0.1cqw solid color-mix(in srgb, var(--auth-on-ocean) 45%, transparent);
+  border-radius: 0.7cqw;
+  background: color-mix(in srgb, var(--auth-glass-dark) 45%, transparent);
+  box-shadow: 0 0.6cqw 1.6cqw color-mix(in srgb, var(--auth-glass-dark) 35%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--auth-on-ocean);
+  font-weight: 600;
 }
 
 .auth-stage__chip svg {
@@ -128,18 +158,35 @@
   align-items: center;
   gap: 2.6cqw;
   padding: 0 3cqw;
+  border: 0.12cqw solid color-mix(in srgb, var(--auth-on-ocean) 60%, transparent);
+  border-radius: 1.4cqw;
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--auth-on-ocean) 50%, transparent),
+    color-mix(in srgb, var(--auth-on-ocean) 34%, transparent)
+  );
+  backdrop-filter: blur(8px);
+  color: var(--auth-ink);
 }
 
 .auth-promo__tag {
   display: inline-block;
   padding: 0.35cqw 1.1cqw;
   font-size: 1.2cqw;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--auth-progress-from), var(--auth-progress-to));
+  box-shadow: 0 0 1.1cqw color-mix(in srgb, var(--auth-progress-to) 60%, transparent);
+  color: var(--auth-progress-on);
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .auth-promo__big {
   margin: 0.7cqw 0 0;
   font-size: 2.25cqw;
   white-space: nowrap;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .auth-promo__sub {
@@ -150,6 +197,7 @@
 .auth-promo__rule {
   width: 0.12cqw;
   height: 72%;
+  background: color-mix(in srgb, var(--auth-ink) 30%, transparent);
 }
 
 .auth-promo__rows {
@@ -174,11 +222,14 @@
   margin: 0.2cqw 0 0;
   font-size: 1.55cqw;
   white-space: nowrap;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .auth-promo__rows small {
   margin-left: 0.4cqw;
   font-size: 1cqw;
+  font-weight: 500;
 }
 
 /* Words, chips and promo show only in the wide landscape tier. */
@@ -188,7 +239,6 @@
   display: none;
 }
 
-/* Wide: only the language toggle, floating over the top-right corner; narrow: a full bar with the brand. */
 .auth-shell__bar {
   position: absolute;
   top: 12px;
@@ -201,6 +251,7 @@
 
 .auth-shell__bar .auth-brand__name {
   display: none;
+  font-size: 24px;
 }
 
 .auth-shell__zone {
@@ -224,6 +275,18 @@
   margin-top: 40px;
   padding: 56px clamp(24px, 3.2vw, 64px) 40px;
   view-transition-name: auth-card;
+  border: 2px solid color-mix(in srgb, var(--auth-on-ocean) 75%, transparent);
+  border-radius: var(--auth-radius-card);
+  background: linear-gradient(
+    145.6deg,
+    color-mix(in srgb, var(--auth-card) 90%, transparent) 0%,
+    color-mix(in srgb, var(--auth-card) 96%, transparent) 27.4%,
+    color-mix(in srgb, var(--auth-card) 96%, transparent) 63.7%,
+    color-mix(in srgb, var(--auth-card) 90%, transparent) 100%
+  );
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--auth-glass-dark) 30%, transparent);
+  color: var(--auth-ink);
+  animation: auth-rise-8 var(--dur-standard) var(--ease-standard) both;
 }
 
 .auth-card .nodi-peek {
@@ -233,6 +296,7 @@
   width: 92px;
   height: 92px;
   pointer-events: none;
+  animation: auth-rise-12 var(--dur-standard) var(--ease-standard) 80ms both;
 }
 
 .auth-brand {
@@ -246,11 +310,17 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  color: var(--auth-ink);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .auth-brand__sep {
   width: 1px;
   height: 32px;
+  background: var(--auth-ink-2);
+  opacity: 0.5;
 }
 
 .auth-brand__tag > span {
@@ -319,100 +389,6 @@
 
 /* ===== Skin ============================================================ */
 
-.auth-stage__copy {
-  color: var(--auth-on-ocean);
-}
-
-.auth-stage__badge {
-  border: 0.12cqw solid color-mix(in srgb, var(--auth-on-ocean) 70%, transparent);
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--auth-glass-dark) 70%, transparent);
-  box-shadow: 0 0 1.2cqw color-mix(in srgb, var(--auth-glow) 50%, transparent);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.auth-stage__badge i {
-  background: currentColor;
-  opacity: 0.8;
-}
-
-.auth-stage__brandline {
-  color: color-mix(in srgb, var(--auth-on-ocean) 90%, var(--nodi-body));
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  text-shadow:
-    0 0.18cqw 0 color-mix(in srgb, var(--auth-ocean) 70%, var(--auth-glass-dark)),
-    0 0 1.2cqw var(--teal-bright),
-    0 0 2.6cqw color-mix(in srgb, var(--primary) 70%, transparent);
-  -webkit-text-stroke: 0.08cqw color-mix(in srgb, var(--primary) 70%, transparent);
-}
-
-.auth-stage__headline {
-  font-weight: 800;
-  text-wrap: balance;
-  text-shadow: 0 0.1cqw 0.5cqw color-mix(in srgb, var(--auth-glass-dark) 70%, transparent);
-}
-
-/* Small text over bright sparkles of the art: full white plus a dark halo keeps 4.5:1. */
-.auth-stage__lede {
-  color: var(--auth-on-ocean);
-  text-shadow: 0 0.08cqw 0.4cqw color-mix(in srgb, var(--auth-glass-dark) 85%, transparent);
-}
-
-.auth-stage__chip {
-  border: 0.1cqw solid color-mix(in srgb, var(--auth-on-ocean) 45%, transparent);
-  border-radius: 0.7cqw;
-  background: color-mix(in srgb, var(--auth-glass-dark) 45%, transparent);
-  box-shadow: 0 0.6cqw 1.6cqw color-mix(in srgb, var(--auth-glass-dark) 35%, transparent);
-  backdrop-filter: blur(6px);
-  color: var(--auth-on-ocean);
-  font-weight: 600;
-}
-
-.auth-promo {
-  border: 0.12cqw solid color-mix(in srgb, var(--auth-on-ocean) 60%, transparent);
-  border-radius: 1.4cqw;
-  background: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--auth-on-ocean) 50%, transparent),
-    color-mix(in srgb, var(--auth-on-ocean) 34%, transparent)
-  );
-  backdrop-filter: blur(8px);
-  color: var(--auth-ink);
-}
-
-.auth-promo__tag {
-  border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--auth-progress-from), var(--auth-progress-to));
-  box-shadow: 0 0 1.1cqw color-mix(in srgb, var(--auth-progress-to) 60%, transparent);
-  color: var(--auth-progress-on);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.auth-promo__big {
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.auth-promo__rule {
-  background: color-mix(in srgb, var(--auth-ink) 30%, transparent);
-}
-
-.auth-promo__rows dd {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.auth-promo__rows small {
-  font-weight: 500;
-}
-
-.auth-shell__bar .auth-brand__name {
-  font-size: 24px;
-}
-
 /* The shared toggle is styled for the app scheme; here it keeps the fixed light auth palette. */
 .auth-shell .language-toggle {
   border-color: var(--auth-line);
@@ -437,32 +413,6 @@
 
 .auth-shell .language-toggle__option:focus-visible {
   outline-color: var(--auth-accent);
-}
-
-.auth-card {
-  border: 2px solid color-mix(in srgb, var(--auth-on-ocean) 75%, transparent);
-  border-radius: var(--auth-radius-card);
-  background: linear-gradient(
-    145.6deg,
-    color-mix(in srgb, var(--auth-card) 90%, transparent) 0%,
-    color-mix(in srgb, var(--auth-card) 96%, transparent) 27.4%,
-    color-mix(in srgb, var(--auth-card) 96%, transparent) 63.7%,
-    color-mix(in srgb, var(--auth-card) 90%, transparent) 100%
-  );
-  box-shadow: 0 20px 60px color-mix(in srgb, var(--auth-glass-dark) 30%, transparent);
-  color: var(--auth-ink);
-}
-
-.auth-brand__name {
-  color: var(--auth-ink);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.auth-brand__sep {
-  background: var(--auth-ink-2);
-  opacity: 0.5;
 }
 
 .auth-brand__tag {
@@ -657,6 +607,7 @@
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform var(--dur-standard) var(--ease-standard);
 }
 
 .auth-btn--primary {
@@ -752,7 +703,12 @@
   line-height: 18px;
 }
 
+output.auth-subtitle {
+  display: block;
+}
+
 .auth-status {
+  display: block;
   margin: 0 0 16px;
   color: var(--auth-ink-3);
   font-size: 14px;
@@ -855,20 +811,10 @@
 
 /* ===== Motion: only transform and opacity animate ======================= */
 
-.auth-card {
-  animation: auth-rise-8 var(--dur-standard) var(--ease-standard) both;
-}
-
-.auth-card .nodi-peek {
-  animation: auth-rise-12 var(--dur-standard) var(--ease-standard) 80ms both;
-}
-
-.auth-card .nodi-peek__eyes {
-  animation: auth-blink 6s linear infinite;
-}
-
-.auth-btn {
-  transition: transform var(--dur-standard) var(--ease-standard);
+@media (prefers-reduced-motion: no-preference) {
+  .auth-card .nodi-peek__eyes {
+    animation: auth-blink 6s linear infinite;
+  }
 }
 
 @media (hover: hover) {

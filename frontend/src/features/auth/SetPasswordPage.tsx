@@ -110,9 +110,9 @@ export function SetPasswordPage() {
   let content;
   if (linkToken && !openLink.isError) {
     content = (
-      <p role="status" className="auth-status">
+      <output className="auth-status">
         {t('auth.setPassword.opening')}
-      </p>
+      </output>
     );
   } else if (setupToken && signedIn) {
     content = (

@@ -82,7 +82,7 @@ function SupportWidgetWhenOn() {
 
 // A failed chunk renders nothing: the route element sits outside ContainedOutlet's ErrorBoundary.
 const OnboardingFlow = lazy(() =>
-  import('./features/onboarding/OnboardingFlow')
+  import('./features/onboarding/OnboardingFlow.tsx')
     .then((module) => ({ default: module.OnboardingFlow }))
     .catch(() => ({ default: () => null })),
 );

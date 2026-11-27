@@ -110,7 +110,7 @@ interface ResetPasswordFormProps {
   onLinkInvalid: () => void;
 }
 
-function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
+function ResetPasswordForm({ token, onLinkInvalid }: Readonly<ResetPasswordFormProps>) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const reset = useResetPasswordMutation();

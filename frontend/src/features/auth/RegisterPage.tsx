@@ -53,7 +53,7 @@ function Field({
   onEdited,
   register,
   errors,
-}: FieldProps) {
+}: Readonly<FieldProps>) {
   const { t } = useTranslation();
   const [shown, setShown] = useState(false);
   const id = `register-${name}`;
@@ -165,13 +165,13 @@ export function RegisterPage() {
         <h1 className="auth-title" tabIndex={-1}>
           {t('auth.register.sent.title')}
         </h1>
-        <p className="auth-status" role="status">
+        <output className="auth-status">
           <Trans
             i18nKey="auth.register.sent.body"
             values={{ email: sentTo }}
             components={{ strong: <strong /> }}
           />
-        </p>
+        </output>
         <ResendConfirmation email={sentTo} />
         <p className="auth-footnote">
           {t('auth.register.sent.alreadyConfirmed')}{' '}

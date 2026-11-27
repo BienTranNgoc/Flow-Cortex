@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { stubApi, type Handler, type RecordedCall } from '../../test/fakeApi';
-import { OnboardingFlow } from './OnboardingFlow';
+import { OnboardingFlow } from './OnboardingFlow.tsx';
 import { requestReplay, resetOnboardingSession } from './onboardingSession';
 import { resetFirstResultClaim } from './useFirstResultClaim';
 

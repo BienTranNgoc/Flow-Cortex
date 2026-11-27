@@ -1,5 +1,6 @@
 import { ApiError } from '@flow-cortex/api-client';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { TFunction } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
@@ -47,6 +48,40 @@ function localTime(date: Date): string {
 /** Only a 401 means the email or password is wrong; any other refusal is not the visitor's typo. */
 function isWrongCredentials(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
+}
+
+function otherLoginFailure(
+  mutation: ReturnType<typeof useLoginMutation>,
+  t: TFunction,
+  passwordReset: boolean,
+) {
+  const lockedUntil = lockedUntilFrom(mutation.error);
+  const lockedText = accountLockedMessage(mutation.error, t, activeLocale());
+  if (!lockedUntil) return lockedText ?? failureMessage(mutation, t, 'auth.login.retryLater');
+
+  const resetLink = <AuthLink to="/forgot-password">{null}</AuthLink>;
+  if (lockedText) {
+    return (
+      <>
+        {lockedText}
+        {passwordReset && (
+          <>
+            {' '}
+            <Trans i18nKey="auth.login.lockedResetOffer" components={{ reset: resetLink }} />
+          </>
+        )}
+      </>
+    );
+  }
+  return passwordReset ? (
+    <Trans
+      i18nKey="auth.login.lockedWithReset"
+      values={{ time: localTime(lockedUntil) }}
+      components={{ reset: resetLink }}
+    />
+  ) : (
+    t('auth.login.locked', { time: localTime(lockedUntil) })
+  );
 }
 
 export function LoginPage() {
@@ -125,46 +160,12 @@ export function LoginPage() {
 
   // The Google message describes the redirect that opened the page, not any later attempt.
   const oauthError = submittedOnce ? null : searchParams.get('oauth_error');
-  const lockedUntil = otherFailure ? lockedUntilFrom(loginMutation.error) : undefined;
-  const lockedText = otherFailure
-    ? accountLockedMessage(loginMutation.error, t, activeLocale())
-    : undefined;
-  const resetLink = <AuthLink to="/forgot-password">{null}</AuthLink>;
   // A link to a panel that never opens would be a dead end, so the sentence stays plain text.
   const helpLink = supportWidget ? <Link to={{ search: HELP_FROM_INACTIVE_ACCOUNT }} /> : <></>;
   const alertBody = (() => {
     if (notConfirmed) return t('auth.login.emailNotConfirmed');
     if (wrongCredentials) return failureMessage(loginMutation, t, 'auth.login.failedFallback');
-    if (otherFailure) {
-      if (lockedUntil) {
-        if (lockedText) {
-          return (
-            <>
-              {lockedText}
-              {passwordReset && (
-                <>
-                  {' '}
-                  <Trans
-                    i18nKey="auth.login.lockedResetOffer"
-                    components={{ reset: resetLink }}
-                  />
-                </>
-              )}
-            </>
-          );
-        }
-        return passwordReset ? (
-          <Trans
-            i18nKey="auth.login.lockedWithReset"
-            values={{ time: localTime(lockedUntil) }}
-            components={{ reset: resetLink }}
-          />
-        ) : (
-          t('auth.login.locked', { time: localTime(lockedUntil) })
-        );
-      }
-      return lockedText ?? failureMessage(loginMutation, t, 'auth.login.retryLater');
-    }
+    if (otherFailure) return otherLoginFailure(loginMutation, t, passwordReset);
     if (oauthError === 'account_inactive') {
       return <Trans i18nKey="auth.oauthError.accountInactive" components={{ help: helpLink }} />;
     }
@@ -184,11 +185,8 @@ export function LoginPage() {
   };
   const emailField = register('email', { onChange: markEdited });
   const passwordField = register('password', { onChange: markEdited });
-  const passwordDescription = errors.password
-    ? 'login-password-error'
-    : wrongCredentials
-      ? 'login-alert'
-      : undefined;
+  const credentialsAlertId = wrongCredentials ? 'login-alert' : undefined;
+  const describedBy = errors.password ? 'login-password-error' : credentialsAlertId;
 
   return (
     <>
@@ -199,9 +197,9 @@ export function LoginPage() {
       <p className="auth-subtitle">{t('auth.login.subtitle')}</p>
 
       {notice && (
-        <p role="status" className="auth-status">
+        <output className="auth-status">
           {notice}
-        </p>
+        </output>
       )}
 
       {alertBody && (
@@ -269,7 +267,7 @@ export function LoginPage() {
               placeholder={t('auth.login.passwordPlaceholder')}
               disabled={isPending}
               aria-invalid={errors.password || wrongCredentials ? 'true' : 'false'}
-              aria-describedby={passwordDescription}
+              aria-describedby={describedBy}
               onAnimationEnd={() => setShake(false)}
               {...passwordField}
               onFocus={() => setFocused('password')}

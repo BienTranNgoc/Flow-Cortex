@@ -25,7 +25,7 @@ interface RequestResetFormProps {
 }
 
 /** Asks for a reset link; the answer repeats the typed address and never says whether it has an account. */
-export function RequestResetForm({ action }: RequestResetFormProps) {
+export function RequestResetForm({ action }: Readonly<RequestResetFormProps>) {
   const { t } = useTranslation();
   const forgot = useForgotPasswordMutation();
   const [typedEmail, setTypedEmail] = useState('');
@@ -120,9 +120,9 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
         {forgot.isPending ? t('auth.reset.request.sending') : action}
       </button>
       {forgot.isSuccess && (
-        <p role="status" className="auth-status">
+        <output className="auth-status">
           {t('auth.reset.request.sent', { email: forgot.variables })}
-        </p>
+        </output>
       )}
       {refusal && (
         <p role="alert" className="auth-alert">
@@ -134,14 +134,14 @@ export function RequestResetForm({ action }: RequestResetFormProps) {
 }
 
 /** Renders `children` only while the backend offers password reset; `/features` failing counts as off. */
-export function PasswordResetGate({ children }: { children: ReactNode }) {
+export function PasswordResetGate({ children }: { readonly children: ReactNode }) {
   const { t } = useTranslation();
   const features = useFeaturesQuery();
   if (features.isPending) {
     return (
-      <p role="status" className="auth-subtitle">
+      <output className="auth-subtitle">
         {t('auth.reset.gate.loading')}
-      </p>
+      </output>
     );
   }
   if (!features.data?.passwordReset) {

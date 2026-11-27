@@ -9,7 +9,7 @@ interface AuthLinkProps {
 }
 
 /** A real link to another auth screen; a plain left click swaps screens through `useAuthNavigate`. */
-export function AuthLink({ to, className, children }: AuthLinkProps) {
+export function AuthLink({ to, className, children }: Readonly<AuthLinkProps>) {
   const { go } = useAuthNavigate();
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (
