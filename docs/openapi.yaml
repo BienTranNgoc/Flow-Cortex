@@ -58,6 +58,118 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/schedule:
+    get:
+      tags:
+      - schedules-controller
+      summary: The caller's schedule for the workflow
+      operationId: getWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+    put:
+      tags:
+      - schedules-controller
+      summary: Create or replace the caller's schedule
+      operationId: setWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetScheduleRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+    delete:
+      tags:
+      - schedules-controller
+      summary: Delete the caller's schedule; its fires stay
+      operationId: deleteWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "204":
+          description: No Content
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/reviews/{reviewId}/helpful:
     put:
       tags:
@@ -444,6 +556,65 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/folders/{id}:
+    put:
+      tags:
+      - chat-folder-controller
+      operationId: renameChatFolder
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatFolderName"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatFolder"
+        "400":
+          description: validation-failed (errors.name)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-folder-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    delete:
+      tags:
+      - chat-folder-controller
+      description: The folder's conversations are kept and return to Recent with their
+        pinned state.
+      operationId: deleteChatFolder
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: chat-folder-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/chat/conversations/{id}:
     put:
       tags:
@@ -497,6 +668,75 @@ paths:
           description: No Content
         "404":
           description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{id}/pin:
+    put:
+      tags:
+      - conversation-controller
+      operationId: pinChatConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConversationPin"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: validation-failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/{id}/folder:
+    put:
+      tags:
+      - chat-folder-controller
+      operationId: moveChatConversation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatConversationFolder"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "404":
+          description: chat-conversation-not-found or chat-folder-not-found; nothing
+            moves
           content:
             application/problem+json:
               schema:
@@ -605,6 +845,70 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "422":
           description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/tags/order:
+    put:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: reorderAdminTrendTags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendTagOrderRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminTrendTag"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-order-stale
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/categories/order:
+    put:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: reorderAdminTrendCategories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendCategoryOrderRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminTrendCategory"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-order-stale
           content:
             application/problem+json:
               schema:
@@ -1380,6 +1684,42 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/account-deletion/block-conditions/{key}:
+    put:
+      tags:
+      - admin-deletion-block-conditions-controller
+      operationId: updateAdminDeletionBlockCondition
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeletionBlockConditionUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionBlockConditionView"
+        "400":
+          description: validation-failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: The key is not a registered condition
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/workflows:
     get:
       tags:
@@ -1681,6 +2021,153 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/schedule/run-now:
+    post:
+      tags:
+      - schedules-controller
+      summary: "Start one run with the schedule's input now, without changing the\
+        \ schedule"
+      operationId: runWorkflowScheduleNow
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/schedule/resume:
+    post:
+      tags:
+      - schedules-controller
+      summary: Resume the caller's schedule
+      operationId: resumeWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/schedule/pause:
+    post:
+      tags:
+      - schedules-controller
+      summary: Pause the caller's schedule
+      operationId: pauseWorkflowSchedule
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflows/{id}/runs:
@@ -2065,6 +2552,79 @@ paths:
                 $ref: "#/components/schemas/WorkflowResponse"
         "400":
           $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/workflows/{id}/batches:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: createBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBatchRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/workflow-examples/{exampleId}/workflows:
@@ -3993,6 +4553,181 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/account-deletion:
+    get:
+      tags:
+      - account-deletion-controller
+      operationId: getAccountDeletionStatus
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionStatus"
+    post:
+      tags:
+      - account-deletion-controller
+      operationId: requestAccountDeletion
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDeletionRequestBody"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionAccepted"
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/me/account-deletion/cancel:
+    post:
+      tags:
+      - account-deletion-controller
+      operationId: cancelAccountDeletion
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionCancelled"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/entities:
+    get:
+      tags:
+      - entities-controller
+      operationId: listEntities
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      - name: kind
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: tag
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityListResponse"
+    post:
+      tags:
+      - entities-controller
+      operationId: createEntity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEntityRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResponse"
+  /api/v1/entities/{id}/versions/{n}/restore:
+    post:
+      tags:
+      - entity-versions-controller
+      operationId: restoreEntityVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: "n"
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreEntityRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityRestoreResponse"
   /api/v1/email-links/{token}/unsubscribe:
     post:
       tags:
@@ -4251,6 +4986,30 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/Saved"
+  /api/v1/connectors/google/authorize:
+    post:
+      tags:
+      - google-connector-controller
+      operationId: googleAuthorize
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleAuthorizeResponse"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/client-errors:
     post:
       tags:
@@ -4285,11 +5044,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/chat/folders:
+    get:
+      tags:
+      - chat-folder-controller
+      operationId: listChatFolders
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatFolderList"
+    post:
+      tags:
+      - chat-folder-controller
+      operationId: createChatFolder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatFolderName"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatFolder"
+        "400":
+          description: validation-failed (errors.name)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: chat-folder-limit; the member holds the most folders allowed
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/chat/conversations:
     get:
       tags:
       - conversation-controller
       operationId: listChatConversations
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 30
+          maximum: 100
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: sort
+        in: query
+        required: false
+        schema:
+          type: string
+          default: newest
+          enum:
+          - newest
+          - oldest
+      - name: pinned
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - only
+          - exclude
+      - name: folder
+        in: query
+        description: "A folder id, or none for conversations outside every folder"
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
       responses:
         "200":
           description: OK
@@ -4297,6 +5140,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatConversationList"
+        "400":
+          description: validation-failed; a field error per refused parameter
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
     post:
       tags:
       - conversation-controller
@@ -4583,6 +5432,154 @@ paths:
           description: Not application/json
         "429":
           description: More than 30 requests in a minute; Retry-After gives the wait
+  /api/v1/batches/{id}/retry:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: retryBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "401":
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "402":
+          description: Payment Required
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Unprocessable Content
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/resume:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: resumeBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/pause:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: pauseBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/cancel:
+    post:
+      tags:
+      - batch-runs-controller
+      operationId: cancelBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
   /api/v1/auth/reset-password:
     post:
       tags:
@@ -4991,6 +5988,72 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
         "429":
           description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/tags:
+    post:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: createAdminTrendTag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendTagCreateRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendTag"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-full
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/categories:
+    post:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: createAdminTrendCategory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendCategoryCreateRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendCategory"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: taxonomy-full
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: category-key-exhausted (errors.nameVi)
           content:
             application/problem+json:
               schema:
@@ -6135,6 +7198,60 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/entities/{id}:
+    get:
+      tags:
+      - entities-controller
+      operationId: getEntity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResponse"
+    delete:
+      tags:
+      - entities-controller
+      operationId: deleteEntity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - entities-controller
+      operationId: updateEntity
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEntityRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityResponse"
   /api/v1/drive/items/{id}:
     get:
       tags:
@@ -6484,6 +7601,124 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkflowStepResponse"
+  /api/v1/admin/trend/taxonomy/tags/{id}:
+    delete:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: deleteAdminTrendTag
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: tag-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: updateAdminTrendTag
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendTagUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendTag"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: tag-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/admin/trend/taxonomy/categories/{key}:
+    delete:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: deleteAdminTrendCategory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: category-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: category-in-use (templateCount)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+    patch:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: updateAdminTrendCategory
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminTrendCategoryUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendCategory"
+        "400":
+          description: validation-failed (errors)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: category-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/admin/roles/{code}:
     get:
       tags:
@@ -6685,6 +7920,56 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareSettingsResponse"
+  /api/v1/workflows/{id}/schedule/runs:
+    get:
+      tags:
+      - schedules-controller
+      summary: "The caller's fires of the workflow, newest first"
+      operationId: listWorkflowScheduleRuns
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewScheduleFireResponse"
   /api/v1/workflows/{id}/reviews:
     get:
       tags:
@@ -8063,6 +9348,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DriveMigrationResponse"
+  /api/v1/me/account-deletion/eligibility:
+    get:
+      tags:
+      - account-deletion-controller
+      operationId: getAccountDeletionEligibility
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletionEligibilityView"
+        "503":
+          description: Service Unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
   /api/v1/health:
     get:
       tags:
@@ -8088,6 +9391,188 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeaturesResponse"
       security: []
+  /api/v1/entities/{id}/versions:
+    get:
+      tags:
+      - entity-versions-controller
+      operationId: listEntityVersions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewEntityVersionResponse"
+  /api/v1/entities/{id}/versions/{n}:
+    get:
+      tags:
+      - entity-versions-controller
+      operationId: getEntityVersion
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: "n"
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityVersionDetailResponse"
+  /api/v1/entities/{id}/runs:
+    get:
+      tags:
+      - entity-runs-controller
+      operationId: listEntityRuns
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 42949672
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewEntityRunResponse"
+  /api/v1/entities/tags:
+    get:
+      tags:
+      - entity-suggestions-controller
+      operationId: listEntityTags
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 10
+          maximum: 20
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntityTagSuggestionResponse"
+  /api/v1/entities/labels:
+    get:
+      tags:
+      - entity-suggestions-controller
+      operationId: listEntityLabels
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 8
+          maximum: 20
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitySuggestionResponse"
+  /api/v1/entities/categories:
+    get:
+      tags:
+      - entity-suggestions-controller
+      operationId: listEntityCategories
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntitySuggestionResponse"
   /api/v1/email-links/{token}:
     get:
       tags:
@@ -8394,6 +9879,318 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/TelegramHealth"
+  /api/v1/connectors/google:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleRead
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleConnection"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/sheets:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: listGoogleSpreadsheets
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SpreadsheetPage"
+  /api/v1/connectors/google/sheets/{id}/tabs:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: listGoogleSpreadsheetTabs
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Tabs"
+  /api/v1/connectors/google/sheets/{id}/preview:
+    get:
+      tags:
+      - google-sheets-controller
+      operationId: previewGoogleSpreadsheetTab
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: tab
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: range
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: hasHeader
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "400":
+          description: Malformed parameter (INVALID_INPUT)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: Usage switched off or credential unreadable
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "422":
+          description: Refused (property reason names the cause)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off or rate limited
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Preview"
+  /api/v1/connectors/google/health:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/GoogleHealth"
+        "403":
+          description: Member is suspended (SUSPENDED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: No active Google connection (NOT_CONNECTED)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "502":
+          description: Google unreachable (UPSTREAM_UNAVAILABLE)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Connector switched off (TURNED_OFF)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/connectors/google/callback:
+    get:
+      tags:
+      - google-connector-controller
+      operationId: googleCallback
+      parameters:
+      - name: connector_google_flow
+        in: cookie
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        "302":
+          description: Redirect to the return path with connector=google and result
+          headers:
+            Location:
+              description: The return path with the result
+              style: simple
+              schema:
+                type: string
+      security: []
   /api/v1/chat/conversations/{id}/messages:
     get:
       tags:
@@ -8417,6 +10214,48 @@ paths:
                   $ref: "#/components/schemas/ChatMessage"
         "404":
           description: chat-conversation-not-found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/chat/conversations/counts:
+    get:
+      tags:
+      - conversation-controller
+      operationId: countChatConversations
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: folder
+        in: query
+        description: "A folder id, or none for conversations outside every folder"
+        required: false
+        schema:
+          type: string
+      - name: todayStart
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: weekStart
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversationCounts"
+        "400":
+          description: validation-failed; a field error per refused parameter
           content:
             application/problem+json:
               schema:
@@ -8574,6 +10413,122 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
+  /api/v1/batches:
+    get:
+      tags:
+      - batch-runs-controller
+      operationId: listBatches
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 21474836
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewBatchResponse"
+  /api/v1/batches/{id}:
+    get:
+      tags:
+      - batch-runs-controller
+      operationId: getBatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchResponse"
+  /api/v1/batches/{id}/rows:
+    get:
+      tags:
+      - batch-runs-controller
+      operationId: listBatchRows
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - failed
+          - cancelled
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          maximum: 10737418
+          minimum: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 200
+          minimum: 1
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageViewBatchRowResponse"
   /api/v1/auth/profile/preferences:
     get:
       tags:
@@ -8647,6 +10602,307 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/MeResponse"
+  /api/v1/assets:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssets
+      parameters:
+      - name: kind
+        in: query
+        description: "Comma-separated kinds: video, image, audio"
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Comma-separated sources: run, upload"
+        schema:
+          type: string
+      - name: group
+        in: query
+        description: "A group key: workflow:<id>, upload or day:<YYYY-MM-DD>"
+        schema:
+          type: string
+      - name: runId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        description: "Search in titles and tags, at most 200 characters"
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: time
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - 7d
+          - 30d
+          - custom
+      - name: from
+        in: query
+        description: "First day, Asia/Ho_Chi_Minh; with time=custom"
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        description: "Last day, inclusive; with time=custom"
+        schema:
+          type: string
+          format: date
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - size_desc
+          - size_asc
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 48
+          maximum: 100
+          minimum: 1
+      - name: cursor
+        in: query
+        description: meta.nextCursor of the previous page
+        schema:
+          type: string
+      - name: mark
+        in: query
+        description: Snapshot instant of a walk
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetPageResponse"
+  /api/v1/assets/{id}:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAsset
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetItemResponse"
+  /api/v1/assets/{id}/view-url:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetViewUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLinkResponse"
+  /api/v1/assets/{id}/download-url:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetDownloadUrl
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetLinkResponse"
+  /api/v1/assets/usage:
+    get:
+      tags:
+      - assets-controller
+      operationId: getAssetUsage
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetUsageResponse"
+  /api/v1/assets/tags:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssetTags
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetTagListResponse"
+  /api/v1/assets/run-results:
+    get:
+      tags:
+      - assets-controller
+      operationId: listRunResults
+      parameters:
+      - name: runId
+        in: query
+        description: 1-100 distinct run ids; a repeated id answers once
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 100
+          minItems: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResultListResponse"
+  /api/v1/assets/groups:
+    get:
+      tags:
+      - assets-controller
+      operationId: listAssetGroups
+      parameters:
+      - name: groupBy
+        in: query
+        schema:
+          type: string
+          enum:
+          - workflow
+          - day
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 10
+          maximum: 30
+          minimum: 1
+      - name: itemsPerGroup
+        in: query
+        schema:
+          type: integer
+          default: 4
+          maximum: 12
+          minimum: 1
+      - name: kind
+        in: query
+        description: "Comma-separated kinds: video, image, audio"
+        schema:
+          type: string
+      - name: source
+        in: query
+        description: "Comma-separated sources: run, upload"
+        schema:
+          type: string
+      - name: runId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: tag
+        in: query
+        schema:
+          type: string
+      - name: favorite
+        in: query
+        schema:
+          type: boolean
+      - name: time
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - 7d
+          - 30d
+          - custom
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: sort
+        in: query
+        description: Order of the items inside each group
+        schema:
+          type: string
+          enum:
+          - newest
+          - oldest
+          - size_desc
+          - size_asc
+      - name: mark
+        in: query
+        description: "meta.mark of page 1, sent with every later page"
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssetGroupPageResponse"
   /api/v1/admin/workflows/{id}/report:
     get:
       tags:
@@ -8732,6 +10988,18 @@ paths:
             text/csv:
               schema:
                 type: string
+  /api/v1/admin/trend/taxonomy:
+    get:
+      tags:
+      - admin-trend-taxonomy-controller
+      operationId: listAdminTrendTaxonomy
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTrendTaxonomy"
   /api/v1/admin/support/requests:
     get:
       tags:
@@ -9532,6 +11800,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PageViewAdminAccountResponse"
+  /api/v1/admin/account-deletion/block-conditions:
+    get:
+      tags:
+      - admin-deletion-block-conditions-controller
+      operationId: listAdminDeletionBlockConditions
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeletionBlockConditionView"
   /.well-known/oauth-authorization-server:
     get:
       tags:
@@ -9676,6 +11958,134 @@ components:
         properties:
           type: object
           additionalProperties: {}
+    SetScheduleRequest:
+      type: object
+      properties:
+        frequency:
+          type: string
+          enum:
+          - daily
+          - weekly
+          - monthly
+          pattern: daily|weekly|monthly
+        dayOfWeek:
+          type: string
+          enum:
+          - monday
+          - tuesday
+          - wednesday
+          - thursday
+          - friday
+          - saturday
+          - sunday
+          pattern: monday|tuesday|wednesday|thursday|friday|saturday|sunday
+        dayOfMonth:
+          type: integer
+          format: int32
+          maximum: 28
+          minimum: 1
+        time:
+          type: string
+          description: "HH:mm on the quarter hour, in the schedule's time zone"
+          example: 08:00
+          pattern: "([01]\\d|2[0-3]):(00|15|30|45)"
+        timezone:
+          type: string
+          default: Asia/Ho_Chi_Minh
+          description: "A region id such as Asia/Ho_Chi_Minh, or UTC"
+        active:
+          type: boolean
+          default: true
+        input:
+          type: string
+          maxLength: 10000
+          minLength: 0
+        acknowledgeCost:
+          type: boolean
+          default: false
+      required:
+      - frequency
+      - time
+    ScheduleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        frequency:
+          type: string
+          enum:
+          - daily
+          - weekly
+          - monthly
+        dayOfWeek:
+          type:
+          - string
+          - "null"
+          enum:
+          - monday
+          - tuesday
+          - wednesday
+          - thursday
+          - friday
+          - saturday
+          - sunday
+        dayOfMonth:
+          type:
+          - integer
+          - "null"
+          format: int32
+        time:
+          type: string
+          example: 08:00
+        timezone:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+        pausedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        nextRunAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        nextRunLocal:
+          type:
+          - string
+          - "null"
+          format: date-time
+          example: 2026-11-17T08:00:00+07:00
+        input:
+          type:
+          - string
+          - "null"
+        acknowledgeCost:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - acknowledgeCost
+      - createdAt
+      - frequency
+      - id
+      - status
+      - time
+      - timezone
+      - updatedAt
+      - workflowId
     HelpfulRequest:
       type: object
       properties:
@@ -9923,6 +12333,27 @@ components:
         expiresIn:
           type: integer
           format: int64
+    ChatFolderName:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          minLength: 1
+    ChatFolder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        conversationCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
     ChatConversationTitle:
       type: object
       properties:
@@ -9943,6 +12374,29 @@ components:
         createdAt:
           type: string
           format: date-time
+        pinned:
+          type: boolean
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+    ChatConversationPin:
+      type: object
+      properties:
+        pinned:
+          type: boolean
+      required:
+      - pinned
+    ChatConversationFolder:
+      type: object
+      properties:
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: The folder to file into; null returns the conversation to Recent
     ProfileUpdateRequest:
       type: object
       properties:
@@ -9960,6 +12414,27 @@ components:
           minLength: 0
       required:
       - name
+    AccountDeletionView:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - NONE
+          - PENDING
+          - EXPIRED
+        requestedAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When the grace period ends; the deletion can be cancelled until
+            then
+      required:
+      - requestedAt
+      - scheduledAt
+      - state
     MeResponse:
       type: object
       properties:
@@ -10021,10 +12496,14 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - content.trend_template.view
+            - content.trend_template.manage
         adminDisabled:
           type: boolean
         phoneVerificationRequired:
           type: boolean
+        accountDeletion:
+          $ref: "#/components/schemas/AccountDeletionView"
       required:
       - adminDisabled
       - permissions
@@ -10069,6 +12548,79 @@ components:
           type: string
       required:
       - locale
+    AdminTrendTagOrderRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 1000
+          minItems: 0
+      required:
+      - ids
+    AdminTrendTag:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nameVi:
+          type: string
+        nameEn:
+          type: string
+        order:
+          type: integer
+          format: int32
+        visible:
+          type: boolean
+        usageCount:
+          type: integer
+          format: int32
+      required:
+      - id
+      - nameEn
+      - nameVi
+      - order
+      - usageCount
+      - visible
+    AdminTrendCategoryOrderRequest:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          maxItems: 1000
+          minItems: 0
+      required:
+      - keys
+    AdminTrendCategory:
+      type: object
+      properties:
+        key:
+          type: string
+        nameVi:
+          type: string
+        nameEn:
+          type: string
+        order:
+          type: integer
+          format: int32
+        visible:
+          type: boolean
+        usageCount:
+          type: integer
+          format: int32
+      required:
+      - key
+      - nameEn
+      - nameVi
+      - order
+      - usageCount
+      - visible
     AdminSupportSettingsUpdate:
       type: object
       properties:
@@ -10569,6 +13121,8 @@ components:
             - payment.setting.view
             - payment.setting.update
             - user.account.export
+            - content.trend_template.view
+            - content.trend_template.manage
         permissionsVersion:
           type: integer
           format: int32
@@ -10994,6 +13548,57 @@ components:
       - supportsAudio
       - supportsVision
       - updatedAt
+    DeletionBlockConditionUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        sortOrder:
+          type: integer
+          format: int32
+          maximum: 999
+          minimum: 0
+        messageVi:
+          type: string
+          maxLength: 500
+          minLength: 0
+        messageEn:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - enabled
+      - messageEn
+      - messageVi
+      - sortOrder
+    DeletionBlockConditionView:
+      type: object
+      properties:
+        key:
+          type: string
+        enabled:
+          type: boolean
+        sortOrder:
+          type: integer
+          format: int32
+          maximum: 999
+          minimum: 0
+        messageVi:
+          type: string
+        messageEn:
+          type: string
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - enabled
+      - key
+      - messageEn
+      - messageVi
+      - sortOrder
+      - updatedAt
     CreateWorkflowRequest:
       type: object
       properties:
@@ -11178,41 +13783,6 @@ components:
           type: string
       required:
       - type
-    RunOptionsRequest:
-      type: object
-      properties:
-        voice:
-          type: string
-          default: female
-          enum:
-          - female
-          - male
-          pattern: female|male
-    StartRunRequest:
-      type: object
-      properties:
-        input:
-          type: string
-          maxLength: 10000
-          minLength: 0
-        uploadId:
-          type: string
-          format: uuid
-        uploadIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-          maxItems: 10
-          minItems: 1
-        originalName:
-          type: string
-          maxLength: 1024
-          minLength: 0
-        options:
-          $ref: "#/components/schemas/RunOptionsRequest"
-        acknowledgeCost:
-          type: boolean
     RunResponse:
       type: object
       properties:
@@ -11349,6 +13919,41 @@ components:
       - deliveryCount
       - mode
       - outputs
+    RunOptionsRequest:
+      type: object
+      properties:
+        voice:
+          type: string
+          default: female
+          enum:
+          - female
+          - male
+          pattern: female|male
+    StartRunRequest:
+      type: object
+      properties:
+        input:
+          type: string
+          maxLength: 10000
+          minLength: 0
+        uploadId:
+          type: string
+          format: uuid
+        uploadIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 10
+          minItems: 1
+        originalName:
+          type: string
+          maxLength: 1024
+          minLength: 0
+        options:
+          $ref: "#/components/schemas/RunOptionsRequest"
+        acknowledgeCost:
+          type: boolean
     ReportRequest:
       type: object
       properties:
@@ -11477,6 +14082,114 @@ components:
           type: string
           maxLength: 200
           minLength: 0
+    CreateBatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 0
+        content:
+          type: string
+          maxLength: 2000000
+          minLength: 0
+        rows:
+          type: array
+          items:
+            type: string
+            maxLength: 10000
+            minLength: 0
+          maxItems: 500
+          minItems: 0
+        format:
+          type: string
+          enum:
+          - csv
+          - json
+          - jsonl
+        skipFirstLine:
+          type: boolean
+        concurrency:
+          type: integer
+          format: int32
+        acknowledgeCost:
+          type: boolean
+    BatchResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - running
+          - paused
+          - completed
+          - completed_with_errors
+          - cancelled
+        concurrency:
+          type: integer
+          format: int32
+        totalRows:
+          type: integer
+          format: int32
+        pendingRows:
+          type: integer
+          format: int64
+        runningRows:
+          type: integer
+          format: int64
+        completedRows:
+          type: integer
+          format: int64
+        failedRows:
+          type: integer
+          format: int64
+        cancelledRows:
+          type: integer
+          format: int64
+        pauseReason:
+          type: string
+          enum:
+          - member
+          - insufficientCredits
+          - unavailable
+        cancelReason:
+          type: string
+          enum:
+          - member
+          - workflowUnavailable
+          - ownerInactive
+        parentBatchId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - cancelledRows
+      - completedRows
+      - concurrency
+      - createdAt
+      - failedRows
+      - id
+      - pendingRows
+      - runningRows
+      - status
+      - totalRows
+      - workflowId
+      - workflowName
     CreateUserRequest:
       type: object
       properties:
@@ -12381,6 +15094,7 @@ components:
           enum:
           - PAT_CREATE
           - PHONE_CHANGE
+          - ACCOUNT_DELETION
       required:
       - password
       - purpose
@@ -12514,6 +15228,265 @@ components:
       - id
       - name
       - token
+    AccountDeletionRequestBody:
+      type: object
+      properties:
+        stepUpProof:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - stepUpProof
+    AccountDeletionAccepted:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - NONE
+          - PENDING
+          - EXPIRED
+        requestedAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+      required:
+      - requestId
+      - requestedAt
+      - scheduledAt
+      - state
+    AccountDeletionCancelled:
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - CANCELLED
+        cancelledAt:
+          type: string
+          format: date-time
+      required:
+      - cancelledAt
+      - state
+    CreateEntityRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - brand
+          - product
+          - character
+          - voice
+        name:
+          type: string
+        handle:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartRequest"
+        tags:
+          type: array
+          items:
+            type: string
+        categoryLabel:
+          type: string
+      required:
+      - kind
+      - name
+    EntityPartRequest:
+      type: object
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        role:
+          type: string
+        label:
+          type: string
+      required:
+      - assetId
+      - role
+    EntityPartAsset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - video
+          - image
+          - audio
+        title:
+          type: string
+        mimeType:
+          type: string
+      required:
+      - id
+      - kind
+      - mimeType
+      - title
+    EntityPartResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+        label:
+          type: string
+        sort:
+          type: integer
+          format: int32
+        asset:
+          $ref: "#/components/schemas/EntityPartAsset"
+      required:
+      - asset
+      - id
+      - role
+      - sort
+    EntityResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - brand
+          - product
+          - character
+          - voice
+        handle:
+          type: string
+        name:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        categoryLabel:
+          type:
+          - string
+          - "null"
+        tags:
+          type: array
+          items:
+            type: string
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartResponse"
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - fields
+      - handle
+      - id
+      - kind
+      - name
+      - parts
+      - tags
+      - updatedAt
+      - version
+    RestoreEntityRequest:
+      type: object
+      properties:
+        baseVersion:
+          type: integer
+          format: int32
+      required:
+      - baseVersion
+    EntityDroppedPart:
+      type: object
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        role:
+          type: string
+        label:
+          type: string
+      required:
+      - assetId
+      - role
+    EntityRestoreResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - brand
+          - product
+          - character
+          - voice
+        handle:
+          type: string
+        name:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        categoryLabel:
+          type:
+          - string
+          - "null"
+        tags:
+          type: array
+          items:
+            type: string
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartResponse"
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        droppedParts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityDroppedPart"
+      required:
+      - createdAt
+      - droppedParts
+      - fields
+      - handle
+      - id
+      - kind
+      - name
+      - parts
+      - tags
+      - updatedAt
+      - version
     EmailLinkUnsubscribed:
       type: object
       properties:
@@ -12783,6 +15756,11 @@ components:
           type: string
         baseUrl:
           type: string
+    GoogleAuthorizeResponse:
+      type: object
+      properties:
+        authorizationUrl:
+          type: string
     Attachment:
       type: object
       properties:
@@ -12827,6 +15805,13 @@ components:
         createdAt:
           type: string
           format: date-time
+        pinned:
+          type: boolean
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
         userMessage:
           $ref: "#/components/schemas/ChatMessage"
         assistantMessageId:
@@ -13207,6 +16192,34 @@ components:
       - stepOrder
       - type
       - value
+    AdminTrendTagCreateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 30
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 30
+          minLength: 0
+      required:
+      - nameEn
+      - nameVi
+    AdminTrendCategoryCreateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 60
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 60
+          minLength: 0
+      required:
+      - nameEn
+      - nameVi
     AdminSupportRequestReply:
       type: object
       properties:
@@ -13683,6 +16696,35 @@ components:
           type: boolean
         marketingEmail:
           type: boolean
+    UpdateEntityRequest:
+      type: object
+      properties:
+        baseVersion:
+          type: integer
+          format: int32
+        kind:
+          type: string
+        name:
+          type: string
+        handle:
+          type: string
+        fields:
+          type: object
+          additionalProperties: {}
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityPartRequest"
+        tags:
+          type: array
+          items:
+            type: string
+        categoryLabel:
+          type:
+          - string
+          - "null"
+      required:
+      - baseVersion
     UpdateDriveItemRequest:
       type: object
       properties:
@@ -13748,6 +16790,32 @@ components:
           enum:
           - show
           - hide
+    AdminTrendTagUpdateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 30
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 30
+          minLength: 0
+        visible:
+          type: boolean
+    AdminTrendCategoryUpdateRequest:
+      type: object
+      properties:
+        nameVi:
+          type: string
+          maxLength: 60
+          minLength: 0
+        nameEn:
+          type: string
+          maxLength: 60
+          minLength: 0
+        visible:
+          type: boolean
     UpdateRoleRequest:
       type: object
       properties:
@@ -13895,6 +16963,73 @@ components:
       required:
       - snapshot
       - version
+    PageViewScheduleFireResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleFireResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    ScheduleFireResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        trigger:
+          type: string
+          enum:
+          - manual
+          - scheduled
+        scheduledAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - starting
+          - started
+          - failed
+        runId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        runStatus:
+          type:
+          - string
+          - "null"
+        errorCode:
+          type:
+          - string
+          - "null"
+        errorMessage:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - createdAt
+      - id
+      - scheduledAt
+      - status
+      - trigger
     ReviewListItemResponse:
       type: object
       properties:
@@ -15127,6 +18262,55 @@ components:
       - expiresAt
       - id
       - name
+    AccountDeletionStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        gracePeriodDays:
+          type: integer
+          format: int32
+        state:
+          type: string
+          enum:
+          - NONE
+          - PENDING
+          - EXPIRED
+        requestedAt:
+          type: string
+          format: date-time
+          description: Null while the state is NONE
+        scheduledAt:
+          type: string
+          format: date-time
+          description: When the grace period ends; null while the state is NONE
+      required:
+      - enabled
+      - gracePeriodDays
+      - state
+    DeletionEligibilityView:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeletionReasonView"
+      required:
+      - eligible
+      - reasons
+    DeletionReasonView:
+      type: object
+      properties:
+        key:
+          type: string
+        message:
+          type: string
+          description: Already in the caller's language
+      required:
+      - key
+      - message
     HealthResponse:
       type: object
       properties:
@@ -15178,6 +18362,222 @@ components:
       - supportAssistant
       - supportWidget
       - uploadContentCheck
+    EntityKindCounts:
+      type: object
+      properties:
+        brand:
+          type: integer
+          format: int64
+        product:
+          type: integer
+          format: int64
+        character:
+          type: integer
+          format: int64
+        voice:
+          type: integer
+          format: int64
+      required:
+      - brand
+      - character
+      - product
+      - voice
+    EntityListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+        counts:
+          $ref: "#/components/schemas/EntityKindCounts"
+      required:
+      - counts
+      - items
+      - page
+      - size
+      - total
+    EntityChangeResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+          - created
+          - renamed
+          - handleChanged
+          - fieldsChanged
+          - partsChanged
+          - tagsChanged
+          - categoryChanged
+          - restored
+        added:
+          type: array
+          items:
+            type: string
+        removed:
+          type: array
+          items:
+            type: string
+        from:
+          type: integer
+          format: int32
+      required:
+      - code
+    EntityVersionResponse:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityChangeResponse"
+        usedInRuns:
+          type: integer
+          format: int32
+      required:
+      - changes
+      - createdAt
+      - current
+      - usedInRuns
+      - version
+    PageViewEntityVersionResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityVersionResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    EntityVersionDetailResponse:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        current:
+          type: boolean
+        entity:
+          $ref: "#/components/schemas/EntityResponse"
+      required:
+      - createdAt
+      - current
+      - entity
+      - version
+    EntityRunResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        version:
+          type: integer
+          format: int32
+        completedAt:
+          type: string
+          format: date-time
+      required:
+      - completedAt
+      - runId
+      - version
+    PageViewEntityRunResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityRunResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    EntityTagSuggestionItem:
+      type: object
+      properties:
+        tag:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - tag
+    EntityTagSuggestionResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityTagSuggestionItem"
+      required:
+      - items
+    EntitySuggestionItem:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - label
+    EntitySuggestionResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntitySuggestionItem"
+      required:
+      - items
     EmailLinkView:
       type: object
       properties:
@@ -15498,15 +18898,170 @@ components:
           type: array
           items:
             type: string
+    GoogleConnection:
+      type: object
+      properties:
+        provider:
+          type: string
+        email:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        missingScopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        usageEnabled:
+          type: boolean
+    Spreadsheet:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        modifiedAt:
+          type: string
+          format: date-time
+        ownerEmail:
+          type: string
+        webViewUrl:
+          type: string
+    SpreadsheetPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Spreadsheet"
+        nextCursor:
+          type: string
+    Tab:
+      type: object
+      properties:
+        sheetId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        rowCount:
+          type: integer
+          format: int32
+        columnCount:
+          type: integer
+          format: int32
+    Tabs:
+      type: object
+      properties:
+        spreadsheetId:
+          type: string
+        title:
+          type: string
+        tabs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tab"
+    Preview:
+      type: object
+      properties:
+        spreadsheetId:
+          type: string
+        tab:
+          type: string
+        range:
+          type: string
+        header:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+    GoogleHealth:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        email:
+          type: string
+        reason:
+          type: string
+    ChatFolderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatFolder"
     ChatConversationList:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/ChatConversation"
+            $ref: "#/components/schemas/ChatConversationListItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+          description: Opaque cursor of the next page; null on the last page
         chatEnabled:
           type: boolean
+    ChatConversationListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        lastActivityAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        pinned:
+          type: boolean
+        folderId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        preview:
+          type:
+          - string
+          - "null"
+          maxLength: 200
+        previewTruncated:
+          type: boolean
+          description: True when the latest text was longer than the preview cap
+    ChatConversationCounts:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        pinned:
+          type: integer
+          format: int32
+        today:
+          type: integer
+          format: int32
+        last7Days:
+          type: integer
+          format: int32
+        earlier:
+          type: integer
+          format: int32
     CapabilitiesResponse:
       type: object
       properties:
@@ -15732,6 +19287,84 @@ components:
       - at
       - code
       - kind
+    PageViewBatchResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
+    BatchRowResponse:
+      type: object
+      properties:
+        rowIndex:
+          type: integer
+          format: int32
+        sourceRowIndex:
+          type: integer
+          format: int32
+        input:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - failed
+          - cancelled
+        runId:
+          type: string
+          format: uuid
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      required:
+      - input
+      - rowIndex
+      - status
+    PageViewBatchRowResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchRowResponse"
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+      required:
+      - items
+      - page
+      - size
+      - total
     PreferencesView:
       type: object
       properties:
@@ -15749,6 +19382,277 @@ components:
       required:
       - privacy
       - ui
+    AssetCountsResponse:
+      type: object
+      properties:
+        all:
+          type: integer
+          format: int64
+        video:
+          type: integer
+          format: int64
+        image:
+          type: integer
+          format: int64
+        audio:
+          type: integer
+          format: int64
+        favorite:
+          type: integer
+          format: int64
+      required:
+      - all
+      - audio
+      - favorite
+      - image
+      - video
+    AssetItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - video
+          - image
+          - audio
+        title:
+          type: string
+        source:
+          type: string
+          enum:
+          - run
+          - upload
+        mimeType:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        workflowName:
+          type: string
+        favorite:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        missing:
+          type: boolean
+        thumbnailUrl:
+          type: string
+      required:
+      - bytes
+      - createdAt
+      - favorite
+      - id
+      - kind
+      - mimeType
+      - missing
+      - runId
+      - source
+      - tags
+      - title
+    AssetPageMetaResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        counts:
+          $ref: "#/components/schemas/AssetCountsResponse"
+        nextCursor:
+          type: string
+        mark:
+          type: string
+          format: date-time
+      required:
+      - counts
+      - mark
+      - total
+    AssetPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetItemResponse"
+        meta:
+          $ref: "#/components/schemas/AssetPageMetaResponse"
+      required:
+      - items
+      - meta
+    AssetLinkResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - expiresAt
+      - url
+    AssetUsageByKindResponse:
+      type: object
+      properties:
+        video:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        image:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        audio:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+      required:
+      - audio
+      - image
+      - video
+    AssetUsageEntryResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: int64
+        bytes:
+          type: integer
+          format: int64
+      required:
+      - bytes
+      - count
+    AssetUsageResponse:
+      type: object
+      properties:
+        total:
+          $ref: "#/components/schemas/AssetUsageEntryResponse"
+        byKind:
+          $ref: "#/components/schemas/AssetUsageByKindResponse"
+      required:
+      - byKind
+      - total
+    AssetTagListResponse:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetTagResponse"
+      required:
+      - tags
+    AssetTagResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+          format: int64
+      required:
+      - count
+      - label
+    RunResultListResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunResultResponse"
+      required:
+      - results
+    RunResultResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        count:
+          type: integer
+          format: int64
+        kinds:
+          type: array
+          items:
+            type: string
+        thumbnails:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunResultThumbnailResponse"
+        registration:
+          type: string
+          enum:
+          - pending
+          - done
+          - none
+      required:
+      - count
+      - kinds
+      - registration
+      - runId
+      - thumbnails
+    RunResultThumbnailResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+      - url
+    AssetGroupPageMetaResponse:
+      type: object
+      properties:
+        totalGroups:
+          type: integer
+          format: int64
+        mark:
+          type: string
+          format: date-time
+      required:
+      - mark
+      - totalGroups
+    AssetGroupPageResponse:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetGroupResponse"
+        meta:
+          $ref: "#/components/schemas/AssetGroupPageMetaResponse"
+      required:
+      - groups
+      - meta
+    AssetGroupResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        count:
+          type: integer
+          format: int64
+        runCount:
+          type: integer
+          format: int64
+        latestAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetItemResponse"
+      required:
+      - count
+      - items
+      - key
+      - latestAt
+      - runCount
     AdminWorkflowResponse:
       type: object
       properties:
@@ -15840,6 +19744,20 @@ components:
       - countsByStatus
       - series
       - workflow
+    AdminTrendTaxonomy:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTrendCategory"
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTrendTag"
+      required:
+      - categories
+      - tags
     AdminSupportRequestPage:
       type: object
       properties:
@@ -16257,6 +20175,8 @@ components:
           - payment.setting.view
           - payment.setting.update
           - user.account.export
+          - content.trend_template.view
+          - content.trend_template.manage
         module:
           type: string
         feature:

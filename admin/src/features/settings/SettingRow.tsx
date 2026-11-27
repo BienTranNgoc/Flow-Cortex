@@ -1,8 +1,11 @@
 import { ApiError, type AdminSetting } from '@flow-cortex/api-client';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import type { TFunction } from 'i18next';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatVietnamTime } from '../support/vietnamTime';
+import { LowerValueDialog } from './LowerValueDialog';
 import { SettingHistory } from './SettingHistory';
+import { loweringToConfirm, type Lowering } from './settingConfirmation';
 import { parseSettingInput } from './settingInput';
 import { useResetSetting, useUpdateSetting } from './useSettings';
 
@@ -16,6 +19,20 @@ function refusal(error: unknown): string | undefined {
   return error instanceof ApiError && error.status === 422 ? error.problem?.errors?.value : undefined;
 }
 
+/** Who last changed the stored value and when, or null when it was never changed. */
+function changeNote(t: TFunction, setting: AdminSetting): string | null {
+  if (!setting.updatedAt) return null;
+  const key = setting.updatedBy ? 'settings.changedBy' : 'settings.changedAt';
+  return t(key, { email: setting.updatedBy, at: formatVietnamTime(setting.updatedAt) });
+}
+
+/** A lowering the admin has not confirmed yet: the change it releases and the button that asked. */
+interface HeldChange {
+  readonly lowering: Lowering;
+  readonly run: () => void;
+  readonly opener: HTMLButtonElement | null;
+}
+
 export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
   const { t } = useTranslation();
   const controlId = useId();
@@ -25,6 +42,10 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
   const decided = setting.decidedValue;
   const [draft, setDraft] = useState(String(decided));
   const [bounds, setBounds] = useState<string | null>(null);
+  const [held, setHeld] = useState<HeldChange | null>(null);
+  const saveButton = useRef<HTMLButtonElement>(null);
+  const resetButton = useRef<HTMLButtonElement>(null);
+  const focusAfterDialog = useRef<HTMLButtonElement | null>(null);
   const busy = update.isPending || reset.isPending;
   const isSwitch = setting.type === 'SWITCH';
 
@@ -32,6 +53,13 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
     setDraft(String(decided));
     setBounds(null);
   }, [decided]);
+
+  useEffect(() => {
+    if (held === null) {
+      focusAfterDialog.current?.focus();
+      focusAfterDialog.current = null;
+    }
+  }, [held]);
 
   const label = t(`settings.keys.${setting.key}.label`, { defaultValue: setting.key });
   const help = t(`settings.keys.${setting.key}.help`, { defaultValue: '' });
@@ -42,6 +70,18 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
     bounds ??
     (failure ? (refusal(failure) ?? t('settings.saveFailed')) : null);
 
+  const save = (value: number | boolean) => {
+    reset.reset();
+    update.mutate(value);
+  };
+
+  /** Runs `send` now, or holds it behind the confirmation when `next` would lower the value. */
+  const release = (next: unknown, opener: HTMLButtonElement | null, send: () => void) => {
+    const lowering = loweringToConfirm(setting.key, setting.value, next);
+    if (lowering) setHeld({ lowering, run: send, opener });
+    else send();
+  };
+
   const submitNumber = (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -51,22 +91,79 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
       return;
     }
     setBounds(null);
-    reset.reset();
-    update.mutate(parsed.value);
+    const value = parsed.value;
+    release(value, saveButton.current, () => save(value));
+  };
+
+  const resetToConfigured = () => {
+    if (busy) return;
+    release(setting.configuredValue, resetButton.current, () => {
+      update.reset();
+      setBounds(null);
+      reset.mutate();
+    });
+  };
+
+  const closeDialog = (change: HeldChange) => {
+    focusAfterDialog.current = change.opener;
+    setHeld(null);
   };
 
   const toggle = (value: boolean) => {
     if (busy) return;
-    reset.reset();
-    update.mutate(value);
+    save(value);
   };
 
-  const change = setting.updatedAt
-    ? t(setting.updatedBy ? 'settings.changedBy' : 'settings.changedAt', {
-        email: setting.updatedBy,
-        at: formatVietnamTime(setting.updatedAt),
-      })
-    : null;
+  const change = changeNote(t, setting);
+  const describedBy = message ? messageId : undefined;
+
+  const renderControl = () => {
+    if (isSwitch) {
+      return (
+        <input
+          id={controlId}
+          className="settings-switch"
+          type="checkbox"
+          role="switch"
+          checked={decided === true}
+          disabled={!canUpdate}
+          aria-disabled={busy}
+          aria-describedby={describedBy}
+          onChange={(event) => toggle(event.target.checked)}
+        />
+      );
+    }
+    if (setting.type === 'ENUM') {
+      return <output id={controlId}>{String(decided)}</output>;
+    }
+    return (
+      <form className="settings-number" onSubmit={submitNumber} noValidate>
+        <input
+          id={controlId}
+          type="text"
+          inputMode="numeric"
+          value={draft}
+          readOnly={!canUpdate}
+          aria-invalid={message !== null}
+          aria-describedby={describedBy}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setBounds(null);
+          }}
+        />
+        {canUpdate && (
+          <button
+            ref={saveButton}
+            type="submit"
+            className="cortex-admin-btn cortex-admin-btn--primary cortex-admin-btn--sm"
+            aria-disabled={busy || draft.trim() === String(decided)}
+          >
+            {t(update.isPending ? 'settings.saving' : 'settings.save')}
+          </button>
+        )}
+      </form>
+    );
+  };
 
   return (
     <li className="cortex-admin-panel settings-item" data-setting={setting.key}>
@@ -77,46 +174,7 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
           </label>
           {help && <p className="settings-muted">{help}</p>}
         </div>
-        {isSwitch ? (
-          <input
-            id={controlId}
-            className="settings-switch"
-            type="checkbox"
-            role="switch"
-            checked={decided === true}
-            disabled={!canUpdate}
-            aria-disabled={busy}
-            aria-describedby={message ? messageId : undefined}
-            onChange={(event) => toggle(event.target.checked)}
-          />
-        ) : setting.type === 'ENUM' ? (
-          <output id={controlId}>{String(decided)}</output>
-        ) : (
-          <form className="settings-number" onSubmit={submitNumber} noValidate>
-            <input
-              id={controlId}
-              type="text"
-              inputMode="numeric"
-              value={draft}
-              readOnly={!canUpdate}
-              aria-invalid={message !== null}
-              aria-describedby={message ? messageId : undefined}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                setBounds(null);
-              }}
-            />
-            {canUpdate && (
-              <button
-                type="submit"
-                className="cortex-admin-btn cortex-admin-btn--primary cortex-admin-btn--sm"
-                aria-disabled={busy || draft.trim() === String(decided)}
-              >
-                {t(update.isPending ? 'settings.saving' : 'settings.save')}
-              </button>
-            )}
-          </form>
-        )}
+        {renderControl()}
       </div>
 
       <p className="settings-meta">
@@ -147,20 +205,27 @@ export function SettingRow({ setting, canUpdate }: Readonly<SettingRowProps>) {
       )}
       {canUpdate && setting.storedValue != null && (
         <button
+          ref={resetButton}
           type="button"
           className="cortex-admin-btn cortex-admin-btn--ghost cortex-admin-btn--sm"
           aria-disabled={busy}
-          onClick={() => {
-            if (busy) return;
-            update.reset();
-            setBounds(null);
-            reset.mutate();
-          }}
+          onClick={resetToConfigured}
         >
           {t('settings.reset')}
         </button>
       )}
       <SettingHistory setting={setting} />
+      {held && (
+        <LowerValueDialog
+          lowering={held.lowering}
+          pending={busy}
+          onConfirm={() => {
+            held.run();
+            closeDialog(held);
+          }}
+          onCancel={() => closeDialog(held)}
+        />
+      )}
     </li>
   );
 }

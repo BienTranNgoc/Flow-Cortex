@@ -178,6 +178,7 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 - Pipeline: a `paper-2` frame holding `paper-3` nodes joined by connectors; a node has a 4px left bar in its status colour, and the selected node is outlined in `primary`. Connectors are `green` when done, `primary` when active, `edge` (dashed when broken) otherwise.
 - Card: `paper-2` fill, `card-edge` edge, `shadow-sm`.
 - Icons: Phosphor, one weight family. `ThemeToggle` keeps its own sun and moon glyphs as the one exception.
+- Run result summary (Runs page row): up to three `run-thumb-size` (28px) squares, `sm` radius, `card-edge` edge on `paper-3` (the placeholder while an image loads), beside the run name from 768px and under it below, then "N files" in `ink-3`; "Saving files…" replaces both while registration is pending. The thumbnails and the text are not interactive, so they have no hover, focus or active state. Nothing shows while the summary loads or after it fails.
 
 ### Password re-check and API tokens
 

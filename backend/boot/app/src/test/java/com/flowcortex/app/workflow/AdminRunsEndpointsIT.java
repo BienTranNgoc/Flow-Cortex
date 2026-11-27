@@ -174,9 +174,10 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
         assertThat(page.items()).extracting(AdminRunItem::ownerEmail)
                 .containsExactlyInAnyOrderElementsOf(owners.stream().map(UserView::email).toList());
         List<String> sql = statements.forRequest("/api/v1/admin/runs");
-        assertThat(sql).as("statements for one page: %s", sql).hasSizeLessThanOrEqualTo(4);
+        assertThat(sql).as("statements for one page: %s", sql).hasSizeLessThanOrEqualTo(5);
         assertThat(sql.stream().filter(statement -> statement.contains("app_user")).count())
-                .as("the caller's own check plus one owner-email lookup: %s", sql).isEqualTo(2);
+                .as("the caller's own check, the deletion gate's read and one owner-email lookup: %s", sql)
+                .isEqualTo(3);
         assertThat(sql.stream().filter(statement -> statement.contains("app_user") && statement.contains(" in ("))
                 .toList()).singleElement().satisfies(lookup -> assertThat(lookup).doesNotContain("password_hash"));
     }
@@ -721,9 +722,10 @@ class AdminRunsEndpointsIT extends AbstractWorkflowHttpIT {
 
             assertThat(response.getBody().items()).hasSize(20);
             List<String> sql = statements.forRequest("/api/v1/admin/runs");
-            assertThat(sql).as("statements for one page: %s", sql).hasSizeLessThanOrEqualTo(5);
+            assertThat(sql).as("statements for one page: %s", sql).hasSizeLessThanOrEqualTo(6);
             assertThat(sql.stream().filter(statement -> statement.contains("app_user")).count())
-                    .as("the caller's own check plus one owner-email lookup: %s", sql).isEqualTo(2);
+                    .as("the caller's own check, the deletion gate's read and one owner-email lookup: %s", sql)
+                    .isEqualTo(3);
             assertThat(sql.stream().filter(statement -> statement.contains("credit_ledger")).count())
                     .as("one grouped ledger read: %s", sql).isEqualTo(1);
         }

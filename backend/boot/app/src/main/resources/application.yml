@@ -313,6 +313,13 @@ flowcortex:
   admin-audit:
     origin-retention: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:365d}
     retention-interval: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:1h}
+  # Deleted trend templates are purged after `grace`, a pass taking at most `batch-size` of them.
+  # Grace must stay above the longest media URL lifetime plus the longest run that reads template media.
+  trend:
+    purge:
+      interval: ${FLOWCORTEX_TREND_PURGE_INTERVAL:15m}
+      grace: ${FLOWCORTEX_TREND_PURGE_GRACE:8d}
+      batch-size: ${FLOWCORTEX_TREND_PURGE_BATCH_SIZE:20}
   # Password login throttle: each client IP gets `capacity` failed attempts per `period`, refilled
   # gradually; over it answers 429 with Retry-After before the password is checked. Budgets are
   # shared by every backend instance. The per-account lockout (5 failures, 15 minutes) is separate.
@@ -389,6 +396,11 @@ flowcortex:
   # (staff and super admins excepted). Needs phone verification on, or startup fails; env + restart.
   phone-gate:
     enabled: ${FLOWCORTEX_PHONE_GATE_ENABLED:false}
+  # Member account deletion: both values are runtime settings changed in the console Settings page;
+  # `enabled: false` here vetoes the switch whatever is stored, empty leaves it to the console.
+  account-deletion:
+    enabled: ${FLOWCORTEX_ACCOUNT_DELETION_ENABLED:}
+    grace-period-days: ${FLOWCORTEX_ACCOUNT_DELETION_GRACE_PERIOD_DAYS:30}
   # HMAC key for phone_send_attempt.phone_hash; at least 32 bytes when phone verification is on.
   phone:
     hash-secret: ${FLOWCORTEX_PHONE_HASH_SECRET:}
@@ -403,6 +415,17 @@ flowcortex:
       api-base-url: https://api.telegram.org
       read-timeout: 8s
       send-timeout: 15s
+    # Off means every Google route and call answers 503 and no request leaves for Google (disconnect and the
+    # callback still answer). On needs the client and the redirect URI, or startup fails. *.googleapis.com must
+    # stay on the egress proxy's allowlist; drive.readonly is a restricted scope, so a public launch needs Google's
+    # app verification first.
+    google:
+      enabled: ${FLOWCORTEX_CONNECTORS_GOOGLE_ENABLED:false}
+      client-id: ${GOOGLE_CONNECTOR_CLIENT_ID:}
+      client-secret: ${GOOGLE_CONNECTOR_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_CONNECTOR_REDIRECT_URI:http://localhost:5173/api/v1/connectors/google/callback}
+      return-path: /integrations
+      read-timeout: 30s
   # Where SMS go. Empty: nowhere. "outbox": the sms_outbox table, read in the admin console
   # (/api/v1/admin/sms-outbox exists only then); development stacks only, nothing is delivered.
   sms:
@@ -512,6 +535,9 @@ flowcortex:
     # Member-initiated run cancellation: off answers 503 and the app hides the stop button.
     cancel:
       enabled: ${FLOWCORTEX_WORKFLOW_CANCEL_ENABLED:false}
+    # Workflow schedules: off answers 503 on every schedule route, as no timer fires a schedule yet.
+    schedules:
+      enabled: ${FLOWCORTEX_WORKFLOW_SCHEDULES_ENABLED:false}
     # A picked-up step must report within this window (a heartbeat every 30 s)
     # or the reaper closes it as lease_expired; the reaper runs every interval.
     lease-seconds: 120
@@ -557,6 +583,17 @@ flowcortex:
     # How often reviews of an uploaded workflow file that were never imported are deleted.
     import-review:
       purge-interval: ${FLOWCORTEX_WORKFLOW_IMPORT_REVIEW_PURGE_INTERVAL:PT15M}
+    # Batches of runs: rows start a few at a time. Off stops every batch where it stands, nothing is lost.
+    batch:
+      dispatch-enabled: ${FLOWCORTEX_WORKFLOW_BATCH_DISPATCH_ENABLED:true}
+      # Wait between dispatch ticks; a create, resume, cancel or retry dispatches at once.
+      dispatch-interval: ${FLOWCORTEX_WORKFLOW_BATCH_DISPATCH_INTERVAL:PT5S}
+      # How long one instance holds a batch before another may take it over; the order of lease-seconds.
+      lease: ${FLOWCORTEX_WORKFLOW_BATCH_LEASE:PT2M}
+      # Live batch rows (claimed or running) one member may have across all their batches.
+      max-live-rows-per-member: ${FLOWCORTEX_WORKFLOW_BATCH_MAX_LIVE_ROWS_PER_MEMBER:5}
+      # Live batch rows in the whole cluster: the provider step pool's 4 running + 4 queued.
+      max-live-rows: ${FLOWCORTEX_WORKFLOW_BATCH_MAX_LIVE_ROWS:8}
   # Paid video-clip vendor jobs are recorded when the vendor accepts them, so a repeated identical
   # ask picks the job up instead of paying again. resume-enabled off sends no attach candidates
   # (every clip submits) while recording continues. Rows older than `retention` are deleted every
@@ -714,6 +751,9 @@ flowcortex:
     # budget is the share thinking may use and must stay below it.
     max-output-tokens: ${FLOWCORTEX_CHAT_MAX_OUTPUT_TOKENS:8192}
     thinking-budget: ${FLOWCORTEX_CHAT_THINKING_BUDGET:1024}
+    # Conversation history. max-folders is the most folders one member holds; the sidebar reads them all.
+    history:
+      max-folders: ${FLOWCORTEX_CHAT_MAX_FOLDERS:100}
   # Media engine: the one home of every media timeout and limit (MediaProperties
   # has no code defaults). The kill switch works like the workflow one above —
   # env var + restart. S3_* is provider-neutral, so another S3-compatible store
@@ -742,6 +782,18 @@ flowcortex:
     provider-video-max-runtime: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_MAX_RUNTIME:10m}
     provider-video-queue-timeout: ${FLOWCORTEX_MEDIA_PROVIDER_VIDEO_QUEUE_TIMEOUT:15m}
     presign-ttl: 15m
+    # Video editor limits (EditorLimitProperties). An admin value from the console Settings page
+    # overrides these; a value outside its bounds fails startup naming the key.
+    editor:
+      project-max-versions: ${FLOWCORTEX_MEDIA_EDITOR_PROJECT_MAX_VERSIONS:50}
+      project-max-bytes: ${FLOWCORTEX_MEDIA_EDITOR_PROJECT_MAX_BYTES:2000000}
+      batch-max-items: ${FLOWCORTEX_MEDIA_EDITOR_BATCH_MAX_ITEMS:4}
+      take-check-daily-max: ${FLOWCORTEX_MEDIA_EDITOR_TAKE_CHECK_DAILY_MAX:14}
+      stems-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_STEMS_MAX_DURATION_SEC:600}
+      speakers-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_SPEAKERS_MAX_DURATION_SEC:600}
+      derive-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_DERIVE_MAX_DURATION_SEC:600}
+      beats-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_BEATS_MAX_DURATION_SEC:600}
+      audio-tools-max-duration-sec: ${FLOWCORTEX_MEDIA_EDITOR_AUDIO_TOOLS_MAX_DURATION_SEC:3600}
     upload:
       # Per-kind size caps; the kind comes from the file's canonical MIME type. The video cap
       # still honours FLOWCORTEX_MEDIA_UPLOAD_MAX_BYTES, its name before per-kind caps.

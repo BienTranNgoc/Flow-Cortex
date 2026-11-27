@@ -18,10 +18,36 @@
   "changedAt": "Đã thay đổi lúc {{at}}",
   "vetoedNote": "Đang bị tắt bởi cấu hình máy chủ; giá trị đã lưu sẽ có hiệu lực khi cấu hình được gỡ.",
   "degradedNote": "Kho cài đặt không khả dụng nên đang áp dụng giá trị dự phòng an toàn.",
+  "lowerValue": {
+    "title": "Giảm số phiên bản giữ lại?",
+    "message": "Giảm từ {{from}} xuống {{to}} sẽ xoá các phiên bản cũ hơn vượt quá {{to}} của mỗi dự án ở lần lưu kế tiếp. Không khôi phục được.",
+    "confirm": "Giảm và lưu",
+    "cancel": "Huỷ"
+  },
   "groups": {
     "support": "Trung tâm trợ giúp",
+    "media": "Media và trình dựng video",
     "user": "Tài khoản",
     "workflow": "Quy trình"
+  },
+  "deletionConditions": {
+    "title": "Điều kiện chặn xoá tài khoản",
+    "description": "Thành viên không thể yêu cầu xoá tài khoản khi còn một điều kiện đang bật dưới đây áp dụng cho họ. Thông báo được hiển thị cho thành viên bằng ngôn ngữ của họ.",
+    "loadFailed": "Không tải được các điều kiện chặn xoá tài khoản.",
+    "empty": "Chưa có điều kiện chặn xoá tài khoản nào để hiển thị.",
+    "enabled": "Chặn việc xoá",
+    "order": "Thứ tự",
+    "messageVi": "Thông báo cho thành viên (tiếng Việt)",
+    "messageEn": "Thông báo cho thành viên (tiếng Anh)",
+    "messageLimit": "Tối đa {{max}} ký tự.",
+    "names": {
+      "workflow": {
+        "active_run": "Có quy trình đang chạy"
+      },
+      "support": {
+        "open_request": "Có yêu cầu hỗ trợ đang mở"
+      }
+    }
   },
   "source": {
     "STORED": "Do quản trị viên đặt",
@@ -47,7 +73,57 @@
     "older": "Cũ hơn"
   },
   "keys": {
+    "media": {
+      "editor": {
+        "project_max_versions": {
+          "label": "Số phiên bản giữ cho mỗi dự án",
+          "help": "Các phiên bản cũ vượt quá số này bị xoá khi lưu dự án. Từ 1 đến 200."
+        },
+        "project_max_bytes": {
+          "label": "Dung lượng tối đa của tài liệu dự án (byte)",
+          "help": "Trình dựng từ chối lưu tài liệu dự án lớn hơn mức này. Từ 100000 đến 10000000 byte."
+        },
+        "batch_max_items": {
+          "label": "Số cảnh mỗi lần tạo hàng loạt",
+          "help": "Trình dựng từ chối lần tạo hàng loạt hoặc tách cảnh bằng AI có nhiều cảnh hơn mức này. Từ 1 đến 12."
+        },
+        "take_check_daily_max": {
+          "label": "Số lượt kiểm lại mỗi người mỗi ngày",
+          "help": "Thành viên đã dùng hết số lượt kiểm lại này trong ngày sẽ bị từ chối đến ngày hôm sau (giờ Việt Nam). Từ 1 đến 200."
+        },
+        "stems_max_duration_sec": {
+          "label": "Độ dài tối đa của đoạn tách giọng và nhạc (giây)",
+          "help": "Trình dựng từ chối tách giọng và nhạc khỏi đoạn dài hơn mức này. Từ 60 đến 3600 giây."
+        },
+        "speakers_max_duration_sec": {
+          "label": "Độ dài tối đa của đoạn tách người nói (giây)",
+          "help": "Trình dựng từ chối tách người nói trong đoạn dài hơn mức này. Từ 60 đến 1800 giây."
+        },
+        "derive_max_duration_sec": {
+          "label": "Độ dài tối đa của nguồn để tạo bản phái sinh (giây)",
+          "help": "Trình dựng từ chối tạo đoạn mới từ nguồn dài hơn mức này. Từ 10 đến 3600 giây."
+        },
+        "beats_max_duration_sec": {
+          "label": "Độ dài tối đa của đoạn phân tích nhịp (giây)",
+          "help": "Trình dựng từ chối phân tích nhịp của đoạn dài hơn mức này. Từ 30 đến 1200 giây."
+        },
+        "audio_tools_max_duration_sec": {
+          "label": "Độ dài tối đa của track cho công cụ âm thanh (giây)",
+          "help": "Trình dựng từ chối trích âm thanh của track dài hơn mức này. Từ 60 đến 14400 giây."
+        }
+      }
+    },
     "user": {
+      "account_deletion": {
+        "enabled": {
+          "label": "Thành viên được yêu cầu xoá tài khoản",
+          "help": "Tắt công tắc sẽ chặn các yêu cầu mới; yêu cầu đã gửi vẫn giữ hạn của mình. Chưa có dữ liệu nào bị xoá khi hết hạn cho đến khi bước xoá dữ liệu được phát hành."
+        },
+        "grace_period_days": {
+          "label": "Số ngày để thành viên đổi ý",
+          "help": "Thành viên có thể huỷ yêu cầu cho đến hết số ngày này kể từ lúc gửi. Mỗi yêu cầu giữ thời hạn đang áp dụng lúc gửi. Từ 1 đến 365 ngày."
+        }
+      },
       "pw_reset": {
         "enabled": {
           "label": "Đặt lại mật khẩu",
