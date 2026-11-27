@@ -998,3 +998,128 @@
   line-height: 1.4;
   color: var(--ink-2);
 }
+
+/* 4-Step Horizontal Progress Bar & Subtle Post-10s Loading Strip */
+.cv-check-stepper {
+  background: var(--paper-2);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 760px) {
+  .cv-check-stepper {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+}
+
+.cv-check-stepper__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-4);
+  transition: color 0.2s ease;
+}
+
+@media (min-width: 760px) {
+  .cv-check-stepper__item:not(:last-child)::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    margin-left: 0.5rem;
+    background: var(--line-soft);
+    border-radius: var(--radius-full);
+    transition: background-color 0.25s ease;
+  }
+
+  .cv-check-stepper__item.is-done:not(:last-child)::after {
+    background: var(--green);
+  }
+}
+
+.cv-check-stepper__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.cv-check-stepper__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--line-soft);
+}
+
+.cv-check-stepper__item.is-active {
+  color: var(--ink);
+}
+
+.cv-check-stepper__item.is-active .cv-check-stepper__icon {
+  color: var(--primary);
+}
+
+.cv-check-stepper__item.is-done {
+  color: var(--green);
+}
+
+.cv-check-stepper__label {
+  white-space: nowrap;
+}
+
+.cv-check-loading-strip {
+  background: var(--paper-2);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.cv-check-loading-strip__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.cv-check-loading-strip__row .spinner {
+  color: var(--primary);
+}
+
+.cv-check-loading-strip__track {
+  height: 4px;
+  width: 100%;
+  border-radius: var(--radius-full);
+  background: var(--paper-3);
+  overflow: hidden;
+}
+
+.cv-check-loading-strip__bar {
+  height: 100%;
+  width: 38%;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  animation: cv-check-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes cv-check-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
+}

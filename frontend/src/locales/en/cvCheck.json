@@ -23,6 +23,13 @@
     "analyze": "Analyze CV",
     "analyzing": "Analyzing CV..."
   },
+  "progress": {
+    "readPdf": "Reading PDF",
+    "checkAts": "Checking ATS",
+    "scoreCv": "Scoring CV",
+    "findJobs": "Finding Jobs",
+    "finalizing": "Finalizing analysis..."
+  },
   "form": {
     "cvTitle": "Resume (PDF Format)",
     "cvPlaceholder": "Paste resume text here...",

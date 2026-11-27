@@ -12,7 +12,7 @@ import {
   UploadSimple,
   WarningCircle,
 } from '@phosphor-icons/react';
-import { type ChangeEvent, useEffect, useId, useState } from 'react';
+import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeading } from '../../app/PageHeading';
 import {
@@ -23,6 +23,9 @@ import { useCvCheckMutation, useRecommendJobsMutation } from './useCvCheck';
 import './CvCheckPage.css';
 
 type ActiveTab = 'evaluation' | 'bullets' | 'interview' | 'jobs';
+type ProgressMode = 'idle' | 'stepper' | 'loading';
+
+const MAX_STEPPER_MS = 10_000;
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -42,9 +45,23 @@ export function CvCheckPage() {
   const [jobRecs, setJobRecs] = useState<JobRecommendationsResponse | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('evaluation');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [progressMode, setProgressMode] = useState<ProgressMode>('idle');
+  const [progressStep, setProgressStep] = useState(0);
+  const timersRef = useRef<number[]>([]);
 
   const checkMutation = useCvCheckMutation();
   const jobsMutation = useRecommendJobsMutation();
+
+  const clearProgressTimers = () => {
+    for (const id of timersRef.current) {
+      window.clearTimeout(id);
+    }
+    timersRef.current = [];
+  };
+
+  useEffect(() => {
+    return () => clearProgressTimers();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -71,6 +88,9 @@ export function CvCheckPage() {
   };
 
   const handleClear = () => {
+    clearProgressTimers();
+    setProgressMode('idle');
+    setProgressStep(0);
     setPdfFile(null);
     setCvText('');
     setReport(null);
@@ -108,19 +128,48 @@ export function CvCheckPage() {
     }
   };
 
+  const finishProgress = () => {
+    clearProgressTimers();
+    setProgressMode((current) => {
+      if (current === 'stepper') {
+        setProgressStep(4);
+        timersRef.current.push(
+          window.setTimeout(() => {
+            setProgressMode('idle');
+          }, 600),
+        );
+        return 'stepper';
+      }
+      return 'idle';
+    });
+  };
+
   const triggerJobSearch = async (profile: NonNullable<CvCheckReport['jobProfile']>) => {
     try {
       const recs = await jobsMutation.mutateAsync({ ...profile, lang: activeLang });
       setJobRecs(recs);
     } catch {
       // Handled via jobsMutation.isError
+    } finally {
+      finishProgress();
     }
   };
 
   const handleSubmit = async () => {
     if (!cvFile && !cvText.trim()) return;
+    clearProgressTimers();
     setJobRecs(null);
     jobsMutation.reset();
+    setProgressMode('stepper');
+    setProgressStep(0);
+
+    timersRef.current.push(
+      window.setTimeout(() => setProgressStep((s) => Math.max(s, 1)), 1200),
+      window.setTimeout(() => setProgressStep((s) => Math.max(s, 2)), 2800),
+      window.setTimeout(() => {
+        setProgressMode((m) => (m === 'stepper' ? 'loading' : m));
+      }, MAX_STEPPER_MS),
+    );
 
     try {
       const result = await checkMutation.mutateAsync({
@@ -131,9 +180,14 @@ export function CvCheckPage() {
       setReport(result);
       setActiveTab('evaluation');
       if (result.jobProfile?.primaryRole) {
+        setProgressStep(3);
         void triggerJobSearch(result.jobProfile);
+      } else {
+        finishProgress();
       }
     } catch {
+      clearProgressTimers();
+      setProgressMode('idle');
       // Handled via checkMutation.isError and checkMutation.error
     }
   };
@@ -317,6 +371,46 @@ export function CvCheckPage() {
           </button>
         </aside>
       </div>
+
+      {/* Analysis Progress (4-Step Bar up to 10s, then subtle animated loading) */}
+      {progressMode === 'stepper' && (
+        <div className="cv-check-stepper" role="status" aria-live="polite">
+          {[
+            t('cvCheck.progress.readPdf', 'Đọc file PDF'),
+            t('cvCheck.progress.checkAts', 'Kiểm tra bố cục & ATS'),
+            t('cvCheck.progress.scoreCv', 'Đánh giá & Chấm điểm'),
+            t('cvCheck.progress.findJobs', 'Tìm việc phù hợp'),
+          ].map((label, idx) => {
+            const state = idx < progressStep ? 'done' : idx === progressStep ? 'active' : 'pending';
+            return (
+              <div key={idx} className={`cv-check-stepper__item is-${state}`}>
+                <span className="cv-check-stepper__icon" aria-hidden="true">
+                  {state === 'done' ? (
+                    <CheckCircle size={18} weight="fill" />
+                  ) : state === 'active' ? (
+                    <ArrowsClockwise size={16} className="spinner" />
+                  ) : (
+                    <span className="cv-check-stepper__dot" />
+                  )}
+                </span>
+                <span className="cv-check-stepper__label">{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {progressMode === 'loading' && (checkMutation.isPending || jobsMutation.isPending) && (
+        <div className="cv-check-loading-strip" role="status" aria-live="polite">
+          <div className="cv-check-loading-strip__row">
+            <ArrowsClockwise size={18} className="spinner" aria-hidden="true" />
+            <span>{t('cvCheck.progress.finalizing', 'Đang hoàn tất phân tích...')}</span>
+          </div>
+          <div className="cv-check-loading-strip__track">
+            <div className="cv-check-loading-strip__bar" />
+          </div>
+        </div>
+      )}
 
       {/* Results Dashboard */}
       {report && (

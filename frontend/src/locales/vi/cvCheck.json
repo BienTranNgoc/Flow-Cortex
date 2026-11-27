@@ -23,6 +23,13 @@
     "analyze": "Đánh giá CV",
     "analyzing": "Đang phân tích CV..."
   },
+  "progress": {
+    "readPdf": "Đọc file PDF",
+    "checkAts": "Kiểm tra bố cục & ATS",
+    "scoreCv": "Đánh giá & Chấm điểm",
+    "findJobs": "Tìm việc phù hợp",
+    "finalizing": "Đang hoàn tất phân tích..."
+  },
   "form": {
     "cvTitle": "Hồ sơ CV (Định dạng PDF)",
     "cvPlaceholder": "Dán nội dung văn bản CV vào đây...",
