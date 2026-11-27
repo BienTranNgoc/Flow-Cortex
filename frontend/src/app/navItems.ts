@@ -1,7 +1,6 @@
 import {
   BookOpen,
   ChatsCircle,
-  FileText,
   FlowArrow,
   HardDrives,
   House,
@@ -37,10 +36,6 @@ const CORE_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/runs', labelKey: 'common.nav.runs', icon: Play },
 ];
 
-const CV_CHECK_NAV_ITEMS: readonly NavEntry[] = [
-  { to: '/check-cv', labelKey: 'common.nav.cvCheck', icon: FileText },
-];
-
 const CHAT_NAV_ITEMS: readonly NavEntry[] = [
   { to: '/chat', labelKey: 'common.nav.chat', icon: ChatsCircle },
 ];
@@ -59,11 +54,10 @@ const DEMO_NAV_ITEMS: readonly NavEntry[] = [
  */
 export function primaryNavItems(
   t: TFunction = i18n.t,
-  options: { chat?: boolean; drive?: boolean; cvCheck?: boolean } = {},
+  options: { chat?: boolean; drive?: boolean } = {},
 ): readonly PrimaryNavItem[] {
   const entries = [
     ...CORE_NAV_ITEMS,
-    ...(options.cvCheck ? CV_CHECK_NAV_ITEMS : []),
     ...(options.chat ? CHAT_NAV_ITEMS : []),
     ...(options.drive ? DRIVE_NAV_ITEMS : []),
     ...(demoPagesEnabled() ? DEMO_NAV_ITEMS : []),

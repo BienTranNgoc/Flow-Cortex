@@ -1,6 +1,16 @@
 {
   "pageTitle": "CV Checker",
   "pageLede": "Upload your PDF CV for a comprehensive evaluation: ATS compliance, core technical depth, STAR impact rewriting, and predicted interview questions.",
+  "homeCard": {
+    "title": "CV Checker",
+    "description": "Upload your PDF CV for international ATS scoring, STAR bullet optimization, and matching job recommendations.",
+    "steps": {
+      "readPdf": "Read PDF",
+      "checkAts": "ATS Audit",
+      "scoreCv": "Score CV",
+      "findJobs": "Find Jobs"
+    }
+  },
   "intro": {
     "title": "PDF CV Verification Frame",
     "desc": "Upload your PDF CV directly for full in-browser preview and automated text extraction via Apache PDFBox + Google Gemini 3.5 Flash."

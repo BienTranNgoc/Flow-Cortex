@@ -77,7 +77,7 @@ export function SidebarNav({ rail, onNavigate }: Readonly<SidebarNavProps>) {
   return (
     <nav className="sidebar-nav" aria-label={t('common.nav.label')}>
       <ul className="sidebar-nav__list">
-        {primaryNavItems(t, { chat, drive, cvCheck: true }).map((item) => (
+        {primaryNavItems(t, { chat, drive }).map((item) => (
           <li key={item.to}>
             <Entry
               to={item.to}

@@ -1,6 +1,16 @@
 {
   "pageTitle": "CV Checker",
   "pageLede": "Tải lên file CV PDF để phân tích toàn diện: điểm chuẩn ATS, kỹ năng cốt lõi, tối ưu thành tích STAR và gợi ý câu hỏi phỏng vấn.",
+  "homeCard": {
+    "title": "Kiểm tra CV",
+    "description": "Tải lên file CV PDF để chấm điểm chuẩn quốc tế ATS, tối ưu câu STAR và gợi ý việc làm phù hợp.",
+    "steps": {
+      "readPdf": "Đọc PDF",
+      "checkAts": "Kiểm tra ATS",
+      "scoreCv": "Chấm điểm CV",
+      "findJobs": "Tìm việc"
+    }
+  },
   "intro": {
     "title": "Khung đối soát hồ sơ CV PDF",
     "desc": "Tải trực tiếp file CV PDF để xem trước toàn diện và trích xuất nội dung tự động bằng Apache PDFBox + Google Gemini 3.5 Flash."
