@@ -29,15 +29,10 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, dirtyFields },
   } = useForm<EditUserFormValues>({
     resolver: zodResolver(editUserSchema),
-    values: {
-      email: user.email ?? '',
-      name: user.name ?? '',
-      role,
-      status,
-    },
+    values: { email: '', name: '', role, status },
   });
 
   if (!user.id) {
@@ -46,9 +41,11 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
   const id = user.id;
 
   const onSave = handleSubmit((values) => {
-    const changes: UpdateUserRequest = { email: values.email, name: values.name };
-    if (values.role !== role) changes.role = values.role;
-    if (values.status !== status) changes.status = values.status;
+    const changes: UpdateUserRequest = {};
+    if (dirtyFields.email && values.email) changes.email = values.email;
+    if (dirtyFields.name && values.name) changes.name = values.name;
+    if (dirtyFields.role) changes.role = values.role;
+    if (dirtyFields.status) changes.status = values.status;
     updateMutation.mutate({ id, changes }, { onSuccess: () => setEditing(false) });
   });
 
@@ -67,9 +64,18 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
             noValidate
             aria-label={t('users.row.editForm', { target: user.email ?? id })}
           >
+            <p id={`edit-hint-${id}`} className="cortex-admin-stale">
+              {t('users.row.keepHint')}
+            </p>
             <div className="cortex-admin-field">
               <label htmlFor={`edit-email-${id}`}>{t('users.row.email')}</label>
-              <input id={`edit-email-${id}`} type="email" {...register('email')} />
+              <input
+                id={`edit-email-${id}`}
+                type="email"
+                placeholder={user.email ?? ''}
+                aria-describedby={`edit-hint-${id}`}
+                {...register('email')}
+              />
               {errors.email?.message && (
                 <p className="cortex-admin-form-error" role="alert">
                   {t(errors.email.message)}
@@ -83,7 +89,12 @@ export function UserRow({ user }: Readonly<{ user: UserResponse }>) {
             </div>
             <div className="cortex-admin-field">
               <label htmlFor={`edit-name-${id}`}>{t('users.row.name')}</label>
-              <input id={`edit-name-${id}`} {...register('name')} />
+              <input
+                id={`edit-name-${id}`}
+                placeholder={user.name ?? ''}
+                aria-describedby={`edit-hint-${id}`}
+                {...register('name')}
+              />
               {errors.name?.message && (
                 <p className="cortex-admin-form-error" role="alert">
                   {t(errors.name.message)}

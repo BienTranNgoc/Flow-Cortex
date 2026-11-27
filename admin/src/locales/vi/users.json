@@ -121,7 +121,8 @@
     "saving": "Đang lưu…",
     "cancel": "Hủy",
     "view": "Xem",
-    "edit": "Sửa"
+    "edit": "Sửa",
+    "keepHint": "Để trống nếu muốn giữ giá trị hiện tại."
   },
   "detail": {
     "title": "Chi tiết người dùng",
@@ -155,7 +156,87 @@
     "suspend": "Tạm ngưng tài khoản",
     "reactivate": "Kích hoạt lại tài khoản",
     "updated": "Đã cập nhật tài khoản.",
-    "invalidRole": "Hãy chọn một vai trò hợp lệ."
+    "invalidRole": "Hãy chọn một vai trò hợp lệ.",
+    "reveal": "Hiện thông tin liên hệ",
+    "revealing": "Đang hiện…",
+    "revealed": "Thông tin liên hệ chỉ được hiện trong lần xem trang này.",
+    "revealError": "Không thể hiện thông tin liên hệ. Hãy thử lại.",
+    "revealUnavailable": "Thông tin liên hệ chưa được hiện vì nhật ký kiểm toán không ghi lại được yêu cầu này. Hãy thử lại sau ít phút."
+  },
+  "activity": {
+    "title": "Hoạt động",
+    "hint": "Những gì thành viên này đã làm và những gì quản trị viên đã làm với tài khoản, mới nhất trước.",
+    "loading": "Đang tải hoạt động…",
+    "loadError": "Không thể tải hoạt động.",
+    "loadMoreError": "Không thể tải thêm hoạt động.",
+    "retry": "Thử lại",
+    "empty": "Chưa có hoạt động nào.",
+    "emptyHint": "Lượt đăng nhập, quy trình, yêu cầu hỗ trợ và thao tác của quản trị viên sẽ hiện ở đây.",
+    "loadMore": "Tải thêm",
+    "loadingMore": "Đang tải…",
+    "actorMember": "Thành viên này",
+    "columns": {
+      "time": "Thời gian",
+      "source": "Nguồn",
+      "action": "Hành động",
+      "actor": "Thực hiện bởi",
+      "object": "Đối tượng"
+    },
+    "sources": {
+      "admin_action": "Thao tác quản trị",
+      "auth": "Đăng nhập",
+      "workflow": "Quy trình",
+      "workflow_run": "Lượt chạy",
+      "support_request": "Hỗ trợ"
+    },
+    "actions": {
+      "user": {
+        "create": "Tạo tài khoản",
+        "update": "Cập nhật tài khoản",
+        "delete": "Xóa tài khoản",
+        "reveal_identity": "Hiện thông tin liên hệ",
+        "export": "Xuất danh sách người dùng"
+      },
+      "admin_account": {
+        "change_role": "Đổi vai trò quản trị",
+        "deactivate": "Vô hiệu hóa quyền quản trị",
+        "activate": "Kích hoạt quyền quản trị"
+      },
+      "auth": {
+        "login_success": "Đăng nhập",
+        "login_failed_bad_credentials": "Đăng nhập thất bại: sai thông tin",
+        "login_failed_account_locked": "Từ chối đăng nhập: tài khoản bị khóa",
+        "login_failed_account_suspended": "Từ chối đăng nhập: tài khoản bị tạm ngưng",
+        "registration_accepted": "Đăng ký",
+        "registration_rejected_rate_limited": "Từ chối đăng ký: quá nhiều lần thử",
+        "password_set": "Đặt mật khẩu",
+        "password_reset_requested": "Yêu cầu đặt lại mật khẩu",
+        "password_reset_completed": "Hoàn tất đặt lại mật khẩu",
+        "oauth_login_success": "Đăng nhập bằng Google",
+        "oauth_login_failed": "Đăng nhập Google thất bại",
+        "oauth_unconfirmed_account_claimed": "Google tiếp nhận tài khoản chưa xác nhận",
+        "refresh_token_rotated": "Gia hạn phiên đăng nhập",
+        "refresh_token_reuse_detected": "Phát hiện dùng lại mã phiên",
+        "step_up_succeeded": "Xác nhận lại danh tính",
+        "step_up_failed_invalid_password": "Xác nhận lại thất bại: sai mật khẩu",
+        "step_up_failed_password_required": "Xác nhận lại thất bại: cần mật khẩu",
+        "step_up_rate_limited": "Từ chối xác nhận lại: quá nhiều lần thử",
+        "pat_created": "Tạo mã truy cập",
+        "pat_revoked": "Thu hồi mã truy cập",
+        "phone_changed": "Đổi số điện thoại",
+        "phone_change_reverted": "Hoàn tác đổi số điện thoại",
+        "logout": "Đăng xuất"
+      },
+      "workflow": {
+        "create": "Tạo quy trình"
+      },
+      "workflow_run": {
+        "start": "Bắt đầu lượt chạy"
+      },
+      "support_request": {
+        "create": "Mở yêu cầu hỗ trợ"
+      }
+    }
   },
   "validation": {
     "emailRequired": "Hãy nhập email",

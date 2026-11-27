@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserActivatedEvent;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.pii.PiiMask;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -318,11 +319,11 @@ class UserAuthEndpointsIT extends AbstractUserModuleIT {
         register(newClientIp(), new RegisterRequest(email, "register-password-1", "Owned"), TokenResponse.class);
         String ownerToken = ownerToken();
 
-        ResponseEntity<UserPageView> list = get("/api/v1/users?size=100", ownerToken, UserPageView.class);
+        ResponseEntity<UserPageView> list = get("/api/v1/users?size=100&q=" + email, ownerToken, UserPageView.class);
 
         assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
         UserResponseView registered = list.getBody().items().stream()
-                .filter(user -> user.email().equals(email))
+                .filter(user -> user.email().equals(PiiMask.email(email)))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("registered user not listed by the owner"));
         assertThat(registered.role()).isEqualTo("MEMBER");

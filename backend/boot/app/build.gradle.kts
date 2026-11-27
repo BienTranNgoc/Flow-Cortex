@@ -88,7 +88,7 @@ tasks.withType<Test> {
     // Evicting the least recently used keeps at most 8 alive. Each context grows with every module, and
     // 2 GB, 3 GB, then 4 GB, ran out in CI as the modules grew with eight full contexts alive, so the heap
     // is 5 GB (one test JVM, 16 GB runners).
-    maxHeapSize = "5g"
+    maxHeapSize = "6g"
     systemProperty("spring.test.context.cache.maxSize", "8")
     // A real env var, as a deployed environment would set it; clearly a test fixture.
     environment("JWT_SECRET", "test-only-jwt-signing-secret-not-a-real-credential-32b")

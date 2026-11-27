@@ -8,6 +8,7 @@ import { PageHeading } from '../../app/PageHeading';
 import { StatusPill } from '../../app/StatusPill';
 import { Timestamp } from '../../app/AdminList';
 import { usePageTitle } from '../../app/usePageTitle';
+import { can } from '../../app/permissions';
 import { useMeQuery } from '../auth/useAuth';
 import {
   roleLabel,
@@ -18,11 +19,20 @@ import {
 } from './enumLabels';
 import { RoleOptions } from './RoleOptions';
 import { canManageAccount } from './userAccess';
+import { UserActivitySection } from './UserActivitySection';
 import { roleCodeSchema } from './userSchemas';
 import { useAssignableRoles } from './useAssignableRoles';
-import { useUpdateUserMutation, useUserQuery } from './useUsers';
+import { useRevealIdentity, useUpdateUserMutation, useUserQuery } from './useUsers';
+import './userDetail.css';
 
 const userIdSchema = z.string().uuid();
+
+/** 503 is the audit trail refusing to record the reveal; any other failure gets the generic message. */
+function revealErrorKey(error: unknown): string {
+  return error instanceof ApiError && error.status === 503
+    ? 'users.detail.revealUnavailable'
+    : 'users.detail.revealError';
+}
 
 export function UserDetailPage() {
   const { t } = useTranslation();
@@ -33,6 +43,7 @@ export function UserDetailPage() {
   const parsedId = userIdSchema.safeParse(userId);
   const userQuery = useUserQuery(parsedId.success ? parsedId.data : '');
   const updateMutation = useUpdateUserMutation();
+  const revealMutation = useRevealIdentity(parsedId.success ? parsedId.data : '');
   const [role, setRole] = useState('');
   const [roleErrorKey, setRoleErrorKey] = useState('');
 
@@ -78,10 +89,14 @@ export function UserDetailPage() {
 
   const user = userQuery.data;
   const manageable = canManageAccount(me, user);
+  const canReveal = can(me, 'user.account.view_pii');
   const updateError =
     updateMutation.error instanceof ApiError ? updateMutation.error.problem : undefined;
   const nextStatus = user.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
-  const initials = user.name?.trim().charAt(0).toUpperCase() || '?';
+  const revealed = revealMutation.data?.id === user.id ? revealMutation.data : undefined;
+  const email = revealed?.email ?? user.email;
+  const name = revealed?.name ?? user.name;
+  const initials = name?.trim().charAt(0).toUpperCase() || '?';
   const saveRole = () => {
     const parsedRole = roleCodeSchema.safeParse(role || user.role || 'MEMBER');
     if (!parsedRole.success) {
@@ -99,8 +114,8 @@ export function UserDetailPage() {
       </Link>
       <PageHeading
         eyebrow={t('users.detail.eyebrow')}
-        title={user.name || user.email || t('users.detail.userFallback')}
-        description={user.email}
+        title={name || email || t('users.detail.userFallback')}
+        description={email}
         actions={
           user.state ? (
             <StatusPill tone={stateTone(user.state)} label={stateLabel(t, user.state)} />
@@ -124,10 +139,33 @@ export function UserDetailPage() {
               {initials}
             </span>
             <div>
-              <strong>{user.name || '—'}</strong>
-              <p className="cortex-admin-page-description">{user.email}</p>
+              <strong>{name || '—'}</strong>
+              <p className="cortex-admin-page-description">{email}</p>
             </div>
           </div>
+          {canReveal && (
+            <div className="cortex-admin-reveal">
+              {revealed ? (
+                <p className="cortex-admin-stale">{t('users.detail.revealed')}</p>
+              ) : (
+                <button
+                  type="button"
+                  className="cortex-admin-btn cortex-admin-btn--sm"
+                  onClick={() => revealMutation.mutate()}
+                  disabled={revealMutation.isPending}
+                >
+                  {revealMutation.isPending
+                    ? t('users.detail.revealing')
+                    : t('users.detail.reveal')}
+                </button>
+              )}
+              {revealMutation.isError && (
+                <p className="cortex-admin-form-error" role="alert">
+                  {t(revealErrorKey(revealMutation.error))}
+                </p>
+              )}
+            </div>
+          )}
           <hr className="cortex-admin-divider" />
           <dl className="cortex-admin-meta-list">
             <div>
@@ -138,7 +176,7 @@ export function UserDetailPage() {
             </div>
             <div>
               <dt>{t('users.detail.email')}</dt>
-              <dd>{user.email}</dd>
+              <dd>{email}</dd>
             </div>
             {user.username && (
               <div>
@@ -273,6 +311,8 @@ export function UserDetailPage() {
           )}
         </section>
       </div>
+
+      <UserActivitySection userId={parsedId.data} />
     </div>
   );
 }

@@ -391,6 +391,9 @@ export const MeResponsePermissionsItem = {
   useraccountexport: 'user.account.export',
   contenttrend_templateview: 'content.trend_template.view',
   contenttrend_templatemanage: 'content.trend_template.manage',
+  systemaudit_logview: 'system.audit_log.view',
+  systemaudit_logexport: 'system.audit_log.export',
+  useraccountview_pii: 'user.account.view_pii',
 } as const;
 
 export interface MeResponse {
@@ -783,6 +786,9 @@ export const RoleResponsePermissionsItem = {
   useraccountexport: 'user.account.export',
   contenttrend_templateview: 'content.trend_template.view',
   contenttrend_templatemanage: 'content.trend_template.manage',
+  systemaudit_logview: 'system.audit_log.view',
+  systemaudit_logexport: 'system.audit_log.export',
+  useraccountview_pii: 'user.account.view_pii',
 } as const;
 
 export interface RoleResponse {
@@ -3640,6 +3646,49 @@ export interface PageViewUserResponse {
   total: number;
 }
 
+export interface IdentityResponse {
+  id?: string;
+  email?: string;
+  name?: string;
+}
+
+export type ActivityItemResponseSource =
+  (typeof ActivityItemResponseSource)[keyof typeof ActivityItemResponseSource];
+
+export const ActivityItemResponseSource = {
+  admin_action: 'admin_action',
+  auth: 'auth',
+  workflow: 'workflow',
+  workflow_run: 'workflow_run',
+  support_request: 'support_request',
+} as const;
+
+export type ActivityItemResponseActorType =
+  (typeof ActivityItemResponseActorType)[keyof typeof ActivityItemResponseActorType];
+
+export const ActivityItemResponseActorType = {
+  admin: 'admin',
+  user: 'user',
+} as const;
+
+export interface ActivityItemResponse {
+  id?: string;
+  source?: ActivityItemResponseSource;
+  action?: string;
+  actorType?: ActivityItemResponseActorType;
+  actorLabel?: string;
+  objectType?: string;
+  objectId?: string;
+  objectLabel?: string;
+  status?: string;
+  occurredAt?: string;
+}
+
+export interface ActivityPageResponse {
+  items?: ActivityItemResponse[];
+  nextCursor?: string;
+}
+
 export interface UserStats {
   total?: number;
   active?: number;
@@ -5127,6 +5176,9 @@ export const PermissionCatalogEntryKey = {
   useraccountexport: 'user.account.export',
   contenttrend_templateview: 'content.trend_template.view',
   contenttrend_templatemanage: 'content.trend_template.manage',
+  systemaudit_logview: 'system.audit_log.view',
+  systemaudit_logexport: 'system.audit_log.export',
+  useraccountview_pii: 'user.account.view_pii',
 } as const;
 
 export interface PermissionCatalogEntry {
@@ -5260,6 +5312,43 @@ export interface ContentDocumentRevision {
   /** @nullable */
   authorEmail?: string | null;
   createdAt: string;
+}
+
+export interface AuditLogItem {
+  id?: string;
+  occurredAt?: string;
+  actorUserId?: string;
+  /** @nullable */
+  actorEmail?: string | null;
+  /** @nullable */
+  actorName?: string | null;
+  action?: string;
+  resourceType?: string;
+  /** @nullable */
+  resourceId?: string | null;
+  /** @nullable */
+  resourceLabel?: string | null;
+  /** @nullable */
+  changeSummary?: JsonNode;
+  status?: string;
+  /** @nullable */
+  errorCode?: string | null;
+  /** @nullable */
+  ip?: string | null;
+  /** @nullable */
+  userAgent?: string | null;
+  origin?: string;
+}
+
+export interface AuditLogPage {
+  items?: AuditLogItem[];
+  /** @nullable */
+  nextCursor?: string | null;
+}
+
+export interface AuditLogFacets {
+  actions?: string[];
+  resourceTypes?: string[];
 }
 
 export interface AdminAssignee {
@@ -5657,6 +5746,15 @@ export type ListBookmarkedWorkflowsParams = {
    * @maximum 50
    */
   size?: number;
+};
+
+export type GetUserActivityParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  cursor?: string;
 };
 
 export type ExportUsersParams = {
@@ -6539,6 +6637,48 @@ export type ListContentDocumentRevisionsParams = {
    */
   size?: number;
 };
+
+export type ListAuditLogParams = {
+  q?: string;
+  action?: string;
+  resourceType?: string;
+  resourceId?: string;
+  actorUserId?: string;
+  status?: ListAuditLogStatus;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  size?: number;
+};
+
+export type ListAuditLogStatus = (typeof ListAuditLogStatus)[keyof typeof ListAuditLogStatus];
+
+export const ListAuditLogStatus = {
+  success: 'success',
+  failed: 'failed',
+} as const;
+
+export type ExportAuditLogParams = {
+  q?: string;
+  action?: string;
+  resourceType?: string;
+  resourceId?: string;
+  actorUserId?: string;
+  status?: ExportAuditLogStatus;
+  from?: string;
+  to?: string;
+};
+
+export type ExportAuditLogStatus = (typeof ExportAuditLogStatus)[keyof typeof ExportAuditLogStatus];
+
+export const ExportAuditLogStatus = {
+  success: 'success',
+  failed: 'failed',
+} as const;
 
 export type ListAdminAssigneesParams = {
   /**
@@ -19997,6 +20137,67 @@ export const listWorkflowExamples = async (
   });
 };
 
+export type revealUserIdentityResponse200 = {
+  data: IdentityResponse;
+  status: 200;
+};
+
+export type revealUserIdentityResponseSuccess = revealUserIdentityResponse200 & {
+  headers: Headers;
+};
+export type revealUserIdentityResponse = revealUserIdentityResponseSuccess;
+
+export const getRevealUserIdentityUrl = (id: string) => {
+  return `/api/v1/users/${id}/identity`;
+};
+
+export const revealUserIdentity = async (
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<revealUserIdentityResponse> => {
+  return customFetch<revealUserIdentityResponse>(getRevealUserIdentityUrl(id), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getUserActivityResponse200 = {
+  data: ActivityPageResponse;
+  status: 200;
+};
+
+export type getUserActivityResponseSuccess = getUserActivityResponse200 & {
+  headers: Headers;
+};
+export type getUserActivityResponse = getUserActivityResponseSuccess;
+
+export const getGetUserActivityUrl = (id: string, params?: GetUserActivityParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/users/${id}/activity?${stringifiedParams}`
+    : `/api/v1/users/${id}/activity`;
+};
+
+export const getUserActivity = async (
+  id: string,
+  params?: GetUserActivityParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getUserActivityResponse> => {
+  return customFetch<getUserActivityResponse>(getGetUserActivityUrl(id, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
 export type getUserStatsResponse200 = {
   data: UserStats;
   status: 200;
@@ -23780,6 +23981,108 @@ export const getContentDocumentRevision = async (
       method: 'GET',
     },
   );
+};
+
+export type listAuditLogResponse200 = {
+  data: AuditLogPage;
+  status: 200;
+};
+
+export type listAuditLogResponseSuccess = listAuditLogResponse200 & {
+  headers: Headers;
+};
+export type listAuditLogResponse = listAuditLogResponseSuccess;
+
+export const getListAuditLogUrl = (params?: ListAuditLogParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/audit-log?${stringifiedParams}`
+    : `/api/v1/admin/audit-log`;
+};
+
+export const listAuditLog = async (
+  params?: ListAuditLogParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listAuditLogResponse> => {
+  return customFetch<listAuditLogResponse>(getListAuditLogUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getAuditLogFacetsResponse200 = {
+  data: AuditLogFacets;
+  status: 200;
+};
+
+export type getAuditLogFacetsResponseSuccess = getAuditLogFacetsResponse200 & {
+  headers: Headers;
+};
+export type getAuditLogFacetsResponse = getAuditLogFacetsResponseSuccess;
+
+export const getGetAuditLogFacetsUrl = () => {
+  return `/api/v1/admin/audit-log/facets`;
+};
+
+export const getAuditLogFacets = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getAuditLogFacetsResponse> => {
+  return customFetch<getAuditLogFacetsResponse>(getGetAuditLogFacetsUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type exportAuditLogResponse200TextCsv = {
+  data: string;
+  status: 200;
+};
+
+export type exportAuditLogResponse200ApplicationProblemJson = {
+  data: string;
+  status: 200;
+};
+
+export type exportAuditLogResponseSuccess = (
+  exportAuditLogResponse200TextCsv | exportAuditLogResponse200ApplicationProblemJson
+) & {
+  headers: Headers;
+};
+export type exportAuditLogResponse = exportAuditLogResponseSuccess;
+
+export const getExportAuditLogUrl = (params?: ExportAuditLogParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/admin/audit-log/export?${stringifiedParams}`
+    : `/api/v1/admin/audit-log/export`;
+};
+
+export const exportAuditLog = async (
+  params?: ExportAuditLogParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<exportAuditLogResponse> => {
+  return customFetch<exportAuditLogResponse>(getExportAuditLogUrl(params), {
+    ...options,
+    method: 'GET',
+  });
 };
 
 export type listAdminAssigneesResponse200 = {

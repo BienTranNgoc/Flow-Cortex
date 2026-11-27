@@ -1,5 +1,6 @@
 import { createAppI18n } from '@flow-cortex/i18n';
 import enAdminAccounts from '../locales/en/adminAccounts.json';
+import enAudit from '../locales/en/audit.json';
 import enAuth from '../locales/en/auth.json';
 import enChat from '../locales/en/chat.json';
 import enCommon from '../locales/en/common.json';
@@ -20,6 +21,7 @@ import enTrend from '../locales/en/trend.json';
 import enUsers from '../locales/en/users.json';
 import enWorkflows from '../locales/en/workflows.json';
 import viAdminAccounts from '../locales/vi/adminAccounts.json';
+import viAudit from '../locales/vi/audit.json';
 import viAuth from '../locales/vi/auth.json';
 import viChat from '../locales/vi/chat.json';
 import viCommon from '../locales/vi/common.json';
@@ -49,6 +51,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     users: viUsers,
     adminAccounts: viAdminAccounts,
     roles: viRoles,
+    audit: viAudit,
     providers: viProviders,
     runs: viRuns,
     workflows: viWorkflows,
@@ -71,6 +74,7 @@ const { i18n, activeLocale, setLocale } = createAppI18n({
     users: enUsers,
     adminAccounts: enAdminAccounts,
     roles: enRoles,
+    audit: enAudit,
     providers: enProviders,
     runs: enRuns,
     workflows: enWorkflows,

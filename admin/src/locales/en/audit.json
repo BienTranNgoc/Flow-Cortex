@@ -1,0 +1,86 @@
+{
+  "title": "Audit log",
+  "eyebrow": "Administration",
+  "description": "Every change admins make, with who made it, what it touched and whether it succeeded.",
+  "refresh": "Refresh",
+  "refreshing": "Refreshing…",
+  "filters": {
+    "label": "Audit log filters",
+    "search": "Search",
+    "searchPlaceholder": "Actor, resource id or label",
+    "searchHint": "Type at least {{count}} characters to search.",
+    "action": "Action",
+    "allActions": "All",
+    "resourceType": "Resource type",
+    "allResourceTypes": "All",
+    "status": "Status",
+    "allStatuses": "All",
+    "from": "From",
+    "to": "To",
+    "rangeReversed": "The start day is after the end day. Pick a start on or before the end.",
+    "clear": "Clear filters",
+    "actorChip": "Actor: {{name}}",
+    "removeActor": "Remove the actor filter ({{name}})",
+    "facetsError": "The action and resource lists could not be loaded.",
+    "facetsRetry": "Retry lists"
+  },
+  "status": {
+    "success": "Success",
+    "failed": "Failed"
+  },
+  "columns": {
+    "time": "Time",
+    "actor": "Actor",
+    "action": "Action",
+    "resource": "Resource",
+    "status": "Status"
+  },
+  "table": {
+    "label": "Audit log rows",
+    "unknownActor": "Unknown actor",
+    "openDetails": "Open details of {{action}} at {{time}}",
+    "filterByActor": "Show only rows by {{name}}"
+  },
+  "loading": "Loading the audit log…",
+  "loadError": "The audit log could not be loaded.",
+  "retry": "Retry",
+  "stale": "The latest refresh failed; the rows shown may be out of date.",
+  "empty": {
+    "title": "No audit rows yet",
+    "hint": "Admin changes appear here as they are made."
+  },
+  "noMatch": "No audit rows match these filters.",
+  "loadMore": "Load 50 more",
+  "loadingMore": "Loading…",
+  "loadMoreError": "The next rows could not be loaded.",
+  "export": {
+    "button": "Export CSV",
+    "busy": "Exporting…",
+    "done": "Downloaded {{fileName}}.",
+    "forbidden": "Your role may not export the audit log.",
+    "unavailable": "The export was not sent because the audit trail could not record it. Try again shortly.",
+    "tooLarge": "The export was not sent: too many rows match. Narrow the filters and try again.",
+    "failed": "The export failed. Try again."
+  },
+  "detail": {
+    "label": "Audit row details",
+    "title": "Audit row",
+    "close": "Close details",
+    "time": "Time",
+    "actor": "Actor",
+    "actorId": "Actor ID",
+    "action": "Action",
+    "resourceType": "Resource type",
+    "resourceId": "Resource ID",
+    "resourceLabel": "Resource label",
+    "status": "Status",
+    "errorCode": "Error code",
+    "ip": "IP address",
+    "userAgent": "User agent",
+    "origin": "Origin",
+    "changeSummary": "Change summary",
+    "id": "Row ID",
+    "none": "None",
+    "filterByActor": "Show only this actor"
+  }
+}

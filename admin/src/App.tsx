@@ -11,6 +11,7 @@ import { RequireAdminApp } from './app/RequireAdminApp';
 import { LoginPage } from './features/auth/LoginPage';
 import { useMeQuery } from './features/auth/useAuth';
 import { AdminAccountsPage } from './features/adminAccounts/AdminAccountsPage';
+import { AuditLogPage } from './features/audit/AuditLogPage';
 import { ChatSettingsPage } from './features/chat/ChatSettingsPage';
 import { DocumentEditorPage } from './features/content/DocumentEditorPage';
 import { DocumentsPage } from './features/content/DocumentsPage';
@@ -54,6 +55,7 @@ const PAGES: Record<string, ReactElement> = {
   '/onboarding-sample': <OnboardingSamplePage />,
   '/admin-accounts': <AdminAccountsPage />,
   '/roles': <RolesPage />,
+  '/audit': <AuditLogPage />,
   '/payment-settings': <PaymentSettingsPage />,
   '/support/articles': <ArticlesPage />,
   '/support/groups': <TopicGroupsPage />,

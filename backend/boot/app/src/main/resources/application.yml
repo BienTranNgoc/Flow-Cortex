@@ -313,6 +313,8 @@ flowcortex:
   admin-audit:
     origin-retention: ${FLOWCORTEX_ADMIN_AUDIT_ORIGIN_RETENTION:365d}
     retention-interval: ${FLOWCORTEX_ADMIN_AUDIT_RETENTION_INTERVAL:1h}
+    # An audit export matching more rows than this is refused (422) instead of cut short.
+    export-max-rows: ${FLOWCORTEX_ADMIN_AUDIT_EXPORT_MAX_ROWS:10000}
   # Deleted trend templates are purged after `grace`, a pass taking at most `batch-size` of them.
   # Grace must stay above the longest media URL lifetime plus the longest run that reads template media.
   trend:

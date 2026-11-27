@@ -171,7 +171,8 @@
       },
       "system": {
         "role": "Roles",
-        "admin_account": "Admin accounts"
+        "admin_account": "Admin accounts",
+        "audit_log": "Audit log"
       },
       "ai": {
         "provider": "AI providers"
@@ -189,7 +190,8 @@
           "change_role": "Change roles",
           "suspend": "Suspend accounts",
           "delete": "Delete accounts",
-          "export": "Export accounts"
+          "export": "Export accounts",
+          "view_pii": "Reveal member contact details"
         }
       },
       "workflow": {
@@ -251,6 +253,10 @@
         "admin_account": {
           "view": "View admin accounts",
           "manage": "Manage admin accounts"
+        },
+        "audit_log": {
+          "view": "View the audit log",
+          "export": "Export the audit log"
         }
       },
       "ai": {

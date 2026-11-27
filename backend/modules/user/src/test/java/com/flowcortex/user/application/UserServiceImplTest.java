@@ -20,6 +20,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.LocalizedStatusException;
 import com.flowcortex.shared.web.NotFoundException;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
@@ -199,6 +200,89 @@ class UserServiceImplTest {
         assertThat(updated.email()).isEqualTo("person@example.com");
         assertThat(updated.name()).isEqualTo("Original Name");
         assertThat(updated.role()).isEqualTo("MEMBER");
+    }
+
+    @Test
+    void maskedEmailSentBack() {
+        UUID ownerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AppUser lan = new AppUser(id, ownerId, "lan.le@example.com", "$2a$hash", "Lê Thị Lan", Role.MEMBER,
+                UserStatus.ACTIVE);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, id)).thenReturn(Optional.of(lan));
+
+        assertThatThrownBy(() -> service.updateUser(ownerId, id, "l****e@example.com", null, null, null))
+                .isInstanceOfSatisfying(UnprocessableEntityException.class, error -> {
+                    assertThat(error.getCode()).isEqualTo("user.maskedValue");
+                    assertThat(error.getDetail().code()).isEqualTo("user.maskedValue");
+                });
+
+        assertThat(lan.getEmail()).isEqualTo("lan.le@example.com");
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(emailLinks);
+    }
+
+    @Test
+    void maskedNameWithAnotherField() {
+        UUID ownerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AppUser lan = new AppUser(id, ownerId, "lan.le@example.com", "$2a$hash", "Lê Thị Lan", Role.MEMBER,
+                UserStatus.ACTIVE);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, id)).thenReturn(Optional.of(lan));
+
+        assertThatThrownBy(() -> service.updateUser(ownerId, id, null, "L*** T*** L***", "CREATOR", null))
+                .isInstanceOf(UnprocessableEntityException.class);
+
+        assertThat(lan.getName()).isEqualTo("Lê Thị Lan");
+        assertThat(lan.getRole()).isEqualTo(Role.MEMBER);
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void aMissingKeyIsRefusedBeforeTheMaskedValueCheck() {
+        UUID adminId = UUID.randomUUID();
+        AppUser manager = new AppUser(UUID.randomUUID(), adminId, "minh@example.com", "$2a$hash", "Minh",
+                Role.OPERATION_MANAGER, UserStatus.ACTIVE);
+        AppUser lan = new AppUser(UUID.randomUUID(), adminId, "lan.le@example.com", "$2a$hash", "Lê Thị Lan",
+                Role.MEMBER, UserStatus.ACTIVE);
+        when(repository.findById(manager.getId())).thenReturn(Optional.of(manager));
+        when(repository.findByOwnerIdAndId(adminId, lan.getId())).thenReturn(Optional.of(lan));
+        doThrow(new AccessDeniedException("Missing permission"))
+                .when(adminPermissions).require(manager.getId(), Permission.SYSTEM_ADMIN_ACCOUNT_MANAGE);
+
+        assertThatThrownBy(() -> service.updateUser(manager.getId(), lan.getId(), null, "L*** T*** L***",
+                "CUSTOMER_SUPPORT", null)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void realNewValue() {
+        UUID ownerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AppUser lan = new AppUser(id, ownerId, "lan.le@example.com", "$2a$hash", "Lê Thị Lan", Role.MEMBER,
+                UserStatus.ACTIVE);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, id)).thenReturn(Optional.of(lan));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserView updated = service.updateUser(ownerId, id, "lan.moi@example.com", null, null, null);
+
+        assertThat(updated.email()).isEqualTo("lan.moi@example.com");
+    }
+
+    @Test
+    void aMemberWhoseMaskIsTheValueItselfCanBeResent() {
+        UUID ownerId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AppUser shortEmail = new AppUser(id, ownerId, "ab@x.vn", "$2a$hash", "Lê Thị Lan", Role.MEMBER,
+                UserStatus.ACTIVE);
+        when(repository.findById(ownerId)).thenReturn(Optional.of(activeOwner(ownerId)));
+        when(repository.findByOwnerIdAndId(ownerId, id)).thenReturn(Optional.of(shortEmail));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserView updated = service.updateUser(ownerId, id, "ab@x.vn", null, null, null);
+
+        assertThat(updated.email()).isEqualTo("ab@x.vn");
     }
 
     @Test

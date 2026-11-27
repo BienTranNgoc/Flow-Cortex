@@ -58,6 +58,9 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
 
         List<String> orderedKeys = jdbc.queryForList("SELECT key FROM permission ORDER BY sort_order", String.class);
         assertThat(orderedKeys).isEqualTo(Arrays.stream(Permission.values()).map(Permission::key).toList());
+        assertThat(orderedKeys).hasSize(41);
+        assertThat(orderedKeys.subList(38, 41)).containsExactly(
+                "system.audit_log.view", "system.audit_log.export", "user.account.view_pii");
     }
 
     @Test
@@ -66,17 +69,21 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
         operationManager.removeIf(key -> Permission.fromKey(key).orElseThrow().superAdminOnly());
         operationManager.remove(Permission.WORKFLOW_WORKFLOW_MANAGE.key());
         operationManager.remove(Permission.PAYMENT_SETTING_UPDATE.key());
+        operationManager.remove(Permission.SYSTEM_AUDIT_LOG_EXPORT.key());
 
         assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.PAYMENT_SETTING_VIEW.key(),
                         Permission.CONTENT_DOCUMENT_VIEW.key(), Permission.CONTENT_DOCUMENT_MANAGE.key(),
                         Permission.CONTENT_MEDIA_VIEW.key(), Permission.CONTENT_MEDIA_MANAGE.key(),
                         Permission.USER_ACCOUNT_EXPORT.key(),
-                        Permission.CONTENT_TREND_TEMPLATE_VIEW.key(), Permission.CONTENT_TREND_TEMPLATE_MANAGE.key())
-                .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key()).isEqualTo(operationManager);
+                        Permission.CONTENT_TREND_TEMPLATE_VIEW.key(), Permission.CONTENT_TREND_TEMPLATE_MANAGE.key(),
+                        Permission.SYSTEM_AUDIT_LOG_VIEW.key(), Permission.USER_ACCOUNT_VIEW_PII.key())
+                .doesNotContain(Permission.PAYMENT_SETTING_UPDATE.key(), Permission.SYSTEM_AUDIT_LOG_EXPORT.key())
+                .isEqualTo(operationManager);
+        assertThat(operationManager).hasSize(34);
         assertThat(keysOf("CUSTOMER_SUPPORT")).isEqualTo(keys(
                 Permission.SUPPORT_TICKET_VIEW, Permission.SUPPORT_TICKET_REPLY, Permission.SUPPORT_TICKET_CLOSE,
-                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.WORKFLOW_RUN_VIEW,
-                Permission.WORKFLOW_WORKFLOW_VIEW));
+                Permission.SUPPORT_TICKET_ASSIGN, Permission.USER_ACCOUNT_VIEW, Permission.USER_ACCOUNT_VIEW_PII,
+                Permission.WORKFLOW_RUN_VIEW, Permission.WORKFLOW_WORKFLOW_VIEW));
         assertThat(keysOf("CONTENT_EDITOR")).isEqualTo(keys(
                 Permission.CONTENT_HELP_TOPIC_VIEW, Permission.CONTENT_HELP_TOPIC_MANAGE,
                 Permission.CONTENT_HELP_ARTICLE_VIEW, Permission.CONTENT_HELP_ARTICLE_MANAGE,
@@ -99,6 +106,28 @@ class RbacCatalogSeedIT extends AbstractUserModuleIT {
                 "SELECT count(*) FROM role_permission WHERE permission_key = ?", Integer.class,
                 Permission.PAYMENT_SETTING_UPDATE.key());
         assertThat(paymentUpdateHolders).isZero();
+    }
+
+    @Test
+    void auditAndPiiKeys() {
+        Set<String> three = keys(Permission.SYSTEM_AUDIT_LOG_VIEW, Permission.SYSTEM_AUDIT_LOG_EXPORT,
+                Permission.USER_ACCOUNT_VIEW_PII);
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM permission WHERE key IN ('system.audit_log.view', 'system.audit_log.export', "
+                        + "'user.account.view_pii') AND NOT super_admin_only", Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT super_admin FROM role WHERE code = 'ADMIN'", Boolean.class)).isTrue();
+        assertThat(keysOf("ADMIN")).isEmpty();
+        assertThat(keysOf("OPERATION_MANAGER")).contains(Permission.SYSTEM_AUDIT_LOG_VIEW.key(),
+                Permission.USER_ACCOUNT_VIEW_PII.key()).doesNotContain(Permission.SYSTEM_AUDIT_LOG_EXPORT.key());
+        assertThat(keysOf("CUSTOMER_SUPPORT").stream().filter(three::contains).toList())
+                .containsExactly(Permission.USER_ACCOUNT_VIEW_PII.key());
+        for (String role : List.of("CONTENT_EDITOR", "PLATFORM_OPERATOR", "MEMBER", "CREATOR")) {
+            assertThat(keysOf(role)).as("keys of %s", role).doesNotContainAnyElementsOf(three);
+        }
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM role_permission WHERE permission_key = 'system.audit_log.export'",
+                Integer.class)).isZero();
     }
 
     @Test

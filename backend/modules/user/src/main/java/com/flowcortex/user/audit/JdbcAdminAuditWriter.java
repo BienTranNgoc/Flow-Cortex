@@ -16,8 +16,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Inserts one {@code admin_audit_event} row in its own transaction. The actor's email and name arrive
- * with the entry, and any failure is logged and swallowed so recording never fails the
- * admin's request.
+ * with the entry. {@link #write} logs and swallows a failure so recording never fails the admin's
+ * request; {@link #writeOrThrow} rethrows it.
  */
 @Component
 public class JdbcAdminAuditWriter {
@@ -40,35 +40,56 @@ public class JdbcAdminAuditWriter {
 
     public void write(AdminAuditEntry entry) {
         try {
-            ActorSnapshot actor = entry.actor();
-            MapSqlParameterSource params = new MapSqlParameterSource()
-                    .addValue("id", UUID.randomUUID())
-                    .addValue("actor_user_id", entry.actorUserId())
-                    .addValue("actor_email", actor.email())
-                    .addValue("actor_name", actor.name())
-                    .addValue("action", entry.action())
-                    .addValue("resource_type", entry.resourceType())
-                    .addValue("resource_id", entry.resourceId())
-                    .addValue("resource_label", entry.resourceLabel())
-                    .addValue("change_summary",
-                            entry.changeSummary() == null ? null : jsonMapper.writeValueAsString(entry.changeSummary()))
-                    .addValue("status", entry.status().column())
-                    .addValue("error_code", entry.errorCode())
-                    .addValue("ip", entry.ip())
-                    .addValue("user_agent", entry.userAgent())
-                    .addValue("origin_source", ORIGIN_HTTP)
-                    .addValue("occurred_at", Timestamp.from(Instant.now(clock)));
-            transaction.executeWithoutResult(status -> jdbc.update("""
-                    INSERT INTO admin_audit_event (id, actor_user_id, actor_email, actor_name, action,
-                        resource_type, resource_id, resource_label, change_summary, status, error_code,
-                        ip, user_agent, origin_source, occurred_at)
-                    VALUES (:id, :actor_user_id, :actor_email, :actor_name, :action,
-                        :resource_type, :resource_id, :resource_label, CAST(:change_summary AS jsonb),
-                        :status, :error_code, :ip, :user_agent, :origin_source, :occurred_at)
-                    """, params));
+            insert(entry);
         } catch (RuntimeException ex) {
-            LOG.error("Admin audit row for {} on {} was not recorded", entry.action(), entry.resourceId(), ex);
+            logNotRecorded(entry, ex);
         }
+    }
+
+    /**
+     * Writes the same row as {@link #write}, but logs and rethrows a failure, for a caller that must
+     * not release data the trail could not record.
+     */
+    public void writeOrThrow(AdminAuditEntry entry) {
+        try {
+            insert(entry);
+        } catch (RuntimeException ex) {
+            logNotRecorded(entry, ex);
+            throw ex;
+        }
+    }
+
+    private static void logNotRecorded(AdminAuditEntry entry, RuntimeException ex) {
+        LOG.error("Admin audit row for {} on {} was not recorded", entry.action(), entry.resourceId(), ex);
+    }
+
+    private void insert(AdminAuditEntry entry) {
+        ActorSnapshot actor = entry.actor();
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("id", UUID.randomUUID())
+                .addValue("actor_user_id", entry.actorUserId())
+                .addValue("actor_email", actor.email())
+                .addValue("actor_name", actor.name())
+                .addValue("action", entry.action())
+                .addValue("resource_type", entry.resourceType())
+                .addValue("resource_id", entry.resourceId())
+                .addValue("resource_label", entry.resourceLabel())
+                .addValue("change_summary",
+                        entry.changeSummary() == null ? null : jsonMapper.writeValueAsString(entry.changeSummary()))
+                .addValue("status", entry.status().column())
+                .addValue("error_code", entry.errorCode())
+                .addValue("ip", entry.ip())
+                .addValue("user_agent", entry.userAgent())
+                .addValue("origin_source", ORIGIN_HTTP)
+                .addValue("occurred_at", Timestamp.from(Instant.now(clock)));
+        transaction.executeWithoutResult(status -> jdbc.update("""
+                INSERT INTO admin_audit_event (id, actor_user_id, actor_email, actor_name, action,
+                    resource_type, resource_id, resource_label, change_summary, status, error_code,
+                    ip, user_agent, origin_source, occurred_at)
+                VALUES (:id, :actor_user_id, :actor_email, :actor_name, :action,
+                    :resource_type, :resource_id, :resource_label, CAST(:change_summary AS jsonb),
+                    :status, :error_code, :ip, :user_agent, :origin_source, :occurred_at)
+                """, params));
     }
 
 }

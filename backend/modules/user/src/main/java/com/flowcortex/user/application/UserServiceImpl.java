@@ -5,6 +5,7 @@ import com.flowcortex.shared.web.ConflictException;
 import com.flowcortex.shared.web.LocalizedMessage;
 import com.flowcortex.shared.web.NotFoundException;
 import com.flowcortex.shared.web.PageView;
+import com.flowcortex.shared.web.UnprocessableEntityException;
 import com.flowcortex.user.api.AdminPermissions;
 import com.flowcortex.user.api.UnknownRoleException;
 import com.flowcortex.user.api.UserActivatedEvent;
@@ -20,6 +21,7 @@ import com.flowcortex.user.emailconfirm.EmailConfirmationService;
 import com.flowcortex.user.infrastructure.AppUserRepository;
 import com.flowcortex.user.infrastructure.RoleRow;
 import com.flowcortex.user.infrastructure.UserDirectoryRepository;
+import com.flowcortex.user.pii.PiiMask;
 import com.flowcortex.user.roles.RbacMutationRules;
 import com.flowcortex.user.roles.RbacMutationSwitch;
 import com.flowcortex.user.roles.RbacMutationSwitch.RbacOperation;
@@ -149,6 +151,7 @@ class UserServiceImpl implements UserService {
         }
         requireKeys(caller, UserMutationPolicy.requiredKeys(UserMutation.update(
                 roleCatalog.require(user.getRole().code()), newRoleRow, user.getStatus(), newStatus)));
+        requireRealValues(user, email, name);
         if (RbacMutationRules.gatesUpdate(user.getRole().code(), newRoleRow)) {
             mutationSwitch.requireEnabled(RbacOperation.USER_ROLE_CHANGE, callerId);
         }
@@ -236,6 +239,14 @@ class UserServiceImpl implements UserService {
         }
         for (Permission key : keys) {
             adminPermissions.require(caller.getId(), key);
+        }
+    }
+
+    /** Admin responses carry masked email and name; one sent back as an edit must not overwrite the real value. */
+    private static void requireRealValues(AppUser user, String email, String name) {
+        if (PiiMask.isMaskOf(email, user.getEmail(), PiiMask.Kind.EMAIL)
+                || PiiMask.isMaskOf(name, user.getName(), PiiMask.Kind.NAME)) {
+            throw new UnprocessableEntityException(new LocalizedMessage("user.maskedValue"), "user.maskedValue");
         }
     }
 

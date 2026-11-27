@@ -2,9 +2,11 @@ package com.flowcortex.user.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,7 +17,9 @@ import ch.qos.logback.core.read.ListAppender;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -106,6 +111,39 @@ class JdbcAdminAuditWriterTest {
         assertThat(p.getValue("ip")).isEqualTo("10.0.0.1");
         assertThat(p.getValue("user_agent")).isEqualTo("agent");
         assertThat(p.getValue("origin_source")).isEqualTo("http");
+    }
+
+    @Test
+    void writeOrThrowPropagatesAFailedInsert() {
+        DataAccessResourceFailureException failure = new DataAccessResourceFailureException("db down");
+        when(jdbc.update(anyString(), any(SqlParameterSource.class))).thenThrow(failure);
+
+        assertThatThrownBy(() -> writer.writeOrThrow(entry("{\"role\":\"CREATOR\"}"))).isSameAs(failure);
+
+        List<ILoggingEvent> errors = logs.list.stream().filter(e -> e.getLevel() == Level.ERROR).toList();
+        assertThat(errors).hasSize(1);
+        assertThat(errors.get(0).getFormattedMessage()).contains("support_kb_article.publish").contains("a-42")
+                .doesNotContain("CREATOR").doesNotContain("10.0.0.1");
+    }
+
+    @Test
+    void writeOrThrowWritesTheSameRowAsWrite() {
+        AdminAuditEntry entry = entry("{\"role\":\"CREATOR\"}", new ActorSnapshot("admin@x.io", "Ada"));
+
+        writer.write(entry);
+        writer.writeOrThrow(entry);
+
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc, times(2)).update(anyString(), params.capture());
+        MapSqlParameterSource written = (MapSqlParameterSource) params.getAllValues().get(0);
+        MapSqlParameterSource writtenOrThrown = (MapSqlParameterSource) params.getAllValues().get(1);
+        assertThat(withoutId(writtenOrThrown.getValues())).isEqualTo(withoutId(written.getValues()));
+    }
+
+    private static Map<String, Object> withoutId(Map<String, Object> values) {
+        Map<String, Object> copy = new HashMap<>(values);
+        copy.remove("id");
+        return copy;
     }
 
     @Test

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flowcortex.user.api.UserQuery;
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.pii.PiiMask;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
@@ -46,7 +47,8 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UserResponseView created = response.getBody();
-        assertThat(created.email()).isEqualTo(newEmail);
+        assertThat(created.email()).isEqualTo(PiiMask.email(newEmail)).isNotEqualTo(newEmail);
+        assertThat(created.name()).isEqualTo("N*** M***");
         assertThat(created.status()).isEqualTo("ACTIVE");
         assertThat(created.role()).isEqualTo("MEMBER");
 
@@ -177,7 +179,7 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
         ResponseEntity<UserResponseView> updateResponse = put("/api/v1/users/" + member.id(), token,
                 new UpdateUserRequestView(correctedEmail, null, null, null), UserResponseView.class);
         assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(updateResponse.getBody().email()).isEqualTo(correctedEmail);
+        assertThat(updateResponse.getBody().email()).isEqualTo(PiiMask.email(correctedEmail));
 
         ResponseEntity<TokenResponse> loginWithNew =
                 restTemplate.postForEntity("/api/v1/auth/login", new LoginRequest(correctedEmail, "member-password-1"),
@@ -274,7 +276,8 @@ class UsersCrudEndpointsIT extends AbstractUserModuleIT {
                 new UpdateUserRequestView(null, "Renamed Self", "ADMIN", "ACTIVE"), UserResponseView.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody().name()).isEqualTo("Renamed Self");
+        assertThat(response.getBody().name()).isEqualTo("R*** S***");
+        assertThat(userService.getUser(admin.id(), admin.id()).name()).isEqualTo("Renamed Self");
         assertThat(response.getBody().role()).isEqualTo("ADMIN");
         assertThat(response.getBody().status()).isEqualTo("ACTIVE");
     }

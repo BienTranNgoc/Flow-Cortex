@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import com.flowcortex.user.api.UserView;
+import com.flowcortex.user.pii.PiiMask;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -124,6 +125,9 @@ class UserDirectoryIT extends AbstractUserModuleIT {
         UserView other = seed(admin, "Someone Else", "MEMBER");
 
         assertThat(ids(list(admin, "?q=nguyen van duc"))).containsExactly(duc.id());
+        Row found = list(admin, "?q=nguyen van duc").items().get(0);
+        assertThat(found.name()).isEqualTo("N*** V*** Đ***");
+        assertThat(found.email()).isEqualTo(PiiMask.email(duc.email())).isNotEqualTo(duc.email());
         assertThat(ids(list(admin, "?q=DUCNV"))).containsExactly(duc.id());
         assertThat(ids(list(admin, "?q=NODI.VN"))).containsExactly(duc.id());
         assertThat(ids(list(admin, "?q=  NGUYỄN "))).containsExactly(duc.id());

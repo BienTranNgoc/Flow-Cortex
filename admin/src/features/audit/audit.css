@@ -1,0 +1,433 @@
+.audit-page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.audit-notice {
+  margin: 0 0 0.75rem;
+}
+
+.audit-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  min-width: 0;
+}
+
+.audit-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.audit-main > .cortex-admin-table-wrapper {
+  margin-top: 0;
+}
+
+.audit-main > .cortex-admin-empty,
+.audit-main > .cortex-admin-error {
+  margin-top: 0;
+}
+
+.audit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.audit-filters .cortex-admin-field {
+  flex: 1 1 10rem;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+}
+
+.audit-filters .audit-filter--search {
+  flex: 2 1 14rem;
+}
+
+.audit-filters .audit-filter--date {
+  flex: 1 1 9rem;
+}
+
+.audit-filters .cortex-admin-field label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-filters input[aria-invalid='true'] {
+  border-color: var(--admin-red);
+}
+
+.audit-hint {
+  margin: 0;
+  color: var(--admin-ink-3);
+  font-size: 0.88rem;
+}
+
+.audit-active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.audit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0.15rem 0.2rem 0.15rem 0.7rem;
+  border: 1px solid var(--admin-card-edge-strong);
+  border-radius: var(--radius-full);
+  background: var(--admin-primary-soft);
+  color: var(--admin-ink);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.audit-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--admin-ink-2);
+  cursor: pointer;
+}
+
+.audit-chip__remove:hover {
+  background: var(--admin-chrome-hover);
+  color: var(--admin-ink);
+}
+
+.audit-chip__remove:active {
+  transform: scale(0.94);
+}
+
+.audit-chip__remove:focus-visible {
+  outline: none;
+  box-shadow: var(--admin-focus-ring);
+}
+
+.audit-table td {
+  overflow-wrap: anywhere;
+}
+
+.audit-table td:first-child {
+  white-space: nowrap;
+}
+
+.audit-row {
+  cursor: pointer;
+}
+
+.audit-row--selected,
+.audit-table tbody .audit-row--selected:hover {
+  background: var(--admin-chrome-active);
+}
+
+.audit-row__open,
+.audit-row__actor {
+  min-height: var(--admin-control-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.audit-row__open:hover,
+.audit-row__actor:hover {
+  color: var(--admin-primary);
+  text-decoration: underline;
+}
+
+.audit-row__open:active,
+.audit-row__actor:active {
+  transform: scale(0.98);
+}
+
+.audit-row__open:focus-visible,
+.audit-row__actor:focus-visible {
+  outline: none;
+  box-shadow: var(--admin-focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+.audit-sub {
+  display: block;
+  color: var(--admin-ink-3);
+  font-size: 0.8rem;
+}
+
+.audit-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
+.audit-more {
+  flex: none;
+}
+
+.audit-detail {
+  min-width: 0;
+}
+
+.audit-detail__sub {
+  display: block;
+  color: var(--admin-ink-3);
+  font-size: 0.85rem;
+}
+
+.audit-detail__action {
+  margin-top: 0.4rem;
+}
+
+.audit-detail__json {
+  margin: 0;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background: var(--admin-card-surface-2);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.audit-detail .cortex-admin-section-heading {
+  align-items: center;
+}
+
+.audit-detail .cortex-admin-section-heading h2:focus {
+  outline: none;
+}
+
+/*
+ * From 1024px the page is exactly one viewport tall and the rows scroll inside their panel, so
+ * the page itself does not scroll: the shell's topbar height and content padding come off the
+ * viewport.
+ */
+@media (min-width: 1024px) {
+  .audit-page {
+    height: calc(100dvh - var(--admin-topbar-h) - 2 * var(--admin-content-pad));
+  }
+
+  .audit-page > * {
+    flex: none;
+  }
+
+  .audit-page > .audit-workspace {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .audit-page--detail .audit-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  }
+
+  /* Six controls share one row down to 1024px: compact padding, least widths that keep each value readable. */
+  .audit-filters {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  .audit-filters input,
+  .audit-filters select {
+    padding-inline: 0.5rem;
+    font-size: 0.88rem;
+  }
+
+  .audit-filters .cortex-admin-field {
+    flex: 1 1 0;
+    min-width: 6rem;
+  }
+
+  .audit-filters .audit-filter--search {
+    flex-grow: 1.6;
+    min-width: 6.5rem;
+  }
+
+  .audit-filters .audit-filter--date {
+    flex: 0 1 8.5rem;
+    min-width: 7.25rem;
+  }
+
+  /* With the details open the table column is too narrow for one row of six controls. */
+  .audit-page--detail .audit-filters {
+    flex-wrap: wrap;
+  }
+
+  .audit-page--detail .audit-filters .cortex-admin-field {
+    flex: 1 1 9rem;
+  }
+
+  .audit-main > * {
+    flex: none;
+  }
+
+  .audit-main > .cortex-admin-table-wrapper {
+    flex: 1 1 0;
+    min-height: 7rem;
+    overflow-y: auto;
+  }
+
+  .audit-detail {
+    overflow-y: auto;
+  }
+}
+
+/* Short windows give the rows the space the intro would take. */
+@media (min-width: 1024px) and (max-height: 800px) {
+  .audit-page > .cortex-admin-page-heading {
+    margin-bottom: 0.75rem;
+  }
+
+  .audit-page .cortex-admin-page-description {
+    display: none;
+  }
+}
+
+/* Filters stack and rows become labelled cards; the details open full width over the page. */
+@media (max-width: 1023px) {
+  .audit-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .audit-filters .cortex-admin-field,
+  .audit-filters .audit-filter--search,
+  .audit-filters .audit-filter--date {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .audit-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .audit-table,
+  .audit-table tbody,
+  .audit-table tr,
+  .audit-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .audit-table tr {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid var(--admin-card-edge);
+    border-radius: var(--radius-md);
+    background: var(--admin-card-surface);
+  }
+
+  .audit-table td {
+    padding: 0.35rem 0.25rem;
+    border: 0;
+  }
+
+  .audit-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--admin-ink-3);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .audit-main > .cortex-admin-table-wrapper {
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .audit-detail {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    overflow-y: auto;
+    border-radius: 0;
+    background: var(--admin-card-surface);
+  }
+}
+
+/*
+ * Below 1440px the open details leave the table too little width for five readable columns, so
+ * the rows take the card layout there as well (same rules as above, kept inside the table's own
+ * scroll region).
+ */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .audit-page--detail .audit-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+  }
+
+  .audit-page--detail .audit-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .audit-page--detail .audit-table,
+  .audit-page--detail .audit-table tbody,
+  .audit-page--detail .audit-table tr,
+  .audit-page--detail .audit-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .audit-page--detail .audit-table tr {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border: 1px solid var(--admin-card-edge);
+    border-radius: var(--radius-md);
+    background: var(--admin-card-surface);
+  }
+
+  .audit-page--detail .audit-table td {
+    padding: 0.35rem 0.25rem;
+    border: 0;
+  }
+
+  .audit-page--detail .audit-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--admin-ink-3);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .audit-page--detail .audit-main > .cortex-admin-table-wrapper {
+    padding: 0.75rem 0.75rem 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audit-chip__remove,
+  .audit-row__open,
+  .audit-row__actor {
+    transition: none;
+  }
+}
