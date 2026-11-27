@@ -1131,6 +1131,16 @@ describe('LoginPage', () => {
 
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       });
+
+      it('omits the OAuth divider when Google sign-in is disabled and shows it when enabled', () => {
+        const { container, unmount } = renderLogin(null);
+        expect(container.querySelector('.auth-divider')).toBeNull();
+        unmount();
+
+        vi.stubEnv('VITE_OAUTH_ENABLED', 'true');
+        const enabled = renderLogin(null);
+        expect(enabled.container.querySelector('.auth-divider')).not.toBeNull();
+      });
     });
   });
 });

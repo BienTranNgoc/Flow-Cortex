@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 import { Trans, useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
+import { oauthEnabled } from '../../app/featureFlags';
 import { OAuthButton } from '../../app/OAuthButton';
 import { AuthLink } from './AuthLink';
 import { useAuthPose } from './authPose';
 import { ResendConfirmation } from './ConfirmEmailPage';
 import { nodiPeekState, type NodiPeekInput } from './nodiPeekState';
 import { googleAuthorizeUrl } from './oauth';
+import { PasswordRevealButton } from './PasswordRevealButton';
 import { registerSchema, type RegisterFormValues } from './registerSchema';
 import {
   failureMessage,
@@ -51,13 +53,15 @@ function Field({
   onEdited,
   register,
   errors,
-}: FieldProps) {
+}: Readonly<FieldProps>) {
   const { t } = useTranslation();
+  const [shown, setShown] = useState(false);
   const id = `register-${name}`;
   const error = errors[name];
   // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
   const message = error?.message && (error.type === 'server' ? error.message : t(error.message));
   const field = register(name, { onChange: onEdited });
+  const isPassword = type === 'password';
   return (
     <div className="auth-field">
       <label htmlFor={id} className="auth-label">
@@ -66,7 +70,7 @@ function Field({
       <div className="auth-control">
         <input
           id={id}
-          type={type}
+          type={isPassword && shown ? 'text' : type}
           className="auth-input"
           autoComplete={autoComplete}
           placeholder={t(`auth.register.${name}Placeholder`)}
@@ -79,6 +83,13 @@ function Field({
             return field.onBlur(event);
           }}
         />
+        {isPassword && (
+          <PasswordRevealButton
+            shown={shown}
+            controlsId={id}
+            onToggle={() => setShown((prev) => !prev)}
+          />
+        )}
       </div>
       {message && (
         <p id={`${id}-error`} role="alert" className="auth-error">
@@ -154,13 +165,13 @@ export function RegisterPage() {
         <h1 className="auth-title" tabIndex={-1}>
           {t('auth.register.sent.title')}
         </h1>
-        <p className="auth-status" role="status">
+        <output className="auth-status">
           <Trans
             i18nKey="auth.register.sent.body"
             values={{ email: sentTo }}
             components={{ strong: <strong /> }}
           />
-        </p>
+        </output>
         <ResendConfirmation email={sentTo} />
         <p className="auth-footnote">
           {t('auth.register.sent.alreadyConfirmed')}{' '}
@@ -204,8 +215,10 @@ export function RegisterPage() {
       )}
 
       <form onSubmit={onSubmit} noValidate aria-label={t('auth.register.formLabel')}>
-        <Field name="firstName" autoComplete="given-name" {...fieldProps} />
-        <Field name="lastName" autoComplete="family-name" {...fieldProps} />
+        <div className="auth-field-row">
+          <Field name="firstName" autoComplete="given-name" {...fieldProps} />
+          <Field name="lastName" autoComplete="family-name" {...fieldProps} />
+        </div>
         <Field name="email" type="email" autoComplete="email" focusAs="email" {...fieldProps} />
         <Field name="username" autoComplete="username" {...fieldProps} />
         <Field
@@ -234,13 +247,17 @@ export function RegisterPage() {
         </button>
       </form>
 
-      <hr className="auth-divider" />
-      <OAuthButton
-        provider="google"
-        label={t('auth.register.google')}
-        href={googleAuthorizeUrl(true, '/')}
-        className="auth-btn auth-btn--google"
-      />
+      {oauthEnabled() && (
+        <>
+          <hr className="auth-divider" />
+          <OAuthButton
+            provider="google"
+            label={t('auth.register.google')}
+            href={googleAuthorizeUrl(true, '/')}
+            className="auth-btn auth-btn--google"
+          />
+        </>
+      )}
 
       <p className="auth-footnote">
         {t('auth.register.haveAccount')}{' '}

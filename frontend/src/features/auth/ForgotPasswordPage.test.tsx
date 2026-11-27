@@ -173,6 +173,48 @@ describe('ForgotPasswordPage', () => {
       );
       expect(screen.getByRole('heading', { name: viAuth.reset.forgot.title })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: viAuth.reset.backToSignIn })).toBeInTheDocument();
+      expect(screen.getByLabelText(viAuth.reset.request.emailLabel)).toHaveAttribute(
+        'placeholder',
+        viAuth.reset.request.emailPlaceholder,
+      );
+    });
+
+    it('clears the field error on edit and drives the NodiPeek mascot pose', async () => {
+      stubApi({
+        'GET /api/v1/features': { status: 200, body: FEATURES },
+        [FORGOT]: { status: 202, body: { status: 'reset_requested' } },
+      });
+      const user = userEvent.setup();
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter initialEntries={['/forgot-password']}>
+            <Routes>
+              <Route element={<AuthLayout />}>
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      const input = await screen.findByLabelText(viAuth.reset.request.emailLabel);
+      const mascot = () => document.querySelector('svg.nodi-peek')?.getAttribute('data-pose');
+
+      await user.click(input);
+      expect(mascot()).toBe('look');
+
+      await user.type(input, 'bad-email');
+      await user.click(screen.getByRole('button', { name: viAuth.reset.forgot.submit }));
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(mascot()).toBe('worried');
+
+      await user.type(input, '@example.com');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(mascot()).toBe('look');
+
+      await user.click(screen.getByRole('button', { name: viAuth.reset.forgot.submit }));
+      expect(await screen.findByRole('status')).toBeInTheDocument();
+      expect(mascot()).toBe('happy');
     });
   });
 });

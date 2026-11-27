@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLink } from './AuthLink';
 import { ResendConfirmation } from './ConfirmEmailPage';
+import { PasswordRevealButton } from './PasswordRevealButton';
 import { setPasswordSchema, type SetPasswordFormValues } from './registerSchema';
 import {
   PASSWORD_LINK_INVALID,
@@ -109,9 +110,9 @@ export function SetPasswordPage() {
   let content;
   if (linkToken && !openLink.isError) {
     content = (
-      <p role="status" className="auth-status">
+      <output className="auth-status">
         {t('auth.setPassword.opening')}
-      </p>
+      </output>
     );
   } else if (setupToken && signedIn) {
     content = (
@@ -148,6 +149,7 @@ function SetPasswordForm({ setupToken, onExpired }: SetPasswordFormProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setPassword = useSetPasswordMutation();
+  const [shownFields, setShownFields] = useState<Record<string, boolean>>({});
   const {
     register,
     handleSubmit,
@@ -202,6 +204,8 @@ function SetPasswordForm({ setupToken, onExpired }: SetPasswordFormProps) {
         {FIELDS.map(({ name, labelKey, type, autoComplete }) => {
           const id = `set-password-${name}`;
           const error = errors[name];
+          const isPassword = type === 'password';
+          const shown = Boolean(shownFields[name]);
           // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
           const message =
             error?.message && (error.type === 'server' ? error.message : t(error.message));
@@ -213,13 +217,20 @@ function SetPasswordForm({ setupToken, onExpired }: SetPasswordFormProps) {
               <div className="auth-control">
                 <input
                   id={id}
-                  type={type}
+                  type={isPassword && shown ? 'text' : type}
                   className="auth-input"
                   autoComplete={autoComplete}
                   aria-invalid={message ? 'true' : 'false'}
                   aria-describedby={message ? `${id}-error` : undefined}
                   {...register(name)}
                 />
+                {isPassword && (
+                  <PasswordRevealButton
+                    shown={shown}
+                    controlsId={id}
+                    onToggle={() => setShownFields((prev) => ({ ...prev, [name]: !prev[name] }))}
+                  />
+                )}
               </div>
               {message && (
                 <p id={`${id}-error`} role="alert" className="auth-error">

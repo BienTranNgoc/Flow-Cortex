@@ -4,7 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useSaveUi } from '../features/auth/useAccountPreferences';
 import { AccountPreferencesSync } from './AccountPreferencesSync';
 import { Footer } from './Footer';
-import { NetworkStatus } from './NetworkStatus';
+import { NetworkStatus } from './NetworkStatus.tsx';
 import { routeFocusTarget } from './routeFocus';
 import { Sidebar } from './Sidebar';
 import { useIsDesktop, useSidebarMode } from './sidebarMode';

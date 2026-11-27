@@ -4,6 +4,9 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLink } from './AuthLink';
+import { useAuthPose } from './authPose';
+import { nodiPeekState } from './nodiPeekState';
+import { PasswordRevealButton } from './PasswordRevealButton';
 import { PasswordResetGate, RequestResetForm } from './RequestResetForm';
 import { resetPasswordSchema, type ResetPasswordFormValues } from './registerSchema';
 import {
@@ -15,9 +18,21 @@ import {
   useResetPasswordMutation,
 } from './useAuth';
 
-const FIELDS: readonly { name: keyof ResetPasswordFormValues; labelKey: string }[] = [
-  { name: 'password', labelKey: 'auth.reset.password.passwordLabel' },
-  { name: 'confirmPassword', labelKey: 'auth.reset.password.confirmPasswordLabel' },
+const FIELDS: readonly {
+  name: keyof ResetPasswordFormValues;
+  labelKey: string;
+  placeholderKey: string;
+}[] = [
+  {
+    name: 'password',
+    labelKey: 'auth.reset.password.passwordLabel',
+    placeholderKey: 'auth.reset.password.passwordPlaceholder',
+  },
+  {
+    name: 'confirmPassword',
+    labelKey: 'auth.reset.password.confirmPasswordLabel',
+    placeholderKey: 'auth.reset.password.confirmPasswordPlaceholder',
+  },
 ];
 
 function tokenFrom(hash: string): string {
@@ -95,10 +110,14 @@ interface ResetPasswordFormProps {
   onLinkInvalid: () => void;
 }
 
-function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
+function ResetPasswordForm({ token, onLinkInvalid }: Readonly<ResetPasswordFormProps>) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const reset = useResetPasswordMutation();
+  const [shownFields, setShownFields] = useState<Record<string, boolean>>({});
+  const [focused, setFocused] = useState<'password' | null>(null);
+  const [editedSinceSubmit, setEditedSinceSubmit] = useState(false);
+  const passwordEditVersion = useRef(0);
   const {
     register,
     handleSubmit,
@@ -109,7 +128,18 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
     defaultValues: { password: '', confirmPassword: '' },
   });
 
+  useAuthPose(
+    nodiPeekState({
+      focused,
+      pending: reset.isPending,
+      failed: Object.keys(errors).length > 0 || (reset.isError && !editedSinceSubmit),
+      succeeded: reset.isSuccess,
+    }),
+  );
+
   const onSubmit = handleSubmit(({ password }) => {
+    setEditedSinceSubmit(false);
+    const submittedVersion = passwordEditVersion.current;
     reset.mutate(
       { token, password },
       {
@@ -124,7 +154,7 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
             onLinkInvalid();
             return;
           }
-          if (refused.password) {
+          if (refused.password && passwordEditVersion.current === submittedVersion) {
             setError(
               'password',
               { type: 'server', message: refused.password },
@@ -146,9 +176,16 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
       <p className="auth-subtitle">{t('auth.reset.password.intro')}</p>
 
       <form onSubmit={onSubmit} noValidate aria-label={t('auth.reset.password.formLabel')}>
-        {FIELDS.map(({ name, labelKey }) => {
+        {FIELDS.map(({ name, labelKey, placeholderKey }) => {
           const id = `reset-password-${name}`;
           const error = errors[name];
+          const shown = Boolean(shownFields[name]);
+          const field = register(name, {
+            onChange: () => {
+              if (name === 'password') passwordEditVersion.current += 1;
+              setEditedSinceSubmit(true);
+            },
+          });
           // Schema messages are locale keys; a server refusal arrives already worded and is shown as is.
           const message =
             error?.message && (error.type === 'server' ? error.message : t(error.message));
@@ -160,12 +197,23 @@ function ResetPasswordForm({ token, onLinkInvalid }: ResetPasswordFormProps) {
               <div className="auth-control">
                 <input
                   id={id}
-                  type="password"
+                  type={shown ? 'text' : 'password'}
                   className="auth-input"
                   autoComplete="new-password"
+                  placeholder={t(placeholderKey)}
                   aria-invalid={message ? 'true' : 'false'}
                   aria-describedby={message ? `${id}-error` : undefined}
-                  {...register(name)}
+                  {...field}
+                  onFocus={() => setFocused('password')}
+                  onBlur={(event) => {
+                    setFocused(null);
+                    return field.onBlur(event);
+                  }}
+                />
+                <PasswordRevealButton
+                  shown={shown}
+                  controlsId={id}
+                  onToggle={() => setShownFields((prev) => ({ ...prev, [name]: !prev[name] }))}
                 />
               </div>
               {message && (
