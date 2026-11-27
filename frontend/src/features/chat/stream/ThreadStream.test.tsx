@@ -112,6 +112,54 @@ describe('ThreadPane stream', () => {
     expect(screen.queryByText('Writing…')).not.toBeInTheDocument();
   });
 
+  describe('conversation list refresh', () => {
+    const listInvalidations = (spy: { mock: { calls: unknown[][] } }) =>
+      spy.mock.calls.filter(
+        ([filters]) => JSON.stringify((filters as { queryKey?: unknown }).queryKey) === '["chat","conversations"]',
+      );
+
+    it('invalidates the conversation views once when the answer leaves streaming', async () => {
+      const hub = stubHub([USER, STREAMING]);
+      const { queryClient } = renderThread();
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+      await screen.findByText('Writing…');
+      await waitFor(() => expect(hub.topics).toEqual(['chat:c1']));
+      await act(async () => {
+        hub.push('chat.updated', { messageId: 'a1' });
+      });
+      await waitFor(() => expect(hub.messageLoads()).toBe(2));
+      expect(listInvalidations(invalidate)).toHaveLength(0);
+
+      hub.setMessages([USER, { ...STREAMING, body: 'Done answer.', status: 'done' }]);
+      await act(async () => {
+        hub.push('chat.updated', { messageId: 'a1' });
+      });
+      await screen.findByText('Done answer.');
+
+      await waitFor(() => expect(listInvalidations(invalidate)).toHaveLength(1));
+      await act(async () => {
+        hub.push('chat.updated', { messageId: 'a1' });
+      });
+      await waitFor(() => expect(hub.messageLoads()).toBe(4));
+      expect(listInvalidations(invalidate)).toHaveLength(1);
+    });
+
+    it('does not invalidate when a finished thread is only reloaded', async () => {
+      const hub = stubHub([USER, { ...STREAMING, body: 'Old answer.', status: 'done' }]);
+      const { queryClient } = renderThread();
+      const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+      await screen.findByText('Old answer.');
+      await waitFor(() => expect(hub.topics).toEqual(['chat:c1']));
+
+      await act(async () => {
+        hub.push('chat.updated', { messageId: 'a1' });
+      });
+      await waitFor(() => expect(hub.messageLoads()).toBe(2));
+
+      expect(listInvalidations(invalidate)).toHaveLength(0);
+    });
+  });
+
   it('reloads the thread once when the stream reconnects and once on resync', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const hub = stubHub([USER]);
