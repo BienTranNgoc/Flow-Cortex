@@ -545,7 +545,7 @@ candidates), `uq_batch_run_parent` (unique, partial `WHERE parent_batch_id IS NO
 
 Row counts are not stored on `batch_run`; they are one grouped read over `idx_batch_run_row_status`.
 
-## Two-factor sign-in (`V2026.11.26.610`)
+## Two-factor sign-in (`V2026.11.26.920`)
 
 ```mermaid
 erDiagram

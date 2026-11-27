@@ -20,7 +20,7 @@
 --   DROP TABLE login_challenge;
 --   DROP TABLE user_recovery_code;
 --   DROP TABLE user_totp;
---   DELETE FROM flyway_schema_history WHERE version = '2026.11.26.610';
+--   DELETE FROM flyway_schema_history WHERE version = '2026.11.26.920';
 --   COMMIT;
 -- Dropping the tables deletes every enrolment; recovery of those rows means a restore.
 
