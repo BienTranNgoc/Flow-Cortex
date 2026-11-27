@@ -26,7 +26,9 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       # Builds bootJar and runs check (tests, Checkstyle, JaCoCo 50% floor) for all modules and
-      # shared libraries, plus Checkstyle on :boot:app. :boot:app ITs run sharded in parallel.
+      # shared libraries, plus Checkstyle on :boot:app. :boot:app ITs run sharded in parallel, and
+      # :modules:content / :modules:trash verify their JaCoCo floors in jacoco-verify because they
+      # include :boot:app's IT execution data.
       - name: Build modules + Checkstyle
         run: >-
           ./gradlew --no-daemon build
@@ -34,6 +36,8 @@ jobs:
           -x :boot:app:multiInstanceTest
           -x :boot:app:jacocoTestReport
           -x :boot:app:jacocoTestCoverageVerification
+          -x :modules:content:jacocoTestCoverageVerification
+          -x :modules:trash:jacocoTestCoverageVerification
 
       - name: Test migration version guard
         working-directory: .
@@ -157,7 +161,14 @@ jobs:
           done
 
       - name: Verify merged coverage floor (ADR-0004)
-        run: ./gradlew --no-daemon :boot:app:jacocoMergedReport :boot:app:jacocoMergedCoverageVerification
+        run: >-
+          ./gradlew --no-daemon -PjacocoMerged=true
+          :boot:app:jacocoMergedReport
+          :boot:app:jacocoMergedCoverageVerification
+          :modules:content:test
+          :modules:trash:test
+          :modules:content:jacocoTestCoverageVerification
+          :modules:trash:jacocoTestCoverageVerification
 
       - name: Upload coverage report
         if: always()

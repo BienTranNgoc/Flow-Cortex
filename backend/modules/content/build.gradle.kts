@@ -28,7 +28,17 @@ dependencies {
 // The service and controllers of this module run against real Postgres, RabbitMQ and MinIO in
 // ContentDocumentsIT and ContentMediaIT, which live in :boot:app (the only place the whole
 // application context assembles). Their execution data counts toward this module's line floor.
+val useMergedAppJacoco = providers.gradleProperty("jacocoMerged").map { it.toBoolean() }.orElse(false)
 tasks.jacocoTestCoverageVerification {
-    dependsOn(":boot:app:test")
-    executionData(project(":boot:app").layout.buildDirectory.file("jacoco/test.exec"))
+    if (useMergedAppJacoco.get()) {
+        dependsOn(tasks.test, ":boot:app:verifyMergedJacocoInputs")
+        executionData(
+            project(":boot:app").fileTree(project(":boot:app").layout.buildDirectory.dir("jacoco-merged")) {
+                include("**/*.exec")
+            },
+        )
+    } else {
+        dependsOn(":boot:app:test")
+        executionData(project(":boot:app").layout.buildDirectory.file("jacoco/test.exec"))
+    }
 }
