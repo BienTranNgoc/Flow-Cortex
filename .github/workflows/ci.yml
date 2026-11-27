@@ -24,6 +24,10 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       contracts: ${{ steps.filter.outputs.contracts }}
       worker: ${{ steps.filter.outputs.worker }}
+      worker_overlay: ${{ steps.filter.outputs.worker_overlay }}
+      worker_audio: ${{ steps.filter.outputs.worker_audio }}
+      worker_trend: ${{ steps.filter.outputs.worker_trend }}
+      worker_preview: ${{ steps.filter.outputs.worker_preview }}
       smoke: ${{ steps.filter.outputs.smoke }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,9 +43,9 @@ jobs:
         # every area runs.
         run: |
           if [ "$EVENT" = pull_request ]; then
-            files=$(git diff --name-only HEAD^1 HEAD)
+            files=$(git diff --name-only --no-renames HEAD^1 HEAD)
           elif git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            files=$(git diff --name-only "$BEFORE" HEAD)
+            files=$(git diff --name-only --no-renames "$BEFORE" HEAD)
           else
             files=.github/workflows/ci.yml
           fi
@@ -57,6 +61,11 @@ jobs:
           area frontend '^(frontend/|admin/|packages/|package\.json$|package-lock\.json$|\.prettierrc$|docs/openapi\.yaml$|\.github/workflows/frontend-ci\.yml$)'
           area contracts '^(contracts/|backend/modules/media/|worker/|\.github/workflows/contracts-ci\.yml$)'
           area worker '^(worker/|contracts/|\.github/workflows/worker-ci\.yml$)'
+          worker_shared='^(worker/(Dockerfile|\.dockerignore|\.python-version|pyproject\.toml|uv\.lock|src/flowcortex_worker/[^/]+\.py|src/flowcortex_worker/contracts/|src/flowcortex_worker/handlers/(__init__|registry)\.py$)|contracts/|\.github/workflows/worker-ci\.yml$)'
+          area worker_overlay "${worker_shared}|^worker/(src/flowcortex_worker/(overlay|video_ops)/|src/flowcortex_worker/handlers/clean_overlay\.py$|engines/requirements-overlay\.txt$|models/|fonts/|docker/check_fonts\.py$|scripts/bench_clean_overlay\.py$)"
+          area worker_audio "${worker_shared}|^worker/(src/flowcortex_worker/(audio/|engines/(__init__|beats|separate|speakers|speaker_clustering)\.py$)|src/flowcortex_worker/handlers/(separate_audio|beats|speakers|align_audio|extract_audio|_audio_input)\.py$|engines/requirements-(torch-cpu|audio.*)\.txt$|tests/engines/test_engines\.py$|eval/|docker/(AUDIO-LICENSES\.md|speakers-NOTICE\.txt)$)"
+          area worker_trend "${worker_shared}|^worker/(src/flowcortex_worker/(trend_studio/|video_analysis/|engines/(__init__|role_suggest)\.py$)|src/flowcortex_worker/handlers/(role_suggest|_audio_input)\.py$|engines/requirements-(torch-cpu|trend)\.txt$|tests/engines/test_trend_engine\.py$|scripts/role_suggest_bench\.py$|docker/TREND-LICENSES\.md$)"
+          area worker_preview "${worker_shared}|^worker/(src/flowcortex_worker/preview/|src/flowcortex_worker/handlers/preview_video\.py$|blender/|docker/preview|fonts/be-vietnam-pro/|tests/test_preview_scene\.py$|tests/fixtures/preview/|scripts/preview_bench\.py$)"
           area smoke '^(backend/|worker/|contracts/|frontend/|admin/|packages/|infra/|docker-compose\.yml$|compose\.(aws|observability)\.yaml$|observability/|\.env\.example$|package\.json$|package-lock\.json$|scripts/smoke-probe\.sh$|scripts/check-egress-isolation\.sh$|scripts/check-admin-csp\.sh$|\.github/workflows/compose-smoke\.yml$)|(^|/)Dockerfile$'
 
   backend:
@@ -78,6 +87,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.worker == 'true'
     uses: ./.github/workflows/worker-ci.yml
+    with:
+      run_overlay: ${{ needs.changes.outputs.worker_overlay == 'true' }}
+      run_audio: ${{ needs.changes.outputs.worker_audio == 'true' }}
+      run_trend: ${{ needs.changes.outputs.worker_trend == 'true' }}
+      run_preview: ${{ needs.changes.outputs.worker_preview == 'true' }}
 
   smoke:
     needs: changes

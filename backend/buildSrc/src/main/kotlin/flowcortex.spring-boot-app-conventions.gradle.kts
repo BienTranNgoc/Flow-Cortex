@@ -64,6 +64,7 @@ val jacocoExclusions = listOf(
     "**/*Config*",
     "**/package-info*",
 )
+val jacocoLineMinimum = "0.50".toBigDecimal()
 
 tasks.jacocoTestReport {
     dependsOn(tasks.test)
@@ -93,7 +94,7 @@ tasks.jacocoTestCoverageVerification {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.50".toBigDecimal()
+                minimum = jacocoLineMinimum
             }
         }
     }
@@ -101,4 +102,55 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.named("check") {
     dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
+val mergedJacocoExecFiles = fileTree(layout.buildDirectory.dir("jacoco-merged")) {
+    include("**/*.exec")
+}
+val mergedJacocoClassDirectories = files(
+    sourceSets.main.get().output.classesDirs.files.map { dir ->
+        fileTree(dir) { exclude(jacocoExclusions) }
+    },
+)
+
+val verifyMergedJacocoInputs = tasks.register("verifyMergedJacocoInputs") {
+    description = "Fails the build if build/jacoco-merged contains no .exec files before JaCoCo's onlyIf skips."
+    group = "verification"
+    doLast {
+        require(!mergedJacocoExecFiles.isEmpty) {
+            "No JaCoCo .exec files found under ${layout.buildDirectory.dir("jacoco-merged").get().asFile}"
+        }
+    }
+}
+
+val jacocoMergedReport = tasks.register<JacocoReport>("jacocoMergedReport") {
+    description = "Generates a JaCoCo report from sharded .exec files in build/jacoco-merged."
+    group = "verification"
+    dependsOn(tasks.named("classes"), verifyMergedJacocoInputs)
+    executionData.setFrom(mergedJacocoExecFiles)
+    sourceDirectories.setFrom(sourceSets.main.get().allSource.srcDirs)
+    classDirectories.setFrom(mergedJacocoClassDirectories)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/test/html"))
+    }
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoMergedCoverageVerification") {
+    description = "Verifies the line coverage floor against merged sharded .exec files."
+    group = "verification"
+    dependsOn(tasks.named("classes"), verifyMergedJacocoInputs)
+    mustRunAfter(jacocoMergedReport)
+    executionData.setFrom(mergedJacocoExecFiles)
+    classDirectories.setFrom(mergedJacocoClassDirectories)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = jacocoLineMinimum
+            }
+        }
+    }
 }
