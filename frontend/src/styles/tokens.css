@@ -79,6 +79,7 @@
   --shadow: 0 8px 24px color-mix(in srgb, var(--shadow-color) 8%, transparent);
   --shadow-lg: 0 20px 40px color-mix(in srgb, var(--shadow-color) 12%, transparent);
   --focus-ring: 0 0 0 2px var(--primary);
+  --media-badge-border: #ffffff;
 
   /* Shape and size */
   --radius-sm: 6px;
