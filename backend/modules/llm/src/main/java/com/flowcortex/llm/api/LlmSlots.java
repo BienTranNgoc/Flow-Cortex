@@ -16,14 +16,6 @@ public interface LlmSlots {
     /** Asks the slot's models for a JSON answer that follows {@code responseSchemaJson} (nullable). */
     LlmJsonResult generateJson(String slot, String userText, String responseSchemaJson);
 
-    /**
-     * Asks the slot's models for a JSON answer grounded in live Google Search results.
-     * Implementations that do not support web grounding fall back to {@link #generateJson}.
-     */
-    default LlmJsonResult generateGroundedJson(String slot, String userText, String responseSchemaJson) {
-        return generateJson(slot, userText, responseSchemaJson);
-    }
-
     /** Voices {@code text} with {@code voice} in one request on the slot's voice models. */
     LlmSpeechResult speak(String slot, String text, String voice);
 

@@ -63,16 +63,6 @@ final class GeminiChainClient implements LlmSlots {
 
     @Override
     public LlmJsonResult generateJson(String slotName, String userText, String responseSchemaJson) {
-        return generateJsonInternal(slotName, userText, responseSchemaJson, false);
-    }
-
-    @Override
-    public LlmJsonResult generateGroundedJson(String slotName, String userText, String responseSchemaJson) {
-        return generateJsonInternal(slotName, userText, responseSchemaJson, true);
-    }
-
-    private LlmJsonResult generateJsonInternal(String slotName, String userText, String responseSchemaJson,
-            boolean googleSearch) {
         Slot slot = slots.slot(slotName);
         if (userText == null || userText.isBlank()) {
             throw new IllegalArgumentException("userText must not be blank");
@@ -80,11 +70,7 @@ final class GeminiChainClient implements LlmSlots {
         if (!properties.hasApiKey()) {
             return new LlmJsonResult.Failed(missingKey(slotName, slot));
         }
-        ObjectNode req = jsonBody(userText, responseSchemaJson);
-        if (googleSearch) {
-            req.putArray("tools").addObject().putObject("google_search");
-        }
-        byte[] body = GeminiAttempts.JSON.writeValueAsBytes(req);
+        byte[] body = GeminiAttempts.JSON.writeValueAsBytes(jsonBody(userText, responseSchemaJson));
         Chained<LlmJsonResult> chained = run(slotName, slot, Mode.JSON, model -> body,
                 properties.endpoint() + "/models/{model}:generateContent",
                 (model, answer) -> {

@@ -28,6 +28,12 @@ type ProgressMode = 'idle' | 'stepper' | 'loading';
 type StepState = 'done' | 'active' | 'pending';
 
 const MAX_STEPPER_MS = 10_000;
+const DEFAULT_RUBRIC_NAME = 'Google XYZ · Harvard OCS · SHRM ATS';
+
+function formatSyncDate(iso: string, lang: 'en' | 'vi'): string {
+  const locale = lang === 'en' ? 'en-US' : 'vi-VN';
+  return new Date(iso).toLocaleDateString(locale);
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -203,11 +209,11 @@ function CvOverviewCard({ report, t }: Readonly<{ report: CvCheckReport; t: TFun
         <div className={`cv-check-score-box ${verdict.cls}`}>
           <span className="cv-check-score-number">{report.overallScore}</span>
           <span className="cv-check-score-label">
-            {t('cvCheck.results.overallScore', 'Điểm chuẩn quốc tế')} / 100
+            {t('cvCheck.results.overallScoreOf100', 'Điểm chuẩn quốc tế / 100')}
           </span>
           <span className="cv-check-score-verdict">{verdict.label}</span>
           <span className="cv-check-rubric-tag">
-            {report.rubric?.name ?? 'Google XYZ · Harvard OCS · SHRM ATS'}
+            {report.rubric?.name ?? DEFAULT_RUBRIC_NAME}
           </span>
         </div>
 
@@ -299,9 +305,7 @@ function CvJobsTab({
           {jobRecs?.lastSyncedAt && (
             <span className="cv-check-profile-pill">
               {t('cvCheck.jobs.syncedNote', 'Cập nhật (7 ngày/lần):')}{' '}
-              {new Date(jobRecs.lastSyncedAt).toLocaleDateString(
-                activeLang === 'en' ? 'en-US' : 'vi-VN',
-              )}
+              {formatSyncDate(jobRecs.lastSyncedAt, activeLang)}
             </span>
           )}
           {jobRecs?.cached && (
@@ -462,7 +466,10 @@ function CvDetailedTabs({
 }>) {
   return (
     <div className="cv-check-tabs-container">
-      <nav className="cv-check-tabs-nav" aria-label="Kết quả chi tiết">
+      <nav
+        className="cv-check-tabs-nav"
+        aria-label={t('cvCheck.tabs.ariaLabel', 'Kết quả chi tiết')}
+      >
         <button
           type="button"
           className={`cv-check-tab-btn ${activeTab === 'evaluation' ? 'is-active' : ''}`}
@@ -747,14 +754,19 @@ export function CvCheckPage() {
     }
   };
 
-  useEffect(() => {
+  const relocalizeRef = useRef<(lang: 'en' | 'vi') => void>(() => {});
+  relocalizeRef.current = (lang) => {
     const needsRelocalize =
-      Boolean(report && reportLang && reportLang !== activeLang) &&
+      Boolean(report && reportLang && reportLang !== lang) &&
       Boolean(cvFile || cvText.trim()) &&
       !checkMutation.isPending;
     if (needsRelocalize) {
-      void runAnalysis(activeLang);
+      void runAnalysis(lang);
     }
+  };
+
+  useEffect(() => {
+    relocalizeRef.current(activeLang);
   }, [activeLang]);
 
   const hasContent = Boolean(cvFile || cvText || report);

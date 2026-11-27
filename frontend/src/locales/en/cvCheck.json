@@ -55,6 +55,7 @@
   "results": {
     "title": "Analysis Results",
     "overallScore": "Overall Fit Score",
+    "overallScoreOf100": "Overall Fit Score / 100",
     "strengths": "Key Strengths",
     "weaknesses": "Areas for Improvement",
     "missingKeywords": "Missing Keywords & Skills"
@@ -74,6 +75,7 @@
     "fail": "FAIL"
   },
   "tabs": {
+    "ariaLabel": "Detailed results",
     "evaluation": "Strengths & Weaknesses",
     "bullets": "STAR Bullet Optimization",
     "interview": "Predicted Interview Questions",

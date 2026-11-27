@@ -55,6 +55,7 @@
   "results": {
     "title": "Kết quả phân tích",
     "overallScore": "Điểm phù hợp",
+    "overallScoreOf100": "Điểm chuẩn quốc tế / 100",
     "strengths": "Điểm mạnh nổi bật",
     "weaknesses": "Điểm cần cải thiện",
     "missingKeywords": "Từ khóa kỹ năng còn thiếu trong CV"
@@ -74,6 +75,7 @@
     "fail": "CHƯA ĐẠT"
   },
   "tabs": {
+    "ariaLabel": "Kết quả chi tiết",
     "evaluation": "Điểm mạnh & Điểm yếu",
     "bullets": "Tối ưu câu mô tả (STAR)",
     "interview": "Dự đoán câu hỏi phỏng vấn",

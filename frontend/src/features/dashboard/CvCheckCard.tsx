@@ -3,30 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { formatNumber } from '../../lib/format';
 import { activeLocale } from '../../lib/i18n';
-import type { CategoryFilter } from './FilterBar';
 import { PipelineThumb } from './PipelineThumb';
 import type { StepView } from './workflowMeta';
 import './WorkflowCard.css';
-
-const SEARCH_TERMS = [
-  'cv',
-  'cv checker',
-  'kiểm tra cv',
-  'resume',
-  'pdf',
-  'ats',
-  'star',
-  'hồ sơ',
-  'việc làm',
-  'jobs',
-];
-
-export function matchesCvCheckCard(query: string, category: CategoryFilter): boolean {
-  if (category !== 'all' && category !== 'production') return false;
-  const needle = query.trim().toLowerCase();
-  if (needle === '') return true;
-  return SEARCH_TERMS.some((term) => term.includes(needle));
-}
 
 export function CvCheckCard() {
   const { t } = useTranslation();
