@@ -502,6 +502,45 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/v1/runs/{runId}/feedback:
+    put:
+      tags:
+      - run-feedback-controller
+      operationId: putRunFeedback
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunFeedbackRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunFeedbackResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/profile/images/{slot}:
     put:
       tags:
@@ -3204,6 +3243,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
       security: []
+  /api/v1/runs/{runId}/steps/{stepId}/edit/undo:
+    post:
+      tags:
+      - run-step-edits-controller
+      operationId: undoRunStepEdit
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: step_not_editable or nothing_to_undo
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepEditResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}/steps/{stepId}/retry:
     post:
       tags:
@@ -7091,6 +7177,95 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyInvalid"
         "409":
           $ref: "#/components/responses/IdempotencyInProgress"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/runs/{runId}/steps/{stepId}/edit:
+    delete:
+      tags:
+      - run-step-edits-controller
+      operationId: discardRunStepEdit
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepEditResponse"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
+    patch:
+      tags:
+      - run-step-edits-controller
+      operationId: editRunStepOutput
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditStepOutputRequest"
+        required: true
+      responses:
+        "400":
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "409":
+          description: step_not_editable or output_revision_conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StepEditResponse"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/runs/{id}:
@@ -12273,6 +12448,41 @@ components:
           type: boolean
       required:
       - roleName
+    RunFeedbackRequest:
+      type: object
+      properties:
+        verdict:
+          type: string
+          enum:
+          - up
+          - down
+        issue:
+          type: string
+          enum:
+          - wrong_request
+          - low_quality
+          - off_brand
+          - technical_error
+          - inappropriate
+          - other
+        detail:
+          type: string
+          maxLength: 1000
+    RunFeedbackResponse:
+      type: object
+      properties:
+        verdict:
+          type: string
+        issue:
+          type: string
+        detail:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - updatedAt
+      - verdict
     UploadedImageRequest:
       type: object
       properties:
@@ -13669,10 +13879,13 @@ components:
           - image
           - upload
           - text
+        generateInsight:
+          type: boolean
       required:
       - allowFork
       - available
       - forkCount
+      - generateInsight
       - startInput
     WorkflowStepResponse:
       type: object
@@ -13783,6 +13996,36 @@ components:
           type: string
       required:
       - type
+    EditableFieldResponse:
+      type: object
+      properties:
+        pointer:
+          type: string
+        label:
+          type: string
+        index:
+          type: integer
+          format: int32
+        source:
+          type: string
+        text:
+          type: string
+      required:
+      - label
+      - pointer
+      - text
+    RunInsightResponse:
+      type: object
+      properties:
+        headline:
+          type: string
+        highlights:
+          type: array
+          items:
+            type: string
+      required:
+      - headline
+      - highlights
     RunResponse:
       type: object
       properties:
@@ -13811,6 +14054,14 @@ components:
         chargedCredits:
           type: integer
           format: int64
+        feedback:
+          $ref: "#/components/schemas/RunFeedbackResponse"
+        insight:
+          $ref: "#/components/schemas/RunInsightResponse"
+        insightPending:
+          type: boolean
+      required:
+      - insightPending
     RunStepChildResponse:
       type: object
       properties:
@@ -13913,10 +14164,36 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RunStepChildResponse"
+        editable:
+          type: boolean
+          description: Whether the member may correct this step's text
+        editableFields:
+          type: array
+          description: The editable texts with their current value; empty unless editable
+          items:
+            $ref: "#/components/schemas/EditableFieldResponse"
+        editedOutput:
+          type: string
+          description: The whole result with the member's edit applied; null when
+            no edit is current
+        editedAt:
+          type: string
+          format: date-time
+        editDiffPct:
+          type: number
+          description: "How far the edit is from the original, 0 to 100; null when\
+            \ no edit is current"
+        editRevision:
+          type: integer
+          format: int32
+          description: The token an edit must send back
       required:
       - attempt
       - children
       - deliveryCount
+      - editRevision
+      - editable
+      - editableFields
       - mode
       - outputs
     RunOptionsRequest:
@@ -14537,6 +14814,34 @@ components:
       required:
       - slug
       - title
+    StepEditResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        stepId:
+          type: string
+          format: uuid
+        editedOutput:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/EditableFieldResponse"
+        editDiffPct:
+          type: number
+        editedAt:
+          type: string
+          format: date-time
+        revision:
+          type: integer
+          format: int32
+      required:
+      - fields
+      - revision
+      - runId
+      - stepId
     RetryRunRequest:
       type: object
       properties:
@@ -16581,6 +16886,8 @@ components:
           pattern: draft|published
         allowFork:
           type: boolean
+        generateInsight:
+          type: boolean
     SetVisibilityRequest:
       type: object
       properties:
@@ -16626,6 +16933,32 @@ components:
         versionId:
           type: string
           format: uuid
+    EditStepOutputRequest:
+      type: object
+      properties:
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldEditRequest"
+          maxItems: 2000
+          minItems: 1
+        expectedRevision:
+          type: integer
+          format: int32
+          minimum: 1
+      required:
+      - expectedRevision
+      - fields
+    FieldEditRequest:
+      type: object
+      properties:
+        pointer:
+          type: string
+        text:
+          type: string
+      required:
+      - pointer
+      - text
     UpdateRunRequest:
       type: object
       properties:
