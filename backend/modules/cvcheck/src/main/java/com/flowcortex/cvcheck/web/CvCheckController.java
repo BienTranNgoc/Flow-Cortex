@@ -30,10 +30,10 @@ class CvCheckController {
         this.jobService = jobService;
     }
 
-    record CheckRequest(String cvText, String jobDescription) {
+    record CheckRequest(String cvText, String jobDescription, String lang) {
     }
 
-    record RecommendJobsRequest(String primaryRole, String seniority, List<String> topSkills, String location) {
+    record RecommendJobsRequest(String primaryRole, String seniority, List<String> topSkills, String location, String lang) {
     }
 
     @Operation(operationId = "checkCv")
@@ -41,7 +41,7 @@ class CvCheckController {
     JsonNode check(@RequestBody CheckRequest request) {
         String cv = clean(request.cvText(), CvCheckService.MAX_CV_CHARS, "cvText", true);
         String jd = clean(request.jobDescription(), CvCheckService.MAX_JD_CHARS, "jobDescription", false);
-        return evaluate(cv, jd, 0);
+        return evaluate(cv, jd, 0, request.lang());
     }
 
     @Operation(operationId = "checkCvMultipart")
@@ -49,7 +49,8 @@ class CvCheckController {
     JsonNode checkMultipart(
             @RequestParam(value = "cvFile", required = false) MultipartFile cvFile,
             @RequestParam(value = "cvText", required = false) String cvText,
-            @RequestParam(value = "jobDescription", required = false) String jobDescription) {
+            @RequestParam(value = "jobDescription", required = false) String jobDescription,
+            @RequestParam(value = "lang", required = false) String lang) {
         String cv;
         int pageCount = 0;
         if (cvFile != null && !cvFile.isEmpty()) {
@@ -71,7 +72,7 @@ class CvCheckController {
 
         String cleanedCv = clean(cv, CvCheckService.MAX_CV_CHARS, "cvText", true);
         String cleanedJd = clean(jobDescription, CvCheckService.MAX_JD_CHARS, "jobDescription", false);
-        return evaluate(cleanedCv, cleanedJd, pageCount);
+        return evaluate(cleanedCv, cleanedJd, pageCount, lang);
     }
 
     @Operation(operationId = "recommendJobsForCv")
@@ -85,14 +86,14 @@ class CvCheckController {
                 .map(s -> clean(s, 80, "topSkills", true))
                 .limit(10)
                 .toList();
-        return switch (jobService.recommend(role, seniority, skills, location)) {
+        return switch (jobService.recommend(role, seniority, skills, location, request.lang())) {
             case CvJobRecommendationService.Outcome.Found ok -> ok.payload();
             case CvJobRecommendationService.Outcome.Refused refused -> throw mapRefusal(refused.reason());
         };
     }
 
-    private JsonNode evaluate(String cv, String jd, int pageCount) {
-        return switch (service.check(cv, jd, pageCount)) {
+    private JsonNode evaluate(String cv, String jd, int pageCount, String lang) {
+        return switch (service.check(cv, jd, pageCount, lang)) {
             case Outcome.Report ok -> ok.report();
             case Outcome.Refused refused -> throw mapRefusal(refused.reason());
         };

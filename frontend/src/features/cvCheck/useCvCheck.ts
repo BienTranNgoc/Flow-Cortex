@@ -10,6 +10,11 @@ export interface CheckCvParams {
   readonly cvFile?: File | null;
   readonly cvText?: string;
   readonly jobDescription?: string;
+  readonly lang?: string;
+}
+
+export interface RecommendJobsParams extends CvJobProfile {
+  readonly lang?: string;
 }
 
 export class CvCheckError extends Error {
@@ -36,6 +41,9 @@ export async function executeCvCheck(params: CheckCvParams): Promise<CvCheckRepo
     if (params.cvText) {
       formData.append('cvText', params.cvText);
     }
+    if (params.lang) {
+      formData.append('lang', params.lang);
+    }
     body = formData;
   } else {
     headers = {
@@ -44,6 +52,7 @@ export async function executeCvCheck(params: CheckCvParams): Promise<CvCheckRepo
     body = JSON.stringify({
       cvText: params.cvText ?? '',
       ...(params.jobDescription ? { jobDescription: params.jobDescription } : {}),
+      ...(params.lang ? { lang: params.lang } : {}),
     });
   }
 
@@ -87,7 +96,7 @@ export function useCvCheckMutation() {
 }
 
 export async function executeRecommendJobs(
-  profile: CvJobProfile,
+  profile: RecommendJobsParams,
 ): Promise<JobRecommendationsResponse> {
   const response = await sessionFetch('/api/v1/cv-check/jobs', {
     method: 'POST',

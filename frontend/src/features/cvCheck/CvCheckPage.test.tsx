@@ -106,14 +106,17 @@ describe('CvCheckPage', () => {
     expect(screen.getByRole('button', { name: /Khung tải lên file CV PDF|PDF CV upload frame/i })).toBeInTheDocument();
   });
 
-  it('loads sample PDF and renders preview frame', async () => {
+  it('uploads PDF and renders preview frame', async () => {
     stubApi(ROUTES);
     const user = userEvent.setup();
-    const { queryClient } = renderRoute('/check-cv', '/check-cv', <CvCheckPage />);
+    const { container, queryClient } = renderRoute('/check-cv', '/check-cv', <CvCheckPage />);
     await settled(queryClient);
 
-    const loadSampleBtn = screen.getByRole('button', { name: /Tải CV PDF mẫu|Load Sample PDF/i });
-    await user.click(loadSampleBtn);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const pdfFile = new File(['%PDF-1.4 sample'], 'CV_Nguyen_Van_An_Backend_Java.pdf', {
+      type: 'application/pdf',
+    });
+    await user.upload(input, pdfFile);
 
     expect(await screen.findByTitle(/Xem trước CV PDF|PDF CV Preview/i)).toBeInTheDocument();
     expect(screen.getByText(/CV_Nguyen_Van_An_Backend_Java.pdf/i)).toBeInTheDocument();
@@ -122,13 +125,16 @@ describe('CvCheckPage', () => {
   it('submits form and displays analysis report score and dimensions', async () => {
     const calls = stubApi(ROUTES);
     const user = userEvent.setup();
-    const { queryClient } = renderRoute('/check-cv', '/check-cv', <CvCheckPage />);
+    const { container, queryClient } = renderRoute('/check-cv', '/check-cv', <CvCheckPage />);
     await settled(queryClient);
 
-    const loadSampleBtn = screen.getByRole('button', { name: /Tải CV PDF mẫu|Load Sample PDF/i });
-    await user.click(loadSampleBtn);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const pdfFile = new File(['%PDF-1.4 sample'], 'CV_Nguyen_Van_An_Backend_Java.pdf', {
+      type: 'application/pdf',
+    });
+    await user.upload(input, pdfFile);
 
-    const submitBtn = screen.getByRole('button', { name: /Đánh giá CV ngay|Analyze CV/i });
+    const submitBtn = screen.getByRole('button', { name: /Analyze CV|Đánh giá CV/i });
     await user.click(submitBtn);
 
     await settled(queryClient);

@@ -77,4 +77,11 @@ class CvScoringArbiterTest {
         assertThat(report.path("rubric").path("tier").asString()).isEqualTo("TIER_3");
         assertThat(report.path("rubric").path("capsApplied")).hasSize(3);
     }
+
+    @Test
+    void formatsAtsChecksInEnglishWhenRequested() {
+        AuditResult audit = CvDeterministicAuditor.audit("No metrics here", 1, "en");
+        assertThat(audit.checks()).allSatisfy(c -> assertThat(c.detail()).doesNotContain("trang", "từ", "Thiếu"));
+        assertThat(audit.checks().getFirst().detail()).contains("1 page");
+    }
 }

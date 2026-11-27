@@ -16,8 +16,6 @@ import { type ChangeEvent, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeading } from '../../app/PageHeading';
 import {
-  createSamplePdfBlob,
-  SAMPLE_CV,
   type CvCheckReport,
   type JobRecommendationsResponse,
 } from './cvCheckTypes';
@@ -33,7 +31,8 @@ function formatSize(bytes: number): string {
 }
 
 export function CvCheckPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const activeLang = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'vi';
   const fileUploadId = useId();
 
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -69,15 +68,6 @@ export function CvCheckPage() {
     } else {
       setCvPdfUrl(null);
     }
-  };
-
-  const handleLoadSample = () => {
-    const blob = createSamplePdfBlob();
-    const sampleFile = new File([blob], 'CV_Nguyen_Van_An_Backend_Java.pdf', {
-      type: 'application/pdf',
-    });
-    setPdfFile(sampleFile);
-    setCvText(SAMPLE_CV);
   };
 
   const handleClear = () => {
@@ -120,7 +110,7 @@ export function CvCheckPage() {
 
   const triggerJobSearch = async (profile: NonNullable<CvCheckReport['jobProfile']>) => {
     try {
-      const recs = await jobsMutation.mutateAsync(profile);
+      const recs = await jobsMutation.mutateAsync({ ...profile, lang: activeLang });
       setJobRecs(recs);
     } catch {
       // Handled via jobsMutation.isError
@@ -136,6 +126,7 @@ export function CvCheckPage() {
       const result = await checkMutation.mutateAsync({
         cvFile,
         cvText: cvText.trim(),
+        lang: activeLang,
       });
       setReport(result);
       setActiveTab('evaluation');
@@ -177,22 +168,14 @@ export function CvCheckPage() {
   return (
     <div className="cv-check-layout">
       <PageHeading
-        title={t('cvCheck.pageTitle', 'Kiểm tra CV với AI (Gemini)')}
+        title={t('cvCheck.pageTitle', 'CV Checker')}
         lede={t(
           'cvCheck.pageLede',
           'Tải lên file CV PDF để phân tích toàn diện: điểm chuẩn ATS, kỹ năng cốt lõi, tối ưu thành tích STAR và gợi ý câu hỏi phỏng vấn.',
         )}
         actions={
-          <div className="cv-check-panel__tools">
-            <button
-              type="button"
-              className="cortex-btn cortex-btn--ghost"
-              onClick={handleLoadSample}
-            >
-              <Sparkle size={16} aria-hidden="true" />
-              {t('cvCheck.actions.loadSample', 'Tải CV PDF mẫu')}
-            </button>
-            {(cvFile || cvText || report) && (
+          (cvFile || cvText || report) ? (
+            <div className="cv-check-panel__tools">
               <button
                 type="button"
                 className="cortex-btn cortex-btn--ghost"
@@ -201,28 +184,10 @@ export function CvCheckPage() {
                 <Trash size={16} aria-hidden="true" />
                 {t('cvCheck.actions.clearAll', 'Xóa tất cả')}
               </button>
-            )}
-          </div>
+            </div>
+          ) : undefined
         }
       />
-
-      <div className="cv-check-intro">
-        <div className="cv-check-intro__info">
-          <h2 className="cv-check-intro__title">
-            {t('cvCheck.intro.title', 'Khung đối soát hồ sơ CV PDF')}
-          </h2>
-          <p className="cv-check-intro__desc">
-            {t(
-              'cvCheck.intro.desc',
-              'Tải trực tiếp file CV PDF để xem trước toàn diện và trích xuất nội dung tự động bằng Apache PDFBox + Google Gemini 3.5 Flash.',
-            )}
-          </p>
-        </div>
-        <span className="cv-check-intro__badge">
-          <Sparkle size={14} weight="fill" aria-hidden="true" />
-          Gemini 3.5 Flash
-        </span>
-      </div>
 
       {checkMutation.isError && (
         <div className="cv-check-error-banner" role="alert">
@@ -236,8 +201,8 @@ export function CvCheckPage() {
         </div>
       )}
 
-      {/* PDF Upload and Preview Area */}
-      <div className="cv-check-form cv-check-form--single">
+      {/* PDF Upload (Left) + Analyze Action (Right) */}
+      <div className="cv-check-workspace">
         <section className="cv-check-panel" aria-labelledby="cv-panel-title">
           <header className="cv-check-panel__head">
             <h3 id="cv-panel-title" className="cv-check-panel__title">
@@ -252,12 +217,12 @@ export function CvCheckPage() {
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
               />
-              <label htmlFor={fileUploadId} className="cv-check-tool-btn">
-                <UploadSimple size={14} aria-hidden="true" />
-                {cvFile
-                  ? t('cvCheck.actions.changePdf', 'Đổi PDF khác')
-                  : t('cvCheck.actions.uploadPdf', 'Tải file PDF')}
-              </label>
+              {cvFile && (
+                <label htmlFor={fileUploadId} className="cv-check-tool-btn">
+                  <UploadSimple size={14} aria-hidden="true" />
+                  {t('cvCheck.actions.changePdf', 'Đổi PDF khác')}
+                </label>
+              )}
             </div>
           </header>
           <div className="cv-check-panel__body">
@@ -324,160 +289,151 @@ export function CvCheckPage() {
                     <UploadSimple size={16} aria-hidden="true" />
                     {t('cvCheck.actions.browsePdf', 'Chọn file PDF')}
                   </label>
-                  <button
-                    type="button"
-                    className="cortex-btn cortex-btn--ghost"
-                    onClick={handleLoadSample}
-                  >
-                    <Sparkle size={16} aria-hidden="true" />
-                    {t('cvCheck.actions.useSamplePdf', 'Dùng CV PDF mẫu')}
-                  </button>
                 </div>
               </div>
             )}
           </div>
         </section>
-      </div>
 
-      {/* Action Button */}
-      <div className="cv-check-actions">
-        <button
-          type="button"
-          className="cortex-btn cortex-btn--primary cv-check-submit-btn"
-          disabled={(!cvFile && !cvText.trim()) || checkMutation.isPending}
-          onClick={handleSubmit}
-        >
-          {checkMutation.isPending ? (
-            <>
-              <ArrowsClockwise className="spinner" size={18} aria-hidden="true" />
-              {t('cvCheck.actions.analyzing', 'Đang trích xuất & chấm điểm với Gemini...')}
-            </>
-          ) : (
-            <>
-              <Sparkle size={18} weight="fill" aria-hidden="true" />
-              {t('cvCheck.actions.analyze', 'Đánh giá CV ngay')}
-            </>
-          )}
-        </button>
+        {/* Action Button on Right */}
+        <aside className="cv-check-side-actions">
+          <button
+            type="button"
+            className="cortex-btn cortex-btn--primary cv-check-submit-btn"
+            disabled={(!cvFile && !cvText.trim()) || checkMutation.isPending}
+            onClick={handleSubmit}
+          >
+            {checkMutation.isPending ? (
+              <>
+                <ArrowsClockwise className="spinner" size={18} aria-hidden="true" />
+                {t('cvCheck.actions.analyzing', 'Đang phân tích CV...')}
+              </>
+            ) : (
+              <>
+                <Sparkle size={18} weight="fill" aria-hidden="true" />
+                {t('cvCheck.actions.analyze', 'Analyze CV')}
+              </>
+            )}
+          </button>
+        </aside>
       </div>
 
       {/* Results Dashboard */}
       {report && (
         <section className="cv-check-results" aria-label={t('cvCheck.results.title', 'Kết quả phân tích')}>
-          {/* Overview Score Card */}
+          {/* Panel 1: Overview Score + Deterministic ATS Audit (Merged into 1 clean card) */}
           <div className="cv-check-overview-card">
-            <div className={`cv-check-score-box ${verdict?.cls ?? ''}`}>
-              <span className="cv-check-score-number">{report.overallScore}</span>
-              <span className="cv-check-score-label">
-                {t('cvCheck.results.overallScore', 'Điểm chuẩn quốc tế')} / 100
-              </span>
-              <span className="cv-check-score-verdict">{verdict?.label}</span>
-              <span className="cv-check-rubric-tag">
-                {report.rubric?.name ?? 'Google XYZ · Harvard OCS · SHRM ATS'}
-              </span>
-            </div>
-
-            <div className="cv-check-dimension-list">
-              <div className="cv-check-dim-row">
-                <div className="cv-check-dim-head">
-                  <span>
-                    {t('cvCheck.dimensions.experienceImpact', 'Tác động & Định lượng (Google XYZ)')}{' '}
-                    <em className="cv-check-dim-weight">({report.rubric?.weights.experienceImpact ?? 30}%)</em>
-                  </span>
-                  <span>{report.dimensions.experienceImpact}%</span>
-                </div>
-                <div className="cv-check-dim-bar">
-                  <div
-                    className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.experienceImpact))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="cv-check-dim-row">
-                <div className="cv-check-dim-head">
-                  <span>
-                    {t('cvCheck.dimensions.hardSkills', 'Kỹ năng cốt lõi (ESCO / O*NET)')}{' '}
-                    <em className="cv-check-dim-weight">({report.rubric?.weights.hardSkills ?? 25}%)</em>
-                  </span>
-                  <span>{report.dimensions.hardSkills}%</span>
-                </div>
-                <div className="cv-check-dim-bar">
-                  <div
-                    className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.hardSkills))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="cv-check-dim-row">
-                <div className="cv-check-dim-head">
-                  <span>
-                    {t('cvCheck.dimensions.atsCompliance', 'Chuẩn ATS & Cấu trúc (SHRM)')}{' '}
-                    <em className="cv-check-dim-weight">({report.rubric?.weights.atsCompliance ?? 20}%)</em>
-                  </span>
-                  <span>{report.dimensions.atsCompliance}%</span>
-                </div>
-                <div className="cv-check-dim-bar">
-                  <div
-                    className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.atsCompliance))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="cv-check-dim-row">
-                <div className="cv-check-dim-head">
-                  <span>
-                    {t('cvCheck.dimensions.domainRelevance', 'Lộ trình & Độ rõ ràng (Harvard OCS)')}{' '}
-                    <em className="cv-check-dim-weight">({report.rubric?.weights.domainRelevance ?? 15}%)</em>
-                  </span>
-                  <span>{report.dimensions.domainRelevance}%</span>
-                </div>
-                <div className="cv-check-dim-bar">
-                  <div
-                    className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.domainRelevance))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="cv-check-dim-row">
-                <div className="cv-check-dim-head">
-                  <span>
-                    {t('cvCheck.dimensions.softSkills', 'Kỹ năng mềm & Văn phong')}{' '}
-                    <em className="cv-check-dim-weight">({report.rubric?.weights.softSkills ?? 10}%)</em>
-                  </span>
-                  <span>{report.dimensions.softSkills}%</span>
-                </div>
-                <div className="cv-check-dim-bar">
-                  <div
-                    className="cv-check-dim-fill"
-                    style={{ width: `${Math.min(100, Math.max(0, report.dimensions.softSkills))}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Deterministic International ATS Checklist */}
-          {report.atsChecks && report.atsChecks.length > 0 && (
-            <div className="cv-check-ats-card">
-              <div className="cv-check-ats-card__head">
-                <h3 className="cv-check-ats-card__title">
-                  {t('cvCheck.atsChecklist.title', 'Kiểm tra ATS & Chuẩn Quốc tế (Tất định)')}
-                </h3>
-                <span className="cv-check-ats-card__sub">
-                  {t('cvCheck.atsChecklist.subtitle', 'Đo trực tiếp từ cấu trúc PDF & nội dung CV')}
+            <div className="cv-check-overview-top">
+              <div className={`cv-check-score-box ${verdict?.cls ?? ''}`}>
+                <span className="cv-check-score-number">{report.overallScore}</span>
+                <span className="cv-check-score-label">
+                  {t('cvCheck.results.overallScore', 'Điểm chuẩn quốc tế')} / 100
+                </span>
+                <span className="cv-check-score-verdict">{verdict?.label}</span>
+                <span className="cv-check-rubric-tag">
+                  {report.rubric?.name ?? 'Google XYZ · Harvard OCS · SHRM ATS'}
                 </span>
               </div>
-              <div className="cv-check-ats-grid">
-                {report.atsChecks.map((check) => (
-                  <div
-                    key={check.id}
-                    className={`cv-check-ats-item cv-check-ats-item--${check.status.toLowerCase()}`}
-                  >
-                    <div className="cv-check-ats-item__top">
+
+              <div className="cv-check-dimension-list">
+                <div className="cv-check-dim-row">
+                  <div className="cv-check-dim-head">
+                    <span>
+                      {t('cvCheck.dimensions.experienceImpact', 'Tác động & Định lượng (Google XYZ)')}{' '}
+                      <em className="cv-check-dim-weight">({report.rubric?.weights.experienceImpact ?? 30}%)</em>
+                    </span>
+                    <span>{report.dimensions.experienceImpact}%</span>
+                  </div>
+                  <div className="cv-check-dim-bar">
+                    <div
+                      className="cv-check-dim-fill"
+                      style={{ width: `${Math.min(100, Math.max(0, report.dimensions.experienceImpact))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="cv-check-dim-row">
+                  <div className="cv-check-dim-head">
+                    <span>
+                      {t('cvCheck.dimensions.hardSkills', 'Kỹ năng cốt lõi (ESCO / O*NET)')}{' '}
+                      <em className="cv-check-dim-weight">({report.rubric?.weights.hardSkills ?? 25}%)</em>
+                    </span>
+                    <span>{report.dimensions.hardSkills}%</span>
+                  </div>
+                  <div className="cv-check-dim-bar">
+                    <div
+                      className="cv-check-dim-fill"
+                      style={{ width: `${Math.min(100, Math.max(0, report.dimensions.hardSkills))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="cv-check-dim-row">
+                  <div className="cv-check-dim-head">
+                    <span>
+                      {t('cvCheck.dimensions.atsCompliance', 'Chuẩn ATS & Cấu trúc (SHRM)')}{' '}
+                      <em className="cv-check-dim-weight">({report.rubric?.weights.atsCompliance ?? 20}%)</em>
+                    </span>
+                    <span>{report.dimensions.atsCompliance}%</span>
+                  </div>
+                  <div className="cv-check-dim-bar">
+                    <div
+                      className="cv-check-dim-fill"
+                      style={{ width: `${Math.min(100, Math.max(0, report.dimensions.atsCompliance))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="cv-check-dim-row">
+                  <div className="cv-check-dim-head">
+                    <span>
+                      {t('cvCheck.dimensions.domainRelevance', 'Lộ trình & Độ rõ ràng (Harvard OCS)')}{' '}
+                      <em className="cv-check-dim-weight">({report.rubric?.weights.domainRelevance ?? 15}%)</em>
+                    </span>
+                    <span>{report.dimensions.domainRelevance}%</span>
+                  </div>
+                  <div className="cv-check-dim-bar">
+                    <div
+                      className="cv-check-dim-fill"
+                      style={{ width: `${Math.min(100, Math.max(0, report.dimensions.domainRelevance))}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="cv-check-dim-row">
+                  <div className="cv-check-dim-head">
+                    <span>
+                      {t('cvCheck.dimensions.softSkills', 'Kỹ năng mềm & Văn phong')}{' '}
+                      <em className="cv-check-dim-weight">({report.rubric?.weights.softSkills ?? 10}%)</em>
+                    </span>
+                    <span>{report.dimensions.softSkills}%</span>
+                  </div>
+                  <div className="cv-check-dim-bar">
+                    <div
+                      className="cv-check-dim-fill"
+                      style={{ width: `${Math.min(100, Math.max(0, report.dimensions.softSkills))}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {report.atsChecks && report.atsChecks.length > 0 && (
+              <div className="cv-check-ats-section">
+                <div className="cv-check-ats-card__head">
+                  <h3 className="cv-check-ats-card__title">
+                    {t('cvCheck.atsChecklist.title', 'Kiểm tra ATS & Chuẩn Quốc tế (Tất định)')}
+                  </h3>
+                  <span className="cv-check-ats-card__sub">
+                    {t('cvCheck.atsChecklist.subtitle', 'Đo trực tiếp từ cấu trúc PDF & nội dung CV')}
+                  </span>
+                </div>
+                <ul className="cv-check-ats-list">
+                  {report.atsChecks.map((check) => (
+                    <li
+                      key={check.id}
+                      className={`cv-check-ats-row cv-check-ats-row--${check.status.toLowerCase()}`}
+                    >
                       <span className="cv-check-ats-badge">
                         {check.status === 'PASS'
                           ? t('cvCheck.atsChecklist.pass', 'ĐẠT')
@@ -485,14 +441,14 @@ export function CvCheckPage() {
                             ? t('cvCheck.atsChecklist.warn', 'CẢNH BÁO')
                             : t('cvCheck.atsChecklist.fail', 'CHƯA ĐẠT')}
                       </span>
+                      <span className="cv-check-ats-item__detail">{check.detail}</span>
                       <span className="cv-check-ats-standard">{check.standard}</span>
-                    </div>
-                    <p className="cv-check-ats-item__detail">{check.detail}</p>
-                  </div>
-                ))}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Detailed Tabs */}
           <div className="cv-check-tabs-container">
@@ -645,7 +601,7 @@ export function CvCheckPage() {
                       {jobRecs?.lastSyncedAt && (
                         <span className="cv-check-profile-pill">
                           {t('cvCheck.jobs.syncedNote', 'Cập nhật (7 ngày/lần):')}{' '}
-                          {new Date(jobRecs.lastSyncedAt).toLocaleDateString()}
+                          {new Date(jobRecs.lastSyncedAt).toLocaleDateString(activeLang === 'en' ? 'en-US' : 'vi-VN')}
                         </span>
                       )}
                       {jobRecs?.cached && (

@@ -38,7 +38,7 @@ public class CvJobRecommendationService {
             - Only pick indices that exist in the CANDIDATE JOBS list; never invent jobs or indices.
             - Score matchScore (0-100) honestly based on role, seniority, and skill overlap.
             - matchedSkills: list 2-5 concrete skills from the candidate that match the job.
-            - summary: write 1-2 concise sentences in Vietnamese explaining why this job fits.
+            - summary: write 1-2 concise sentences strictly in %s explaining why this job fits.
 
             CANDIDATE PROFILE:
             - Target Role: %s
@@ -74,6 +74,12 @@ public class CvJobRecommendationService {
     }
 
     public Outcome recommend(String primaryRole, String seniority, List<String> topSkills, String location) {
+        return recommend(primaryRole, seniority, topSkills, location, "vi");
+    }
+
+    public Outcome recommend(String primaryRole, String seniority, List<String> topSkills, String location, String lang) {
+        boolean en = CvDeterministicAuditor.isEnglish(lang);
+        String langCode = en ? "en" : "vi";
         String role = primaryRole.strip();
         String level = (seniority == null || seniority.isBlank()) ? "Middle" : seniority.strip();
         String loc = (location == null || location.isBlank()) ? "Vietnam" : location.strip();
@@ -84,10 +90,11 @@ public class CvJobRecommendationService {
                 .toList();
 
         String roleKey = normalizeRoleKey(role);
+        String cacheKey = roleKey + "|" + langCode;
         Instant now = Instant.now();
         Instant freshSince = now.minus(syncJob.refreshWindow());
 
-        CachedEntry memHit = memoryCache.get(roleKey);
+        CachedEntry memHit = memoryCache.get(cacheKey);
         if (memHit != null && memHit.expiresAt().isAfter(now)) {
             ObjectNode copy = memHit.payload().deepCopy();
             copy.put("cached", true);
@@ -112,11 +119,11 @@ public class CvJobRecommendationService {
         List<ScoredJob> candidates = preRank(roleJobs, role, level, skills, loc);
         final Optional<Instant> effectiveSynced = syncedAt;
         final boolean isCached = servedFromDb;
-        ObjectNode payload = rankWithLlm(candidates, role, level, skills, loc, effectiveSynced, isCached)
-                .orElseGet(() -> fallbackPayload(candidates, role, skills, loc, effectiveSynced, isCached));
+        ObjectNode payload = rankWithLlm(candidates, role, level, skills, loc, effectiveSynced, isCached, en)
+                .orElseGet(() -> fallbackPayload(candidates, role, skills, loc, effectiveSynced, isCached, en));
 
         Instant expiresAt = effectiveSynced.orElse(now).plus(syncJob.refreshWindow());
-        putCache(roleKey, payload, expiresAt, now);
+        putCache(cacheKey, payload, expiresAt, now);
         return new Outcome.Found(payload);
     }
 
@@ -127,7 +134,8 @@ public class CvJobRecommendationService {
             List<String> skills,
             String location,
             Optional<Instant> syncedAt,
-            boolean cached) {
+            boolean cached,
+            boolean en) {
         StringBuilder jobList = new StringBuilder();
         for (int i = 0; i < candidates.size(); i++) {
             JobPosting job = candidates.get(i).job();
@@ -150,7 +158,7 @@ public class CvJobRecommendationService {
         }
 
         String skillsText = skills.isEmpty() ? role : String.join(", ", skills);
-        String prompt = RANK_PROMPT.formatted(role, level, skillsText, location, jobList);
+        String prompt = RANK_PROMPT.formatted(en ? "English" : "Vietnamese", role, level, skillsText, location, jobList);
         LlmJsonResult result = llm.generateJson(CvCheckService.SLOT, prompt, RANK_SCHEMA);
         if (!(result instanceof LlmJsonResult.Answered answered)) {
             return Optional.empty();
@@ -198,15 +206,19 @@ public class CvJobRecommendationService {
             List<String> skills,
             String location,
             Optional<Instant> syncedAt,
-            boolean cached) {
+            boolean cached,
+            boolean en) {
         ObjectNode payload = buildBasePayload(role, skills, location, syncedAt, cached, syncJob.providerConfigured());
         ArrayNode jobs = (ArrayNode) payload.get("jobs");
         for (int i = 0; i < Math.min(TOP_RESULTS, candidates.size()); i++) {
             ScoredJob scored = candidates.get(i);
             JobPosting posting = scored.job();
             int pct = Math.min(92, Math.max(60, 60 + scored.score() * 4));
+            String defaultSummary = en
+                    ? posting.title() + " at " + posting.company() + " (" + posting.location() + ")."
+                    : "Vị trí " + posting.title() + " tại " + posting.company() + " (" + posting.location() + ").";
             String summary = posting.description().isBlank()
-                    ? "Vị trí " + posting.title() + " tại " + posting.company() + " (" + posting.location() + ")."
+                    ? defaultSummary
                     : posting.description().length() > 160
                             ? posting.description().substring(0, 160) + "..."
                             : posting.description();

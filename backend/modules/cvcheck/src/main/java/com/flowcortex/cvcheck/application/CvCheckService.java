@@ -33,7 +33,7 @@ public class CvCheckService {
             - softSkills (Weight 10%% — SHRM / Harvard Tone): Ownership, collaboration, leadership signals, concise active-voice writing.
 
             overallScore: Weighted score (0-100) using 0.30*experienceImpact + 0.25*hardSkills + 0.20*atsCompliance + 0.15*domainRelevance + 0.10*softSkills.
-            Write all text in the language of the CV (e.g. Vietnamese if the CV is in Vietnamese, English if in English).
+            OUTPUT LANGUAGE REQUIREMENT: Write ALL text fields (strengths, weaknesses, rewrittenBullets, interviewQuestions) strictly in %s.
             strengths: 3-5 concrete strong points backed by evidence in the CV.
             weaknesses: 3-5 specific weaknesses or gaps referencing the international standards above.
             missingKeywords: 4-8 important industry keywords or certifications that would elevate this CV.
@@ -54,7 +54,7 @@ public class CvCheckService {
             Score each dimension 0-100 using only evidence in the CV; never invent experience.
             Dimensions: hardSkills (match of core skills), experienceImpact (measurable results, STAR/XYZ),
             softSkills, atsCompliance (structure, keywords, formatting), domainRelevance.
-            overallScore is the weighted judgement 0-100. Write all text in the language of the CV.
+            overallScore is the weighted judgement 0-100. Write ALL text fields strictly in %s.
             rewrittenBullets: rewrite up to 5 weak CV bullets in STAR style without adding facts.
             interviewQuestions: up to 8 questions the CV makes likely.
             jobProfile: extract primaryRole, seniority, topSkills (4-6 skills), and location from the CV.
@@ -92,34 +92,39 @@ public class CvCheckService {
     }
 
     public Outcome check(String cvText) {
-        return check(cvText, null, 0);
+        return check(cvText, null, 0, "vi");
     }
 
     public Outcome check(String cvText, String jobDescription) {
-        return check(cvText, jobDescription, 0);
+        return check(cvText, jobDescription, 0, "vi");
     }
 
     public Outcome check(String cvText, String jobDescription, int pageCount) {
+        return check(cvText, jobDescription, pageCount, "vi");
+    }
+
+    public Outcome check(String cvText, String jobDescription, int pageCount, String lang) {
+        String outputLang = CvDeterministicAuditor.isEnglish(lang) ? "English" : "Vietnamese";
         String prompt = (jobDescription == null || jobDescription.isBlank())
-                ? STANDALONE_PROMPT.formatted(cvText)
-                : JD_PROMPT.formatted(jobDescription, cvText);
+                ? STANDALONE_PROMPT.formatted(outputLang, cvText)
+                : JD_PROMPT.formatted(outputLang, jobDescription, cvText);
         LlmJsonResult result = llm.generateJson(SLOT, prompt, SCHEMA);
         return switch (result) {
-            case LlmJsonResult.Answered answered -> parse(answered.json(), cvText, pageCount);
+            case LlmJsonResult.Answered answered -> parse(answered.json(), cvText, pageCount, lang);
             case LlmJsonResult.Blocked blocked -> new Outcome.Refused(Refusal.BLOCKED);
             case LlmJsonResult.Failed failed -> new Outcome.Refused(failed.kind() == LlmJsonResult.Kind.QUOTA_EXCEEDED
                     ? Refusal.BUSY : Refusal.UNAVAILABLE);
         };
     }
 
-    private Outcome parse(String answer, String cvText, int pageCount) {
+    private Outcome parse(String answer, String cvText, int pageCount, String lang) {
         try {
             JsonNode report = json.readTree(answer);
             if (!report.hasNonNull("overallScore")) {
                 return new Outcome.Refused(Refusal.UNAVAILABLE);
             }
             if (report instanceof ObjectNode obj && obj.path("dimensions").isObject()) {
-                CvDeterministicAuditor.AuditResult audit = CvDeterministicAuditor.audit(cvText, pageCount);
+                CvDeterministicAuditor.AuditResult audit = CvDeterministicAuditor.audit(cvText, pageCount, lang);
                 CvScoringArbiter.arbitrate(obj, audit);
             }
             return new Outcome.Report(report);

@@ -1,5 +1,5 @@
 {
-  "pageTitle": "AI CV Checker (Gemini)",
+  "pageTitle": "CV Checker",
   "pageLede": "Upload your PDF CV for a comprehensive evaluation: ATS compliance, core technical depth, STAR impact rewriting, and predicted interview questions.",
   "intro": {
     "title": "PDF CV Verification Frame",
@@ -20,8 +20,8 @@
     "useSamplePdf": "Use Sample PDF CV",
     "changePdf": "Change PDF",
     "removePdf": "Remove PDF file",
-    "analyze": "Analyze CV with Gemini",
-    "analyzing": "Extracting & scoring with Gemini..."
+    "analyze": "Analyze CV",
+    "analyzing": "Analyzing CV..."
   },
   "form": {
     "cvTitle": "Resume (PDF Format)",
