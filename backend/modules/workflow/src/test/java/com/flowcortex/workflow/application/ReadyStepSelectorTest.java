@@ -165,4 +165,25 @@ class ReadyStepSelectorTest {
                 .isInstanceOfSatisfying(ReadyStepSelector.Decision.Dispatch.class,
                         d -> assertThat(d.steps()).containsExactly(beforeSpeechDone.get(3)));
     }
+
+    @Test
+    void dispatchesMcClipsSevenAndEightTogetherOncePrerequisitesComplete() {
+        List<RunStep> steps = List.of(
+                complete(step(1, "generate_script", null)),
+                complete(step(2, "APPROVAL_CHECKPOINT", null)),
+                complete(step(3, "generate_speech", "{step:2}")),
+                complete(step(4, "generate_storyboard", "{step:2}")),
+                complete(step(5, "generate_keyframe", "{step:4}")),
+                complete(step(6, "APPROVAL_CHECKPOINT", "{step:5}")),
+                step(7, "generate_video", "{step:4}"),
+                step(8, "generate_video", "{step:4}"),
+                step(9, "lipsync_video", "{step:2}"),
+                step(10, "render_video", null));
+
+        ReadyStepSelector.Decision decision =
+                ReadyStepSelector.select(true, ProductVideoWorkflow.MC_ID, RunStatus.RUNNING, steps);
+
+        assertThat(decision).isInstanceOfSatisfying(ReadyStepSelector.Decision.Dispatch.class,
+                dispatch -> assertThat(dispatch.steps()).containsExactly(steps.get(6), steps.get(7)));
+    }
 }

@@ -94,7 +94,7 @@ class WorkflowServiceImpl implements WorkflowService, WorkflowAuthoring {
     }
 
     private static String inputKind(WorkflowView view) {
-        if (ProductVideoWorkflow.ID.equals(view.id())) {
+        if (ProductVideoWorkflow.isProductVideo(view.id())) {
             return "product_video";
         }
         boolean imageFirst = !view.steps().isEmpty() && "remote".equals(view.steps().getFirst().mode());

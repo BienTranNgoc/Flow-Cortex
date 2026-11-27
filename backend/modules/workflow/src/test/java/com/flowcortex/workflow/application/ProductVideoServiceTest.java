@@ -428,7 +428,8 @@ class ProductVideoServiceTest {
                 "{\"profile\":\"vi_voice_v1\"}", null);
         s3.markRunning(now);
         s3.markCompleted(null, "{}", now,
-                "[{\"name\":\"speech.wav\",\"bucket\":\"media\",\"objectKey\":\"runs/" + originalRunId + "/steps/3/attempts/1/speech.wav\",\"mime\":\"audio/wav\",\"bytes\":1000}]");
+                "[{\"name\":\"speech.wav\",\"bucket\":\"media\",\"objectKey\":\"runs/" + originalRunId
+                        + "/steps/3/attempts/1/speech.wav\",\"mime\":\"audio/wav\",\"bytes\":1000}]");
         RunStep s7 = new RunStep(UUID.randomUUID(), originalRunId, (short) 7, "generate_video", null,
                 "{\"profile\":\"vertical_ad_clip_v2\",\"referenceImages\":\"all\"}", null);
         s7.markRunning(now);

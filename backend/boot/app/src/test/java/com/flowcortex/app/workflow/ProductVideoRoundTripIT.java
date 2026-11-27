@@ -58,7 +58,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
-    void fixtureArtifactsCarryAProductVideoThroughTwoGeneratedClips() throws Exception {
+    void fixtureArtifactsCarryAProductVideoThroughSingleContinuousShot() throws Exception {
         UserView owner = newUser("product-round-trip");
         String token = loginAs(owner);
         List<UUID> uploads = List.of(uploadImage(owner));
@@ -107,32 +107,25 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
                         + "\"sourceRevisionId\":\"" + review.currentRevisionId() + "\","
                         + "\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"}");
 
-        JsonNode firstVideoJob = receiveJob("provider.video.jobs", runId, "generate_video");
-        assertThat(firstVideoJob.path("params").path("payload").path("prompt").asString())
+        JsonNode videoJob = receiveJob("provider.video.jobs", runId, "generate_video");
+        assertThat(videoJob.path("params").path("payload").path("prompt").asString())
                 .isEqualTo("Opening hero scene");
-        assertSendsFirstProductImage(firstVideoJob, runId);
-        String firstClipKey = outputKey(firstVideoJob, "clip.mp4");
-        put(MEDIA_BUCKET, firstClipKey, "video/mp4", "fixture clip one");
-        publishVideoResult(runId, firstVideoJob, firstClipKey, "b");
-
-        JsonNode secondVideoJob = receiveJob("provider.video.jobs", runId, "generate_video");
-        assertThat(secondVideoJob.path("params").path("payload").path("prompt").asString())
-                .isEqualTo("Benefit closing scene");
-        assertSendsFirstProductImage(secondVideoJob, runId);
-        String secondClipKey = outputKey(secondVideoJob, "clip.mp4");
-        put(MEDIA_BUCKET, secondClipKey, "video/mp4", "fixture clip two");
-        publishVideoResult(runId, secondVideoJob, secondClipKey, "c");
+        assertThat(videoJob.path("params").path("payload").path("durationSeconds").asInt()).isEqualTo(10);
+        assertSendsFirstProductImage(videoJob, runId);
+        String clipKey = outputKey(videoJob, "clip.mp4");
+        put(MEDIA_BUCKET, clipKey, "video/mp4", "fixture continuous clip");
+        publishVideoResult(runId, videoJob, clipKey, "b");
         // Every provider job of the run was taken off its own queue; nothing went to the wrong one.
         assertThat(rabbit.receive("provider.jobs", 200)).isNull();
+        assertThat(rabbit.receive("provider.video.jobs", 200)).isNull();
 
         JsonNode renderJob = receiveJob("media.render.jobs", runId, "render_video");
         JsonNode renderInputs = renderJob.get("inputs");
         assertThat(List.of(renderInputs.get(0).get("key").asString(), renderInputs.get(1).get("key").asString(),
-                renderInputs.get(2).get("key").asString(), renderInputs.get(3).get("key").asString()))
-                .containsExactly("image_1", "speech", "generated_video_1", "generated_video_2");
+                renderInputs.get(2).get("key").asString()))
+                .containsExactly("image_1", "speech", "generated_video_1");
         assertThat(renderJob.get("inputs").get(1).get("objectKey").asString()).isEqualTo(speechKey);
-        assertThat(renderJob.get("inputs").get(2).get("objectKey").asString()).isEqualTo(firstClipKey);
-        assertThat(renderJob.get("inputs").get(3).get("objectKey").asString()).isEqualTo(secondClipKey);
+        assertThat(renderJob.get("inputs").get(2).get("objectKey").asString()).isEqualTo(clipKey);
 
         String videoKey = outputKey(renderJob, "video.mp4");
         put(MEDIA_BUCKET, videoKey, "video/mp4", "fixture mp4");
@@ -141,7 +134,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
 
         assertThat(pollUntil(owner.id(), runId, run -> "completed".equals(run.status()), WAIT).steps())
                 .allMatch(step -> "completed".equals(step.status()));
-        assertThat(get("/api/v1/runs/" + runId + "/steps/7/outputs/video.mp4/url", token, String.class)
+        assertThat(get("/api/v1/runs/" + runId + "/steps/6/outputs/video.mp4/url", token, String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
@@ -156,7 +149,7 @@ class ProductVideoRoundTripIT extends AbstractWorkflowHttpIT {
     private void publishVideoResult(UUID runId, JsonNode job, String clipKey, String hashCharacter) {
         publishResult("provider", runId, job,
                 output("clip.mp4", clipKey, "video/mp4", 16),
-                "{\"profile\":\"vertical_ad_clip_v1\",\"durationSeconds\":5,"
+                "{\"profile\":\"vertical_ad_clip_v1\",\"durationSeconds\":10,"
                         + "\"provider\":\"wan\",\"model\":\"wan-video/wan-2.2-5b-fast\","
                         + "\"aspectRatio\":\"9:16\",\"resolution\":\"480p\","
                         + "\"sourceRevisionId\":\"" + job.path("params").path("payload")
