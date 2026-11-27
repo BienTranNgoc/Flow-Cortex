@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flowcortex.cvcheck.application.CvCheckService.Outcome;
 import com.flowcortex.cvcheck.application.CvCheckService.Refusal;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.llm.api.LlmSlotRequest;
 import com.flowcortex.llm.api.LlmSlots;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
@@ -26,9 +27,9 @@ class CvCheckServiceTest {
     private static LlmSlots slots(LlmJsonResult result) {
         return new LlmSlots() {
             @Override
-            public LlmJsonResult generateJson(String slot, String userText, String schema) {
-                assertThat(slot).isEqualTo(CvCheckService.SLOT);
-                assertThat(userText).contains("Nguyen Van An");
+            public LlmJsonResult generateJson(LlmSlotRequest request) {
+                assertThat(request.slot()).isEqualTo(CvCheckService.SLOT);
+                assertThat(request.userText()).contains("Nguyen Van An");
                 return result;
             }
 

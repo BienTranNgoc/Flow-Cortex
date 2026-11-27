@@ -13,6 +13,7 @@ import com.flowcortex.cvcheck.application.CvJobRecommendationService.Outcome;
 import com.flowcortex.cvcheck.infrastructure.CvJobPostingRepository;
 import com.flowcortex.cvcheck.infrastructure.JobPosting;
 import com.flowcortex.llm.api.LlmJsonResult;
+import com.flowcortex.llm.api.LlmSlotRequest;
 import com.flowcortex.llm.api.LlmSlots;
 import com.flowcortex.llm.api.LlmSpeechResult;
 import java.time.Duration;
@@ -38,9 +39,9 @@ class CvJobRecommendationServiceTest {
     private static LlmSlots slots(LlmJsonResult result, AtomicInteger calls) {
         return new LlmSlots() {
             @Override
-            public LlmJsonResult generateJson(String slot, String userText, String schema) {
+            public LlmJsonResult generateJson(LlmSlotRequest request) {
                 calls.incrementAndGet();
-                assertThat(slot).isEqualTo(CvCheckService.SLOT);
+                assertThat(request.slot()).isEqualTo(CvCheckService.SLOT);
                 return result;
             }
 

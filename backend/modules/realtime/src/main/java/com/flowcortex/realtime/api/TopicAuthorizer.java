@@ -13,4 +13,9 @@ public interface TopicAuthorizer {
 
     /** Whether {@code userId} may read the claimed {@code topic}. */
     boolean authorize(UUID userId, String topic);
+
+    /** Whether a stream holding a topic of this authorizer is asked about it again every recheck interval. */
+    default boolean revocable() {
+        return false;
+    }
 }

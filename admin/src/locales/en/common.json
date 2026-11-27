@@ -7,6 +7,17 @@
   "errors": {
     "requestFailed": "Something went wrong. Try again."
   },
+  "bell": {
+    "label": "Notifications, {{unread}} unread",
+    "title": "Notifications",
+    "unreadMark": "Unread:",
+    "markAllRead": "Mark all as read",
+    "markAllFailed": "Could not mark the notifications as read. Try again.",
+    "loading": "Loading notifications…",
+    "empty": "You have no notifications.",
+    "loadError": "Could not load notifications.",
+    "retry": "Try again"
+  },
   "language": {
     "groupLabel": "Language",
     "vi": "Tiếng Việt",
@@ -89,6 +100,7 @@
         "roles": "Roles & permissions",
         "contentDocuments": "Documents",
         "contentMedia": "Media library",
+        "trendTaxonomy": "Trend taxonomy",
         "chatSettings": "Settings"
       }
     },

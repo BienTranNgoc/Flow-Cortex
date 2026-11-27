@@ -4,6 +4,7 @@ import com.flowcortex.support.request.InboxQuery.Bounds;
 import com.flowcortex.support.request.InboxQuery.InboxFilter;
 import com.flowcortex.support.request.InboxQuery.Sort;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -30,9 +31,37 @@ final class InboxSql {
     private InboxSql() {
     }
 
+    /**
+     * A {@code new} or {@code in_progress} request past its warning cut-off, so due soon or overdue; the cut-offs
+     * are {@code now} minus the warning, already collapsed onto the limit when it is not below it.
+     */
+    static final String AT_RISK = "((status = 'new' AND last_activity_at < :newWarnCut) "
+            + "OR (status = 'in_progress' AND last_activity_at < :inProgressWarnCut))";
+
+    private static final String OVERDUE = "((status = 'new' AND last_activity_at < :newCut) "
+            + "OR (status = 'in_progress' AND last_activity_at < :inProgressCut))";
+
+    /** The filter without any SLA clause; the filter must not be {@code atRisk}. */
     static Where where(InboxFilter filter, Dimension exclude) {
+        return where(filter, exclude, null);
+    }
+
+    /**
+     * @param thresholds binds the four SLA cut-offs, read from {@code filter.now()}; null only when the filter is
+     *        not {@code atRisk} and the query adds no SLA clause of its own
+     */
+    static Where where(InboxFilter filter, Dimension exclude, SlaThresholds thresholds) {
         List<String> clauses = new ArrayList<>();
         MapSqlParameterSource params = new MapSqlParameterSource();
+        if (thresholds != null) {
+            Instant now = filter.now();
+            params.addValue("newCut", Timestamp.from(now.minus(thresholds.newLimit())))
+                    .addValue("newWarnCut", Timestamp.from(now.minus(thresholds.newWarnCut())))
+                    .addValue("inProgressCut", Timestamp.from(now.minus(thresholds.inProgressLimit())))
+                    .addValue("inProgressWarnCut", Timestamp.from(now.minus(thresholds.inProgressWarnCut())));
+        } else if (filter.atRisk()) {
+            throw new IllegalArgumentException("The at-risk filter needs the SLA thresholds");
+        }
         if (filter.status() != null && exclude != Dimension.STATUS) {
             clauses.add("status = :status");
             params.addValue("status", filter.status());
@@ -69,7 +98,19 @@ final class InboxSql {
                 clauses.add("lower(subject) LIKE lower(:pattern)");
             }
         }
+        if (filter.atRisk()) {
+            clauses.add(AT_RISK);
+        }
         return new Where(clauses.isEmpty() ? "" : " WHERE " + String.join(" AND ", clauses), params);
+    }
+
+    /**
+     * Splits the at-risk rows of a query over {@code where.and(AT_RISK)} into overdue and due soon, so a count
+     * reads only the rows past a warning cut-off.
+     */
+    static String slaSummarySelect() {
+        return "SELECT count(*) FILTER (WHERE " + OVERDUE + ") AS overdue, count(*) FILTER (WHERE NOT " + OVERDUE
+                + ") AS due_soon FROM support_request";
     }
 
     static String orderBy(Sort sort) {

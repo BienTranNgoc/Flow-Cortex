@@ -1,0 +1,112 @@
+{
+  "eyebrow": "Content",
+  "title": "Trend taxonomy",
+  "description": "Categories and tags that organise trend templates, in the order members see them.",
+  "readOnlyHint": "You can view the taxonomy but not change it.",
+  "common": {
+    "loading": "Loading…",
+    "loadFailed": "Could not load the trend taxonomy.",
+    "retry": "Retry",
+    "refreshFailed": "Could not refresh the latest data — showing the version loaded earlier.",
+    "saveFailed": "Could not save. Please try again."
+  },
+  "tabs": {
+    "label": "Kind of record",
+    "categories": "Categories",
+    "tags": "Tags"
+  },
+  "categories": {
+    "tableLabel": "Categories table",
+    "add": "Add category",
+    "emptyTitle": "No categories yet",
+    "emptyWritable": "Add the first category to start organising templates.",
+    "emptyReadOnly": "There are no categories."
+  },
+  "tags": {
+    "tableLabel": "Tags table",
+    "add": "Add tag",
+    "emptyTitle": "No tags yet",
+    "emptyWritable": "Add the first tag to start labelling templates.",
+    "emptyReadOnly": "There are no tags."
+  },
+  "columns": {
+    "order": "Order",
+    "nameVi": "Vietnamese name",
+    "nameEn": "English name",
+    "usage": "Templates using it",
+    "visibility": "Visibility",
+    "actions": "Actions"
+  },
+  "visibility": {
+    "visible": "Visible",
+    "hidden": "Hidden",
+    "hide": "Hide",
+    "show": "Show",
+    "hideRow": "Hide {{name}}",
+    "showRow": "Show {{name}}"
+  },
+  "actions": {
+    "up": "Up",
+    "down": "Down",
+    "edit": "Edit",
+    "delete": "Delete",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "editRow": "Edit {{name}}",
+    "deleteRow": "Delete {{name}}"
+  },
+  "announce": {
+    "created": "Added {{name}}",
+    "updated": "Saved {{name}}",
+    "movedUp": "Moved {{name}} up to position {{position}}",
+    "movedDown": "Moved {{name}} down to position {{position}}",
+    "deleted": "Deleted {{name}}",
+    "hidden": "{{name}} is now hidden",
+    "shown": "{{name}} is now visible"
+  },
+  "dialog": {
+    "addCategory": "Add category",
+    "editCategory": "Edit category",
+    "addTag": "Add tag",
+    "editTag": "Edit tag",
+    "nameVi": "Vietnamese name",
+    "nameEn": "English name",
+    "hint": "Up to {{max}} characters",
+    "key": "Key",
+    "keyHint": "Fixed when the category is created, because templates store it.",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "errors": {
+      "name": "Enter 1–{{max}} characters",
+      "letterOrDigit": "The Vietnamese name needs at least one letter or digit"
+    }
+  },
+  "delete": {
+    "categoryTitle": "Delete category {{name}}?",
+    "categoryBody": "A category that templates use cannot be deleted; hide it instead.",
+    "tagTitle": "Delete tag {{name}}?",
+    "tagBodyUnused": "No template uses this tag.",
+    "tagBody_one": "{{count}} template loses this tag.",
+    "tagBody_other": "{{count}} templates lose this tag.",
+    "confirm": "Delete",
+    "working": "Deleting…",
+    "cancel": "Cancel"
+  },
+  "inUse": {
+    "message_one": "{{name}} is used by {{count}} template, so it cannot be deleted.",
+    "message_other": "{{name}} is used by {{count}} templates, so it cannot be deleted.",
+    "hideInstead": "Hide instead",
+    "dismiss": "Dismiss"
+  },
+  "problems": {
+    "category-not-found": "That category no longer exists. The list was reloaded.",
+    "tag-not-found": "That tag no longer exists. The list was reloaded.",
+    "category-in-use_one": "{{count}} template uses this category, so it cannot be deleted.",
+    "category-in-use_other": "{{count}} templates use this category, so it cannot be deleted.",
+    "taxonomy-order-stale": "The list changed since it was loaded, so the move was not applied. The list was reloaded; try again.",
+    "taxonomy-full": "This list is full (1000 records). Delete one before adding another.",
+    "category-key-exhausted": "Every key derived from this name is taken. Choose a different Vietnamese name.",
+    "validation-failed": "Some of the data was refused. Check the names and try again."
+  }
+}

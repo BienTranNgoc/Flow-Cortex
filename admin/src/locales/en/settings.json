@@ -18,8 +18,36 @@
   "changedAt": "Changed at {{at}}",
   "vetoedNote": "Turned off by the server configuration; the stored value applies once it is lifted.",
   "degradedNote": "The settings store is unavailable, so a safe fallback applies.",
+  "lowerValue": {
+    "title": "Lower the versions kept?",
+    "message": "Lowering from {{from}} to {{to}} removes each project's older versions beyond {{to}} at its next save. They cannot be restored.",
+    "confirm": "Lower and save",
+    "cancel": "Cancel"
+  },
   "groups": {
-    "support": "Help Center"
+    "support": "Help Center",
+    "media": "Media and video editor",
+    "user": "Accounts",
+    "workflow": "Workflows"
+  },
+  "deletionConditions": {
+    "title": "Account deletion conditions",
+    "description": "A member cannot request deletion while an enabled condition below applies to them. The message is shown to the member in their language.",
+    "loadFailed": "Could not load the account deletion conditions.",
+    "empty": "There are no account deletion conditions to show.",
+    "enabled": "Blocks deletion",
+    "order": "Order",
+    "messageVi": "Message to the member (Vietnamese)",
+    "messageEn": "Message to the member (English)",
+    "messageLimit": "Up to {{max}} characters.",
+    "names": {
+      "workflow": {
+        "active_run": "A workflow is running"
+      },
+      "support": {
+        "open_request": "A support request is open"
+      }
+    }
   },
   "source": {
     "STORED": "Set by an admin",
@@ -45,7 +73,79 @@
     "older": "Older"
   },
   "keys": {
+    "media": {
+      "editor": {
+        "project_max_versions": {
+          "label": "Versions kept per project",
+          "help": "Older versions beyond this number are removed when a project is saved. 1 to 200."
+        },
+        "project_max_bytes": {
+          "label": "Largest project document (bytes)",
+          "help": "The editor refuses to save a project document larger than this. 100000 to 10000000 bytes."
+        },
+        "batch_max_items": {
+          "label": "Scenes per batch",
+          "help": "The editor refuses an AI batch or scene split with more scenes than this. 1 to 12."
+        },
+        "take_check_daily_max": {
+          "label": "Take checks per member per day",
+          "help": "A member who has used this many take checks today is refused until the next Vietnam day. 1 to 200."
+        },
+        "stems_max_duration_sec": {
+          "label": "Longest clip for voice and music separation (seconds)",
+          "help": "The editor refuses to separate voice and music from a clip longer than this. 60 to 3600 seconds."
+        },
+        "speakers_max_duration_sec": {
+          "label": "Longest clip for speaker separation (seconds)",
+          "help": "The editor refuses to separate speakers in a clip longer than this. 60 to 1800 seconds."
+        },
+        "derive_max_duration_sec": {
+          "label": "Longest clip for deriving a version (seconds)",
+          "help": "The editor refuses to derive a new clip from a source longer than this. 10 to 3600 seconds."
+        },
+        "beats_max_duration_sec": {
+          "label": "Longest clip for beat analysis (seconds)",
+          "help": "The editor refuses to analyse the beats of a clip longer than this. 30 to 1200 seconds."
+        },
+        "audio_tools_max_duration_sec": {
+          "label": "Longest track for audio tools (seconds)",
+          "help": "The editor refuses to extract the audio of a track longer than this. 60 to 14400 seconds."
+        }
+      }
+    },
+    "user": {
+      "account_deletion": {
+        "enabled": {
+          "label": "Members can request account deletion",
+          "help": "Turning it off stops new requests; requests already made keep their deadline. Nothing is erased at the deadline until the erasure step ships."
+        },
+        "grace_period_days": {
+          "label": "Days to change one's mind",
+          "help": "A member can cancel until this many days after requesting. Each request keeps the period that applied when it was made. 1 to 365 days."
+        }
+      },
+      "pw_reset": {
+        "enabled": {
+          "label": "Password reset",
+          "help": "Turning it off hides the reset link for members and refuses reset requests from the next request."
+        }
+      }
+    },
+    "workflow": {
+      "run_cancellation": {
+        "enabled": {
+          "label": "Run cancellation",
+          "help": "Turning it off hides the Stop button for members and refuses cancel requests from the next request."
+        }
+      }
+    },
     "support": {
+      "help_center": {
+        "enabled": {
+          "label": "Help Center",
+          "help": "Turning it off hides the Help Center for members and refuses every Help Center request from the next request."
+        }
+      },
       "assistant": {
         "enabled": {
           "label": "AI assistant",
@@ -96,6 +196,30 @@
         "closed_request_months": {
           "label": "Months to keep a closed request",
           "help": "Counted from the request's last activity. 6 to 120 months."
+        }
+      },
+      "sla": {
+        "alerts": {
+          "enabled": {
+            "label": "Alert admins about late requests",
+            "help": "Rings the admin bell when a request becomes due soon or overdue. The inbox keeps showing each request's level while it is off."
+          }
+        },
+        "new_hours": {
+          "label": "Hours before a new request is overdue",
+          "help": "Counted from the request's last activity. 1 to 720 hours. A warning at or above this limit means no \"due soon\" level."
+        },
+        "new_warn_hours": {
+          "label": "Hours before a new request is due soon",
+          "help": "Counted from the request's last activity. 1 to 720 hours. At or above the limit, \"due soon\" never shows."
+        },
+        "in_progress_days": {
+          "label": "Days before an in-progress request is overdue",
+          "help": "Counted from the request's last activity. 1 to 90 days. A warning at or above this limit means no \"due soon\" level."
+        },
+        "in_progress_warn_days": {
+          "label": "Days before an in-progress request is due soon",
+          "help": "Counted from the request's last activity. 1 to 90 days. At or above the limit, \"due soon\" never shows."
         }
       }
     }

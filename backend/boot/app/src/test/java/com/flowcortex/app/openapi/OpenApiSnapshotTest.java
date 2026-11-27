@@ -10,9 +10,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +59,56 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
     }
 
     @Test
+    void googleConnectorRoutesPublishTheirSuccessBody() {
+        // An explicit error @ApiResponse makes springdoc drop its default 200, which leaves the generated
+        // client with an error-only return type.
+        ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        tools.jackson.databind.JsonNode paths = JSON.readTree(response.getBody()).path("paths");
+
+        Set<String> bodyOperations = Set.of("googleAuthorize", "googleRead", "googleHealth", "listGoogleSpreadsheets",
+                "listGoogleSpreadsheetTabs", "previewGoogleSpreadsheetTab");
+        Set<String> seen = new HashSet<>();
+        for (Map.Entry<String, tools.jackson.databind.JsonNode> path : paths.properties()) {
+            if (!path.getKey().startsWith("/api/v1/connectors/google")) {
+                continue;
+            }
+            for (Map.Entry<String, tools.jackson.databind.JsonNode> operation : path.getValue().properties()) {
+                tools.jackson.databind.JsonNode responses = operation.getValue().path("responses");
+                String operationId = operation.getValue().path("operationId").asString();
+                assertThat(responses.propertyNames().stream().anyMatch(code -> code.startsWith("2") || code.startsWith("3")))
+                        .as("%s %s documents a success response", operation.getKey(), path.getKey())
+                        .isTrue();
+                if (bodyOperations.contains(operationId)) {
+                    seen.add(operationId);
+                    tools.jackson.databind.JsonNode content = responses.path("200").path("content");
+                    assertThat(content.isObject() && content.properties().stream()
+                            .anyMatch(media -> media.getValue().path("schema").isObject()))
+                            .as("%s documents a 200 body schema", operationId)
+                            .isTrue();
+                }
+            }
+        }
+        assertThat(seen).isEqualTo(bodyOperations);
+    }
+
+    @Test
+    void theWorkflowArtifactPublishesAStepConfigAsAnObjectAndTheOptionalDataStore() {
+        ResponseEntity<String> response = restTemplate.getForEntity("/v3/api-docs", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        tools.jackson.databind.JsonNode schemas = JSON.readTree(response.getBody()).at("/components/schemas");
+
+        tools.jackson.databind.JsonNode config = schemas.at("/WorkflowArtifactStep/properties/config");
+        assertThat(config.get("type").toString()).contains("object").contains("null").doesNotContain("string");
+        assertThat(schemas.at("/WorkflowArtifactStep/properties/stepOrder/maximum").asInt()).isEqualTo(32767);
+        assertThat(schemas.at("/WorkflowArtifact/properties/dataStore/items/$ref").asText())
+                .endsWith("/WorkflowArtifactDataEntry");
+        assertThat(schemas.at("/WorkflowArtifact/required").toString()).doesNotContain("dataStore");
+        assertThat(schemas.at("/WorkflowArtifactDataEntry/required").toString()).contains("key", "dataType", "value");
+    }
+
+    @Test
     void theOAuthErrorAnswersAreTypedAsTheOAuthErrorObject() throws IOException {
         JsonNode paths = liveDocument().get("paths");
         String[][] errorAnswers = {
@@ -90,6 +142,39 @@ class OpenApiSnapshotTest extends AbstractPostgresBootTest {
         assertThat(read).doesNotContain("IdempotencyKey", "IdempotentReplayed", "ApiTokenDailyLimit");
         String outsideTheTokenRoutes = paths.at(pointer("/api/v1/oauth/token") + "/post").toString();
         assertThat(outsideTheTokenRoutes).doesNotContain("IdempotencyKey", "ApiTokenDailyLimit");
+    }
+
+    @Test
+    void everyScheduleOperationDocumentsItsSuccessAnswer() throws IOException {
+        JsonNode paths = liveDocument().get("paths");
+        String schedule = "/api/v1/workflows/{id}/schedule";
+        String[][] successes = {
+                {schedule, "put", "200", "ScheduleResponse"},
+                {schedule, "get", "200", "ScheduleResponse"},
+                {schedule + "/pause", "post", "200", "ScheduleResponse"},
+                {schedule + "/resume", "post", "200", "ScheduleResponse"},
+                {schedule + "/run-now", "post", "201", "RunResponse"},
+                {schedule + "/runs", "get", "200", "PageViewScheduleFireResponse"}};
+
+        for (String[] operation : successes) {
+            JsonNode success = paths.at(pointer(operation[0]) + "/" + operation[1] + "/responses/" + operation[2]);
+            assertThat(success.at("/content/application~1json/schema/$ref").asText())
+                    .as("%s %s %s", operation[1], operation[0], operation[2])
+                    .isEqualTo("#/components/schemas/" + operation[3]);
+        }
+        assertThat(paths.at(pointer(schedule) + "/delete/responses/204").isMissingNode())
+                .as("delete answers 204").isFalse();
+    }
+
+    @Test
+    void theBatchReadsPublishTheirSuccessAnswers() throws IOException {
+        JsonNode paths = liveDocument().get("paths");
+
+        assertThat(paths.at(pointer("/api/v1/batches/{id}") + "/get/responses/200/content/application~1json/schema/$ref")
+                .asText()).isEqualTo("#/components/schemas/BatchResponse");
+        assertThat(paths.at(pointer("/api/v1/batches/{id}/rows")
+                + "/get/responses/200/content/application~1json/schema/$ref").asText())
+                .isEqualTo("#/components/schemas/PageViewBatchRowResponse");
     }
 
     private JsonNode liveDocument() throws IOException {

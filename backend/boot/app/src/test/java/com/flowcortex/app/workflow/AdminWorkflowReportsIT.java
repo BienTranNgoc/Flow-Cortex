@@ -262,7 +262,8 @@ class AdminWorkflowReportsIT extends AbstractWorkflowHttpIT {
             assertThat(row.steps()).isEqualTo(1);
         });
         List<String> sql = statements.forRequest(LIST);
-        assertThat(sql).as("statements for one page: %s", sql).hasSizeLessThanOrEqualTo(5);
+        assertThat(sql).as("statements for one page, the deletion gate's read included: %s", sql)
+                .hasSizeLessThanOrEqualTo(6);
     }
 
     private UserView newMember(UserView admin) {
