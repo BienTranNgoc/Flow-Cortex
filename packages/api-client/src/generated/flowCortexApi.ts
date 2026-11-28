@@ -1868,6 +1868,8 @@ export interface ProductVideoRunRequest {
    * @maxLength 500
    */
   sceneNote?: string;
+  /** @pattern voice_bgm|music_only */
+  audioMode?: string;
 }
 
 export interface RedoProductVideoRequest {
@@ -12824,6 +12826,60 @@ export const startProductVideoRun = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(productVideoRunRequest),
+  });
+};
+
+export type reopenProductVideoScriptResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type reopenProductVideoScriptResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type reopenProductVideoScriptResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type reopenProductVideoScriptResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type reopenProductVideoScriptResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type reopenProductVideoScriptResponseSuccess = reopenProductVideoScriptResponse200 & {
+  headers: Headers;
+};
+export type reopenProductVideoScriptResponseError = (
+  | reopenProductVideoScriptResponse400
+  | reopenProductVideoScriptResponse409
+  | reopenProductVideoScriptResponse422
+  | reopenProductVideoScriptResponse429
+) & {
+  headers: Headers;
+};
+
+export type reopenProductVideoScriptResponse =
+  reopenProductVideoScriptResponseSuccess | reopenProductVideoScriptResponseError;
+
+export const getReopenProductVideoScriptUrl = (runId: string) => {
+  return `/api/v1/product-videos/runs/${runId}/script/reopen`;
+};
+
+export const reopenProductVideoScript = async (
+  runId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reopenProductVideoScriptResponse> => {
+  return customFetch<reopenProductVideoScriptResponse>(getReopenProductVideoScriptUrl(runId), {
+    ...options,
+    method: 'POST',
   });
 };
 

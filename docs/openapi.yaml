@@ -3866,6 +3866,37 @@ paths:
           $ref: "#/components/responses/IdempotencyKeyReused"
         "429":
           $ref: "#/components/responses/ApiTokenDailyLimit"
+  /api/v1/product-videos/runs/{runId}/script/reopen:
+    post:
+      tags:
+      - product-videos-controller
+      operationId: reopenProductVideoScript
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: OK
+          headers:
+            Idempotent-Replayed:
+              $ref: "#/components/headers/IdempotentReplayed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunResponse"
+        "400":
+          $ref: "#/components/responses/IdempotencyKeyInvalid"
+        "409":
+          $ref: "#/components/responses/IdempotencyInProgress"
+        "422":
+          $ref: "#/components/responses/IdempotencyKeyReused"
+        "429":
+          $ref: "#/components/responses/ApiTokenDailyLimit"
   /api/v1/product-videos/runs/{runId}/redo:
     post:
       tags:
@@ -14848,6 +14879,9 @@ components:
           type: string
           maxLength: 500
           minLength: 0
+        audioMode:
+          type: string
+          pattern: voice_bgm|music_only
       required:
       - description
       - productName
