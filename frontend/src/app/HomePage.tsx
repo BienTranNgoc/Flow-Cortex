@@ -6,6 +6,8 @@ import { problemDetailOf } from '../lib/problemMessage';
 import { HomePrompt } from '../features/chat/HomePrompt';
 import { useFeatures } from './useFeatures';
 import { useWorkflowsQuery } from '../features/workflow/useWorkflows';
+import { CvCheckCard } from '../features/dashboard/CvCheckCard';
+import { matchesCvCheckCard } from '../features/dashboard/cvCheckCardFilter';
 import { FilterBar } from '../features/dashboard/FilterBar';
 import { SearchBar } from '../features/dashboard/SearchBar';
 import { useDashboardWorkflows } from '../features/dashboard/useDashboardWorkflows';
@@ -34,6 +36,12 @@ export function HomePage() {
   const { filtered, counts, query, setQuery, category, setCategory, reset } = dashboard;
   const hasWorkflows = workflows.length > 0;
   const workflowsReady = !workflowsQuery.isLoading && !workflowsQuery.isError;
+  const showCvCheckCard = matchesCvCheckCard(query, category);
+  const displayCounts = {
+    ...counts,
+    all: counts.all + 1,
+    production: counts.production + 1,
+  };
 
   if (meQuery.isLoading)
     return <output className="dashboard-loading">{t('common.home.loading')}</output>;
@@ -86,7 +94,7 @@ export function HomePage() {
             <div className="launchpad-cards__search">
               <SearchBar value={query} onChange={setQuery} />
             </div>
-            <FilterBar value={category} onChange={setCategory} counts={counts} />
+            <FilterBar value={category} onChange={setCategory} counts={displayCounts} />
           </div>
         )}
 
@@ -100,7 +108,7 @@ export function HomePage() {
             }}
           />
         )}
-        {workflowsReady && hasWorkflows && filtered.length === 0 && (
+        {workflowsReady && hasWorkflows && filtered.length === 0 && !showCvCheckCard && (
           <StatusBlock
             kind="empty"
             message={t('common.state.noMatch')}
@@ -115,10 +123,11 @@ export function HomePage() {
           />
         )}
 
-        {(workflowsQuery.isLoading || filtered.length > 0) && (
+        {(workflowsQuery.isLoading || filtered.length > 0 || (workflowsReady && showCvCheckCard)) && (
           <div className="workflow-grid-region">
             <div className="workflow-grid" aria-busy={workflowsQuery.isLoading || undefined}>
               {workflowsQuery.isLoading && <Skeleton shape="card" count={PLACEHOLDER_CARDS} />}
+              {workflowsReady && showCvCheckCard && <CvCheckCard />}
               {filtered.map((workflow) => (
                 <WorkflowCard key={workflow.id ?? workflow.name} workflow={workflow} />
               ))}

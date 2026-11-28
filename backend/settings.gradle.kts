@@ -25,6 +25,7 @@ include(
     ":modules:connector",
     ":modules:billing",
     ":modules:chat",
+    ":modules:cvcheck",
     ":modules:notification",
     ":modules:trend",
     ":modules:trash",

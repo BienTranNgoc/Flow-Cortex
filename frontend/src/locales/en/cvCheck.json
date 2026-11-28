@@ -1,0 +1,110 @@
+{
+  "pageTitle": "CV Checker",
+  "pageLede": "Upload your PDF CV for a comprehensive evaluation: ATS compliance, core technical depth, STAR impact rewriting, and predicted interview questions.",
+  "homeCard": {
+    "title": "CV Checker",
+    "description": "Upload your PDF CV for international ATS scoring, STAR bullet optimization, and matching job recommendations.",
+    "steps": {
+      "readPdf": "Read PDF",
+      "checkAts": "ATS Audit",
+      "scoreCv": "Score CV",
+      "findJobs": "Find Jobs"
+    }
+  },
+  "intro": {
+    "title": "PDF CV Verification Frame",
+    "desc": "Upload your PDF CV directly for full in-browser preview and automated text extraction via Apache PDFBox + Google Gemini 3.5 Flash."
+  },
+  "verdict": {
+    "tier1": "Tier 1 — Fast-Track (Big Tech Standard)",
+    "tier2": "Tier 2 — Recruiter Ready (SHRM 75+)",
+    "tier3": "Tier 3 — Conditional (Needs Optimization)",
+    "tier4": "Tier 4 — High ATS Rejection Risk"
+  },
+  "actions": {
+    "loadSample": "Load Sample PDF CV",
+    "clearAll": "Clear all",
+    "uploadFile": "Upload PDF file",
+    "uploadPdf": "Upload PDF file",
+    "browsePdf": "Browse PDF file",
+    "useSamplePdf": "Use Sample PDF CV",
+    "changePdf": "Change PDF",
+    "removePdf": "Remove PDF file",
+    "analyze": "Analyze CV",
+    "analyzing": "Analyzing CV..."
+  },
+  "progress": {
+    "readPdf": "Reading PDF",
+    "checkAts": "Checking ATS",
+    "scoreCv": "Scoring CV",
+    "findJobs": "Finding Jobs",
+    "finalizing": "Finalizing analysis..."
+  },
+  "form": {
+    "cvTitle": "Resume (PDF Format)",
+    "cvPlaceholder": "Paste resume text here...",
+    "dropzoneTitle": "Drag & drop PDF CV here",
+    "dropzoneDesc": "or click to browse from your computer · PDF only (.pdf), max 8MB",
+    "dropzoneAria": "PDF CV upload frame",
+    "pdfPreviewTitle": "PDF CV Preview",
+    "jdTitle": "Job Description (JD)",
+    "jdPlaceholder": "Paste target job description here (technical requirements, responsibilities, benefits)...",
+    "maxChars": "Max 20,000 characters",
+    "maxCharsJd": "Max 10,000 characters"
+  },
+  "results": {
+    "title": "Analysis Results",
+    "overallScore": "Overall Fit Score",
+    "overallScoreOf100": "Overall Fit Score / 100",
+    "strengths": "Key Strengths",
+    "weaknesses": "Areas for Improvement",
+    "missingKeywords": "Missing Keywords & Skills"
+  },
+  "dimensions": {
+    "hardSkills": "Hard Skills Depth (ESCO / O*NET)",
+    "experienceImpact": "Impact & Metrics (Google XYZ)",
+    "softSkills": "Soft Skills & Tone",
+    "atsCompliance": "ATS & Structure (SHRM)",
+    "domainRelevance": "Career Clarity (Harvard OCS)"
+  },
+  "atsChecklist": {
+    "title": "Deterministic International ATS Audit",
+    "subtitle": "Measured directly from PDF structure & resume content",
+    "pass": "PASS",
+    "warn": "WARN",
+    "fail": "FAIL"
+  },
+  "tabs": {
+    "ariaLabel": "Detailed results",
+    "evaluation": "Strengths & Weaknesses",
+    "bullets": "STAR Bullet Optimization",
+    "interview": "Predicted Interview Questions",
+    "jobs": "Matching Jobs"
+  },
+  "jobs": {
+    "detectedProfile": "Vietnam job profile:",
+    "syncedNote": "Synced (weekly):",
+    "cachedBadge": "Cached · Refreshes weekly",
+    "loading": "Finding matching Vietnam job openings...",
+    "error": "Unable to load matching jobs right now. Please retry or search directly on job boards.",
+    "retry": "Retry",
+    "matchSuffix": "match",
+    "viewAndApply": "View & Apply",
+    "unconfigured": "SERPAPI_API_KEY or JSEARCH_API_KEY is not configured yet for live Vietnam job sync. Use the quick job board links below.",
+    "empty": "No direct listings found for this role yet. Use the quick search links below.",
+    "moreOnBoards": "Explore more on Vietnam job boards:"
+  },
+  "bullets": {
+    "original": "[Original]:",
+    "improved": "[Suggested STAR]:",
+    "empty": "No rewritten bullet suggestions available."
+  },
+  "interview": {
+    "empty": "No interview questions predicted."
+  },
+  "error": {
+    "notACv": "This PDF does not look like a CV or resume. Please double-check and upload your actual resume file.",
+    "fileTooLarge": "This PDF exceeds the 8MB size limit. Please compress the file or upload a smaller PDF.",
+    "general": "An error occurred while evaluating the CV. Please verify your PDF file or try again in a few moments."
+  }
+}

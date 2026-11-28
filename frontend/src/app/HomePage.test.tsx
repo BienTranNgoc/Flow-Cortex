@@ -1,5 +1,5 @@
 import { setToken, type WorkflowResponse, type WorkflowStepResponse } from '@flow-cortex/api-client';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import { renderRoute, stubApi } from '../test/fakeApi';
@@ -120,9 +120,10 @@ describe('HomePage — launchpad cards', () => {
     renderHome();
 
     await screen.findByRole('heading', { name: 'A' });
-    expect(screen.queryByText(/^~\d+s$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/GPU Credit/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/P[012]/)).not.toBeInTheDocument();
+    const cardA = screen.getByRole('link', { name: 'Open A' });
+    expect(within(cardA).queryByText(/^~\d+s$/)).not.toBeInTheDocument();
+    expect(within(cardA).queryByText(/GPU Credit/)).not.toBeInTheDocument();
+    expect(within(cardA).queryByText(/P[012]/)).not.toBeInTheDocument();
   });
 
   it('shows a load error with retry when the workflows API fails', async () => {
@@ -275,7 +276,24 @@ describe('HomePage — launchpad cards', () => {
     expect(screen.getByText('No workflow matches your search.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByRole('searchbox')).toHaveValue('');
-    expect(screen.getAllByRole('link', { name: /^Open / })).toHaveLength(3);
+    expect(screen.getAllByRole('link', { name: /^Open / })).toHaveLength(4);
+  });
+
+  it('renders the CV Checker pipeline card first and links it to /check-cv', async () => {
+    stubApi({
+      'GET /api/v1/auth/me': { status: 200, body: ME },
+      'GET /api/v1/workflows': {
+        status: 200,
+        body: [workflow('wf-a', 'Douyin Video Repurpose', DOUYIN_STEPS)],
+      },
+    });
+
+    renderHome();
+
+    const cvLink = await screen.findByRole('link', { name: 'Open CV Checker' });
+    expect(cvLink).toHaveAttribute('href', '/check-cv');
+    const cardLinks = screen.getAllByRole('link', { name: /^Open / });
+    expect(cardLinks[0]).toBe(cvLink);
   });
 
   it('offers the guide when the account has no workflows', async () => {
@@ -355,7 +373,7 @@ describe('HomePage — launchpad cards', () => {
 
     expect(await screen.findByText('Review required')).toBeInTheDocument();
     expect(screen.getByText('3 steps')).toBeInTheDocument();
-    expect(screen.getByText(/^~\d/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^~\d/).length).toBeGreaterThanOrEqual(2);
   });
 
   it('shows a short non-technical description below each card', async () => {

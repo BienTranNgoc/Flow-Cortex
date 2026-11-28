@@ -2481,6 +2481,22 @@ export interface DriveItemResponse {
   updatedAt: string;
 }
 
+export interface JsonNode {}
+
+export interface CheckRequest {
+  cvText?: string;
+  jobDescription?: string;
+  lang?: string;
+}
+
+export interface RecommendJobsRequest {
+  primaryRole?: string;
+  seniority?: string;
+  topSkills?: string[];
+  location?: string;
+  lang?: string;
+}
+
 export interface TelegramRefreshChatsRequest {
   chatId?: number;
   /**
@@ -2590,12 +2606,6 @@ export interface ChatConversationCreate {
   firstMessage: ChatFirstMessage;
 }
 
-/**
- * Card or run payload; shape depends on kind
- * @nullable
- */
-export type ChatMessagePayload = { [key: string]: unknown } | null;
-
 export interface ChatMessage {
   id?: string;
   seq?: number;
@@ -2606,7 +2616,7 @@ export interface ChatMessage {
    * Card or run payload; shape depends on kind
    * @nullable
    */
-  payload?: ChatMessagePayload;
+  payload?: JsonNode | null;
   status?: string;
   createdAt?: string;
 }
@@ -3123,7 +3133,7 @@ export interface UpdateStepRequest {
    * @maxLength 255
    */
   inputRef?: string;
-  config?: string;
+  config?: JsonNode;
 }
 
 export interface PublishedVersionRequest {
@@ -3220,8 +3230,6 @@ export interface UiPreferences {
   theme?: UiPreferencesTheme;
   sidebarMode?: UiPreferencesSidebarMode;
 }
-
-export interface JsonNode {}
 
 export type PrivacySettingsProfile =
   (typeof PrivacySettingsProfile)[keyof typeof PrivacySettingsProfile];
@@ -5478,6 +5486,16 @@ export type ListDriveItemsParams = {
   size?: number;
   role?: string;
   contentType?: string;
+};
+
+export type CheckCvParams = {
+  cvText?: string;
+  jobDescription?: string;
+  lang?: string;
+};
+
+export type CheckCvBodyOne = {
+  cvFile?: Blob | File;
 };
 
 export type ListChatConversationsParams = {
@@ -14590,6 +14608,89 @@ export const createDriveItem = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createDriveItemRequest),
+  });
+};
+
+export type checkCvResponse200 = {
+  data: JsonNode;
+  status: 200;
+};
+
+export type checkCvResponseSuccess = checkCvResponse200 & {
+  headers: Headers;
+};
+export type checkCvResponse = checkCvResponseSuccess;
+
+export const getCheckCvUrl = (params?: CheckCvParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/cv-check?${stringifiedParams}`
+    : `/api/v1/cv-check`;
+};
+
+export const checkCv = async (
+  checkCvBody: CheckCvBodyOne | CheckRequest,
+  params?: CheckCvParams,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<checkCvResponse> => {
+  return customFetch<checkCvResponse>(getCheckCvUrl(params), {
+    ...options,
+    method: 'POST',
+    body: JSON.stringify(checkCvBody),
+  });
+};
+
+export type recommendJobsForCvResponse200 = {
+  data: JsonNode;
+  status: 200;
+};
+
+export type recommendJobsForCvResponseSuccess = recommendJobsForCvResponse200 & {
+  headers: Headers;
+};
+export type recommendJobsForCvResponse = recommendJobsForCvResponseSuccess;
+
+export const getRecommendJobsForCvUrl = () => {
+  return `/api/v1/cv-check/jobs`;
+};
+
+export const recommendJobsForCv = async (
+  recommendJobsRequest: RecommendJobsRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<recommendJobsForCvResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<recommendJobsForCvResponse>(getRecommendJobsForCvUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(recommendJobsRequest),
   });
 };
 

@@ -1,0 +1,110 @@
+{
+  "pageTitle": "CV Checker",
+  "pageLede": "Tải lên file CV PDF để phân tích toàn diện: điểm chuẩn ATS, kỹ năng cốt lõi, tối ưu thành tích STAR và gợi ý câu hỏi phỏng vấn.",
+  "homeCard": {
+    "title": "Kiểm tra CV",
+    "description": "Tải lên file CV PDF để chấm điểm chuẩn quốc tế ATS, tối ưu câu STAR và gợi ý việc làm phù hợp.",
+    "steps": {
+      "readPdf": "Đọc PDF",
+      "checkAts": "Kiểm tra ATS",
+      "scoreCv": "Chấm điểm CV",
+      "findJobs": "Tìm việc"
+    }
+  },
+  "intro": {
+    "title": "Khung đối soát hồ sơ CV PDF",
+    "desc": "Tải trực tiếp file CV PDF để xem trước toàn diện và trích xuất nội dung tự động bằng Apache PDFBox + Google Gemini 3.5 Flash."
+  },
+  "verdict": {
+    "tier1": "Hạng 1 — Xuất sắc (Chuẩn Big Tech)",
+    "tier2": "Hạng 2 — Đạt chuẩn tuyển dụng (SHRM 75+)",
+    "tier3": "Hạng 3 — Cần tối ưu trước khi nộp",
+    "tier4": "Hạng 4 — Nguy cơ bị ATS loại sớm"
+  },
+  "actions": {
+    "loadSample": "Tải CV PDF mẫu",
+    "clearAll": "Xóa tất cả",
+    "uploadFile": "Tải file PDF",
+    "uploadPdf": "Tải file PDF",
+    "browsePdf": "Chọn file PDF",
+    "useSamplePdf": "Dùng CV PDF mẫu",
+    "changePdf": "Đổi PDF khác",
+    "removePdf": "Xóa file PDF",
+    "analyze": "Đánh giá CV",
+    "analyzing": "Đang phân tích CV..."
+  },
+  "progress": {
+    "readPdf": "Đọc file PDF",
+    "checkAts": "Kiểm tra bố cục & ATS",
+    "scoreCv": "Đánh giá & Chấm điểm",
+    "findJobs": "Tìm việc phù hợp",
+    "finalizing": "Đang hoàn tất phân tích..."
+  },
+  "form": {
+    "cvTitle": "Hồ sơ CV (Định dạng PDF)",
+    "cvPlaceholder": "Dán nội dung văn bản CV vào đây...",
+    "dropzoneTitle": "Kéo & thả file CV PDF vào đây",
+    "dropzoneDesc": "hoặc bấm để chọn từ máy tính · Chỉ hỗ trợ .pdf, tối đa 8MB",
+    "dropzoneAria": "Khung tải lên file CV PDF",
+    "pdfPreviewTitle": "Xem trước CV PDF",
+    "jdTitle": "Bản mô tả công việc (JD)",
+    "jdPlaceholder": "Dán bản mô tả công việc (JD) mục tiêu vào đây (yêu cầu kỹ thuật, trách nhiệm công việc, quyền lợi)...",
+    "maxChars": "Tối đa 20.000 ký tự",
+    "maxCharsJd": "Tối đa 10.000 ký tự"
+  },
+  "results": {
+    "title": "Kết quả phân tích",
+    "overallScore": "Điểm phù hợp",
+    "overallScoreOf100": "Điểm chuẩn quốc tế / 100",
+    "strengths": "Điểm mạnh nổi bật",
+    "weaknesses": "Điểm cần cải thiện",
+    "missingKeywords": "Từ khóa kỹ năng còn thiếu trong CV"
+  },
+  "dimensions": {
+    "hardSkills": "Kỹ năng cốt lõi (ESCO / O*NET)",
+    "experienceImpact": "Tác động & Định lượng (Google XYZ)",
+    "softSkills": "Kỹ năng mềm & Văn phong",
+    "atsCompliance": "Chuẩn ATS & Cấu trúc (SHRM)",
+    "domainRelevance": "Lộ trình & Độ rõ ràng (Harvard OCS)"
+  },
+  "atsChecklist": {
+    "title": "Kiểm tra ATS & Chuẩn Quốc tế (Tất định)",
+    "subtitle": "Đo trực tiếp từ cấu trúc PDF & nội dung CV",
+    "pass": "ĐẠT",
+    "warn": "CẢNH BÁO",
+    "fail": "CHƯA ĐẠT"
+  },
+  "tabs": {
+    "ariaLabel": "Kết quả chi tiết",
+    "evaluation": "Điểm mạnh & Điểm yếu",
+    "bullets": "Tối ưu câu mô tả (STAR)",
+    "interview": "Dự đoán câu hỏi phỏng vấn",
+    "jobs": "Việc làm phù hợp"
+  },
+  "jobs": {
+    "detectedProfile": "Hồ sơ tìm việc Việt Nam:",
+    "syncedNote": "Cập nhật (7 ngày/lần):",
+    "cachedBadge": "Từ bộ nhớ đệm · Tự làm mới sau 7 ngày",
+    "loading": "Đang tìm tin tuyển dụng tại Việt Nam phù hợp với hồ sơ...",
+    "error": "Không thể tải danh sách tin tuyển dụng lúc này. Bạn có thể thử lại hoặc tìm trực tiếp trên các trang tuyển dụng.",
+    "retry": "Thử lại",
+    "matchSuffix": "phù hợp",
+    "viewAndApply": "Xem & Ứng tuyển",
+    "unconfigured": "Chưa cấu hình khóa SERPAPI_API_KEY hoặc JSEARCH_API_KEY để tự động lấy tin tuyển dụng Việt Nam. Bạn có thể tìm trực tiếp trên các sàn tuyển dụng bên dưới.",
+    "empty": "Chưa tìm thấy tin tuyển dụng trực tiếp cho vị trí này. Hãy dùng các liên kết tìm kiếm nhanh bên dưới.",
+    "moreOnBoards": "Tìm thêm trên các sàn tuyển dụng Việt Nam:"
+  },
+  "bullets": {
+    "original": "[Bản gốc]:",
+    "improved": "[Đề xuất STAR]:",
+    "empty": "Không có gợi ý viết lại nào."
+  },
+  "interview": {
+    "empty": "Không có câu hỏi phỏng vấn nào."
+  },
+  "error": {
+    "notACv": "Có vẻ file PDF này không phải là CV. Vui lòng kiểm tra lại và tải lên đúng hồ sơ xin việc của bạn.",
+    "fileTooLarge": "File PDF vượt quá dung lượng tối đa 8MB. Vui lòng nén nhỏ file hoặc chọn file khác.",
+    "general": "Đã xảy ra lỗi khi phân tích CV. Vui lòng kiểm tra lại file PDF hoặc thử lại sau ít phút."
+  }
+}

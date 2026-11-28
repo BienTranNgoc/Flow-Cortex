@@ -327,6 +327,8 @@ services:
       FLOWCORTEX_DUB_ENABLED: ${FLOWCORTEX_DUB_ENABLED:-false}
       # One Gemini client and key serve dubbing and the Help Center assistant; empty fails both.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      JSEARCH_API_KEY: ${JSEARCH_API_KEY:-}
       GEMINI_SAFETY_THRESHOLD: ${GEMINI_SAFETY_THRESHOLD:-BLOCK_MEDIUM_AND_ABOVE}
       # Admin-console kill switch: off answers /api/v1/admin/** with 503; the member API is unaffected.
       FLOWCORTEX_ADMIN_ENABLED: ${FLOWCORTEX_ADMIN_ENABLED:-true}

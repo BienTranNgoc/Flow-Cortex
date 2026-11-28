@@ -4920,6 +4920,65 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DriveItemResponse"
+  /api/v1/cv-check:
+    post:
+      tags:
+      - cv-check-controller
+      operationId: checkCv
+      parameters:
+      - name: cvText
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: jobDescription
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: lang
+        in: query
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                cvFile:
+                  type: string
+                  format: binary
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonNode"
+  /api/v1/cv-check/jobs:
+    post:
+      tags:
+      - cv-check-controller
+      operationId: recommendJobsForCv
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendJobsRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonNode"
   /api/v1/connectors/telegram/refresh-chats:
     post:
       tags:
@@ -15649,6 +15708,31 @@ components:
       - semanticRole
       - source
       - updatedAt
+    JsonNode: {}
+    CheckRequest:
+      type: object
+      properties:
+        cvText:
+          type: string
+        jobDescription:
+          type: string
+        lang:
+          type: string
+    RecommendJobsRequest:
+      type: object
+      properties:
+        primaryRole:
+          type: string
+        seniority:
+          type: string
+        topSkills:
+          type: array
+          items:
+            type: string
+        location:
+          type: string
+        lang:
+          type: string
     TelegramRefreshChatsRequest:
       type: object
       properties:
@@ -15836,6 +15920,7 @@ components:
           type:
           - object
           - "null"
+          $ref: "#/components/schemas/JsonNode"
           description: Card or run payload; shape depends on kind
         status:
           type: string
@@ -16619,7 +16704,7 @@ components:
           maxLength: 255
           minLength: 0
         config:
-          type: string
+          $ref: "#/components/schemas/JsonNode"
     PublishedVersionRequest:
       type: object
       properties:
@@ -16763,7 +16848,6 @@ components:
           enum:
           - pinned
           - rail
-    JsonNode: {}
     PrivacySettings:
       type: object
       properties:
