@@ -7,7 +7,9 @@
     { "$ref": "#/$defs/generateScriptJob" },
     { "$ref": "#/$defs/generateStoryboardJob" },
     { "$ref": "#/$defs/generateSpeechJob" },
-    { "$ref": "#/$defs/generateVideoJob" }
+    { "$ref": "#/$defs/generateKeyframeJob" },
+    { "$ref": "#/$defs/generateVideoJob" },
+    { "$ref": "#/$defs/lipsyncVideoJob" }
   ],
   "$defs": {
     "productPayload": {
@@ -20,7 +22,10 @@
         "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
         "cta": { "type": "string", "minLength": 1, "maxLength": 500 },
         "price": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "promotion": { "type": "string", "minLength": 1, "maxLength": 500 }
+        "promotion": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "templateId": { "enum": ["showroom-v1", "mc-v1"] },
+        "scenePreset": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "sceneNote": { "type": "string", "minLength": 1, "maxLength": 500 }
       }
     },
     "productAdParams": {
@@ -40,7 +45,20 @@
       "required": ["script", "sourceRevisionId"],
       "properties": {
         "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
-        "sourceRevisionId": { "type": "string", "format": "uuid" }
+        "sourceRevisionId": { "type": "string", "format": "uuid" },
+        "voiceGender": { "enum": ["male", "female"] },
+        "voice": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "templateId": { "enum": ["showroom-v1", "mc-v1"] },
+        "audioMode": { "enum": ["voice_bgm", "music_only"] },
+        "mcHookScript": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "productCloseScript": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      },
+      "not": {
+        "required": ["templateId", "audioMode"],
+        "properties": {
+          "templateId": { "const": "mc-v1" },
+          "audioMode": { "const": "music_only" }
+        }
       }
     },
     "storyboardPayload": {
@@ -50,7 +68,12 @@
       "required": ["script", "sourceRevisionId"],
       "properties": {
         "script": { "type": "string", "minLength": 1, "maxLength": 8000 },
-        "sourceRevisionId": { "type": "string", "format": "uuid" }
+        "sourceRevisionId": { "type": "string", "format": "uuid" },
+        "templateId": { "enum": ["showroom-v1", "mc-v1"] },
+        "scenePreset": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "sceneNote": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "mcHookScript": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "productCloseScript": { "type": "string", "minLength": 1, "maxLength": 2000 }
       }
     },
     "storyboardParams": {
@@ -73,6 +96,28 @@
         "payload": { "$ref": "#/$defs/speechPayload" }
       }
     },
+    "keyframePayload": {
+      "title": "KeyframePayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "sourceRevisionId"],
+      "properties": {
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 2500 },
+        "sourceRevisionId": { "type": "string", "format": "uuid" },
+        "scenePreset": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "sceneNote": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "keyframeParams": {
+      "title": "KeyframeParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "vertical_ad_keyframe_v1" },
+        "payload": { "$ref": "#/$defs/keyframePayload" }
+      }
+    },
     "videoPayload": {
       "title": "VideoPayload",
       "type": "object",
@@ -80,12 +125,35 @@
       "required": ["prompt", "sourceRevisionId"],
       "properties": {
         "prompt": { "type": "string", "minLength": 1, "maxLength": 2500 },
-        "sourceRevisionId": { "type": "string", "format": "uuid" }
+        "sourceRevisionId": { "type": "string", "format": "uuid" },
+        "durationSeconds": { "type": "integer", "minimum": 4, "maximum": 10 },
+        "resolution": { "enum": ["480p", "720p", "768p"] },
+        "firstFrameKey": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "lipsyncPayload": {
+      "title": "LipsyncPayload",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRevisionId"],
+      "properties": {
+        "sourceRevisionId": { "type": "string", "format": "uuid" },
+        "durationSeconds": { "type": "integer", "minimum": 2, "maximum": 10 }
+      }
+    },
+    "lipsyncParams": {
+      "title": "LipsyncParams",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "payload"],
+      "properties": {
+        "profile": { "const": "vertical_ad_lipsync_v1" },
+        "payload": { "$ref": "#/$defs/lipsyncPayload" }
       }
     },
     "videoInput": {
       "title": "VideoInput",
-      "description": "A reference image the worker fetches from the media store and forwards to the video provider as the first frame.",
+      "description": "A reference asset the worker fetches from the media store and forwards to the provider.",
       "type": "object",
       "additionalProperties": false,
       "required": ["key", "bucket", "objectKey"],
@@ -93,7 +161,7 @@
         "key": {
           "type": "string",
           "minLength": 1,
-          "description": "Logical name inside this job; e.g. 'reference'."
+          "description": "Logical name inside this job; e.g. 'product_1', 'mc', 'background', 'video', 'audio'."
         },
         "bucket": { "type": "string", "minLength": 1 },
         "objectKey": { "type": "string", "minLength": 1 }
@@ -105,7 +173,7 @@
       "additionalProperties": false,
       "required": ["profile", "payload"],
       "properties": {
-        "profile": { "const": "vertical_ad_clip_v1" },
+        "profile": { "enum": ["vertical_ad_clip_v1", "vertical_ad_clip_v2"] },
         "payload": { "$ref": "#/$defs/videoPayload" }
       }
     },
@@ -140,9 +208,9 @@
         "params": { "$ref": "#/$defs/productAdParams" },
         "inputs": {
           "type": "array",
-          "maxItems": 1,
+          "maxItems": 3,
           "items": { "$ref": "#/$defs/videoInput" },
-          "description": "Optional product image the worker forwards to the multimodal script provider."
+          "description": "Optional product images (up to 3) the worker forwards to the multimodal script provider."
         },
         "outputPrefix": {
           "type": "string",
@@ -215,9 +283,9 @@
         "params": { "$ref": "#/$defs/storyboardParams" },
         "inputs": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 4,
           "items": { "$ref": "#/$defs/videoInput" },
-          "description": "Optional product images (up to 3) the worker forwards to the multimodal storyboard provider."
+          "description": "Optional product images (up to 3) plus optional background reference image forwarded to the multimodal storyboard provider."
         },
         "outputPrefix": {
           "type": "string",
@@ -227,6 +295,38 @@
         "attempt": { "type": "integer", "minimum": 1 },
         "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
         "issuedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "generateKeyframeJob": {
+      "title": "GenerateKeyframeJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "jobId", "runId", "correlationId", "stepOrder",
+        "capability", "params", "outputPrefix", "attempt", "maxRuntimeSeconds", "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": { "type": "string", "format": "uuid" },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "capability": { "const": "generate_keyframe" },
+        "params": { "$ref": "#/$defs/keyframeParams" },
+        "inputs": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/videoInput" },
+          "description": "Product images (1-3), optional MC portrait and optional background image."
+        },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$"
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "vendorLedger": { "$ref": "#/$defs/vendorLedger" }
       }
     },
     "generateVideoJob": {
@@ -260,14 +360,47 @@
         "params": { "$ref": "#/$defs/videoParams" },
         "inputs": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 4,
           "items": { "$ref": "#/$defs/videoInput" },
-          "description": "Optional reference images (up to 3); the worker fetches them and forwards them to the video provider."
+          "description": "Optional first-frame keyframe and up to 3 product reference images."
         },
         "outputPrefix": {
           "type": "string",
           "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$",
           "description": "The only object-key prefix under which this job may publish outputs."
+        },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "vendorLedger": { "$ref": "#/$defs/vendorLedger" }
+      }
+    },
+    "lipsyncVideoJob": {
+      "title": "LipsyncVideoJob",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "jobId", "runId", "correlationId", "stepOrder",
+        "capability", "params", "inputs", "outputPrefix", "attempt", "maxRuntimeSeconds", "issuedAt"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "runId": { "type": "string", "format": "uuid" },
+        "correlationId": { "type": "string", "format": "uuid" },
+        "stepOrder": { "type": "integer", "minimum": 1 },
+        "capability": { "const": "lipsync_video" },
+        "params": { "$ref": "#/$defs/lipsyncParams" },
+        "inputs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/videoInput" },
+          "description": "Source video ('video') and speech WAV ('audio') for lip-sync."
+        },
+        "outputPrefix": {
+          "type": "string",
+          "pattern": "^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$"
         },
         "attempt": { "type": "integer", "minimum": 1 },
         "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },

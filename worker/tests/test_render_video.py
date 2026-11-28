@@ -163,7 +163,7 @@ def test_unknown_profile_is_rejected(tmp_path: Path, profile: str) -> None:
         ["image_1", "speech", "generated_video_1", "generated_video_2", "subtitle"],
         ["image_1", "image_1", "speech", "generated_video_1", "generated_video_2"],
         ["image_1", "speech", "speech", "generated_video_1", "generated_video_2"],
-        ["image_1", "speech", "generated_video_1"],
+        ["image_1", "speech", "generated_video_2"],
     ],
     ids=[
         "no-image",
@@ -174,7 +174,7 @@ def test_unknown_profile_is_rejected(tmp_path: Path, profile: str) -> None:
         "extra-input",
         "duplicate-image",
         "duplicate-speech",
-        "missing-second-video",
+        "missing-first-video",
     ],
 )
 def test_invalid_input_bindings_are_rejected(tmp_path: Path, keys: list[str]) -> None:

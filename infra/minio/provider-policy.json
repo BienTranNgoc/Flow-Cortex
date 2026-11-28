@@ -12,9 +12,14 @@
       "Resource": [
         "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
         "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json",
+        "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/keyframe.jpg",
+        "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/clip.mp4",
         "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1",
         "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_2",
-        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_3"
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_3",
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/mc",
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/background",
+        "arn:aws:s3:::flowcortex-media/runs/*/inputs/background-v*-*"
       ]
     }
   ]

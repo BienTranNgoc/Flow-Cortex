@@ -247,6 +247,88 @@ describe('ProductVideoStartForm', () => {
       description: 'Giữ nhiệt 12 tiếng',
       uploadIds: ['up-1'],
       video: { aspectRatio: '9:16' },
+      templateId: 'showroom-v1',
+      voiceGender: 'male',
+    });
+  });
+
+  it('disables mc-v1 by default until enabled by catalog, and submits mc-v1 when available', async () => {
+    renderForm();
+    await screen.findByLabelText('Product name *');
+    expect(screen.getByRole('radio', { name: /MC giới thiệu sản phẩm/ })).toBeDisabled();
+    expect(screen.getByText('Coming soon')).toBeInTheDocument();
+  });
+
+  it('switches to mc-v1 when available, auto-syncs female voice from MC preset, and submits preset & background fields', async () => {
+    const user = userEvent.setup();
+    const { FALLBACK_PRODUCT_VIDEO_CATALOG } = await import('./productVideoPresets');
+    const calls = renderForm({
+      'GET /api/v1/product-videos/templates': {
+        status: 200,
+        body: {
+          ...FALLBACK_PRODUCT_VIDEO_CATALOG,
+          templates: FALLBACK_PRODUCT_VIDEO_CATALOG.templates.map((tpl) => ({
+            ...tpl,
+            available: true,
+          })),
+        },
+      },
+    });
+    await fillRequired(user);
+
+    const mcRadio = screen.getByRole('radio', { name: /MC giới thiệu sản phẩm/ });
+    await waitFor(() => expect(mcRadio).toBeEnabled());
+    await user.click(mcRadio);
+    expect(screen.getByRole('radio', { name: 'Female voice' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    await user.click(screen.getByRole('button', { name: /Studio tối giản/ }));
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+    act(() => FakeXhr.instances[0]!.respond(200));
+
+    expect(await screen.findByText('Product video run r1')).toBeInTheDocument();
+    const start = sent(calls).find((call) => call.path === '/api/v1/product-videos/runs')!;
+    expect(start.body).toEqual({
+      productName: 'Bình giữ nhiệt',
+      description: 'Giữ nhiệt 12 tiếng',
+      uploadIds: ['up-1'],
+      video: { aspectRatio: '9:16' },
+      templateId: 'mc-v1',
+      voiceGender: 'female',
+      mcPresetId: 'mc-nu-tre',
+      backgroundPresetId: 'bg-studio-minimal',
+    });
+  });
+
+  it('supports custom Vietnamese sceneNote for background', async () => {
+    const user = userEvent.setup();
+    const calls = renderForm();
+    await fillRequired(user);
+
+    await user.click(screen.getByRole('tab', { name: 'Describe' }));
+    await user.type(
+      screen.getByPlaceholderText(/Warm wooden counter/),
+      'Quầy gỗ sồi ánh nắng sáng',
+    );
+    await user.click(screen.getByRole('button', { name: 'Start run' }));
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+    act(() => FakeXhr.instances[0]!.respond(200));
+
+    expect(await screen.findByText('Product video run r1')).toBeInTheDocument();
+    const start = sent(calls).find((call) => call.path === '/api/v1/product-videos/runs')!;
+    expect(start.body).toEqual({
+      productName: 'Bình giữ nhiệt',
+      description: 'Giữ nhiệt 12 tiếng',
+      uploadIds: ['up-1'],
+      video: { aspectRatio: '9:16' },
+      templateId: 'showroom-v1',
+      voiceGender: 'male',
+      sceneNote: 'Quầy gỗ sồi ánh nắng sáng',
     });
   });
 
@@ -563,6 +645,69 @@ describe('ProductVideoStartForm', () => {
       expect(screen.getByRole('button', { name: 'Start run' })).toBeEnabled();
       expect(screen.getByText('2 / 3 photos')).toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('ignores mc and background images when restoring productDraft images', async () => {
+      stubApi({
+        'GET /api/v1/workflows': { status: 200, body: [PRODUCT_VIDEO] },
+        'GET /api/v1/capabilities': {
+          status: 200,
+          body: {
+            mediaEnabled: true,
+            productVideoEnabled: true,
+            productVideoWorkflowId: PRODUCT_VIDEO_ID,
+          },
+        },
+        [`GET /api/v1/workflows/${PRODUCT_VIDEO_ID}`]: { status: 200, body: PRODUCT_VIDEO },
+      });
+      const stubbedFetch = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === 'string' ? input : input.toString();
+          return url.startsWith('http://minio.test/')
+            ? Promise.resolve(jpeg())
+            : stubbedFetch(input, init);
+        }),
+      );
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter
+            initialEntries={[
+              {
+                pathname: `/workflows/${PRODUCT_VIDEO_ID}`,
+                state: {
+                  productDraft: {
+                    productName: 'Redmi Watch 5 Lite',
+                    description: 'Màn hình AMOLED',
+                    images: [
+                      { name: 'mc', mimeType: 'image/jpeg', url: 'http://minio.test/mc' },
+                      { name: 'image_1', mimeType: 'image/jpeg', url: 'http://minio.test/image_1' },
+                      {
+                        name: 'background',
+                        mimeType: 'image/jpeg',
+                        url: 'http://minio.test/background',
+                      },
+                    ],
+                  },
+                },
+              },
+            ]}
+          >
+            <Routes>
+              <Route path="/workflows/:id" element={<WorkflowDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByText('image_1.jpg')).toBeInTheDocument();
+      expect(screen.queryByText('mc.jpg')).not.toBeInTheDocument();
+      expect(screen.queryByText('background.jpg')).not.toBeInTheDocument();
+      expect(screen.getByText('1 / 3 photos')).toBeInTheDocument();
     });
   });
 });

@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import dataclass
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn
 
 from ..errors import PermanentError, TransientError
 from .adapter import (
@@ -34,6 +34,7 @@ from .vendor_jobs import (
     VendorJobEnded,
     VendorJobTimeout,
     VendorResultGone,
+    download_replicate_media,
     probe_json,
     probe_media,
     vendor_scope,
@@ -44,7 +45,6 @@ log = logging.getLogger("flowcortex_provider_worker.minimax")
 
 PROVIDER_MINIMAX = "minimax"
 _MAX_VIDEO_BYTES = 100 * 1024 * 1024
-_DOWNLOAD_ATTEMPTS = 4
 _TERMINAL_FAILURES = {"failed", "canceled"}
 _CANCEL_ATTEMPTS = 3
 _CANCEL_RETRY_DELAYS = (1.0, 2.0)
@@ -107,9 +107,9 @@ class MinimaxAdapter:
             raise PermanentError(
                 "contract_violation", "MiniMax resolution must be 480P or 768P"
             )
-        if self.config.duration != 5:
+        if not 4 <= self.config.duration <= 10:
             raise PermanentError(
-                "contract_violation", "MiniMax duration must be 5 seconds"
+                "contract_violation", "MiniMax duration must be between 4 and 10 seconds"
             )
         if self.config.aspect_ratio not in _VALID_RATIOS:
             raise PermanentError(
@@ -127,18 +127,32 @@ class MinimaxAdapter:
 
     def submit_video(self, request: VideoRequest) -> str:
         identity = self.video_identity()
+        duration = request.duration_seconds or identity.duration_seconds
+        if not 4 <= duration <= 10:
+            raise PermanentError(
+                "contract_violation", "MiniMax duration must be between 4 and 10 seconds"
+            )
+        resolution = (request.resolution or identity.resolution).strip().upper()
+        if resolution not in _VALID_RESOLUTIONS:
+            raise PermanentError(
+                "contract_violation", "MiniMax resolution must be 480P or 768P"
+            )
         model_path = "/".join(
             urllib.parse.quote(part, safe="") for part in self.config.model.split("/")
         )
-        reference_urls = self._resolve_reference_urls(request)
         input_body: dict[str, Any] = {
             "prompt": request.prompt,
-            "duration": identity.duration_seconds,
-            "resolution": identity.resolution.upper(),
+            "duration": duration,
+            "resolution": resolution,
             "ratio": identity.aspect_ratio,
         }
-        if reference_urls:
-            input_body["reference_image_urls"] = reference_urls
+        # MiniMax H3 rejects first_frame_image combined with reference_image_urls (E006).
+        if request.first_frame_image_bytes:
+            input_body["first_frame_image"] = self._upload_file(request.first_frame_image_bytes, 0)
+        else:
+            reference_urls = self._resolve_reference_urls(request)
+            if reference_urls:
+                input_body["reference_image_urls"] = reference_urls
         body = json.dumps({"input": input_body}).encode()
         response = self._json_request(
             f"{self.config.base_url.rstrip('/')}/models/{model_path}/predictions",
@@ -165,7 +179,12 @@ class MinimaxAdapter:
                     raise PermanentError(
                         "provider_response_invalid", "MiniMax completed without a video URL"
                     )
-                return VideoArtifact(self._download_video(video_url), task_id)
+                return VideoArtifact(
+                    self._download_video(
+                        video_url, task_id=task_id, abort=abort, deadline=deadline
+                    ),
+                    task_id,
+                )
             if status in _TERMINAL_FAILURES:
                 log.warning("MiniMax prediction failed", extra={"taskStatus": status})
                 raise VendorJobEnded("failed", f"MiniMax prediction ended with status {status}")
@@ -222,7 +241,7 @@ class MinimaxAdapter:
                 )
                 if exc.code not in (408, 429) and not (500 <= exc.code < 600):
                     return CancelResult(confirmed=False, reason=last_reason)
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+            except (urllib.error.URLError, TimeoutError, ValueError) as exc:
                 last_reason = type(exc).__name__
                 log.warning(
                     "MiniMax prediction cancel failed",
@@ -368,49 +387,30 @@ class MinimaxAdapter:
             )
         return parsed
 
-    def _download_video(self, url: str) -> bytes:
+    def _download_video(
+        self, url: str, *, task_id: str, abort: VideoAbort, deadline: float
+    ) -> bytes:
         if not _is_replicate_delivery(url):
             raise PermanentError(
                 "provider_response_invalid", "MiniMax video URL is outside Replicate"
             )
-        last_error: TransientError | None = None
-        for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
-            try:
-                body = self._download_once(url)
-                break
-            except TransientError as exc:
-                last_error = exc
-                if attempt == _DOWNLOAD_ATTEMPTS:
-                    raise
-                log.warning(
-                    "MiniMax video download will retry",
-                    extra={"downloadAttempt": attempt, "errorType": type(exc.__cause__).__name__},
-                )
-                time.sleep(float(2 ** (attempt - 1)))
-        else:  # pragma: no cover
-            raise last_error or TransientError("MiniMax video download failed")
+        body = download_replicate_media(
+            url,
+            provider=PROVIDER_MINIMAX,
+            label="MiniMax video",
+            task_id=task_id,
+            max_bytes=_MAX_VIDEO_BYTES,
+            request_timeout_seconds=self.config.request_timeout_seconds,
+            abort=abort,
+            deadline=deadline,
+            on_http_error=lambda exc: _raise_http_error(exc, gone=RESULT_GONE_STATUSES),
+            logger=log,
+        )
         if len(body) > _MAX_VIDEO_BYTES:
             raise PermanentError("provider_response_invalid", "MiniMax video exceeds 100 MB")
         if len(body) < 12 or body[4:8] != b"ftyp":
             raise PermanentError("provider_response_invalid", "MiniMax output is not an MP4 file")
         return body
-
-    def _download_once(self, url: str) -> bytes:
-        try:
-            req = urllib.request.Request(
-                url,
-                method="GET",
-                headers={"User-Agent": WORKER_USER_AGENT},
-            )
-            with urllib.request.urlopen(
-                req,
-                timeout=self.config.request_timeout_seconds,
-            ) as response:
-                return cast(bytes, response.read(_MAX_VIDEO_BYTES + 1))
-        except urllib.error.HTTPError as exc:
-            _raise_http_error(exc, gone=RESULT_GONE_STATUSES)
-        except (urllib.error.URLError, TimeoutError) as exc:
-            raise TransientError(f"MiniMax video download failed: {type(exc).__name__}") from exc
 
 
 def _extract_video_url(output: Any) -> str | None:

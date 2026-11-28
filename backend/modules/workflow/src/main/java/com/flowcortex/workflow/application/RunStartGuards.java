@@ -49,6 +49,28 @@ class RunStartGuards {
         }
     }
 
+    /**
+     * Validates structural readiness against the full workflow while charging/checking per-step guards
+     * only for the single step being regenerated.
+     */
+    void checkSingleStep(UUID ownerId, UUID workflowId, List<WorkflowStep> allSteps, WorkflowStep targetStep,
+            StartContext context) {
+        checkSubset(ownerId, workflowId, allSteps, List.of(targetStep), context);
+    }
+
+    /**
+     * Validates structural readiness against the full workflow while charging/checking per-step guards
+     * only for the subset of steps being re-executed.
+     */
+    void checkSubset(UUID ownerId, UUID workflowId, List<WorkflowStep> allSteps, List<WorkflowStep> targetSteps,
+            StartContext context) {
+        List<StepDef> allDefs = defsOf(allSteps);
+        List<StepDef> subsetDefs = defsOf(targetSteps);
+        for (RunStartGuard guard : guards) {
+            guard.check(ownerId, workflowId, guard instanceof WorkflowReadinessGuard ? allDefs : subsetDefs, context);
+        }
+    }
+
     private static List<StepDef> defsOf(List<WorkflowStep> steps) {
         return steps.stream()
                 .map(step -> new StepDef(step.getStepOrder(), step.getName(), step.getType(), step.getConfig(),

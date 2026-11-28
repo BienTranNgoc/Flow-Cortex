@@ -21,7 +21,7 @@ public class MediaAssetBinding {
     @Column(name = "binding_key", nullable = false, updatable = false)
     private String bindingKey;
 
-    @Column(name = "asset_id", nullable = false, updatable = false)
+    @Column(name = "asset_id", nullable = false)
     private UUID assetId;
 
     @Column(name = "position", nullable = false, updatable = false)
@@ -51,6 +51,10 @@ public class MediaAssetBinding {
 
     public UUID getAssetId() {
         return assetId;
+    }
+
+    public void replaceAsset(UUID newAssetId) {
+        this.assetId = newAssetId;
     }
 
     public short getPosition() {

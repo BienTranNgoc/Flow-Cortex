@@ -78,6 +78,34 @@ public interface MediaJobs {
     List<MediaAssetInput> copyRunInputs(UUID runId, List<MediaAssetInput> inputs);
 
     /**
+     * Uploads a built-in server-side preset image (JPEG) under {@code runs/<runId>/inputs/<bindingKey>} with
+     * run-input retention, without writing any database rows yet. Call outside any transaction; register it
+     * via {@link #replaceRunInputBinding} inside the committing transaction so failed/raced starts leave no
+     * orphan asset rows.
+     */
+    default MediaJobInput putRunInputImageObject(UUID runId, String bindingKey, byte[] jpegBytes) {
+        throw new UnsupportedOperationException("putRunInputImageObject is not implemented");
+    }
+
+    /**
+     * Uploads a versioned JPEG run input object under a unique key below {@code runs/<runId>/inputs/} with
+     * run-input retention, without writing any database rows yet. Call outside any transaction; register it
+     * via {@link #replaceRunInputBinding} inside the committing transaction so failed/raced requests leave no
+     * orphan asset rows.
+     */
+    default MediaJobInput putRunInputImageObject(UUID runId, String bindingKey, int attempt, byte[] jpegBytes) {
+        throw new UnsupportedOperationException("putRunInputImageObject is not implemented");
+    }
+
+    /**
+     * Registers a previously uploaded run input object as a {@code media_asset} and updates (or adds) the
+     * run's binding for {@code storedObject.key()} inside the caller's transaction.
+     */
+    default MediaAssetInput replaceRunInputBinding(UUID runId, UUID ownerId, MediaJobInput storedObject, long bytes) {
+        throw new UnsupportedOperationException("replaceRunInputBinding is not implemented");
+    }
+
+    /**
      * Snapshots the copies {@link #copyRunInputs} made for {@code runId} against that run, in the caller's
      * transaction, once the run is saved.
      * @throws IllegalArgumentException if an input is not a copy under {@code runs/<runId>/inputs/} of the media bucket

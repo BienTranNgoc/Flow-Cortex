@@ -26,15 +26,25 @@ from flowcortex_worker.storage import Storage, client_from, remove_leftovers
 from .adapter import (
     CapabilityProviderAdapter,
     FixtureProviderAdapter,
+    KeyframeAdapter,
+    LipsyncAdapter,
     ScriptAdapter,
     SpeechAdapter,
     VideoAdapter,
+)
+from .azure_adapter import (
+    PROVIDER_AZURE,
+    AzureSpeechAdapter,
+    FallbackSpeechAdapter,
+    azure_config_from_env,
 )
 from .capabilities import ExecutionContext, execute
 from .contracts.provider_job import ProviderJob
 from .control import ControlClient, ControlConfig
 from .edge_adapter import PROVIDER_EDGE, EdgeSpeechAdapter, config_from_env
 from .fal_queue import probe_fal_queue, urllib_fetch
+from .keyframe_adapter import SeedreamConfig, SeedreamKeyframeAdapter
+from .lipsync_adapter import KlingLipsyncAdapter, KlingLipsyncConfig
 from .minimax_adapter import PROVIDER_MINIMAX, MinimaxAdapter, MinimaxConfig
 from .openai_adapter import (
     _OPENAI_BASE_URL,
@@ -214,13 +224,18 @@ def make_execute_job(
                 "contract_violation",
                 "generate_video jobs are handled by provider-video-worker on provider.video.jobs",
             )
+        probes_needed = request.capability in {
+            VIDEO_CAPABILITY,
+            "generate_keyframe",
+            "lipsync_video",
+        }
         context = ExecutionContext(
             storage=storage,
             bucket=storage.bucket,
             output_prefix=request.outputPrefix,
             abort=runner,
             report=report,
-            probes=build_probe_registry(adapter, os.environ) if is_video else {},
+            probes=build_probe_registry(adapter, os.environ) if probes_needed else {},
             control=control if is_video else None,
             deadline_monotonic=runner.deadline_monotonic,
         )
@@ -238,7 +253,9 @@ def build_probe_registry(adapter: Any, environ: Mapping[str, str]) -> ProbeRegis
     explicitly enabled and keyed, since no adapter here submits to it yet.
     """
     probes: dict[str, ProbeFn] = {
-        adapter.video_identity().provider: lambda task_id, handle: adapter.probe_video(task_id)
+        adapter.video_identity().provider: lambda task_id, handle: adapter.probe_video(task_id),
+        "seedream": lambda task_id, handle: adapter.probe_keyframe(task_id),
+        "kling_lipsync": lambda task_id, handle: adapter.probe_lipsync(task_id),
     }
     fal_key = environ.get("FAL_KEY", "").strip()
     if environ.get("FAL_QUEUE_PROBE_ENABLED", "").strip().lower() == "true" and fal_key:
@@ -252,6 +269,71 @@ def build_probe_registry(adapter: Any, environ: Mapping[str, str]) -> ProbeRegis
             handle, headers, urllib_fetch, suffixes
         )
     return probes
+
+
+def _resolve_video_credentials(
+    video_provider: str,
+    generic_key: str,
+    generic_url: str,
+    generic_model: str,
+) -> tuple[str, str, str]:
+    if video_provider == PROVIDER_SEEDANCE:
+        return (
+            os.environ.get("SEEDANCE_API_KEY", "").strip() or generic_key,
+            os.environ.get("SEEDANCE_BASE_URL", "").strip() or generic_url,
+            os.environ.get("SEEDANCE_MODEL", "").strip() or generic_model,
+        )
+    if video_provider == PROVIDER_VEO:
+        return (
+            os.environ.get("VEO_API_KEY", "").strip() or generic_key,
+            os.environ.get("VEO_BASE_URL", "").strip() or generic_url,
+            os.environ.get("VEO_MODEL", "").strip() or generic_model,
+        )
+    if video_provider == PROVIDER_WAN:
+        return (
+            os.environ.get("WAN_API_KEY", "").strip() or generic_key,
+            os.environ.get("WAN_BASE_URL", "").strip() or generic_url,
+            os.environ.get("WAN_MODEL", "").strip() or generic_model,
+        )
+    if video_provider == PROVIDER_MINIMAX:
+        return (
+            os.environ.get("MINIMAX_API_KEY", "").strip()
+            or os.environ.get("WAN_API_KEY", "").strip()
+            or generic_key,
+            os.environ.get("MINIMAX_BASE_URL", "").strip() or generic_url,
+            os.environ.get("MINIMAX_MODEL", "").strip() or generic_model,
+        )
+    return generic_key, generic_url, generic_model
+
+
+def _resolve_replicate_key(configured_video_provider: str, generic_video_key: str) -> str:
+    explicit = os.environ.get("REPLICATE_API_TOKEN", "").strip()
+    if explicit:
+        return explicit
+    if configured_video_provider == PROVIDER_MINIMAX:
+        return (
+            os.environ.get("MINIMAX_API_KEY", "").strip()
+            or os.environ.get("WAN_API_KEY", "").strip()
+            or generic_video_key
+        )
+    if configured_video_provider == PROVIDER_WAN:
+        return os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
+    return ""
+
+
+def _build_mc_adapters(
+    configured_video_provider: str,
+    generic_video_key: str,
+) -> tuple[KeyframeAdapter | None, LipsyncAdapter | None]:
+    replicate_key = _resolve_replicate_key(configured_video_provider, generic_video_key)
+    if replicate_key:
+        return (
+            SeedreamKeyframeAdapter(SeedreamConfig(api_key=replicate_key)),
+            KlingLipsyncAdapter(KlingLipsyncConfig(api_key=replicate_key)),
+        )
+    if configured_video_provider == PROVIDER_FIXTURE:
+        return FixtureProviderAdapter(), FixtureProviderAdapter()
+    return None, None
 
 
 def _build_adapter(
@@ -312,30 +394,9 @@ def _build_adapter(
     generic_video_key = os.environ.get("VIDEO_PROVIDER_API_KEY", "").strip()
     generic_video_url = os.environ.get("VIDEO_PROVIDER_BASE_URL", "").strip()
     generic_video_model = os.environ.get("VIDEO_PROVIDER_MODEL", "").strip()
-    if video_provider == PROVIDER_SEEDANCE:
-        video_api_key = os.environ.get("SEEDANCE_API_KEY", "").strip() or generic_video_key
-        video_base_url = os.environ.get("SEEDANCE_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("SEEDANCE_MODEL", "").strip() or generic_video_model
-    elif video_provider == PROVIDER_VEO:
-        video_api_key = os.environ.get("VEO_API_KEY", "").strip() or generic_video_key
-        video_base_url = os.environ.get("VEO_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("VEO_MODEL", "").strip() or generic_video_model
-    elif video_provider == PROVIDER_WAN:
-        video_api_key = os.environ.get("WAN_API_KEY", "").strip() or generic_video_key
-        video_base_url = os.environ.get("WAN_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("WAN_MODEL", "").strip() or generic_video_model
-    elif video_provider == PROVIDER_MINIMAX:
-        video_api_key = (
-            os.environ.get("MINIMAX_API_KEY", "").strip()
-            or os.environ.get("WAN_API_KEY", "").strip()
-            or generic_video_key
-        )
-        video_base_url = os.environ.get("MINIMAX_BASE_URL", "").strip() or generic_video_url
-        video_model = os.environ.get("MINIMAX_MODEL", "").strip() or generic_video_model
-    else:
-        video_api_key = generic_video_key
-        video_base_url = generic_video_url
-        video_model = generic_video_model
+    video_api_key, video_base_url, video_model = _resolve_video_credentials(
+        video_provider, generic_video_key, generic_video_url, generic_video_model
+    )
 
     script_adapter = _build_script_adapter(
         script_provider,
@@ -351,6 +412,9 @@ def _build_adapter(
     video_adapter = _build_video_adapter(
         video_provider, video_api_key, video_base_url, video_model, s3_public_endpoint
     )
+    keyframe_adapter, lipsync_adapter = _build_mc_adapters(
+        configured_video_provider, generic_video_key
+    )
     log.info(
         "provider adapters selected",
         extra={
@@ -359,7 +423,13 @@ def _build_adapter(
             "videoProvider": video_provider,
         },
     )
-    return CapabilityProviderAdapter(script_adapter, speech_adapter, video_adapter)
+    return CapabilityProviderAdapter(
+        script_adapter,
+        speech_adapter,
+        video_adapter,
+        keyframe_adapter=keyframe_adapter,
+        lipsync_adapter=lipsync_adapter,
+    )
 
 
 def _build_script_adapter(
@@ -400,6 +470,19 @@ def _build_script_adapter(
 def _build_speech_adapter(
     provider: str, api_key: str, base_url: str, model: str
 ) -> SpeechAdapter:
+    if provider == PROVIDER_AZURE:
+        primary = AzureSpeechAdapter(azure_config_from_env())
+        fallback_name = os.environ.get("SPEECH_FALLBACK_PROVIDER", PROVIDER_EDGE).strip().lower()
+        if fallback_name == PROVIDER_EDGE:
+            return FallbackSpeechAdapter(
+                primary=primary, fallback=EdgeSpeechAdapter(config_from_env())
+            )
+        if fallback_name in {"", "none", "off", "false"}:
+            return primary
+        raise RuntimeError(
+            f"Unknown SPEECH_FALLBACK_PROVIDER '{fallback_name}'; "
+            f"accepted values: {PROVIDER_EDGE}, none"
+        )
     if provider == PROVIDER_EDGE:
         return EdgeSpeechAdapter(config_from_env())
     if provider == PROVIDER_OPENAI:
@@ -409,7 +492,7 @@ def _build_speech_adapter(
         return FixtureProviderAdapter()
     raise RuntimeError(
         f"Unknown SPEECH_PROVIDER '{provider}'; accepted values: "
-        f"{PROVIDER_FIXTURE}, {PROVIDER_EDGE}, {PROVIDER_OPENAI}"
+        f"{PROVIDER_FIXTURE}, {PROVIDER_AZURE}, {PROVIDER_EDGE}, {PROVIDER_OPENAI}"
     )
 
 

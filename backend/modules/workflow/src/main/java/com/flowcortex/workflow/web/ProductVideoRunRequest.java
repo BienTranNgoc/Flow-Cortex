@@ -19,7 +19,21 @@ record ProductVideoRunRequest(
         @Size(max = 500) String promotion,
         @NotNull @Size(min = 1, max = 3) List<@NotNull UUID> uploadIds,
         @NotNull @Valid VideoConfig video,
-        Boolean acknowledgeCost) {
+        Boolean acknowledgeCost,
+        @Pattern(regexp = "showroom-v1|mc-v1") String templateId,
+        @Pattern(regexp = "male|female") String voiceGender,
+        @Size(max = 64) String mcPresetId,
+        UUID mcUploadId,
+        @Size(max = 64) String backgroundPresetId,
+        UUID backgroundUploadId,
+        @Size(max = 500) String sceneNote,
+        @Pattern(regexp = "voice_bgm|music_only") String audioMode) {
+
+    ProductVideoRunRequest(String productName, String description, String cta, String price, String promotion,
+            List<UUID> uploadIds, VideoConfig video, Boolean acknowledgeCost) {
+        this(productName, description, cta, price, promotion, uploadIds, video, acknowledgeCost,
+                null, null, null, null, null, null, null, null);
+    }
 
     record VideoConfig(@NotNull @Pattern(regexp = "9:16") String aspectRatio) {
     }
@@ -36,8 +50,40 @@ record ProductVideoRunRequest(
         return notBlankWhenPresent(price) && notBlankWhenPresent(promotion) && notBlankWhenPresent(cta);
     }
 
+    @AssertTrue(message = "mcPresetId and mcUploadId cannot both be set")
+    @JsonIgnore
+    boolean hasSingleMcSource() {
+        return mcPresetId == null || mcPresetId.isBlank() || mcUploadId == null;
+    }
+
+    @AssertTrue(message = "backgroundPresetId and backgroundUploadId cannot both be set")
+    @JsonIgnore
+    boolean hasSingleBackgroundSource() {
+        return backgroundPresetId == null || backgroundPresetId.isBlank() || backgroundUploadId == null;
+    }
+
+    @AssertTrue(message = "mcUploadId and backgroundUploadId must be distinct from product uploadIds")
+    @JsonIgnore
+    boolean hasDistinctExtraUploads() {
+        if (mcUploadId != null && mcUploadId.equals(backgroundUploadId)) {
+            return false;
+        }
+        if (uploadIds == null) {
+            return true;
+        }
+        return (mcUploadId == null || !uploadIds.contains(mcUploadId))
+                && (backgroundUploadId == null || !uploadIds.contains(backgroundUploadId));
+    }
+
+    @AssertTrue(message = "audioMode music_only is only supported for showroom-v1")
+    @JsonIgnore
+    boolean hasSupportedAudioModeForTemplate() {
+        return !"music_only".equals(audioMode) || !"mc-v1".equals(templateId);
+    }
+
     ProductVideoDraft draft() {
-        return ProductVideoDraft.of(productName, description, cta, price, promotion, video.aspectRatio());
+        return ProductVideoDraft.of(productName, description, cta, price, promotion, video.aspectRatio(),
+                templateId, voiceGender, mcPresetId, backgroundPresetId, sceneNote, audioMode);
     }
 
     private static boolean notBlankWhenPresent(String value) {

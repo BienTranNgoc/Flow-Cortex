@@ -53,6 +53,7 @@ final class WorkflowGraph {
                     if (!first && problem == null) {
                         resolvedEdge(step, before, refSteps.get(i), refSteps, byOrder).ifPresent(edges::add);
                     }
+                    edges.addAll(outputInputEdges(step, byOrder));
                 }
                 case STORED -> { }
                 case STORED_WITH_OUTPUTS -> edges.addAll(outputInputEdges(step, byOrder));

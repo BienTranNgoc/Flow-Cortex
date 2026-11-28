@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -68,6 +69,7 @@ class ProviderStepExecutor implements StepExecutor {
     public boolean bindsRunInputs() {
         return "generate_script".equals(capability)
                 || "generate_storyboard".equals(capability)
+                || "generate_keyframe".equals(capability)
                 || "generate_video".equals(capability);
     }
 
@@ -89,7 +91,7 @@ class ProviderStepExecutor implements StepExecutor {
         params.put("profile", jobProfile);
         params.put("payload", payload);
         ProviderJob job = new ProviderJob("1", context.stepId(), context.runId(), context.runId(),
-                context.stepOrder(), capability, params, providerInputs(context),
+                context.stepOrder(), capability, params, providerInputs(context, payload),
                 MediaJob.outputPrefix(context.runId(), context.stepOrder(), context.attempt()),
                 (int) context.attempt(), Math.toIntExact(maxRuntime().toSeconds()), clock.instant(),
                 vendorLedger(context, jobProfile, payload));
@@ -107,7 +109,9 @@ class ProviderStepExecutor implements StepExecutor {
      * that cannot answer must not stop a paid step, so it dispatches with none.
      */
     private VendorLedger vendorLedger(StepContext context, String jobProfile, Map<String, Object> payload) {
-        if (ledger == null || !"generate_video".equals(capability)) {
+        if (ledger == null || (!"generate_video".equals(capability)
+                && !"generate_keyframe".equals(capability)
+                && !"lipsync_video".equals(capability))) {
             return null;
         }
         String requestKey = VendorRequestKey.of(capability, jobProfile, payload);
@@ -128,7 +132,10 @@ class ProviderStepExecutor implements StepExecutor {
      * image from the run's inputs is sent. Otherwise, for capabilities binding run inputs (script,
      * storyboard), the first snapshotted product image is sent as visual ground truth.
      */
-    private List<ProviderInput> providerInputs(StepContext context) {
+    private List<ProviderInput> providerInputs(StepContext context, Map<String, Object> payload) {
+        if ("lipsync_video".equals(capability)) {
+            return resolveLipsyncInputs(context);
+        }
         if (!bindsRunInputs()) {
             return List.of();
         }
@@ -141,7 +148,9 @@ class ProviderStepExecutor implements StepExecutor {
             }
             JsonNode references = tree.get("referenceImages");
             if (references != null && !references.isNull()) {
-                return resolveMultipleReferences(context, references);
+                Object rawFirstFrame = payload != null ? payload.get("firstFrameKey") : null;
+                String firstFrameKey = rawFirstFrame instanceof String s && !s.isBlank() ? s : null;
+                return resolveMultipleReferences(context, references, firstFrameKey);
             }
             JsonNode reference = tree.get("referenceImage");
             if (reference != null && !reference.isNull()) {
@@ -162,6 +171,14 @@ class ProviderStepExecutor implements StepExecutor {
             try {
                 List<MediaJobInput> inputs = objectMapper.readValue(context.storedInput(), INPUTS);
                 if (!inputs.isEmpty()) {
+                    if ("generate_storyboard".equals(capability)) {
+                        return inputs.stream()
+                                .filter(input -> input.key() != null
+                                        && (input.key().startsWith("image_") || "background".equals(input.key())))
+                                .limit(4)
+                                .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                                .toList();
+                    }
                     MediaJobInput first = inputs.getFirst();
                     return List.of(new ProviderInput(first.key(), first.bucket(), first.objectKey()));
                 }
@@ -173,23 +190,44 @@ class ProviderStepExecutor implements StepExecutor {
         return List.of();
     }
 
-    private List<ProviderInput> resolveMultipleReferences(StepContext context, JsonNode references) {
-        String runInputs = "runs/" + context.runId() + "/inputs/";
+    private List<ProviderInput> resolveMultipleReferences(StepContext context, JsonNode references,
+            String firstFrameKey) {
+        String runScope = "runs/" + context.runId() + "/";
         List<MediaJobInput> available = storedInputs(context.storedInput(), "referenceImages").stream()
                 .filter(input -> input.bucket() != null && !input.bucket().isBlank()
-                        && input.objectKey() != null && MediaJob.isBelow(runInputs, input.objectKey()))
+                        && input.objectKey() != null && MediaJob.isBelow(runScope, input.objectKey()))
                 .toList();
+        int maxRefs = "generate_keyframe".equals(capability)
+                ? 5
+                : "generate_video".equals(capability) ? 4 : 3;
         if (references.isTextual() && "all".equals(references.textValue())) {
-            List<ProviderInput> resolved = available.stream()
-                    .limit(3)
-                    .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
-                    .toList();
+            List<ProviderInput> resolved;
+            if (firstFrameKey != null) {
+                ProviderInput requiredFirst = available.stream()
+                        .filter(input -> firstFrameKey.equals(input.key()))
+                        .findFirst()
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .orElseThrow(() -> missingImage(firstFrameKey, null));
+                List<ProviderInput> combined = new java.util.ArrayList<>(maxRefs);
+                combined.add(requiredFirst);
+                available.stream()
+                        .filter(input -> !firstFrameKey.equals(input.key()))
+                        .limit(Math.max(0, maxRefs - 1))
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .forEach(combined::add);
+                resolved = List.copyOf(combined);
+            } else {
+                resolved = available.stream()
+                        .limit(maxRefs)
+                        .map(input -> new ProviderInput(input.key(), input.bucket(), input.objectKey()))
+                        .toList();
+            }
             if (resolved.isEmpty()) {
                 throw missingImage("referenceImages", null);
             }
             return resolved;
         }
-        if (references.isArray() && !references.isEmpty() && references.size() <= 3) {
+        if (references.isArray() && !references.isEmpty() && references.size() <= maxRefs) {
             List<ProviderInput> resolved = new java.util.ArrayList<>(references.size());
             for (JsonNode entry : references) {
                 if (!entry.isTextual() || entry.textValue().isBlank()) {
@@ -207,6 +245,68 @@ class ProviderStepExecutor implements StepExecutor {
         }
         throw new StepFailedException("contract_violation",
                 "referenceImages must be 'all' or an array of 1 to 3 input keys");
+    }
+
+    private boolean isLipsyncArrayInput(String input) {
+        if (!"lipsync_video".equals(capability) || input == null || input.isBlank()) {
+            return false;
+        }
+        try {
+            return objectMapper.readTree(input).isArray();
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
+    private List<ProviderInput> resolveLipsyncInputs(StepContext context) {
+        String runScope = "runs/" + context.runId() + "/";
+        if (isLipsyncArrayInput(context.storedInput())) {
+            List<MediaJobInput> entries = storedInputs(context.storedInput(), "video/audio");
+            return List.of(
+                    findScopedInput(entries, "video", runScope),
+                    findScopedInput(entries, "audio", runScope));
+        }
+        if (isLipsyncArrayInput(context.input())) {
+            List<MediaJobInput> entries = storedInputs(context.input(), "video/audio");
+            return List.of(
+                    findScopedInput(entries, "video", runScope),
+                    findScopedInput(entries, "audio", runScope));
+        }
+        Map<String, Object> input = payload(context.input());
+        return List.of(
+                extractAssetInput(context.runId(), input, "video"),
+                extractAssetInput(context.runId(), input, "audio"));
+    }
+
+    private ProviderInput findScopedInput(List<MediaJobInput> entries, String key, String runScope) {
+        return entries.stream()
+                .filter(entry -> key.equals(entry.key())
+                        && entry.bucket() != null && !entry.bucket().isBlank()
+                        && entry.objectKey() != null && MediaJob.isBelow(runScope, entry.objectKey()))
+                .findFirst()
+                .map(entry -> new ProviderInput(entry.key(), entry.bucket(), entry.objectKey()))
+                .orElseThrow(() -> new StepFailedException("contract_violation",
+                        "lipsync_video requires '" + key + "' outputInput inside the current run"));
+    }
+
+    private ProviderInput extractAssetInput(UUID runId, Map<String, Object> input, String key) {
+        Object raw = input.get(key);
+        if (!(raw instanceof Map<?, ?> ref)) {
+            throw new StepFailedException("contract_violation",
+                    "lipsync_video requires '" + key + "' asset reference with bucket and objectKey");
+        }
+        Object bucket = ref.get("bucket");
+        Object objectKey = ref.get("objectKey");
+        if (!(bucket instanceof String b) || b.isBlank() || !(objectKey instanceof String k) || k.isBlank()) {
+            throw new StepFailedException("contract_violation",
+                    "lipsync_video '" + key + "' reference must include non-blank bucket and objectKey");
+        }
+        String runScope = "runs/" + runId + "/";
+        if (!MediaJob.isBelow(runScope, k)) {
+            throw new StepFailedException("contract_violation",
+                    "lipsync_video '" + key + "' objectKey must be inside the current run");
+        }
+        return new ProviderInput(key, b, k);
     }
 
     private List<MediaJobInput> storedInputs(String storedInput, String key) {
@@ -256,25 +356,40 @@ class ProviderStepExecutor implements StepExecutor {
             return input;
         }
         try {
-            Object mapping = objectMapper.readValue(config, OBJECT).get("payloadFields");
+            Map<String, Object> parsedConfig = objectMapper.readValue(config, OBJECT);
+            Object mapping = parsedConfig.get("payloadFields");
+            Map<String, Object> result;
             if (mapping == null) {
-                return input;
-            }
-            if (!(mapping instanceof Map<?, ?> fields) || fields.isEmpty()) {
-                throw new StepFailedException("contract_violation",
-                        "Provider payloadFields must be a non-empty object");
-            }
-            Map<String, Object> result = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> field : fields.entrySet()) {
-                if (!(field.getKey() instanceof String target) || target.isBlank()
-                        || !(field.getValue() instanceof String source) || source.isBlank()
-                        || !input.containsKey(source)) {
+                result = new LinkedHashMap<>(input);
+            } else {
+                if (!(mapping instanceof Map<?, ?> fields) || fields.isEmpty()) {
                     throw new StepFailedException("contract_violation",
-                            "Provider payloadFields contains an invalid or missing source field");
+                            "Provider payloadFields must be a non-empty object");
                 }
-                result.put(target, input.get(source));
+                result = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> field : fields.entrySet()) {
+                    if (!(field.getKey() instanceof String target) || target.isBlank()
+                            || !(field.getValue() instanceof String source) || source.isBlank()
+                            || !input.containsKey(source)) {
+                        throw new StepFailedException("contract_violation",
+                                "Provider payloadFields contains an invalid or missing source field");
+                    }
+                    result.put(target, input.get(source));
+                }
             }
-            appendPromptInstruction(result, objectMapper.readValue(config, OBJECT));
+            if (parsedConfig.get("payloadDefaults") instanceof Map<?, ?> defaults) {
+                for (Map.Entry<?, ?> entry : defaults.entrySet()) {
+                    if (entry.getKey() instanceof String key && !key.isBlank() && entry.getValue() != null) {
+                        result.putIfAbsent(key, entry.getValue());
+                    }
+                }
+            }
+            if (parsedConfig.get("promptSuffix") instanceof String suffix && !suffix.isBlank()
+                    && result.get("prompt") instanceof String basePrompt && !basePrompt.isBlank()) {
+                String combined = basePrompt + "\nAdjustment: " + suffix.trim();
+                result.put("prompt", combined.length() <= 2500 ? combined : combined.substring(0, 2500));
+            }
+            appendPromptInstruction(result, parsedConfig);
             return result;
         } catch (JsonProcessingException e) {
             throw new StepFailedException("contract_violation", "Provider step config is not valid JSON", e);

@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { ReviewTaskResponse, ScriptRevisionResponse } from '@flow-cortex/api-client';
+import type {
+  ReviewTaskResponse,
+  RunStepResponse,
+  ScriptRevisionResponse,
+} from '@flow-cortex/api-client';
 import { activeLocale } from '../../lib/i18n';
 import { formatDateTime } from '../../lib/format';
 import {
@@ -12,6 +16,7 @@ import {
   useRevisionsQuery,
 } from './useWorkflows';
 import { isLostRace } from './lostRace';
+import { KeyframeReviewPanel } from './KeyframeReviewPanel';
 import { PickList, type PickChoice } from './PickList';
 import { QaReviewForm } from './QaReviewForm';
 import { decisionRefusal, fieldMessage, ownSentence } from './reviewRefusal';
@@ -21,9 +26,17 @@ interface ReviewFormProps {
   runId: string;
   task: ReviewTaskResponse;
   originalPayload: string | undefined;
+  isMcTemplate?: boolean | undefined;
+  keyframeStep?: RunStepResponse | undefined;
 }
 
-function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>) {
+function ReviewForm({
+  runId,
+  task,
+  originalPayload,
+  isMcTemplate = false,
+  keyframeStep,
+}: Readonly<ReviewFormProps>) {
   const { t } = useTranslation();
   const original = originalPayload ?? '';
   const scripted = Boolean(task.currentRevisionId);
@@ -77,12 +90,34 @@ function ReviewForm({ runId, task, originalPayload }: Readonly<ReviewFormProps>)
     reject.mutate();
   };
 
+  if (!scripted && !pickOptions && keyframeStep) {
+    return (
+      <KeyframeReviewPanel
+        runId={runId}
+        keyframeStep={keyframeStep}
+        onApprove={onApprove}
+        onReject={onReject}
+        approvePending={approve.isPending}
+        rejectPending={reject.isPending}
+        approveError={
+          approve.isError && !serverFieldError ? approveError(approve.error, false, t) : undefined
+        }
+        rejectError={
+          reject.isError
+            ? (decisionRefusal(reject.error, t) ?? t('workflow.approval.rejectFailed'))
+            : undefined
+        }
+      />
+    );
+  }
+
   return (
     <section className="approval-panel" aria-label={t('workflow.approval.region')}>
       {scripted ? (
         <ScriptReview
           task={task}
           runId={runId}
+          isMcTemplate={isMcTemplate}
           onApprovalBlockedChange={setScriptApprovalBlocked}
         />
       ) : pickOptions ? (
@@ -177,10 +212,12 @@ function approveError(error: unknown, scripted: boolean, t: TFunction): string {
 function ScriptReview({
   task,
   runId,
+  isMcTemplate = false,
   onApprovalBlockedChange,
 }: Readonly<{
   task: ReviewTaskResponse;
   runId: string;
+  isMcTemplate?: boolean | undefined;
   onApprovalBlockedChange: (blocked: boolean) => void;
 }>) {
   const { t } = useTranslation();
@@ -197,6 +234,7 @@ function ScriptReview({
       runId={runId}
       task={task}
       revisions={list}
+      isMcTemplate={isMcTemplate}
       onApprovalBlockedChange={onApprovalBlockedChange}
     />
   );
@@ -220,7 +258,15 @@ function DecideBy({ expiresAt }: Readonly<{ expiresAt: string | undefined }>) {
  * The pending review of a paused run: a checkpoint's content can be edited before it is approved,
  * its options picked from, or a QA review's questions answered.
  */
-export function ApprovalPanel({ runId }: Readonly<{ runId: string }>) {
+export function ApprovalPanel({
+  runId,
+  isMcTemplate = false,
+  keyframeStep,
+}: Readonly<{
+  runId: string;
+  isMcTemplate?: boolean | undefined;
+  keyframeStep?: RunStepResponse | undefined;
+}>) {
   const { t } = useTranslation();
   const tasksQuery = useReviewTasksQuery(runId);
 
@@ -242,7 +288,13 @@ export function ApprovalPanel({ runId }: Readonly<{ runId: string }>) {
       {asking ? (
         <QaReviewForm runId={runId} task={task} />
       ) : (
-        <ReviewForm runId={runId} task={task} originalPayload={task.originalPayload} />
+        <ReviewForm
+          runId={runId}
+          task={task}
+          originalPayload={task.originalPayload}
+          isMcTemplate={isMcTemplate}
+          keyframeStep={keyframeStep}
+        />
       )}
     </div>
   );

@@ -33,7 +33,9 @@ set -euo pipefail
 API_URL="${API_URL:-http://localhost:8080}"
 POLL_SECONDS="${POLL_SECONDS:-120}"
 PRODUCT_VIDEO="${FLOWCORTEX_PRODUCT_VIDEO_ENABLED:-false}"
+PRODUCT_VIDEO_MC="${FLOWCORTEX_PRODUCT_VIDEO_MC_ENABLED:-false}"
 WORKFLOW_NAME="Check a video file"
+HTTP_CODE_FMT='%{http_code}'
 
 cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
@@ -69,7 +71,7 @@ grant() {
 # PUTs a file to a grant's URL; prints the HTTP status.
 put() {
   local file=$1 url=$2 mime=${3:-video/mp4}
-  curl -sS -o "$work/put-body" -w '%{http_code}' -T "$file" -H "Content-Type: $mime" "$url"
+  curl -sS -o "$work/put-body" -w "$HTTP_CODE_FMT" -T "$file" -H "Content-Type: $mime" "$url"
 }
 
 # Uploads a file and starts the workflow on it; prints the run id.
@@ -139,7 +141,7 @@ pass "clip run $run completed, videoCodec h264"
 
 url="$(api "$member" "/api/v1/runs/$run/steps/1/outputs/video-details.json/url" | jq -er .url)" \
   || fail "download URL for video-details.json"
-code="$(curl -sS -D "$work/headers" -o "$work/video-details.json" -w '%{http_code}' "$url")"
+code="$(curl -sS -D "$work/headers" -o "$work/video-details.json" -w "$HTTP_CODE_FMT" "$url")"
 [[ "$code" == 200 ]] || fail "technical details download answered $code"
 disposition="$(tr -d '\r' <"$work/headers" | awk 'tolower($1) == "content-disposition:" { sub(/^[^:]*: */, ""); print }')"
 [[ "$disposition" == 'attachment; filename="video-details.json"' ]] \
@@ -149,7 +151,7 @@ pass "technical details downloaded (200, $disposition)"
 
 url="$(api "$member" "/api/v1/runs/$run/steps/2/outputs/source-audio.wav/url" | jq -er .url)" \
   || fail "download URL for source-audio.wav"
-code="$(curl -sS -D "$work/audio-headers" -o "$work/source-audio.wav" -w '%{http_code}' "$url")"
+code="$(curl -sS -D "$work/audio-headers" -o "$work/source-audio.wav" -w "$HTTP_CODE_FMT" "$url")"
 [[ "$code" == 200 ]] || fail "audio download answered $code"
 
 docker compose cp "$work/source-audio.wav" worker:/tmp/source-audio.wav >/dev/null
@@ -169,7 +171,7 @@ printf 'not a video' >"$work/bad.mp4"
 g="$(grant bad.mp4 "$(stat -c %s "$work/bad.mp4")")" || fail "upload grant for bad.mp4"
 code="$(put "$work/bad.mp4" "$(jq -er .url <<<"$g")")"
 [[ "$code" == 200 ]] || fail "PUT bad.mp4 answered $code: $(cat "$work/put-body")"
-code="$(curl -sS -o "$work/start-body" -w '%{http_code}' -H "Authorization: Bearer $member" \
+code="$(curl -sS -o "$work/start-body" -w "$HTTP_CODE_FMT" -H "Authorization: Bearer $member" \
   -H 'Content-Type: application/json' \
   -d "$(jq -n --arg u "$(jq -er .uploadId <<<"$g")" '{uploadId: $u, originalName: "bad.mp4"}')" \
   "$API_URL/api/v1/workflows/$workflow/runs")"
@@ -216,9 +218,11 @@ jq -e 'all(.steps[]; .status == "completed")' <<<"$body" >/dev/null \
   || fail "Product Video run $run completed with a step not completed: $(jq -c '[.steps[] | .status]' <<<"$body")"
 pass "Product Video run $run approved, spoken and rendered: completed"
 
-url="$(api "$member" "/api/v1/runs/$run/steps/7/outputs/video.mp4/url" | jq -er .url)" \
+render_step="$(jq -er '.steps[] | select(.type == "render_video") | .stepOrder' <<<"$body")" \
+  || fail "find render_video stepOrder in Product Video run $run"
+url="$(api "$member" "/api/v1/runs/$run/steps/$render_step/outputs/video.mp4/url" | jq -er .url)" \
   || fail "download URL for video.mp4"
-code="$(curl -sS -o "$work/video.mp4" -w '%{http_code}' "$url")"
+code="$(curl -sS -o "$work/video.mp4" -w "$HTTP_CODE_FMT" "$url")"
 [[ "$code" == 200 && -s "$work/video.mp4" ]] || fail "video.mp4 download answered $code"
 docker compose cp "$work/video.mp4" worker:/tmp/product-video.mp4 >/dev/null
 video="$(docker compose exec -T worker ffprobe -v error \
@@ -227,5 +231,90 @@ jq -e 'any(.streams[]; .codec_type == "video" and .codec_name == "h264" and .wid
   and any(.streams[]; .codec_type == "audio")' <<<"$video" >/dev/null \
   || fail "video.mp4 is not a 480x854 h264 video with audio: $(jq -c . <<<"$video")"
 pass "Product Video video.mp4 downloaded and verified"
+
+if [[ "$PRODUCT_VIDEO_MC" != true ]]; then
+  echo "SKIP  Product Video MC (FLOWCORTEX_PRODUCT_VIDEO_MC_ENABLED is not true)"
+  echo "smoke-probe: all checks passed"
+  exit 0
+fi
+
+templates="$(api "$member" /api/v1/product-videos/templates)" || fail "GET /api/v1/product-videos/templates"
+jq -e 'any(.templates[]; .id == "mc-v1" and .available == true)
+  and (.mcPresets | length >= 3)
+  and (.backgroundPresets | length >= 4)' <<<"$templates" >/dev/null \
+  || fail "templates catalog missing available mc-v1 or presets: $templates"
+pass "Product Video templates catalog lists mc-v1 (available) and presets"
+
+for preset_path in /api/v1/product-videos/presets/mc/mc-nu-tre /api/v1/product-videos/presets/backgrounds/bg-studio-minimal; do
+  code="$(curl -sS -o "$work/preset.jpg" -w "$HTTP_CODE_FMT" -H "Authorization: Bearer $member" "$API_URL$preset_path")"
+  [[ "$code" == 200 && -s "$work/preset.jpg" ]] || fail "GET $preset_path answered $code"
+done
+pass "Built-in MC & background preset images served (200)"
+
+mc_run="$(api "$member" /api/v1/product-videos/runs "$(jq -n --arg upload "$upload" '{
+    productName: "Smoke MC watch", description: "Minimalist steel watch with sapphire glass.",
+    cta: "Order now", uploadIds: [$upload], templateId: "mc-v1", voiceGender: "female",
+    mcPresetId: "mc-nu-tre", backgroundPresetId: "bg-studio-minimal", video: {aspectRatio: "9:16"}}')" \
+  | jq -er .id)" || fail "start an MC Product Video run"
+body="$(await_run "$mc_run")"
+[[ "$(jq -r .status <<<"$body")" == waiting_approval ]] \
+  || fail "MC run $mc_run did not pause at Checkpoint 1: $(jq -c '{status, errorMessage}' <<<"$body")"
+pass "MC run $mc_run paused at Checkpoint 1 (script review)"
+
+cp1="$(api "$member" "/api/v1/runs/$mc_run/review-tasks" | jq -ec 'first(.[] | select(.status == "pending"))')" \
+  || fail "Checkpoint 1 task of MC run $mc_run"
+cp1_id="$(jq -r .id <<<"$cp1")"
+api "$member" "/api/v1/review-tasks/$cp1_id/approve" \
+  "$(jq -c '{revisionId: .currentRevisionId, expectedVersion: .version}' <<<"$cp1")" >/dev/null \
+  || fail "approve Checkpoint 1 of MC run $mc_run"
+
+cp2=""
+cp2_deadline=$((SECONDS + POLL_SECONDS))
+while :; do
+  body="$(api "$member" "/api/v1/runs/$mc_run")" || fail "GET MC run $mc_run"
+  status="$(jq -r .status <<<"$body")"
+  if [[ "$status" == completed || "$status" == failed || "$status" == error || "$status" == cancelled ]]; then
+    fail "MC run $mc_run ended with $status before Checkpoint 2: $(jq -c '{status, errorMessage, steps: [.steps[] | {order: .stepOrder, type, status, errorCode}]}' <<<"$body")"
+  fi
+  cp2="$(api "$member" "/api/v1/runs/$mc_run/review-tasks" \
+    | jq -c --arg cp1 "$cp1_id" 'first(.[] | select(.status == "pending" and .id != $cp1)) // empty')"
+  if [[ -n "$cp2" ]]; then
+    break
+  fi
+  ((SECONDS < cp2_deadline)) || fail "MC run $mc_run did not reach Checkpoint 2 after ${POLL_SECONDS}s: $(jq -c '{status, steps: [.steps[] | {order: .stepOrder, status}]}' <<<"$body")"
+  sleep 2
+done
+pass "MC run $mc_run paused at Checkpoint 2 (keyframe review)"
+
+api "$member" "/api/v1/review-tasks/$(jq -r .id <<<"$cp2")/approve" '{}' >/dev/null \
+  || fail "approve Checkpoint 2 of MC run $mc_run"
+
+mc_body="$(await_run "$mc_run" running waiting_approval)"
+[[ "$(jq -r .status <<<"$mc_body")" == completed ]] \
+  || fail "MC run $mc_run did not complete: $(jq -c '{status, errorMessage, steps: [.steps[] | {order: .stepOrder, type, status, errorCode}]}' <<<"$mc_body")"
+jq -e '(.steps | length == 10) and all(.steps[]; .status == "completed")' <<<"$mc_body" >/dev/null \
+  || fail "MC run $mc_run did not complete all 10 steps"
+pass "MC run $mc_run completed all 10 steps"
+
+redo_run="$(api "$member" "/api/v1/product-videos/runs/$mc_run/redo" \
+  '{"redoSteps":[8],"sceneNote":"Slow macro pan","acknowledgeCost":true}' | jq -er .id)" \
+  || fail "selective redo on MC run $mc_run"
+redo_body="$(await_run "$redo_run")"
+[[ "$(jq -r .status <<<"$redo_body")" == completed ]] \
+  || fail "MC redo run $redo_run did not complete: $(jq -c '{status, errorMessage}' <<<"$redo_body")"
+jq -ne --argjson src "$mc_body" --argjson redo "$redo_body" '
+  ($src.steps | INDEX(.stepOrder | tostring)) as $s |
+  ($redo.steps | length == 10) and
+  all($redo.steps[]; .status == "completed") and
+  all($redo.steps[];
+    if (.stepOrder == 8 or .stepOrder == 10) then
+      (.finishedAt != $s[.stepOrder | tostring].finishedAt)
+    else
+      (.startedAt == $s[.stepOrder | tostring].startedAt
+        and .finishedAt == $s[.stepOrder | tostring].finishedAt)
+    end
+  )' >/dev/null \
+  || fail "MC redo run $redo_run did not selectively reuse steps 1..7 & 9 and re-run steps 8 & 10"
+pass "MC selective scene redo run $redo_run completed (reused steps 1..7 & 9, re-ran 8 & 10)"
 
 echo "smoke-probe: all checks passed"

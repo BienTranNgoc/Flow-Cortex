@@ -14,6 +14,15 @@ interface ProductBriefBannerProps {
   showRetryAction?: boolean | undefined;
 }
 
+const NON_PRODUCT_IMAGE_KEYS = new Set(['mc', 'background']);
+
+function isProductImageKey(bindingKey: string | undefined): boolean {
+  if (!bindingKey) return false;
+  const key = bindingKey.trim().toLowerCase();
+  if (NON_PRODUCT_IMAGE_KEYS.has(key)) return false;
+  return key === 'image' || key.startsWith('image_') || key.startsWith('product_');
+}
+
 /** Compact context strip showing product thumbnail, name, description, and target video format pills. */
 export function ProductBriefBanner({
   runId,
@@ -24,7 +33,9 @@ export function ProductBriefBanner({
   const { t } = useTranslation();
   const inputsQuery = useRunInputsQuery(runId);
   const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
-  const imageInputs = (inputsQuery.data ?? []).filter((item) => item.kind === 'image');
+  const imageInputs = (inputsQuery.data ?? []).filter(
+    (item) => item.kind === 'image' && isProductImageKey(item.bindingKey),
+  );
   const firstImage = imageInputs[0];
   const imageUrl = firstImage?.url && firstImage.url !== brokenUrl ? firstImage.url : undefined;
   const draftImages = imageInputs

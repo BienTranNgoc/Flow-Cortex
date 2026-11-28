@@ -141,11 +141,16 @@ class MediaJobsImpl implements MediaJobs {
      * {@code productAdParams}/{@code speechParams} definitions the provider job schema names. */
     private void validateProviderParams(ProviderJob job) {
         ProviderParams contract = switch (job.capability()) {
-            case "generate_script" -> new ProviderParams("product_ad_v1", ProviderJobPayload.ProductAd.class);
-            case "generate_storyboard" -> new ProviderParams("product_ad_storyboard_v1",
+            case "generate_script" -> new ProviderParams(Set.of("product_ad_v1"), ProviderJobPayload.ProductAd.class);
+            case "generate_storyboard" -> new ProviderParams(Set.of("product_ad_storyboard_v1"),
                     ProviderJobPayload.Storyboard.class);
-            case "generate_speech" -> new ProviderParams("vi_voice_v1", ProviderJobPayload.Speech.class);
-            case "generate_video" -> new ProviderParams("vertical_ad_clip_v1", ProviderJobPayload.Video.class);
+            case "generate_speech" -> new ProviderParams(Set.of("vi_voice_v1"), ProviderJobPayload.Speech.class);
+            case "generate_keyframe" -> new ProviderParams(Set.of("vertical_ad_keyframe_v1"),
+                    ProviderJobPayload.Keyframe.class);
+            case "generate_video" -> new ProviderParams(Set.of("vertical_ad_clip_v1", "vertical_ad_clip_v2"),
+                    ProviderJobPayload.Video.class);
+            case "lipsync_video" -> new ProviderParams(Set.of("vertical_ad_lipsync_v1"),
+                    ProviderJobPayload.Lipsync.class);
             default -> null;
         };
         if (contract == null) {
@@ -157,8 +162,9 @@ class MediaJobsImpl implements MediaJobs {
             throw new ConstraintViolationException("params has keys the " + job.capability()
                     + " contract does not define: " + unknown, Set.of());
         }
-        if (!contract.profile().equals(job.params().get("profile"))) {
-            throw new ConstraintViolationException("params.profile must be " + contract.profile() + " for "
+        Object rawProfile = job.params().get("profile");
+        if (!(rawProfile instanceof String profileValue) || !contract.profiles().contains(profileValue)) {
+            throw new ConstraintViolationException("params.profile must be one of " + contract.profiles() + " for "
                     + job.capability(), Set.of());
         }
         Object payload;
@@ -174,7 +180,7 @@ class MediaJobsImpl implements MediaJobs {
         }
     }
 
-    private record ProviderParams(String profile, Class<?> payload) {
+    private record ProviderParams(Set<String> profiles, Class<?> payload) {
     }
 
     @Override
@@ -191,7 +197,7 @@ class MediaJobsImpl implements MediaJobs {
 
     @Override
     public MediaLimits providerLimits(String capability) {
-        if ("generate_video".equals(capability)) {
+        if ("generate_video".equals(capability) || "lipsync_video".equals(capability)) {
             return new MediaLimits(properties.providerVideoQueueTimeout(), properties.providerVideoMaxRuntime(),
                     largestMediaInputBytes());
         }
@@ -279,12 +285,84 @@ class MediaJobsImpl implements MediaJobs {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public MediaJobInput putRunInputImageObject(UUID runId, String bindingKey, byte[] jpegBytes) {
+        validatePresetJpeg(bindingKey, jpegBytes);
+        String bucket = properties.s3().bucket();
+        String targetKey = runInputKey(runId, bindingKey);
+        store.put(bucket, targetKey, "image/jpeg", jpegBytes, S3MediaStore.RUN_INPUT_RETENTION);
+        return new MediaJobInput(bindingKey, bucket, targetKey);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NEVER)
+    public MediaJobInput putRunInputImageObject(UUID runId, String bindingKey, int attempt, byte[] jpegBytes) {
+        if (attempt < 2) {
+            throw new IllegalArgumentException("Regeneration attempt must be >= 2");
+        }
+        validatePresetJpeg(bindingKey, jpegBytes);
+        String bucket = properties.s3().bucket();
+        String targetKey = runInputKey(runId, bindingKey + "-v" + attempt + "-" + UUID.randomUUID());
+        store.put(bucket, targetKey, "image/jpeg", jpegBytes, S3MediaStore.RUN_INPUT_RETENTION);
+        return new MediaJobInput(bindingKey, bucket, targetKey);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public MediaAssetInput replaceRunInputBinding(UUID runId, UUID ownerId, MediaJobInput storedObject, long bytes) {
+        String bucket = properties.s3().bucket();
+        String runInputPrefix = "runs/" + runId + "/inputs/";
+        if (storedObject == null || storedObject.key() == null || !storedObject.key().matches("[a-z0-9_-]{1,32}")
+                || !bucket.equals(storedObject.bucket())
+                || storedObject.objectKey() == null
+                || !MediaJob.isBelow(runInputPrefix, storedObject.objectKey())) {
+            throw new IllegalArgumentException("Replacement input must be a valid object below " + runInputPrefix);
+        }
+        Instant now = Instant.now();
+        UUID assetId = UUID.randomUUID();
+        assets.save(new MediaAsset(assetId, ownerId, personalSpaces.personalSpaceOf(ownerId), "image",
+                bucket, storedObject.objectKey(), "image/jpeg", bytes, null, now));
+        List<MediaAssetBinding> existing = bindings.findByRunIdOrderByPositionAsc(runId);
+        Optional<MediaAssetBinding> current = existing.stream()
+                .filter(b -> storedObject.key().equals(b.getBindingKey()))
+                .findFirst();
+        if (current.isPresent()) {
+            current.get().replaceAsset(assetId);
+            bindings.save(current.get());
+        } else {
+            short nextPos = (short) (existing.stream().mapToInt(MediaAssetBinding::getPosition).max().orElse(-1) + 1);
+            bindings.save(new MediaAssetBinding(runId, storedObject.key(), assetId, nextPos, now));
+        }
+        return new MediaAssetInput(assetId, storedObject);
+    }
+
+    private static void validatePresetJpeg(String bindingKey, byte[] jpegBytes) {
+        if (bindingKey == null || !bindingKey.matches("[a-z0-9_-]{1,32}") || jpegBytes == null || jpegBytes.length < 3
+                || (jpegBytes[0] & 0xFF) != 0xFF || (jpegBytes[1] & 0xFF) != 0xD8 || (jpegBytes[2] & 0xFF) != 0xFF) {
+            throw new IllegalArgumentException("Preset image must be a valid JPEG with a safe binding key");
+        }
+    }
+
+    static String effectiveRunInputKey(String mediaBucket, UUID runId, String bindingKey, MediaAsset asset) {
+        String runInputPrefix = "runs/" + runId + "/inputs/";
+        if (asset != null && mediaBucket.equals(asset.getBucket())
+                && asset.getObjectKey() != null && MediaJob.isBelow(runInputPrefix, asset.getObjectKey())) {
+            return asset.getObjectKey();
+        }
+        return runInputKey(runId, bindingKey);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<MediaAssetInput> boundRunInputs(UUID runId) {
         String bucket = properties.s3().bucket();
         return bindings.findByRunIdOrderByPositionAsc(runId).stream()
-                .map(binding -> new MediaAssetInput(binding.getAssetId(), new MediaJobInput(
-                        binding.getBindingKey(), bucket, runInputKey(runId, binding.getBindingKey()))))
+                .map(binding -> {
+                    MediaAsset asset = assets.findById(binding.getAssetId()).orElse(null);
+                    String objectKey = effectiveRunInputKey(bucket, runId, binding.getBindingKey(), asset);
+                    return new MediaAssetInput(binding.getAssetId(), new MediaJobInput(
+                            binding.getBindingKey(), bucket, objectKey));
+                })
                 .toList();
     }
 
@@ -317,7 +395,11 @@ class MediaJobsImpl implements MediaJobs {
     public boolean runInputsStored(UUID runId) {
         String bucket = properties.s3().bucket();
         return bindings.findByRunIdOrderByPositionAsc(runId).stream()
-                .allMatch(binding -> store.head(bucket, runInputKey(runId, binding.getBindingKey())).isPresent());
+                .allMatch(binding -> {
+                    MediaAsset asset = assets.findById(binding.getAssetId()).orElse(null);
+                    return store.head(bucket, effectiveRunInputKey(bucket, runId, binding.getBindingKey(), asset))
+                            .isPresent();
+                });
     }
 
     @Override
@@ -791,7 +873,8 @@ class MediaJobsImpl implements MediaJobs {
             }
             String bindingKey = binding.getBindingKey();
             String mimeType = asset.get().getMimeType();
-            MediaDownload download = presignedGet(bucket, runInputKey(runId, bindingKey),
+            String objectKey = effectiveRunInputKey(bucket, runId, bindingKey, asset.get());
+            MediaDownload download = presignedGet(bucket, objectKey,
                     "input-" + bindingKey + "." + extensionOf(mimeType));
             inputs.add(new RunInput(bindingKey, asset.get().getKind(), mimeType, download.url(),
                     download.expiresAt()));

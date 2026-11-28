@@ -43,7 +43,7 @@ class WorkflowWriteAccess {
         Workflow workflow = workflowRepository.findByIdAndDeletedAtIsNull(workflowId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
         requireOwnerOrAdmin(caller, workflow);
-        if (ProductVideoWorkflow.ID.equals(workflow.getId())) {
+        if (ProductVideoWorkflow.isProductVideo(workflow.getId())) {
             throw new ConflictException(new LocalizedMessage("workflow.system.readOnly"));
         }
         return workflow;

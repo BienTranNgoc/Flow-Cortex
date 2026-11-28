@@ -184,6 +184,17 @@ public class WorkflowRun {
         this.finishedAt = null;
     }
 
+    /** Reopens an errored run back to {@code WAITING_APPROVAL} (e.g. after {@code speech_too_long}). */
+    public boolean reopenWaitingApproval() {
+        if (status != RunStatus.ERROR) {
+            return false;
+        }
+        this.status = RunStatus.WAITING_APPROVAL;
+        this.errorMessage = null;
+        this.finishedAt = null;
+        return true;
+    }
+
     public String getInput() {
         return input;
     }

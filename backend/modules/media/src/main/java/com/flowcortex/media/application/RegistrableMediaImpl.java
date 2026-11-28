@@ -70,9 +70,9 @@ class RegistrableMediaImpl implements RegistrableMedia {
                 continue;
             }
             MediaAsset asset = upload.get();
+            String objectKey = MediaJobsImpl.effectiveRunInputKey(mediaBucket, runId, binding.getBindingKey(), asset);
             inputs.add(new BoundRunInput(asset.getId(), asset.getOwnerId(), binding.getBindingKey(),
-                    asset.getKind(), mediaBucket, "runs/" + runId + "/inputs/" + binding.getBindingKey(),
-                    asset.getMimeType()));
+                    asset.getKind(), mediaBucket, objectKey, asset.getMimeType()));
         }
         return inputs;
     }

@@ -9,11 +9,11 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
-/** Contract returned by {@code generate_video/vertical_ad_clip_v1}. */
+/** Contract returned by {@code generate_video} and {@code lipsync_video}. */
 public record ProviderVideoData(
-        @NotBlank @Pattern(regexp = "vertical_ad_clip_v1") String profile,
+        @NotBlank @Pattern(regexp = "vertical_ad_clip_v1|vertical_ad_clip_v2|vertical_ad_lipsync_v1") String profile,
         @NotNull Integer durationSeconds,
-        @NotBlank @Pattern(regexp = "seedance|veo|wan|minimax|fixture") String provider,
+        @NotBlank @Pattern(regexp = "seedance|veo|wan|minimax|kling_lipsync|fixture") String provider,
         @NotBlank @Size(max = 200) String model,
         @NotBlank @Pattern(regexp = "9:16") String aspectRatio,
         @NotBlank @Pattern(regexp = "480p|720p|768p") String resolution,
@@ -32,9 +32,9 @@ public record ProviderVideoData(
                 providerTaskId, format, null, null);
     }
 
-    @AssertTrue(message = "durationSeconds must be 5")
+    @AssertTrue(message = "durationSeconds must be between 2 and 10")
     @JsonIgnore
-    public boolean isFiveSeconds() {
-        return durationSeconds != null && durationSeconds == 5;
+    public boolean isValidDuration() {
+        return durationSeconds != null && durationSeconds >= 2 && durationSeconds <= 10;
     }
 }

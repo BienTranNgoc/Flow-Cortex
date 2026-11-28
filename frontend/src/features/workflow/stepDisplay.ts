@@ -49,7 +49,9 @@ const LABEL_KEYS: Record<string, string> = {
   generate_script: 'workflow.step.label.generate_script',
   generate_storyboard: 'workflow.step.label.generate_storyboard',
   generate_speech: 'workflow.step.label.generate_speech',
+  generate_keyframe: 'workflow.step.label.generate_keyframe',
   generate_video: 'workflow.step.label.generate_video',
+  lipsync_video: 'workflow.step.label.lipsync_video',
   render_video: 'workflow.step.label.render_video',
 };
 
@@ -66,6 +68,13 @@ export function stepLabel(
   isProductVideo = false,
 ): string {
   if (step.type === CHECKPOINT && isProductVideo) {
+    const prev =
+      steps && step.stepOrder !== undefined
+        ? steps.find((s) => s.stepOrder === step.stepOrder! - 1)
+        : undefined;
+    if (prev?.type === 'generate_keyframe') {
+      return t('workflow.step.label.reviewKeyframe');
+    }
     return t('workflow.step.label.reviewScript');
   }
   if (step.type === 'generate_video' && steps) {
@@ -242,43 +251,49 @@ export function formatSeconds(seconds: number, t: TFunction, locale: Locale): st
     : t('common.units.minutes', { value: plain(mins, locale) });
 }
 
+function durationFromTimestamps(
+  startedAt: string | undefined,
+  finishedAt: string | undefined,
+  t: TFunction,
+  locale: Locale,
+): string | null {
+  if (!startedAt || !finishedAt) return null;
+  const start = new Date(startedAt).getTime();
+  const end = new Date(finishedAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+  const ms = end - start;
+  const s = ms / 1000;
+  return s < 0.1
+    ? t('common.units.milliseconds', { value: plain(ms, locale) })
+    : formatSeconds(s, t, locale);
+}
+
+function durationFromOutput(
+  output: string | undefined,
+  t: TFunction,
+  locale: Locale,
+): string | null {
+  if (!output) return null;
+  try {
+    const report: unknown = JSON.parse(output);
+    if (!report || typeof report !== 'object') return null;
+    const r = report as Record<string, unknown>;
+    if (typeof r.durationMs === 'number') return shortSeconds(r.durationMs / 1000, t, locale);
+    if (typeof r.durationSeconds === 'number') return shortSeconds(r.durationSeconds, t, locale);
+    if (typeof r.duration === 'string') return r.duration;
+  } catch {
+    // not a json report
+  }
+  return null;
+}
+
 /**
  * Execution duration of a step in the given language (e.g. "11.3s", "1m 20s"), from its timestamps,
  * else from the duration its output report carries.
  */
 export function stepDuration(step: RunStepResponse, t: TFunction, locale: Locale): string | null {
-  if (step.startedAt && step.finishedAt) {
-    const start = new Date(step.startedAt).getTime();
-    const end = new Date(step.finishedAt).getTime();
-    if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
-      const ms = end - start;
-      const s = ms / 1000;
-      if (s < 0.1) {
-        return t('common.units.milliseconds', { value: plain(ms, locale) });
-      }
-      return formatSeconds(s, t, locale);
-    }
-  }
-
-  if (step.output) {
-    try {
-      const report: unknown = JSON.parse(step.output);
-      if (report && typeof report === 'object') {
-        const r = report as Record<string, unknown>;
-        if (typeof r.durationMs === 'number') {
-          return shortSeconds(r.durationMs / 1000, t, locale);
-        }
-        if (typeof r.durationSeconds === 'number') {
-          return shortSeconds(r.durationSeconds, t, locale);
-        }
-        if (typeof r.duration === 'string') {
-          return r.duration;
-        }
-      }
-    } catch {
-      // not a json report
-    }
-  }
-
-  return null;
+  return (
+    durationFromTimestamps(step.startedAt, step.finishedAt, t, locale) ??
+    durationFromOutput(step.output, t, locale)
+  );
 }

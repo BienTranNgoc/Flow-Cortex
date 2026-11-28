@@ -16,9 +16,12 @@ import {
   getWorkflow,
   listWorkflowExamples,
   listWorkflows,
+  redoProductVideoSteps,
+  regenerateKeyframe,
   rejectTask,
   requestUpload,
   saveRevision,
+  sessionFetch,
   startProductVideoRun,
   startRun,
   unwrap,
@@ -28,6 +31,8 @@ import type {
   ApproveReviewTaskRequest,
   GetRunLogLevel,
   ProductVideoRunRequest,
+  RedoProductVideoRequest,
+  RegenerateKeyframeRequest,
   RunInputResponse,
   StartRunRequest,
   UploadRequest,
@@ -223,6 +228,52 @@ export function useSaveRevisionMutation(runId: string, taskId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['review-tasks', taskId, 'revisions'] });
       queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+    },
+  });
+}
+
+export function useRegenerateKeyframeMutation(runId: string) {
+  const queryClient = useQueryClient();
+  const runKey = ['runs', runId];
+  return useMutation({
+    mutationFn: (body: RegenerateKeyframeRequest) =>
+      unwrap(regenerateKeyframe(runId, body, authHeaders())),
+    onSuccess: (run) => {
+      queryClient.setQueryData(runKey, run);
+      queryClient.invalidateQueries({ queryKey: ['runs', runId, 'review-tasks'] });
+    },
+  });
+}
+
+export function useRedoProductVideoMutation(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: RedoProductVideoRequest) =>
+      unwrap(redoProductVideoSteps(runId, body, authHeaders())),
+    onSuccess: (created) => {
+      if (created.id) {
+        queryClient.setQueryData(['runs', created.id], created);
+      }
+    },
+  });
+}
+
+export function useReopenProductVideoScriptMutation(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await sessionFetch(`/api/v1/product-videos/runs/${runId}/script/reopen`, {
+        method: 'POST',
+        ...authHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    },
+    onSuccess: (run) => {
+      queryClient.setQueryData(['runs', runId], run);
+      queryClient.invalidateQueries({ queryKey: ['runs', runId, 'review-tasks'] });
     },
   });
 }

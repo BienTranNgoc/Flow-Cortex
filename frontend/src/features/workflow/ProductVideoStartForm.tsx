@@ -18,6 +18,12 @@ import { useTransitionNavigate } from '../../app/useTransitionNavigate';
 import { activeLocale } from '../../lib/i18n';
 import { CreditsRefusal } from '../credits/CreditsRefusal';
 import { invalidateBalance } from '../credits/useBalance';
+import { AssetPickerField, type AssetMode } from './AssetPickerField';
+import {
+  useProductVideoTemplatesQuery,
+  type ProductVideoTemplateId,
+  type VoiceGender,
+} from './productVideoPresets';
 import { ProductVideoPreviewPanel } from './ProductVideoPreviewPanel';
 import {
   createMultiUpload,
@@ -103,10 +109,14 @@ function readInitialDraft(state: unknown): Record<TextFieldName, string> {
   };
 }
 
+const NON_PRODUCT_DRAFT_NAMES = new Set(['mc', 'background']);
+
 function readInitialImages(state: unknown): DraftImage[] {
   const parsed = ProductDraftStateSchema.safeParse(state);
   if (!parsed.success || !parsed.data.productDraft.images) return [];
-  return parsed.data.productDraft.images.slice(0, MAX_IMAGES);
+  return parsed.data.productDraft.images
+    .filter((item) => !NON_PRODUCT_DRAFT_NAMES.has(item.name.trim().toLowerCase()))
+    .slice(0, MAX_IMAGES);
 }
 
 function formatBytes(bytes: number): string {
@@ -124,15 +134,54 @@ function startButtonLabel(phase: MultiUploadPhase | null, t: TFunction): string 
   return t('workflow.start.button');
 }
 
+function resolveMcPreview(
+  templateId: ProductVideoTemplateId,
+  mcMode: AssetMode,
+  mcUploadPreviewUrl: string | null,
+  mcFile: File | null,
+  preset: { imageUrl: string; label: string } | null,
+): { url: string | null; label: string | null } {
+  if (templateId !== 'mc-v1') return { url: null, label: null };
+  if (mcMode === 'upload') return { url: mcUploadPreviewUrl, label: mcFile?.name ?? null };
+  return { url: preset?.imageUrl ?? null, label: preset?.label ?? null };
+}
+
+function resolveBgPreview(
+  bgMode: AssetMode,
+  bgUploadPreviewUrl: string | null,
+  bgFile: File | null,
+  sceneNote: string,
+  preset: { imageUrl: string; label: string } | null,
+): { url: string | null; label: string | null } {
+  if (bgMode === 'upload') return { url: bgUploadPreviewUrl, label: bgFile?.name ?? null };
+  if (bgMode === 'note') return { url: null, label: sceneNote.trim() || null };
+  return { url: preset?.imageUrl ?? null, label: preset?.label ?? null };
+}
+
+function mergeUniqueFiles(current: File[], incoming: File[]): File[] {
+  const seen = new Set(current.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
+  const merged = [...current];
+  for (const file of incoming) {
+    const key = `${file.name}:${file.size}:${file.lastModified}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(file);
+    }
+  }
+  return merged;
+}
+
 /**
  * Product Video start form: captures product name, description, and 1 product photo alongside a 9:16 preview.
  */
 export function ProductVideoStartForm({
   disabled,
   onIncomplete,
+  initialTemplateId = 'showroom-v1',
 }: Readonly<{
   disabled: boolean;
   onIncomplete: (problem: IncompleteWorkflow | null) => void;
+  initialTemplateId?: ProductVideoTemplateId | undefined;
 }>) {
   const { t } = useTranslation();
   const { go } = useTransitionNavigate();
@@ -140,6 +189,7 @@ export function ProductVideoStartForm({
   const queryClient = useQueryClient();
   const createUpload = useCreateUploadMutation();
   const startRun = useStartProductVideoRunMutation();
+  const { data: catalog } = useProductVideoTemplatesQuery();
   const uploadAll = useMemo(
     () =>
       createMultiUpload({
@@ -148,6 +198,17 @@ export function ProductVideoStartForm({
       }),
     [createUpload.mutateAsync],
   );
+
+  const [templateId, setTemplateId] = useState<ProductVideoTemplateId>(initialTemplateId);
+  const [audioMode, setAudioMode] = useState<'voice_bgm' | 'music_only'>('voice_bgm');
+  const [voiceGender, setVoiceGender] = useState<VoiceGender>('male');
+  const [mcMode, setMcMode] = useState<AssetMode>('preset');
+  const [mcPresetId, setMcPresetId] = useState<string>('mc-nu-tre');
+  const [mcFile, setMcFile] = useState<File | null>(null);
+  const [bgMode, setBgMode] = useState<AssetMode>('preset');
+  const [bgPresetId, setBgPresetId] = useState<string | null>(null);
+  const [bgFile, setBgFile] = useState<File | null>(null);
+  const [sceneNote, setSceneNote] = useState('');
 
   const [text, setText] = useState<Record<TextFieldName, string>>(() =>
     readInitialDraft(location.state),
@@ -220,18 +281,72 @@ export function ProductVideoStartForm({
 
   const previewUrl = previewUrls[0] ?? null;
 
+  const mcUploadPreviewUrl = useMemo(() => {
+    if (!mcFile || typeof URL.createObjectURL !== 'function') return null;
+    return URL.createObjectURL(mcFile);
+  }, [mcFile]);
+
+  const bgUploadPreviewUrl = useMemo(() => {
+    if (!bgFile || typeof URL.createObjectURL !== 'function') return null;
+    return URL.createObjectURL(bgFile);
+  }, [bgFile]);
+
+  useEffect(() => {
+    return () => {
+      if (mcUploadPreviewUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(mcUploadPreviewUrl);
+      }
+    };
+  }, [mcUploadPreviewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (bgUploadPreviewUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(bgUploadPreviewUrl);
+      }
+    };
+  }, [bgUploadPreviewUrl]);
+
+  const selectedMcPreset = catalog.mcPresets.find((p) => p.id === mcPresetId) ?? null;
+  const selectedBgPreset = catalog.backgroundPresets.find((p) => p.id === bgPresetId) ?? null;
+
+  const { url: mcPreviewUrl, label: mcLabel } = resolveMcPreview(
+    templateId,
+    mcMode,
+    mcUploadPreviewUrl,
+    mcFile,
+    selectedMcPreset,
+  );
+  const { url: bgPreviewUrl, label: bgLabel } = resolveBgPreview(
+    bgMode,
+    bgUploadPreviewUrl,
+    bgFile,
+    sceneNote,
+    selectedBgPreset,
+  );
+
+  const onSelectTemplate = (next: ProductVideoTemplateId) => {
+    setTemplateId(next);
+    if (next === 'mc-v1' && mcMode === 'preset' && selectedMcPreset) {
+      setVoiceGender(selectedMcPreset.voiceGender);
+    }
+  };
+
+  const onSelectMcPreset = (id: string) => {
+    setMcPresetId(id);
+    const preset = catalog.mcPresets.find((p) => p.id === id);
+    if (preset) {
+      setVoiceGender(preset.voiceGender);
+    }
+  };
+
+  const onSelectBgPreset = (id: string) => {
+    setBgPresetId((current) => (current === id ? null : id));
+  };
+
   const applyPickedFiles = (fileList: FileList | null) => {
     if (phase || !fileList || fileList.length === 0) return;
-    const incoming = Array.from(fileList);
-    const seen = new Set(files.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
-    const merged = [...files];
-    for (const file of incoming) {
-      const key = `${file.name}:${file.size}:${file.lastModified}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        merged.push(file);
-      }
-    }
+    const merged = mergeUniqueFiles(files, Array.from(fileList));
     setFiles(merged);
     setFailure(null);
     setImageError(asCheck(firstImageProblem(merged)));
@@ -330,22 +445,52 @@ export function ProductVideoStartForm({
   const run = async () => {
     clearProblems();
     let uploadIds: string[] | null;
+    let mcUploadId: string | undefined;
+    let backgroundUploadId: string | undefined;
     try {
       uploadIds = await uploadAll(files, setPhase);
+      if (uploadIds === null) return;
+      if (templateId === 'mc-v1' && mcMode === 'upload' && mcFile) {
+        const mcIds = await uploadAll([mcFile], setPhase);
+        if (mcIds === null) return;
+        mcUploadId = mcIds[0];
+      }
+      if (bgMode === 'upload' && bgFile) {
+        const bgIds = await uploadAll([bgFile], setPhase);
+        if (bgIds === null) return;
+        backgroundUploadId = bgIds[0];
+      }
     } catch (error) {
       setPhase(null);
       showFailure(error);
       return;
     }
-    if (uploadIds === null) {
-      return;
-    }
-    await submitRun({
+    const payload: ProductVideoRunRequest & { audioMode?: 'voice_bgm' | 'music_only' } = {
       productName: text.productName.trim(),
       description: text.description.trim(),
       uploadIds,
       video: { aspectRatio: '9:16' },
-    });
+      templateId,
+      voiceGender,
+    };
+    if (templateId === 'showroom-v1' && audioMode === 'music_only') {
+      payload.audioMode = 'music_only';
+    }
+    if (templateId === 'mc-v1') {
+      if (mcUploadId) {
+        payload.mcUploadId = mcUploadId;
+      } else if (mcMode === 'preset' && mcPresetId) {
+        payload.mcPresetId = mcPresetId;
+      }
+    }
+    if (backgroundUploadId) {
+      payload.backgroundUploadId = backgroundUploadId;
+    } else if (bgMode === 'preset' && bgPresetId) {
+      payload.backgroundPresetId = bgPresetId;
+    } else if (bgMode === 'note' && sceneNote.trim()) {
+      payload.sceneNote = sceneNote.trim();
+    }
+    await submitRun(payload);
   };
 
   const runAnyway = (body: ProductVideoRunRequest) => {
@@ -388,6 +533,40 @@ export function ProductVideoStartForm({
           aria-label={t('workflow.productVideo.formLabel')}
           className="pv-form"
         >
+          <div className="pv-field">
+            <div className="pv-field-header">
+              <label id="pv-template-label">{t('workflow.productVideo.templateLabel')}</label>
+            </div>
+            <div className="pv-template-grid" role="radiogroup" aria-labelledby="pv-template-label">
+              {catalog.templates.map((tpl) => {
+                const active = templateId === tpl.id;
+                const unavailable = !tpl.available;
+                return (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    disabled={phase !== null || unavailable}
+                    className={active ? 'pv-template-card pv-template-card--active' : 'pv-template-card'}
+                    onClick={() => onSelectTemplate(tpl.id)}
+                  >
+                    <span className="pv-template-title">{tpl.name}</span>
+                    <span className="pv-template-summary">{tpl.summary}</span>
+                    {(unavailable || tpl.estimatedCredits != null) && (
+                      <span className="pv-template-credits">
+                        {unavailable
+                          ? t('workflow.productVideo.templateComingSoon')
+                          : t('workflow.productVideo.templateCredits', {
+                              credits: tpl.estimatedCredits,
+                            })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {TEXT_FIELDS.map((field) => (
             <div className="pv-field" key={field.id}>
               <div className="pv-field-header">
@@ -565,6 +744,107 @@ export function ProductVideoStartForm({
               </div>
             )}
           </div>
+          {templateId === 'mc-v1' && (
+            <AssetPickerField
+              id="pv-mc"
+              label={t('workflow.productVideo.mcLabel')}
+              hint={t('workflow.productVideo.mcHint')}
+              presets={catalog.mcPresets.map((p) => ({
+                id: p.id,
+                label: p.label,
+                imageUrl: p.imageUrl,
+                badge:
+                  p.voiceGender === 'female'
+                    ? t('workflow.productVideo.voiceFemale')
+                    : t('workflow.productVideo.voiceMale'),
+              }))}
+              mode={mcMode}
+              onModeChange={setMcMode}
+              selectedPresetId={mcPresetId}
+              onSelectPreset={onSelectMcPreset}
+              uploadedFile={mcFile}
+              onUploadFile={setMcFile}
+              disabled={phase !== null}
+            />
+          )}
+          <AssetPickerField
+            id="pv-bg"
+            label={t('workflow.productVideo.bgLabel')}
+            hint={t('workflow.productVideo.bgHint')}
+            presets={catalog.backgroundPresets}
+            mode={bgMode}
+            onModeChange={setBgMode}
+            selectedPresetId={bgPresetId}
+            onSelectPreset={onSelectBgPreset}
+            uploadedFile={bgFile}
+            onUploadFile={setBgFile}
+            allowNote
+            noteValue={sceneNote}
+            onNoteChange={setSceneNote}
+            disabled={phase !== null}
+          />
+          {templateId === 'showroom-v1' && (
+            <div className="pv-field">
+              <div className="pv-field-header">
+                <label id="pv-audio-mode-label">{t('workflow.productVideo.audioModeLabel')}</label>
+              </div>
+              <div
+                className="pv-voice-toggle"
+                role="radiogroup"
+                aria-labelledby="pv-audio-mode-label"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={audioMode === 'voice_bgm'}
+                  disabled={phase !== null}
+                  className={audioMode === 'voice_bgm' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setAudioMode('voice_bgm')}
+                >
+                  {t('workflow.productVideo.audioVoiceBgm')}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={audioMode === 'music_only'}
+                  disabled={phase !== null}
+                  className={audioMode === 'music_only' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setAudioMode('music_only')}
+                >
+                  {t('workflow.productVideo.audioMusicOnly')}
+                </button>
+              </div>
+            </div>
+          )}
+          {(templateId !== 'showroom-v1' || audioMode !== 'music_only') && (
+            <div className="pv-field">
+              <div className="pv-field-header">
+                <label id="pv-voice-label">{t('workflow.productVideo.voiceLabel')}</label>
+              </div>
+              <div className="pv-voice-toggle" role="radiogroup" aria-labelledby="pv-voice-label">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={voiceGender === 'male'}
+                  disabled={phase !== null}
+                  className={voiceGender === 'male' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setVoiceGender('male')}
+                >
+                  {t('workflow.productVideo.voiceMale')}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={voiceGender === 'female'}
+                  disabled={phase !== null}
+                  className={voiceGender === 'female' ? 'pv-tab pv-tab--active' : 'pv-tab'}
+                  onClick={() => setVoiceGender('female')}
+                >
+                  {t('workflow.productVideo.voiceFemale')}
+                </button>
+              </div>
+            </div>
+          )}
           {uploadPercent !== null && (
             <progress
               className="upload-progress"
@@ -612,6 +892,13 @@ export function ProductVideoStartForm({
         productName={text.productName}
         description={text.description}
         previewUrl={previewUrl}
+        templateId={templateId}
+        voiceGender={voiceGender}
+        mcLabel={mcLabel}
+        mcPreviewUrl={mcPreviewUrl}
+        backgroundLabel={bgLabel}
+        backgroundPreviewUrl={bgPreviewUrl}
+        imageCount={files.length}
       />
     </div>
   );

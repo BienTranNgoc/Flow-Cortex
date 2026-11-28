@@ -10,11 +10,16 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import socket
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Literal
+from contextlib import suppress
+from typing import Any, Literal, NoReturn
 
 from ..errors import PermanentError, TransientError
 from .adapter import VendorProbe, VideoIdentity, VideoRequest
@@ -33,6 +38,10 @@ PROBE_GONE_STATUSES = frozenset({400, 401, 403, 404, 410})
 RESULT_GONE_STATUSES = frozenset({403, 404, 410})
 _PROBE_TIMEOUT_SECONDS = 30.0
 WORKER_USER_AGENT = "FlowCortexWorker/1.0 (compatible; Mozilla/5.0)"
+REPLICATE_DOWNLOAD_ATTEMPTS = 8
+REPLICATE_HANDSHAKE_TIMEOUT_SECONDS = 8.0
+REPLICATE_DIRECT_ATTEMPTS_BEFORE_FALLBACK = 2
+_REPLICATE_FALLBACK_ENV = "REPLICATE_DELIVERY_FALLBACK_BASE_URL"
 
 
 class VendorJobEnded(PermanentError):
@@ -111,6 +120,11 @@ def fingerprint_document(
         "prompt": request.prompt,
         "imageSha256": hashlib.sha256(primary_image).hexdigest() if primary_image else None,
         "extraImageSha256s": extra_images,
+        "firstFrameSha256": (
+            hashlib.sha256(request.first_frame_image_bytes).hexdigest()
+            if request.first_frame_image_bytes
+            else None
+        ),
     }
     return {key: value for key, value in document.items() if value is not None}
 
@@ -245,3 +259,256 @@ def probe_media(
     if status in PROBE_GONE_STATUSES:
         return "gone"
     raise TransientError(f"vendor result probe answered HTTP {status}")
+
+
+def _extract_raw_socket(resp: Any) -> socket.socket | None:
+    raw = getattr(getattr(resp, "fp", None), "raw", None)
+    base_sock = getattr(raw, "_sock", None)
+    return base_sock if isinstance(base_sock, socket.socket) else None
+
+
+def _check_abort_or_deadline(
+    abort: Any,
+    timed_out: bool,
+    deadline: float,
+    provider: str,
+    task_id: str,
+) -> None:
+    abort.check()
+    if timed_out or time.monotonic() >= deadline:
+        raise VendorJobTimeout(provider, task_id)
+
+
+def read_bounded_response(
+    resp: Any,
+    *,
+    max_bytes: int,
+    provider: str,
+    task_id: str,
+    abort: Any,
+    deadline: float,
+) -> bytes:
+    """Read an HTTP response body while cutting the underlying socket on abort or deadline."""
+    # SSLSocket subclasses socket.socket and raises NotImplementedError on dup(); hold the live
+    # socket under a lock and clear it before urlopen's context manager closes the response.
+    active_sock = _extract_raw_socket(resp)
+    lock = threading.Lock()
+    timed_out = False
+
+    def cut() -> None:
+        with lock:
+            if active_sock is not None:
+                with suppress(OSError):
+                    active_sock.shutdown(socket.SHUT_RDWR)
+
+    def on_timeout() -> None:
+        nonlocal timed_out
+        timed_out = True
+        cut()
+
+    on_kill = getattr(abort, "on_kill", None)
+    if callable(on_kill):
+        on_kill(cut)
+
+    remaining = max(0.0, deadline - time.monotonic())
+    timer = threading.Timer(remaining, on_timeout)
+    timer.daemon = True
+    timer.start()
+    read_fn = getattr(resp, "read1", None) or resp.read
+    chunks = bytearray()
+    try:
+        while True:
+            _check_abort_or_deadline(abort, timed_out, deadline, provider, task_id)
+            chunk = read_fn(65536)
+            if not chunk:
+                break
+            chunks.extend(chunk)
+            if len(chunks) > max_bytes:
+                return bytes(chunks)
+        _check_abort_or_deadline(abort, timed_out, deadline, provider, task_id)
+        expected_len = _expected_content_length(resp)
+        if expected_len is not None and len(chunks) < expected_len:
+            raise TransientError(
+                f"{provider} download truncated: got {len(chunks)} of {expected_len} bytes"
+            )
+        return bytes(chunks)
+    except OSError:
+        _check_abort_or_deadline(abort, timed_out, deadline, provider, task_id)
+        raise
+    finally:
+        timer.cancel()
+        timer.join()
+        with lock:
+            active_sock = None
+
+
+def _expected_content_length(resp: Any) -> int | None:
+    headers = getattr(resp, "headers", None)
+    raw_len = headers.get("Content-Length") if headers is not None else None
+    if raw_len is None:
+        return None
+    try:
+        parsed = int(str(raw_len).strip())
+    except ValueError:
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _sleep_with_abort(abort: Any, delay: float) -> None:
+    wait_fn = getattr(abort, "wait", None)
+    if callable(wait_fn):
+        wait_fn(delay)
+    else:
+        time.sleep(delay)
+
+
+def _download_replicate_once(
+    url: str,
+    *,
+    provider: str,
+    label: str,
+    task_id: str,
+    max_bytes: int,
+    request_timeout_seconds: float,
+    handshake_timeout: float,
+    abort: Any,
+    deadline: float,
+    on_http_error: Callable[[urllib.error.HTTPError], NoReturn],
+    is_fallback: bool = False,
+) -> bytes:
+    req = urllib.request.Request(url, method="GET", headers={"User-Agent": WORKER_USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=handshake_timeout) as resp:
+            abort.check()
+            if time.monotonic() >= deadline:
+                raise VendorJobTimeout(provider, task_id)
+            raw_sock = getattr(getattr(getattr(resp, "fp", None), "raw", None), "_sock", None)
+            if raw_sock is not None and hasattr(raw_sock, "settimeout"):
+                body_timeout = min(request_timeout_seconds, max(1.0, deadline - time.monotonic()))
+                raw_sock.settimeout(body_timeout)
+            return read_bounded_response(
+                resp,
+                max_bytes=max_bytes,
+                provider=provider,
+                task_id=task_id,
+                abort=abort,
+                deadline=deadline,
+            )
+    except urllib.error.HTTPError as exc:
+        try:
+            if is_fallback:
+                raise TransientError(f"{label} fallback relay HTTP {exc.code}") from exc
+            on_http_error(exc)
+        finally:
+            with suppress(Exception):
+                exc.close()
+    except OSError as exc:
+        raise TransientError(f"{label} download failed: {type(exc).__name__}") from exc
+
+
+def _build_replicate_fallback_url(original_url: str, fallback_base_url: str) -> str | None:
+    base = fallback_base_url.strip().rstrip("/")
+    if not base:
+        return None
+    try:
+        parsed_base = urllib.parse.urlparse(base)
+        base_host = parsed_base.hostname
+        _ = parsed_base.port
+    except ValueError:
+        return None
+    if (
+        parsed_base.scheme != "https"
+        or not base_host
+        or parsed_base.query
+        or parsed_base.fragment
+        or parsed_base.username is not None
+        or parsed_base.password is not None
+    ):
+        return None
+    try:
+        orig = urllib.parse.urlparse(original_url)
+        host = (orig.hostname or "").lower()
+    except ValueError:
+        return None
+    if not host:
+        return None
+    base_path = parsed_base.path.rstrip("/")
+    orig_path = orig.path if orig.path.startswith("/") else f"/{orig.path}"
+    joined_path = f"{base_path}/{host}{orig_path}"
+    return urllib.parse.urlunparse(
+        (parsed_base.scheme, parsed_base.netloc, joined_path, "", orig.query, "")
+    )
+
+
+def download_replicate_media(
+    url: str,
+    *,
+    provider: str,
+    label: str,
+    task_id: str,
+    max_bytes: int,
+    request_timeout_seconds: float,
+    abort: Any,
+    deadline: float,
+    on_http_error: Callable[[urllib.error.HTTPError], NoReturn],
+    logger: logging.Logger = log,
+    attempts: int = REPLICATE_DOWNLOAD_ATTEMPTS,
+    handshake_timeout_seconds: float = REPLICATE_HANDSHAKE_TIMEOUT_SECONDS,
+    fallback_base_url: str | None = None,
+) -> bytes:
+    """Download Replicate CDN media with fail-fast TLS handshake timeout and bounded retries."""
+    job_deadline = getattr(abort, "deadline_monotonic", None)
+    effective_deadline = (
+        min(deadline, float(job_deadline)) if isinstance(job_deadline, (int, float)) else deadline
+    )
+    resolved_fallback_base = (
+        fallback_base_url
+        if fallback_base_url is not None
+        else os.environ.get(_REPLICATE_FALLBACK_ENV, "")
+    )
+    fallback_url = _build_replicate_fallback_url(url, resolved_fallback_base)
+    for attempt in range(1, attempts + 1):
+        abort.check()
+        remaining = effective_deadline - time.monotonic()
+        if remaining <= 0:
+            raise VendorJobTimeout(provider, task_id)
+        use_fallback = (
+            fallback_url is not None and attempt > REPLICATE_DIRECT_ATTEMPTS_BEFORE_FALLBACK
+        )
+        target_url = fallback_url if use_fallback and fallback_url is not None else url
+        host = (urllib.parse.urlparse(target_url).hostname or "").lower()
+        try:
+            hs_timeout = min(request_timeout_seconds, handshake_timeout_seconds, remaining)
+            return _download_replicate_once(
+                target_url,
+                provider=provider,
+                label=label,
+                task_id=task_id,
+                max_bytes=max_bytes,
+                request_timeout_seconds=request_timeout_seconds,
+                handshake_timeout=hs_timeout,
+                abort=abort,
+                deadline=effective_deadline,
+                on_http_error=on_http_error,
+                is_fallback=use_fallback,
+            )
+        except TransientError as exc:
+            if attempt == attempts:
+                raise
+            remaining = effective_deadline - time.monotonic()
+            if remaining <= 0:
+                raise VendorJobTimeout(provider, task_id) from exc
+            logger.warning(
+                "%s media download will retry",
+                label,
+                extra={
+                    "downloadAttempt": attempt,
+                    "maxAttempts": attempts,
+                    "host": host,
+                    "usedFallback": use_fallback,
+                    "errorType": type(exc.__cause__).__name__,
+                },
+            )
+            delay = min(1.0 if attempt == 1 else 2.0, remaining)
+            _sleep_with_abort(abort, delay)
+    raise TransientError(f"{label} download failed")  # pragma: no cover

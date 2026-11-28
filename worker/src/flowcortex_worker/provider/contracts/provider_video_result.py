@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from uuid import UUID
 
 
@@ -15,9 +15,9 @@ class ProviderVideoData(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    profile: Literal["vertical_ad_clip_v1"]
-    durationSeconds: Literal[5]
-    provider: Literal["seedance", "veo", "wan", "minimax", "fixture"]
+    profile: Literal["vertical_ad_clip_v1", "vertical_ad_clip_v2", "vertical_ad_lipsync_v1"]
+    durationSeconds: Annotated[StrictInt, Field(ge=2, le=10)]
+    provider: Literal["seedance", "veo", "wan", "minimax", "kling_lipsync", "fixture"]
     model: Annotated[StrictStr, Field(max_length=200, min_length=1)]
     aspectRatio: Literal["9:16"]
     resolution: Literal["480p", "720p", "768p"]

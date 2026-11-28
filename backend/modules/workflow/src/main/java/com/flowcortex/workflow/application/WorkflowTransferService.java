@@ -133,7 +133,7 @@ public class WorkflowTransferService {
     public Exported export(UUID adminId, UUID workflowId) {
         Workflow workflow = workflowRepository.findActiveById(workflowId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.notFound", workflowId)));
-        if (ProductVideoWorkflow.ID.equals(workflow.getId())) {
+        if (ProductVideoWorkflow.isProductVideo(workflow.getId())) {
             throw new ConflictException(new LocalizedMessage("workflow.copy.fixedWorkflow"));
         }
         List<StepDefinition> steps = WorkflowCarry.of(stepRepository.findByWorkflowIdOrderByStepOrderAsc(workflowId));

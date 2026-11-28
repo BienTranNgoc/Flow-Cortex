@@ -86,7 +86,7 @@ public class RunStep {
     private short deliveryCount;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "config", updatable = false)
+    @Column(name = "config")
     private String config;
 
     @Column(name = "input_ref", updatable = false)
@@ -362,6 +362,64 @@ public class RunStep {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.finishedAt = now;
+    }
+
+    /** Resets a completed step (e.g. {@code generate_keyframe}) to run a new attempt with updated config/inputs. */
+    public void resetForRegeneration(String updatedConfig, String updatedInput) {
+        requireStatus(RunStepStatus.COMPLETED, RunStepStatus.PENDING);
+        this.status = RunStepStatus.PENDING;
+        this.attempt = (short) (this.attempt + 1);
+        this.config = updatedConfig;
+        if (updatedInput != null) {
+            this.input = updatedInput;
+        }
+        this.output = null;
+        this.outputs = null;
+        this.errorCode = null;
+        this.errorMessage = null;
+        this.startedAt = null;
+        this.finishedAt = null;
+        this.pickedUpAt = null;
+        this.leaseUntil = null;
+        this.queueDeadline = null;
+        this.runDeadline = null;
+        this.progressPercent = null;
+        this.deliveryCount = 0;
+    }
+
+    /** Resets a completed or errored step back to {@code PENDING} with a new attempt while preserving snapshotted inputs. */
+    public void resetToPendingForReopen() {
+        resetToPendingForReopen(null);
+    }
+
+    /** Resets a completed or errored step back to {@code PENDING}, optionally updating its stored config. */
+    public void resetToPendingForReopen(String updatedConfig) {
+        if (this.status != RunStepStatus.COMPLETED && this.status != RunStepStatus.ERROR) {
+            throw new IllegalStateException("Cannot reopen step from " + status);
+        }
+        this.status = RunStepStatus.PENDING;
+        this.attempt = (short) (this.attempt + 1);
+        if (updatedConfig != null) {
+            this.config = updatedConfig;
+        }
+        this.output = null;
+        this.outputs = null;
+        this.errorCode = null;
+        this.errorMessage = null;
+        this.startedAt = null;
+        this.finishedAt = null;
+        this.pickedUpAt = null;
+        this.leaseUntil = null;
+        this.queueDeadline = null;
+        this.runDeadline = null;
+        this.progressPercent = null;
+        this.deliveryCount = 0;
+    }
+
+    /** Updates the snapshotted input of a still-pending downstream step (e.g. after a keyframe background change). */
+    public void replacePendingInput(String updatedInput) {
+        requireStatus(RunStepStatus.PENDING, RunStepStatus.PENDING);
+        this.input = updatedInput;
     }
 
     private static Instant later(Instant current, Instant candidate) {

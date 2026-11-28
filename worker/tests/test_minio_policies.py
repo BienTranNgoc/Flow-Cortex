@@ -17,11 +17,18 @@ from flowcortex_worker.storage import Storage
 SPEECH_ARTIFACTS = {
     "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/speech.wav",
     "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/manifest.json",
+    "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/keyframe.jpg",
+    "arn:aws:s3:::flowcortex-media/runs/*/steps/*/attempts/*/clip.mp4",
 }
 PRODUCT_IMAGES = {
     "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_1",
     "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_2",
     "arn:aws:s3:::flowcortex-media/runs/*/inputs/image_3",
+    "arn:aws:s3:::flowcortex-media/runs/*/inputs/mc",
+    "arn:aws:s3:::flowcortex-media/runs/*/inputs/background",
+}
+VERSIONED_BACKGROUND_OVERRIDES = {
+    "arn:aws:s3:::flowcortex-media/runs/*/inputs/background-v*-*",
 }
 
 
@@ -44,8 +51,12 @@ def _status(response: dict[str, Any]) -> int:
 def test_provider_reads_only_speech_artifacts_and_the_first_three_product_images() -> None:
     readable = _resources_for("s3:GetObject")
 
-    assert not [resource for resource in readable if resource.endswith("*")]
-    assert readable == SPEECH_ARTIFACTS | PRODUCT_IMAGES
+    assert not [
+        resource
+        for resource in readable - VERSIONED_BACKGROUND_OVERRIDES
+        if resource.endswith("*")
+    ]
+    assert readable == SPEECH_ARTIFACTS | PRODUCT_IMAGES | VERSIONED_BACKGROUND_OVERRIDES
 
 
 def test_provider_writes_only_under_its_step_attempts() -> None:

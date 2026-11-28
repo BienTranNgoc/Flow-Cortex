@@ -1847,6 +1847,58 @@ export interface ProductVideoRunRequest {
   uploadIds: string[];
   video: VideoConfig;
   acknowledgeCost?: boolean;
+  /** @pattern showroom-v1|mc-v1 */
+  templateId?: string;
+  /** @pattern male|female */
+  voiceGender?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  mcPresetId?: string;
+  mcUploadId?: string;
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  backgroundPresetId?: string;
+  backgroundUploadId?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  sceneNote?: string;
+  /** @pattern voice_bgm|music_only */
+  audioMode?: string;
+}
+
+export interface RedoProductVideoRequest {
+  /**
+   * @minItems 0
+   * @maxItems 3
+   * @items.exclusiveMinimum 0
+   */
+  redoSteps: number[];
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  sceneNote?: string;
+  acknowledgeCost?: boolean;
+}
+
+export interface RegenerateKeyframeRequest {
+  /**
+   * @minLength 0
+   * @maxLength 64
+   */
+  backgroundPresetId?: string;
+  /**
+   * @minLength 0
+   * @maxLength 500
+   */
+  sceneNote?: string;
+  acknowledgeCost?: boolean;
 }
 
 export interface OnboardingResetResponse {
@@ -3903,6 +3955,39 @@ export interface RunTrayResponse {
 export interface CurrentImages {
   avatar?: ProfileImageView;
   cover?: ProfileImageView;
+}
+
+export interface BackgroundPreset {
+  id?: string;
+  label?: string;
+  imageUrl?: string;
+  resourcePath?: string;
+}
+
+export interface McPreset {
+  id?: string;
+  label?: string;
+  voiceGender?: string;
+  imageUrl?: string;
+  resourcePath?: string;
+}
+
+export interface TemplateSpec {
+  id?: string;
+  version?: number;
+  name?: string;
+  summary?: string;
+  estimatedCredits?: number;
+  maxProductImages?: number;
+  requiredRoles?: string[];
+  optionalRoles?: string[];
+  available?: boolean;
+}
+
+export interface TemplatesResponse {
+  templates?: TemplateSpec[];
+  mcPresets?: McPreset[];
+  backgroundPresets?: BackgroundPreset[];
 }
 
 export interface OnboardingSampleWorkflow {
@@ -12744,6 +12829,212 @@ export const startProductVideoRun = async (
   });
 };
 
+export type reopenProductVideoScriptResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type reopenProductVideoScriptResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type reopenProductVideoScriptResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type reopenProductVideoScriptResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type reopenProductVideoScriptResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type reopenProductVideoScriptResponseSuccess = reopenProductVideoScriptResponse200 & {
+  headers: Headers;
+};
+export type reopenProductVideoScriptResponseError = (
+  | reopenProductVideoScriptResponse400
+  | reopenProductVideoScriptResponse409
+  | reopenProductVideoScriptResponse422
+  | reopenProductVideoScriptResponse429
+) & {
+  headers: Headers;
+};
+
+export type reopenProductVideoScriptResponse =
+  reopenProductVideoScriptResponseSuccess | reopenProductVideoScriptResponseError;
+
+export const getReopenProductVideoScriptUrl = (runId: string) => {
+  return `/api/v1/product-videos/runs/${runId}/script/reopen`;
+};
+
+export const reopenProductVideoScript = async (
+  runId: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<reopenProductVideoScriptResponse> => {
+  return customFetch<reopenProductVideoScriptResponse>(getReopenProductVideoScriptUrl(runId), {
+    ...options,
+    method: 'POST',
+  });
+};
+
+export type redoProductVideoStepsResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type redoProductVideoStepsResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type redoProductVideoStepsResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type redoProductVideoStepsResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type redoProductVideoStepsResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type redoProductVideoStepsResponseSuccess = redoProductVideoStepsResponse200 & {
+  headers: Headers;
+};
+export type redoProductVideoStepsResponseError = (
+  | redoProductVideoStepsResponse400
+  | redoProductVideoStepsResponse409
+  | redoProductVideoStepsResponse422
+  | redoProductVideoStepsResponse429
+) & {
+  headers: Headers;
+};
+
+export type redoProductVideoStepsResponse =
+  redoProductVideoStepsResponseSuccess | redoProductVideoStepsResponseError;
+
+export const getRedoProductVideoStepsUrl = (runId: string) => {
+  return `/api/v1/product-videos/runs/${runId}/redo`;
+};
+
+export const redoProductVideoSteps = async (
+  runId: string,
+  redoProductVideoRequest: RedoProductVideoRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<redoProductVideoStepsResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<redoProductVideoStepsResponse>(getRedoProductVideoStepsUrl(runId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(redoProductVideoRequest),
+  });
+};
+
+export type regenerateKeyframeResponse200 = {
+  data: RunResponse;
+  status: 200;
+};
+
+export type regenerateKeyframeResponse400 = {
+  data: IdempotencyKeyInvalidResponse;
+  status: 400;
+};
+
+export type regenerateKeyframeResponse409 = {
+  data: IdempotencyInProgressResponse;
+  status: 409;
+};
+
+export type regenerateKeyframeResponse422 = {
+  data: IdempotencyKeyReusedResponse;
+  status: 422;
+};
+
+export type regenerateKeyframeResponse429 = {
+  data: ApiTokenDailyLimitResponse;
+  status: 429;
+};
+
+export type regenerateKeyframeResponseSuccess = regenerateKeyframeResponse200 & {
+  headers: Headers;
+};
+export type regenerateKeyframeResponseError = (
+  | regenerateKeyframeResponse400
+  | regenerateKeyframeResponse409
+  | regenerateKeyframeResponse422
+  | regenerateKeyframeResponse429
+) & {
+  headers: Headers;
+};
+
+export type regenerateKeyframeResponse =
+  regenerateKeyframeResponseSuccess | regenerateKeyframeResponseError;
+
+export const getRegenerateKeyframeUrl = (runId: string) => {
+  return `/api/v1/product-videos/runs/${runId}/keyframes/regenerate`;
+};
+
+export const regenerateKeyframe = async (
+  runId: string,
+  regenerateKeyframeRequest?: RegenerateKeyframeRequest,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<regenerateKeyframeResponse> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit['headers']>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return customFetch<regenerateKeyframeResponse>(getRegenerateKeyframeUrl(runId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(regenerateKeyframeRequest),
+  });
+};
+
 export type resetOnboardingResponse200 = {
   data: OnboardingResetResponse;
   status: 200;
@@ -20848,6 +21139,54 @@ export const getCurrentProfileImages = async (
   options?: Parameters<typeof customFetch>[1],
 ): Promise<getCurrentProfileImagesResponse> => {
   return customFetch<getCurrentProfileImagesResponse>(getGetCurrentProfileImagesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type listTemplatesResponse200 = {
+  data: TemplatesResponse;
+  status: 200;
+};
+
+export type listTemplatesResponseSuccess = listTemplatesResponse200 & {
+  headers: Headers;
+};
+export type listTemplatesResponse = listTemplatesResponseSuccess;
+
+export const getListTemplatesUrl = () => {
+  return `/api/v1/product-videos/templates`;
+};
+
+export const listTemplates = async (
+  options?: Parameters<typeof customFetch>[1],
+): Promise<listTemplatesResponse> => {
+  return customFetch<listTemplatesResponse>(getListTemplatesUrl(), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getPresetImageResponse200 = {
+  data: Blob;
+  status: 200;
+};
+
+export type getPresetImageResponseSuccess = getPresetImageResponse200 & {
+  headers: Headers;
+};
+export type getPresetImageResponse = getPresetImageResponseSuccess;
+
+export const getGetPresetImageUrl = (category: string, id: string) => {
+  return `/api/v1/product-videos/presets/${category}/${id}`;
+};
+
+export const getPresetImage = async (
+  category: string,
+  id: string,
+  options?: Parameters<typeof customFetch>[1],
+): Promise<getPresetImageResponse> => {
+  return customFetch<getPresetImageResponse>(getGetPresetImageUrl(category, id), {
     ...options,
     method: 'GET',
   });

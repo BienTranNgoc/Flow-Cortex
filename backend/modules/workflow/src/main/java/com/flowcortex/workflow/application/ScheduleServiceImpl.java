@@ -195,7 +195,7 @@ class ScheduleServiceImpl implements ScheduleService {
      * accepts it.
      */
     private void checkStartable(UUID callerId, UUID workflowId, boolean active) {
-        if (ProductVideoWorkflow.ID.equals(workflowId)) {
+        if (ProductVideoWorkflow.isProductVideo(workflowId)) {
             throw new LocalizedStatusException(HttpStatus.BAD_REQUEST,
                     new LocalizedMessage("workflow.productVideo.startElsewhere"));
         }

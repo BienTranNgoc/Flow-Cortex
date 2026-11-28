@@ -18,9 +18,9 @@
     "format"
   ],
   "properties": {
-    "profile": { "const": "vertical_ad_clip_v1" },
-    "durationSeconds": { "const": 5 },
-    "provider": { "enum": ["seedance", "veo", "wan", "minimax", "fixture"] },
+    "profile": { "enum": ["vertical_ad_clip_v1", "vertical_ad_clip_v2", "vertical_ad_lipsync_v1"] },
+    "durationSeconds": { "type": "integer", "minimum": 2, "maximum": 10 },
+    "provider": { "enum": ["seedance", "veo", "wan", "minimax", "kling_lipsync", "fixture"] },
     "model": { "type": "string", "minLength": 1, "maxLength": 200 },
     "aspectRatio": { "const": "9:16" },
     "resolution": { "enum": ["480p", "720p", "768p"] },

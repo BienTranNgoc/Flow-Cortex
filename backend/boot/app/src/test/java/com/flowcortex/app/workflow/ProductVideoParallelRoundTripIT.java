@@ -40,6 +40,7 @@ import tools.jackson.databind.json.JsonMapper;
         webEnvironment = WebEnvironment.RANDOM_PORT,
         properties = {
                 "flowcortex.product-video.enabled=true",
+                "flowcortex.product-video.mc-enabled=true",
                 "flowcortex.product-video.parallel-clips-enabled=true",
                 "flowcortex.workflow.cancel.enabled=true",
                 "flowcortex.workflow.reaper-interval-ms=3600000"
@@ -70,22 +71,28 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
     }
 
     @Test
-    void dispatchesBothClipsBeforeEitherCompletesAndComposesInOrderWhenSixFinishesFirst() throws Exception {
+    void dispatchesBothClipsBeforeEitherCompletesAndComposesInOrderWhenEightFinishesFirst() throws Exception {
         ParallelRun run = startAndAdvanceToParallelClips("pv-parallel-ok");
 
         // Both clips must receive CONTINUE from backend over the dedicated control RPC.
-        assertThat(requestControl(run.runId(), run.clip5().jobId(), 1).decision())
+        assertThat(requestControl(run.runId(), run.clip7().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.CONTINUE);
-        assertThat(requestControl(run.runId(), run.clip6().jobId(), 1).decision())
+        assertThat(requestControl(run.runId(), run.clip8().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.CONTINUE);
 
-        // Clip 6 completes first: render_video must wait until clip 5 finishes too.
-        publishVideoClipSuccess(run.runId(), run.clip6(), run.revisionId(), "pred-clip-6");
-        assertThat(receiveQueueJobFor(run.runId(), "media.render.jobs", "render_video", Duration.ofMillis(700)))
+        // Clip 8 completes first: lipsync_video must wait until clip 7 finishes too.
+        publishVideoClipSuccess(run.runId(), run.clip8(), run.revisionId(), "pred-clip-8");
+        assertThat(receiveQueueJobFor(run.runId(), "provider.jobs", "lipsync_video", Duration.ofMillis(700)))
                 .isNull();
 
-        // Clip 5 completes second: render_video dispatches once with step 5 then step 6 clip order.
-        publishVideoClipSuccess(run.runId(), run.clip5(), run.revisionId(), "pred-clip-5");
+        // Clip 7 completes second: lipsync_video dispatches for step 9, then render_video composes in order.
+        publishVideoClipSuccess(run.runId(), run.clip7(), run.revisionId(), "pred-clip-7");
+        Message lipsyncMessage = receiveQueueJobFor(run.runId(), "provider.jobs", "lipsync_video", WAIT);
+        assertThat(lipsyncMessage).isNotNull();
+        ClipJob lipsyncJob = toClipJob(lipsyncMessage);
+        assertThat(lipsyncJob.stepOrder()).isEqualTo(9);
+        publishLipsyncSuccess(run.runId(), lipsyncJob, run.revisionId(), "pred-lipsync-9");
+
         Message renderMessage = receiveQueueJobFor(run.runId(), "media.render.jobs", "render_video", WAIT);
         assertThat(renderMessage).isNotNull();
         JsonNode renderJson = JSON.readTree(renderMessage.getBody());
@@ -95,13 +102,16 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
         List<String> objectKeys = renderJson.get("inputs").valueStream()
                 .map(node -> node.get("objectKey").asString())
                 .toList();
-        assertThat(inputKeys).containsExactly("image_1", "speech", "generated_video_1", "generated_video_2");
-        assertThat(objectKeys.get(2)).contains("/steps/5/");
-        assertThat(objectKeys.get(3)).contains("/steps/6/");
+        int video1Idx = inputKeys.indexOf("generated_video_1");
+        int video2Idx = inputKeys.indexOf("generated_video_2");
+        assertThat(inputKeys).contains("speech", "generated_video_1", "generated_video_2");
+        assertThat(video1Idx).isLessThan(video2Idx);
+        assertThat(objectKeys.get(video1Idx)).contains("/steps/9/");
+        assertThat(objectKeys.get(video2Idx)).contains("/steps/8/");
 
         // Complete render_video and confirm the run reaches completed without a second render dispatch.
         UUID renderJobId = UUID.fromString(renderJson.get("jobId").asString());
-        String renderObjectKey = "runs/" + run.runId() + "/steps/7/attempts/1/video.mp4";
+        String renderObjectKey = "runs/" + run.runId() + "/steps/10/attempts/1/video.mp4";
         putMediaObject(renderObjectKey, "video/mp4", new byte[] {0, 0, 0, 1});
         publishResult("media", "{\"schemaVersion\":\"1\",\"jobId\":\"" + renderJobId + "\",\"runId\":\""
                 + run.runId() + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
@@ -120,8 +130,8 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
     void controlProtocolReturnsCancelSiblingFailedAndDiscardStaleOverRabbitMq() throws Exception {
         ParallelRun run = startAndAdvanceToParallelClips("pv-parallel-cancel");
 
-        // Clip 6 fails terminally; run fails with clip 6's message and sibling receives cancel decision.
-        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.clip6().jobId()
+        // Clip 8 fails terminally; run fails with clip 8's message and sibling receives cancel decision.
+        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.clip8().jobId()
                 + "\",\"runId\":\"" + run.runId() + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"error\","
                 + "\"error\":{\"code\":\"provider_request_failed\",\"message\":\"wan clip 2 error\","
                 + "\"retryable\":false},\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"video-it\"}",
@@ -130,13 +140,13 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
         var failed = pollUntil(run.ownerId(), run.runId(), r -> "error".equals(r.status()), WAIT);
         assertThat(failed.errorMessage()).isEqualTo("wan clip 2 error");
 
-        assertThat(requestControl(run.runId(), run.clip5().jobId(), 1).decision())
+        assertThat(requestControl(run.runId(), run.clip7().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.CANCEL_SIBLING_FAILED);
-        assertThat(requestControl(run.runId(), run.clip6().jobId(), 1).decision())
+        assertThat(requestControl(run.runId(), run.clip8().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.DISCARD_STALE);
 
-        // Clip 5 settles with sibling_failed: preserves first error message and never dispatches render_video.
-        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.clip5().jobId()
+        // Clip 7 settles with sibling_failed: preserves first error message and never dispatches downstream jobs.
+        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\"" + run.clip7().jobId()
                 + "\",\"runId\":\"" + run.runId() + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"error\","
                 + "\"error\":{\"code\":\"sibling_failed\",\"message\":\"sibling clip failed\","
                 + "\"retryable\":false},\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"video-it\"}",
@@ -145,9 +155,11 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
         var settledRun = pollUntil(run.ownerId(), run.runId(),
                 r -> r.steps().stream().noneMatch(step -> "running".equals(step.status())), WAIT);
         assertThat(settledRun.errorMessage()).isEqualTo("wan clip 2 error");
-        assertThat(settledRun.steps().get(4).errorCode()).isEqualTo("sibling_failed");
-        assertThat(requestControl(run.runId(), run.clip5().jobId(), 1).decision())
+        assertThat(settledRun.steps().get(6).errorCode()).isEqualTo("sibling_failed");
+        assertThat(requestControl(run.runId(), run.clip7().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.DISCARD_STALE);
+        assertThat(receiveQueueJobFor(run.runId(), "provider.jobs", "lipsync_video", Duration.ofMillis(400)))
+                .isNull();
         assertThat(receiveQueueJobFor(run.runId(), "media.render.jobs", "render_video", Duration.ofMillis(400)))
                 .isNull();
     }
@@ -160,22 +172,24 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
                 run.token(), null, RunResponseView.class);
         assertThat(cancelled.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(cancelled.getBody().status()).isEqualTo("cancelling");
-        assertThat(cancelled.getBody().steps().get(6).status()).isEqualTo("skipped");
+        assertThat(cancelled.getBody().steps().get(8).status()).isEqualTo("skipped");
+        assertThat(cancelled.getBody().steps().get(9).status()).isEqualTo("skipped");
 
-        assertThat(requestControl(run.runId(), run.clip5().jobId(), 1).decision())
+        assertThat(requestControl(run.runId(), run.clip7().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.CONTINUE);
-        assertThat(requestControl(run.runId(), run.clip6().jobId(), 1).decision())
+        assertThat(requestControl(run.runId(), run.clip8().jobId(), 1).decision())
                 .isEqualTo(MediaControlResponse.Decision.CONTINUE);
 
-        publishVideoClipSuccess(run.runId(), run.clip5(), run.revisionId(), "pred-stop-5");
+        publishVideoClipSuccess(run.runId(), run.clip7(), run.revisionId(), "pred-stop-7");
         var mid = workflowRunService.getRun(run.ownerId(), run.runId());
         assertThat(mid.status()).isEqualTo("cancelling");
 
-        publishVideoClipSuccess(run.runId(), run.clip6(), run.revisionId(), "pred-stop-6");
+        publishVideoClipSuccess(run.runId(), run.clip8(), run.revisionId(), "pred-stop-8");
         var done = pollUntil(run.ownerId(), run.runId(), r -> "cancelled".equals(r.status()), WAIT);
-        assertThat(done.steps().get(4).status()).isEqualTo("completed");
-        assertThat(done.steps().get(5).status()).isEqualTo("completed");
-        assertThat(done.steps().get(6).status()).isEqualTo("skipped");
+        assertThat(done.steps().get(6).status()).isEqualTo("completed");
+        assertThat(done.steps().get(7).status()).isEqualTo("completed");
+        assertThat(done.steps().get(8).status()).isEqualTo("skipped");
+        assertThat(done.steps().get(9).status()).isEqualTo("skipped");
     }
 
     private ParallelRun startAndAdvanceToParallelClips(String userPrefix) throws Exception {
@@ -185,7 +199,7 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
 
         ResponseEntity<RunResponseView> started = post("/api/v1/product-videos/runs", token,
                 new ProductVideoView("Binh nuoc", "Giu nhiet tot", "Mua ngay", List.of(uploadId),
-                        new ProductVideoView.VideoConfigView("9:16")),
+                        new ProductVideoView.VideoConfigView("9:16"), "mc-v1", "mc-nu-tre"),
                 RunResponseView.class);
         assertThat(started.getStatusCode()).isEqualTo(HttpStatus.OK);
         UUID runId = started.getBody().id();
@@ -199,27 +213,15 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
                 + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"it-provider\"}", runId);
 
         pollUntil(owner.id(), runId, r -> "waiting_approval".equals(r.status()), WAIT);
-        ResponseEntity<ReviewTaskResponseView[]> tasks = get("/api/v1/runs/" + runId + "/review-tasks", token,
-                ReviewTaskResponseView[].class);
-        assertThat(tasks.getStatusCode()).isEqualTo(HttpStatus.OK);
-        ReviewTaskResponseView task = tasks.getBody()[0];
-        UUID revisionId = task.currentRevisionId();
-        ResponseEntity<String> approved = post("/api/v1/review-tasks/" + task.id() + "/approve", token,
-                new ApproveScriptView(revisionId, task.version()), String.class);
+        ReviewTaskResponseView scriptTask = findPendingReviewTask(runId, token);
+        UUID revisionId = scriptTask.currentRevisionId();
+        ResponseEntity<String> approved = post("/api/v1/review-tasks/" + scriptTask.id() + "/approve", token,
+                new ApproveScriptView(revisionId, scriptTask.version()), String.class);
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-        Message storyboardJob = receiveQueueJobFor(runId, "provider.jobs", "generate_storyboard", WAIT);
-        assertThat(storyboardJob).isNotNull();
-        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\""
-                + storyboardJob.getMessageProperties().getMessageId() + "\",\"runId\":\"" + runId
-                + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
-                + "\"data\":{\"profile\":\"product_ad_storyboard_v1\",\"sourceRevisionId\":\"" + revisionId
-                + "\",\"scene1Prompt\":\"Scene 1\",\"scene2Prompt\":\"Scene 2\"},"
-                + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"it-provider\"}", runId);
 
         Message speechJob = receiveQueueJobFor(runId, "provider.jobs", "generate_speech", WAIT);
         assertThat(speechJob).isNotNull();
-        String speechKey = "runs/" + runId + "/steps/4/attempts/1/speech.wav";
+        String speechKey = "runs/" + runId + "/steps/3/attempts/1/speech.wav";
         putMediaObject(speechKey, "audio/wav", new byte[] {'R', 'I', 'F', 'F'});
         publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\""
                 + speechJob.getMessageProperties().getMessageId() + "\",\"runId\":\"" + runId
@@ -231,17 +233,59 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
                 + "\",\"idempotencyKey\":\"" + "a".repeat(64) + "\",\"format\":\"wav\"},"
                 + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"it-provider\"}", runId);
 
+        Message storyboardJob = receiveQueueJobFor(runId, "provider.jobs", "generate_storyboard", WAIT);
+        assertThat(storyboardJob).isNotNull();
+        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\""
+                + storyboardJob.getMessageProperties().getMessageId() + "\",\"runId\":\"" + runId
+                + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
+                + "\"data\":{\"profile\":\"product_ad_storyboard_v1\",\"sourceRevisionId\":\"" + revisionId
+                + "\",\"scene1Prompt\":\"Scene 1\",\"scene2Prompt\":\"Scene 2\"},"
+                + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"it-provider\"}", runId);
+
+        Message keyframeJob = receiveQueueJobFor(runId, "provider.jobs", "generate_keyframe", WAIT);
+        assertThat(keyframeJob).isNotNull();
+        String keyframeKey = "runs/" + runId + "/steps/5/attempts/1/keyframe.jpg";
+        putMediaObject(keyframeKey, "image/jpeg", ImageFixtures.png());
+        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\""
+                + keyframeJob.getMessageProperties().getMessageId() + "\",\"runId\":\"" + runId
+                + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
+                + "\"outputs\":[{\"name\":\"keyframe.jpg\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\""
+                + keyframeKey + "\",\"mime\":\"image/jpeg\",\"bytes\":" + ImageFixtures.png().length + "}],"
+                + "\"data\":{\"profile\":\"vertical_ad_keyframe_v1\",\"provider\":\"fixture\","
+                + "\"model\":\"fixture-keyframe\",\"aspectRatio\":\"9:16\",\"width\":720,\"height\":1280,"
+                + "\"sourceRevisionId\":\"" + revisionId + "\",\"idempotencyKey\":\"" + "d".repeat(64)
+                + "\",\"providerTaskId\":\"pred-kf-5\",\"format\":\"jpg\"},"
+                + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"it-provider\"}", runId);
+
+        pollUntil(owner.id(), runId, r -> "waiting_approval".equals(r.status()), WAIT);
+        ReviewTaskResponseView keyframeTask = findPendingReviewTask(runId, token);
+        ResponseEntity<String> keyframeApproved = post("/api/v1/review-tasks/" + keyframeTask.id() + "/approve", token,
+                null, String.class);
+        assertThat(keyframeApproved.getStatusCode()).isEqualTo(HttpStatus.OK);
+
         Message firstVideo = receiveQueueJobFor(runId, "provider.video.jobs", "generate_video", WAIT);
         Message secondVideo = receiveQueueJobFor(runId, "provider.video.jobs", "generate_video", WAIT);
         assertThat(firstVideo).isNotNull();
         assertThat(secondVideo).isNotNull();
         ClipJob clipA = toClipJob(firstVideo);
         ClipJob clipB = toClipJob(secondVideo);
-        ClipJob clip5 = clipA.stepOrder() == 5 ? clipA : clipB;
-        ClipJob clip6 = clipA.stepOrder() == 6 ? clipA : clipB;
-        assertThat(clip5.stepOrder()).isEqualTo(5);
-        assertThat(clip6.stepOrder()).isEqualTo(6);
-        return new ParallelRun(runId, owner.id(), token, revisionId, clip5, clip6);
+        ClipJob clip7 = clipA.stepOrder() == 7 ? clipA : clipB;
+        ClipJob clip8 = clipA.stepOrder() == 8 ? clipA : clipB;
+        assertThat(clip7.stepOrder()).isEqualTo(7);
+        assertThat(clip8.stepOrder()).isEqualTo(8);
+        return new ParallelRun(runId, owner.id(), token, revisionId, clip7, clip8);
+    }
+
+    private ReviewTaskResponseView findPendingReviewTask(UUID runId, String token) {
+        ResponseEntity<ReviewTaskResponseView[]> tasks = get("/api/v1/runs/" + runId + "/review-tasks", token,
+                ReviewTaskResponseView[].class);
+        assertThat(tasks.getStatusCode()).isEqualTo(HttpStatus.OK);
+        for (ReviewTaskResponseView task : tasks.getBody()) {
+            if ("pending".equals(task.status())) {
+                return task;
+            }
+        }
+        throw new AssertionError("No pending review task found for run " + runId);
     }
 
     private ClipJob toClipJob(Message msg) {
@@ -256,9 +300,23 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
                 + runId + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
                 + "\"outputs\":[{\"name\":\"clip.mp4\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\""
                 + key + "\",\"mime\":\"video/mp4\",\"bytes\":4}],"
-                + "\"data\":{\"profile\":\"vertical_ad_clip_v1\",\"durationSeconds\":5,\"provider\":\"wan\","
+                + "\"data\":{\"profile\":\"vertical_ad_clip_v2\",\"durationSeconds\":5,\"provider\":\"wan\","
                 + "\"model\":\"wan-video/wan-2.2-5b-fast\",\"aspectRatio\":\"9:16\",\"resolution\":\"480p\","
                 + "\"sourceRevisionId\":\"" + revisionId + "\",\"idempotencyKey\":\"" + "b".repeat(64)
+                + "\",\"providerTaskId\":\"" + providerTaskId + "\",\"format\":\"mp4\"},"
+                + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"video-it\"}", runId);
+    }
+
+    private void publishLipsyncSuccess(UUID runId, ClipJob clip, UUID revisionId, String providerTaskId) {
+        String key = "runs/" + runId + "/steps/" + clip.stepOrder() + "/attempts/1/clip.mp4";
+        putMediaObject(key, "video/mp4", new byte[] {0, 0, 0, 1});
+        publishResult("provider", "{\"schemaVersion\":\"1\",\"jobId\":\"" + clip.jobId() + "\",\"runId\":\""
+                + runId + "\",\"attempt\":1,\"deliveryCount\":0,\"status\":\"completed\","
+                + "\"outputs\":[{\"name\":\"clip.mp4\",\"bucket\":\"" + MEDIA_BUCKET + "\",\"objectKey\":\""
+                + key + "\",\"mime\":\"video/mp4\",\"bytes\":4}],"
+                + "\"data\":{\"profile\":\"vertical_ad_lipsync_v1\",\"durationSeconds\":5,\"provider\":\"kling_lipsync\","
+                + "\"model\":\"kling-lipsync\",\"aspectRatio\":\"9:16\",\"resolution\":\"480p\","
+                + "\"sourceRevisionId\":\"" + revisionId + "\",\"idempotencyKey\":\"" + "c".repeat(64)
                 + "\",\"providerTaskId\":\"" + providerTaskId + "\",\"format\":\"mp4\"},"
                 + "\"finishedAt\":\"" + Instant.now() + "\",\"workerId\":\"video-it\"}", runId);
     }
@@ -334,14 +392,14 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
     record ClipJob(UUID jobId, int stepOrder) {
     }
 
-    record ParallelRun(UUID runId, UUID ownerId, String token, UUID revisionId, ClipJob clip5, ClipJob clip6) {
+    record ParallelRun(UUID runId, UUID ownerId, String token, UUID revisionId, ClipJob clip7, ClipJob clip8) {
     }
 
     record ApproveScriptView(UUID revisionId, Long expectedVersion) {
     }
 
     record ProductVideoView(String productName, String description, String cta, List<UUID> uploadIds,
-            VideoConfigView video) {
+            VideoConfigView video, String templateId, String mcPresetId) {
 
         record VideoConfigView(String aspectRatio) {
         }
@@ -353,6 +411,6 @@ class ProductVideoParallelRoundTripIT extends AbstractWorkflowHttpIT {
     record UploadResponseView(UUID uploadId) {
     }
 
-    record ReviewTaskResponseView(UUID id, UUID currentRevisionId, Long version) {
+    record ReviewTaskResponseView(UUID id, UUID currentRevisionId, Long version, String status) {
     }
 }

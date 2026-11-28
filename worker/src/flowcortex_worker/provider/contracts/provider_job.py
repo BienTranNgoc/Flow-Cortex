@@ -16,6 +16,9 @@ class ProductAdPayload(BaseModel):
     cta: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
     price: Annotated[StrictStr | None, Field(max_length=200, min_length=1)] = None
     promotion: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
+    templateId: Literal["showroom-v1", "mc-v1"] | None = None
+    scenePreset: Annotated[StrictStr | None, Field(max_length=64, min_length=1)] = None
+    sceneNote: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
 
 
 class ProductAdParams(BaseModel):
@@ -32,6 +35,12 @@ class SpeechPayload(BaseModel):
     )
     script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
     sourceRevisionId: UUID
+    voiceGender: Literal["male", "female"] | None = None
+    voice: Annotated[StrictStr | None, Field(max_length=100, min_length=1)] = None
+    templateId: Literal["showroom-v1", "mc-v1"] | None = None
+    audioMode: Literal["voice_bgm", "music_only"] | None = None
+    mcHookScript: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
+    productCloseScript: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
 
 
 class StoryboardPayload(BaseModel):
@@ -40,6 +49,11 @@ class StoryboardPayload(BaseModel):
     )
     script: Annotated[StrictStr, Field(max_length=8000, min_length=1)]
     sourceRevisionId: UUID
+    templateId: Literal["showroom-v1", "mc-v1"] | None = None
+    scenePreset: Annotated[StrictStr | None, Field(max_length=64, min_length=1)] = None
+    sceneNote: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
+    mcHookScript: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
+    productCloseScript: Annotated[StrictStr | None, Field(max_length=2000, min_length=1)] = None
 
 
 class StoryboardParams(BaseModel):
@@ -58,17 +72,54 @@ class SpeechParams(BaseModel):
     payload: SpeechPayload
 
 
+class KeyframePayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    prompt: Annotated[StrictStr, Field(max_length=2500, min_length=1)]
+    sourceRevisionId: UUID
+    scenePreset: Annotated[StrictStr | None, Field(max_length=64, min_length=1)] = None
+    sceneNote: Annotated[StrictStr | None, Field(max_length=500, min_length=1)] = None
+
+
+class KeyframeParams(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profile: Literal["vertical_ad_keyframe_v1"]
+    payload: KeyframePayload
+
+
 class VideoPayload(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     prompt: Annotated[StrictStr, Field(max_length=2500, min_length=1)]
     sourceRevisionId: UUID
+    durationSeconds: Annotated[StrictInt | None, Field(ge=4, le=10)] = None
+    resolution: Literal["480p", "720p", "768p"] | None = None
+    firstFrameKey: Annotated[StrictStr | None, Field(max_length=64, min_length=1)] = None
+
+
+class LipsyncPayload(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    sourceRevisionId: UUID
+    durationSeconds: Annotated[StrictInt | None, Field(ge=2, le=10)] = None
+
+
+class LipsyncParams(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    profile: Literal["vertical_ad_lipsync_v1"]
+    payload: LipsyncPayload
 
 
 class VideoInput(BaseModel):
     """
-    A reference image the worker fetches from the media store and forwards to the video provider as the first frame.
+    A reference asset the worker fetches from the media store and forwards to the provider.
     """
 
     model_config = ConfigDict(
@@ -76,7 +127,10 @@ class VideoInput(BaseModel):
     )
     key: Annotated[
         StrictStr,
-        Field(description="Logical name inside this job; e.g. 'reference'.", min_length=1),
+        Field(
+            description="Logical name inside this job; e.g. 'product_1', 'mc', 'background', 'video', 'audio'.",
+            min_length=1,
+        ),
     ]
     bucket: Annotated[StrictStr, Field(min_length=1)]
     objectKey: Annotated[StrictStr, Field(min_length=1)]
@@ -86,7 +140,7 @@ class VideoParams(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    profile: Literal["vertical_ad_clip_v1"]
+    profile: Literal["vertical_ad_clip_v1", "vertical_ad_clip_v2"]
     payload: VideoPayload
 
 
@@ -109,8 +163,8 @@ class GenerateScriptJob(BaseModel):
     inputs: Annotated[
         list[VideoInput] | None,
         Field(
-            description="Optional product image the worker forwards to the multimodal script provider.",
-            max_length=1,
+            description="Optional product images (up to 3) the worker forwards to the multimodal script provider.",
+            max_length=3,
         ),
     ] = None
     outputPrefix: Annotated[
@@ -172,8 +226,8 @@ class GenerateStoryboardJob(BaseModel):
     inputs: Annotated[
         list[VideoInput] | None,
         Field(
-            description="Optional product images (up to 3) the worker forwards to the multimodal storyboard provider.",
-            max_length=3,
+            description="Optional product images (up to 3) plus optional background reference image forwarded to the multimodal storyboard provider.",
+            max_length=4,
         ),
     ] = None
     outputPrefix: Annotated[
@@ -218,6 +272,33 @@ class VendorLedger(BaseModel):
     candidates: Annotated[list[VendorCandidate], Field(max_length=5)]
 
 
+class GenerateKeyframeJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schemaVersion: Literal["1"]
+    jobId: UUID
+    runId: UUID
+    correlationId: UUID
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    capability: Literal["generate_keyframe"]
+    params: KeyframeParams
+    inputs: Annotated[
+        list[VideoInput] | None,
+        Field(
+            description="Product images (1-3), optional MC portrait and optional background image.",
+            max_length=5,
+        ),
+    ] = None
+    outputPrefix: Annotated[
+        StrictStr, Field(pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$")
+    ]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    issuedAt: AwareDatetime
+    vendorLedger: VendorLedger | None = None
+
+
 class GenerateVideoJob(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -237,8 +318,8 @@ class GenerateVideoJob(BaseModel):
     inputs: Annotated[
         list[VideoInput] | None,
         Field(
-            description="Optional reference images (up to 3); the worker fetches them and forwards them to the video provider.",
-            max_length=3,
+            description="Optional first-frame keyframe and up to 3 product reference images.",
+            max_length=4,
         ),
     ] = None
     outputPrefix: Annotated[
@@ -254,11 +335,51 @@ class GenerateVideoJob(BaseModel):
     vendorLedger: VendorLedger | None = None
 
 
+class LipsyncVideoJob(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    schemaVersion: Literal["1"]
+    jobId: UUID
+    runId: UUID
+    correlationId: UUID
+    stepOrder: Annotated[StrictInt, Field(ge=1)]
+    capability: Literal["lipsync_video"]
+    params: LipsyncParams
+    inputs: Annotated[
+        list[VideoInput],
+        Field(
+            description="Source video ('video') and speech WAV ('audio') for lip-sync.",
+            max_length=2,
+            min_length=2,
+        ),
+    ]
+    outputPrefix: Annotated[
+        StrictStr, Field(pattern="^runs/[0-9a-f-]{36}/steps/[1-9][0-9]*/attempts/[1-9][0-9]*/$")
+    ]
+    attempt: Annotated[StrictInt, Field(ge=1)]
+    maxRuntimeSeconds: Annotated[StrictInt, Field(ge=1)]
+    issuedAt: AwareDatetime
+    vendorLedger: VendorLedger | None = None
+
+
 class ProviderJob(
-    RootModel[GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob]
+    RootModel[
+        GenerateScriptJob
+        | GenerateStoryboardJob
+        | GenerateSpeechJob
+        | GenerateKeyframeJob
+        | GenerateVideoJob
+        | LipsyncVideoJob
+    ]
 ):
     root: Annotated[
-        GenerateScriptJob | GenerateStoryboardJob | GenerateSpeechJob | GenerateVideoJob,
+        GenerateScriptJob
+        | GenerateStoryboardJob
+        | GenerateSpeechJob
+        | GenerateKeyframeJob
+        | GenerateVideoJob
+        | LipsyncVideoJob,
         Field(
             description="A typed provider job. Product content is carried only in params.payload and must not be logged.",
             title="ProviderJob",

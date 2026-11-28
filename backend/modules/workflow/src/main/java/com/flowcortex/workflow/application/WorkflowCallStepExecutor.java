@@ -119,7 +119,8 @@ class WorkflowCallStepExecutor implements StepExecutor {
         List<WorkflowStep> steps = found.isPresent() ? served.stepsFor(found.get(), ownerId) : List.of();
         List<String> types = steps.stream().map(WorkflowStep::getType).toList();
         refuseIf(WorkflowCallRules.refusal(new WorkflowCallRules.CallFacts(namedId, parent.getWorkflowId(),
-                ancestors, parentDepth, found.isPresent(), ProductVideoWorkflow.ID, types,
+                ancestors, parentDepth, found.isPresent(),
+                ProductVideoWorkflow.isProductVideo(namedId) ? namedId : null, types,
                 !types.isEmpty() && executors.snapshotsRunInputs(types.getFirst()),
                 types.stream().anyMatch(executors::isRemote),
                 steps.stream().anyMatch(step -> !executors.isAvailable(step.getType(), step.getConfig())),

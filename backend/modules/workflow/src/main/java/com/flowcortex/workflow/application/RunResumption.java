@@ -227,7 +227,7 @@ public class RunResumption {
         }
         WorkflowRun original = workflowRunRepository.findByIdAndOwnerId(runId, callerId)
                 .orElseThrow(() -> new NotFoundException(new LocalizedMessage("workflow.run.notFound", runId)));
-        if (ProductVideoWorkflow.ID.equals(original.getWorkflowId())) {
+        if (ProductVideoWorkflow.isProductVideo(original.getWorkflowId())) {
             throw new LocalizedStatusException(HttpStatus.BAD_REQUEST,
                     new LocalizedMessage("workflow.run.retry.productVideo"));
         }

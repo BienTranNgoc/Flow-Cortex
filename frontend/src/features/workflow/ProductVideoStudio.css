@@ -397,6 +397,9 @@
 
 .pv-phone-empty {
   color: var(--ink-4);
+  background: var(--paper);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
   font-size: 0.8125rem;
   line-height: 1.4;
   display: flex;
@@ -616,7 +619,7 @@
 
 /* Compact 7-step pipeline layout inside Product Video runs */
 @media (min-width: 900px) {
-  .pv-run-shell .run-layout {
+  .pv-run-shell .run-layout:not(.run-layout--canvas) {
     grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
     gap: 1.25rem;
   }
@@ -844,7 +847,7 @@
   color: var(--ink-2);
   line-height: 1.5;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .pv-media-card {
@@ -999,4 +1002,404 @@
     left: 0;
     width: 100%;
   }
+}
+
+/* Template, MC & Background Preset Picker */
+.pv-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.pv-template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--card-border);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color var(--dur-quick) ease, background-color var(--dur-quick) ease;
+}
+
+.pv-template-card:hover {
+  border-color: var(--primary);
+}
+
+.pv-template-card--active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.pv-template-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.pv-template-summary {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  line-height: 1.35;
+}
+
+.pv-template-credits {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.pv-asset-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  background: var(--paper);
+  padding: 0.1875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+}
+
+.pv-tab {
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.pv-tab--active {
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.pv-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.25rem, 1fr));
+  gap: 0.625rem;
+}
+
+.pv-preset-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.375rem;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--card-border);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.pv-preset-card--active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.pv-preset-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--paper-2);
+}
+
+.pv-preset-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pv-preset-check {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-preset-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.pv-preset-badge {
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+
+.pv-voice-toggle {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.pv-phone-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.pv-phone-bg-scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--shadow-color) 42%, transparent);
+  z-index: 0;
+}
+
+.pv-phone-media,
+.pv-phone-caption {
+  position: relative;
+  z-index: 1;
+}
+
+.pv-phone-mc-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 3rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--media-badge-border);
+  box-shadow: var(--shadow-sm);
+  z-index: 2;
+}
+
+.pv-preview-meta {
+  list-style: none;
+  margin: 0.875rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+/* MC 2-segment script editor & Checkpoint 2 keyframe review (flat Light/Dark token chrome) */
+.pv-mc-script-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.pv-script-counter {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-script-counter--over {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.pv-keyframe-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .pv-keyframe-review {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+.pv-keyframe-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pv-keyframe-frame {
+  aspect-ratio: 9 / 16;
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-edge);
+  background: var(--paper-3);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-keyframe-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pv-keyframe-placeholder {
+  padding: 1rem;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+}
+
+.pv-keyframe-meta {
+  margin: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-keyframe-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pv-keyframe-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pv-keyframe-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+}
+
+.pv-keyframe-preset {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--target-min);
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-edge);
+  background: var(--btn-bg);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pv-keyframe-preset:hover:not(:disabled) {
+  border-color: var(--line-2);
+  background: var(--btn-bg-hover);
+}
+
+.pv-keyframe-preset--selected {
+  border: 2px solid var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.pv-keyframe-preset-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--paper-3);
+}
+
+.pv-keyframe-preset-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.pv-keyframe-preset-check {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.pv-keyframe-note {
+  min-height: 4.5rem;
+}
+
+.pv-keyframe-regen-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pv-keyframe-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.pv-keyframe-divider {
+  margin: 0.25rem 0;
+  border: 0;
+  border-top: 1px solid var(--card-edge);
+}
+
+/* Selective scene & lip-sync redo bar on completed Product Video showcase */
+.pv-redo-bar {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--card-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pv-redo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pv-redo-btn--active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.pv-redo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-edge);
+  background: var(--paper);
+}
+
+.pv-redo-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }

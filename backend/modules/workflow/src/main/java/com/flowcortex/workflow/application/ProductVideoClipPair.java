@@ -3,18 +3,22 @@ package com.flowcortex.workflow.application;
 import com.flowcortex.workflow.api.ProductVideoWorkflow;
 import com.flowcortex.workflow.domain.RunStep;
 import com.flowcortex.workflow.domain.RunStepStatus;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/** Identifies the Product Video parallel clip pair (steps 5–6 referencing storyboard step 3) in a run snapshot. */
+/** Identifies the Product Video parallel clip pair in a run snapshot (showroom legacy 5–6 or MC 7–8). */
 final class ProductVideoClipPair {
 
     private static final int STORYBOARD_ORDER = 3;
     private static final int FIRST_CLIP_ORDER = 5;
     private static final int SECOND_CLIP_ORDER = 6;
+    private static final int MC_STORYBOARD_ORDER = 4;
+    private static final int MC_FIRST_CLIP_ORDER = 7;
+    private static final int MC_SECOND_CLIP_ORDER = 8;
     private static final String STORYBOARD_TYPE = "generate_storyboard";
     private static final String VIDEO_TYPE = "generate_video";
 
@@ -46,7 +50,18 @@ final class ProductVideoClipPair {
     }
 
     static Optional<Pair> match(UUID workflowId, List<RunStep> steps) {
-        if (!ProductVideoWorkflow.ID.equals(workflowId) || steps == null || steps.size() < SECOND_CLIP_ORDER) {
+        if (ProductVideoWorkflow.ID.equals(workflowId)) {
+            return matchPair(steps, STORYBOARD_ORDER, FIRST_CLIP_ORDER, SECOND_CLIP_ORDER);
+        }
+        if (ProductVideoWorkflow.MC_ID.equals(workflowId)) {
+            return matchPair(steps, MC_STORYBOARD_ORDER, MC_FIRST_CLIP_ORDER, MC_SECOND_CLIP_ORDER);
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<Pair> matchPair(List<RunStep> steps, int storyboardOrder, int firstClipOrder,
+            int secondClipOrder) {
+        if (steps == null || steps.size() < secondClipOrder) {
             return Optional.empty();
         }
         Map<Integer, RunStep> byOrder = new HashMap<>();
@@ -55,25 +70,30 @@ final class ProductVideoClipPair {
                 return Optional.empty();
             }
         }
-        RunStep step1 = byOrder.get(1);
-        RunStep step2 = byOrder.get(2);
-        RunStep step3 = byOrder.get(STORYBOARD_ORDER);
-        RunStep step4 = byOrder.get(4);
-        RunStep step5 = byOrder.get(FIRST_CLIP_ORDER);
-        RunStep step6 = byOrder.get(SECOND_CLIP_ORDER);
-        if (step1 == null || step2 == null || step3 == null || step4 == null || step5 == null || step6 == null) {
+        List<RunStep> prerequisites = new ArrayList<>(firstClipOrder - 1);
+        for (int order = 1; order < firstClipOrder; order++) {
+            RunStep prerequisite = byOrder.get(order);
+            if (prerequisite == null) {
+                return Optional.empty();
+            }
+            prerequisites.add(prerequisite);
+        }
+        RunStep storyboard = byOrder.get(storyboardOrder);
+        RunStep firstClip = byOrder.get(firstClipOrder);
+        RunStep secondClip = byOrder.get(secondClipOrder);
+        if (storyboard == null || firstClip == null || secondClip == null) {
             return Optional.empty();
         }
-        if (!STORYBOARD_TYPE.equals(step3.getType())
-                || !VIDEO_TYPE.equals(step5.getType())
-                || !VIDEO_TYPE.equals(step6.getType())) {
+        if (!STORYBOARD_TYPE.equals(storyboard.getType())
+                || !VIDEO_TYPE.equals(firstClip.getType())
+                || !VIDEO_TYPE.equals(secondClip.getType())) {
             return Optional.empty();
         }
-        if (!referencesStepOrder(step5.getInputRef(), STORYBOARD_ORDER)
-                || !referencesStepOrder(step6.getInputRef(), STORYBOARD_ORDER)) {
+        if (!referencesStepOrder(firstClip.getInputRef(), storyboardOrder)
+                || !referencesStepOrder(secondClip.getInputRef(), storyboardOrder)) {
             return Optional.empty();
         }
-        return Optional.of(new Pair(List.of(step1, step2, step3, step4), step5, step6));
+        return Optional.of(new Pair(List.copyOf(prerequisites), firstClip, secondClip));
     }
 
     private static boolean referencesStepOrder(String inputRef, int order) {
