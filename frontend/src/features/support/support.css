@@ -4,6 +4,13 @@ body.support-widget-on {
   padding-bottom: var(--support-launcher-clearance);
 }
 
+/* Keep .app-shell flush with the bottom so sticky .sidebar stays pinned on bottom scroll. */
+@supports selector(:has(*)) {
+  body.support-widget-on:has(.app-shell) {
+    padding-bottom: 0;
+  }
+}
+
 .support-launcher {
   position: fixed;
   right: max(20px, env(safe-area-inset-right, 0px));

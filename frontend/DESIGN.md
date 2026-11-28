@@ -195,7 +195,7 @@ Personality: corporate, calm and exact. One curve, `ease-standard`, and three du
 ### Help Center
 
 - Launcher: a 56px button fixed bottom-right (20px from the edges, safe-area aware), `paper-3` fill, `line-2` outline, fully rounded, `shadow`. It holds the headset mascot, painted only from the `nodi-*` tokens (`nodi-headset` and `nodi-earcup` belong to the launcher alone); from 640px up the label "Trợ giúp" shows beside it in `ink`. Its accessible name is "Trợ giúp" at every width, and it reports `aria-expanded`.
-- Clearance: while the widget is on, the page body gains `support-launcher-clearance` (88px) of bottom padding, so the launcher never covers the last control of a page.
+- Clearance: while the widget is on, pages outside `.app-shell` gain `support-launcher-clearance` (88px) of bottom padding on `body`; inside `.app-shell`, `body` keeps no extra bottom padding so the sticky sidebar stays pinned on bottom scroll.
 - Panel: a `role="dialog"` labelled "Trung tâm trợ giúp", 400 × min(640px, 100svh − 96px), sitting above the launcher; `paper-3` body, `paper-2` header with `line` dividers, `lg` radius, `shadow-lg`. It enters with `opacity` and an 8px rise over `dur-standard`. Below 640px it fills the screen with no radius and a 44px close button. Escape or the close button closes it and returns focus to the launcher.
 - Tabs: a `role="tablist"` with a roving tabindex; arrow keys, Home and End move and select. A guest sees Trang chủ and Trợ lý; a member also sees Hướng dẫn and Yêu cầu. A tab is `ink-3`, the selected one `ink` with a 2px `primary` underline.
 - Lists (Bắt đầu articles, suggested questions, guide groups, search results): full-width 44px rows in the button style, section titles in small uppercase `ink-3`.
