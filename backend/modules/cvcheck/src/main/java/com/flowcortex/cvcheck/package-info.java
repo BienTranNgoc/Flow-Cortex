@@ -6,6 +6,6 @@
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "CV check",
-        allowedDependencies = {"llm :: api", "shared :: web", "shared :: security"}
+        allowedDependencies = {"llm :: api", "jobs :: api", "shared :: web", "shared :: security"}
 )
 package com.flowcortex.cvcheck;
