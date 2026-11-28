@@ -4,14 +4,10 @@ body.support-widget-on {
   padding-bottom: var(--support-launcher-clearance);
 }
 
-/* Keep clearance inside .app-column so .app-shell reaches the bottom and sticky .sidebar stays pinned. */
+/* Keep .app-shell flush with the bottom so sticky .sidebar stays pinned on bottom scroll. */
 @supports selector(:has(*)) {
   body.support-widget-on:has(.app-shell) {
     padding-bottom: 0;
-  }
-
-  body.support-widget-on:has(.app-shell) .cortex-footer {
-    padding-bottom: calc(0.5rem + var(--support-launcher-clearance));
   }
 }
 
