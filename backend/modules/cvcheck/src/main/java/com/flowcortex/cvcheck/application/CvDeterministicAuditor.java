@@ -32,13 +32,17 @@ public final class CvDeterministicAuditor {
             "(?:github\\.com|linkedin\\.com|gitlab\\.com|bitbucket\\.org|portfolio|https?://)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern METRIC = Pattern.compile(
-            "(?:\\d+(?:[.,]\\d+)?\\s*%|\\$\\s*\\d+[\\d.,]*[kKmMbB]?|\\d+[\\d.,]*\\s*(?:triệu|tỷ|vnd|usd|ms|sec|users|người dùng|khách hàng|api|apis|dự án|projects|x)\\b|\\b\\d{2,}\\+)",
+            "(?:\\d+(?:[.,]\\d+)?\\s*%|\\$\\s*\\d+[\\d.,]*[kKmMbB]?"
+                    + "|\\d+[\\d.,]*\\s*(?:triệu|tỷ|vnd|usd|ms|sec|users|người dùng"
+                    + "|khách hàng|api|apis|dự án|projects|x)\\b|\\b\\d{2,}\\+)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern PASSIVE_PHRASE = Pattern.compile(
             "(?:chịu trách nhiệm|phụ trách|tham gia vào|responsible for|duties included|worked on|helped with|assisted in)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern ACTION_VERB = Pattern.compile(
-            "\\b(?:built|designed|engineered|developed|implemented|optimized|reduced|increased|launched|led|architected|automated|deployed|improved|delivered|xây dựng|thiết kế|tối ưu|triển khai|phát triển|dẫn dắt|cải thiện|tự động hóa|giảm|tăng)\\b",
+            "\\b(?:built|designed|engineered|developed|implemented|optimized|reduced|increased"
+                    + "|launched|led|architected|automated|deployed|improved|delivered"
+                    + "|xây dựng|thiết kế|tối ưu|triển khai|phát triển|dẫn dắt|cải thiện|tự động hóa|giảm|tăng)\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private CvDeterministicAuditor() {

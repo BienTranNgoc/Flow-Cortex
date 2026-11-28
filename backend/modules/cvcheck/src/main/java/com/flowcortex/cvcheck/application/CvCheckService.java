@@ -31,19 +31,30 @@ public class CvCheckService {
             - 0-59 (Substandard / Tier 4): Passive task lists, missing critical structure, or major gaps.
 
             Dimensions & Standards:
-            - experienceImpact (Weight 30%% — Google XYZ / STAR): Measurable outcomes ("Accomplished X as measured by Y, by doing Z"), scale, and strong action verbs. Penalize passive responsibility lists.
-            - hardSkills (Weight 25%% — ESCO / O*NET): Technical depth, modern stack proficiency, and concrete proof of skills applied in projects/roles.
-            - atsCompliance (Weight 20%% — SHRM / Enterprise ATS): Clean sectioning, parseable structure, contact completeness, and industry keyword density.
-            - domainRelevance (Weight 15%% — Harvard OCS): Reverse-chronological clarity, consistent career progression, and credible professional positioning.
-            - softSkills (Weight 10%% — SHRM / Harvard Tone): Ownership, collaboration, leadership signals, concise active-voice writing.
+            - experienceImpact (Weight 30%% — Google XYZ / STAR): Measurable outcomes
+              ("Accomplished X as measured by Y, by doing Z"), scale, and strong action verbs.
+              Penalize passive responsibility lists.
+            - hardSkills (Weight 25%% — ESCO / O*NET): Technical depth, modern stack proficiency,
+              and concrete proof of skills applied in projects/roles.
+            - atsCompliance (Weight 20%% — SHRM / Enterprise ATS): Clean sectioning, parseable structure,
+              contact completeness, and industry keyword density.
+            - domainRelevance (Weight 15%% — Harvard OCS): Reverse-chronological clarity, consistent
+              career progression, and credible professional positioning.
+            - softSkills (Weight 10%% — SHRM / Harvard Tone): Ownership, collaboration, leadership signals,
+              concise active-voice writing.
 
-            overallScore: Weighted score (0-100) using 0.30*experienceImpact + 0.25*hardSkills + 0.20*atsCompliance + 0.15*domainRelevance + 0.10*softSkills.
-            OUTPUT LANGUAGE REQUIREMENT: Write ALL text fields (strengths, weaknesses, rewrittenBullets, interviewQuestions) strictly in %s.
+            overallScore: Weighted score (0-100) using
+              0.30*experienceImpact + 0.25*hardSkills + 0.20*atsCompliance
+              + 0.15*domainRelevance + 0.10*softSkills.
+            OUTPUT LANGUAGE REQUIREMENT: Write ALL text fields (strengths, weaknesses, rewrittenBullets,
+              interviewQuestions) strictly in %s.
             strengths: 3-5 concrete strong points backed by evidence in the CV.
             weaknesses: 3-5 specific weaknesses or gaps referencing the international standards above.
             missingKeywords: 4-8 important industry keywords or certifications that would elevate this CV.
-            rewrittenBullets: Select up to 5 weak, passive, or vague bullets in the CV and rewrite them in Google XYZ / STAR style with strong action verbs (never fabricate fake numbers).
-            interviewQuestions: 5-8 insightful technical and behavioral interview questions hiring managers will likely ask based on this CV.
+            rewrittenBullets: Select up to 5 weak, passive, or vague bullets in the CV and rewrite them
+              in Google XYZ / STAR style with strong action verbs (never fabricate fake numbers).
+            interviewQuestions: 5-8 insightful technical and behavioral interview questions hiring
+              managers will likely ask based on this CV.
             jobProfile: Extract the candidate's target job search profile from the CV:
             - primaryRole: Concise standard job title (e.g. "Java Backend Developer", "Frontend React Engineer").
             - seniority: Estimated level ("Intern", "Fresher", "Junior", "Middle", "Senior", or "Lead").
@@ -116,7 +127,8 @@ public class CvCheckService {
         }
         String outputLang = CvDeterministicAuditor.isEnglish(lang)
                 ? "English"
-                : "Vietnamese (Tiếng Việt — even if the CV is written in English, every explanation, strength, weakness, rewritten bullet, and interview question MUST be in natural Vietnamese)";
+                : "Vietnamese (Tiếng Việt — even if the CV is written in English, every explanation, "
+                        + "strength, weakness, rewritten bullet, and interview question MUST be in natural Vietnamese)";
         String prompt = (jobDescription == null || jobDescription.isBlank())
                 ? STANDALONE_PROMPT.formatted(outputLang, outputLang, cvText)
                 : JD_PROMPT.formatted(outputLang, jobDescription, cvText);

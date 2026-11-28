@@ -26,9 +26,11 @@ public class CvJobPostingRepository {
         }
         String sql = """
                 INSERT INTO cv_job_postings
-                    (source, external_id, role_key, title, company, location, salary, work_mode, tags, description, apply_url, published_at, synced_at)
+                    (source, external_id, role_key, title, company, location, salary,
+                     work_mode, tags, description, apply_url, published_at, synced_at)
                 VALUES
-                    (:source, :externalId, :roleKey, :title, :company, :location, :salary, :workMode, :tags, :description, :applyUrl, :publishedAt, :syncedAt)
+                    (:source, :externalId, :roleKey, :title, :company, :location, :salary,
+                     :workMode, :tags, :description, :applyUrl, :publishedAt, :syncedAt)
                 ON CONFLICT (source, external_id) DO UPDATE SET
                     role_key = EXCLUDED.role_key,
                     title = EXCLUDED.title,
